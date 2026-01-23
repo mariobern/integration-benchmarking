@@ -234,6 +234,178 @@ python quick_benchmark.py --csv publisher_11_feeds.csv --exclude-asset-class cry
 
 ---
 
+## Single Publisher Benchmark Tool
+
+A faster benchmark tool for evaluating a **single publisher's** data quality. Use this when you only need to evaluate one publisher instead of all publishers for a feed.
+
+### When to Use This Tool
+
+| Scenario | Use This Tool |
+|----------|---------------|
+| Evaluate one specific publisher | `publisher_benchmark.py` ✓ |
+| Check if a feed has enough publishers | `quick_benchmark.py` |
+| Onboard a new publisher | `publisher_benchmark.py` ✓ |
+| Full feed readiness assessment | `quick_benchmark.py` |
+
+### Why It's Faster
+
+- `quick_benchmark.py` queries **all publishers** for each feed (slower, gives feed readiness)
+- `publisher_benchmark.py` queries **one publisher** only (faster, gives publisher quality)
+
+### Step-by-Step Usage
+
+#### Step 1: Activate Your Virtual Environment
+
+If not already activated:
+
+**Linux/macOS:**
+```bash
+cd /path/to/integration-benchmarking
+source venv/bin/activate
+```
+
+**Windows:**
+```cmd
+venv\Scripts\activate.bat
+```
+
+#### Step 2: Prepare Your Input CSV
+
+Create or use a CSV file with three columns (no header):
+
+```csv
+feed_id,date,mode
+327,2025-10-06,fx
+340,2025-10-02,fx
+346,2025-10-02,metals
+```
+
+#### Step 3: Run the Benchmark
+
+**Option A: Use filename convention (recommended)**
+
+Name your file `publisher_{id}_feeds.csv` and the script extracts the publisher ID automatically:
+
+```bash
+python publisher_benchmark.py --csv publisher_55_feeds.csv
+```
+
+**Option B: Specify publisher ID explicitly**
+
+```bash
+python publisher_benchmark.py --csv feeds.csv --publisher-id 55
+```
+
+### Command-Line Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--csv FILE` | CSV file with feeds to evaluate (required) | - |
+| `--publisher-id ID` | Publisher ID to evaluate | Extracted from filename |
+| `--output FILE` | Output CSV path | `publisher_{id}_benchmark_results.csv` |
+| `--workers N` | Parallel workers for faster processing | `4` |
+| `--include-asset-class CLASS [CLASS ...]` | Only process these asset classes | All |
+| `--exclude-asset-class CLASS [CLASS ...]` | Skip these asset classes | None |
+| `--list-asset-classes` | List asset classes in CSV and exit | - |
+
+### Understanding the Output
+
+Results are saved to `publisher_{id}_benchmark_results.csv` (or your specified output file):
+
+| Column | Meaning |
+|--------|---------|
+| `publisher_id` | The publisher that was evaluated |
+| `feed_id` | The feed that was evaluated |
+| `date` | Evaluation date |
+| `mode` | Asset class (fx, metals, etc.) |
+| `symbol` | Feed symbol (e.g., EUR/USD) |
+| `passes` | `True` if RMSE/spread ≤ 1.0 |
+| `n_observations` | Number of matched data points |
+| `rmse` | Root Mean Square Error vs benchmark |
+| `mean_spread` | Average benchmark spread |
+| `rmse_over_spread` | RMSE divided by spread (pass threshold: ≤ 1.0) |
+| `error` | Error message if evaluation failed |
+| `execution_time_ms` | Processing time in milliseconds |
+
+### Pass/Fail Criteria
+
+- **Publisher PASSES** if: `rmse_over_spread <= 1.0`
+- Minimum 100 observations required for valid evaluation
+
+### Examples
+
+```bash
+# Basic usage with filename convention
+python publisher_benchmark.py --csv publisher_55_feeds.csv
+
+# Explicit publisher ID
+python publisher_benchmark.py --csv feeds.csv --publisher-id 55
+
+# Faster processing with more workers
+python publisher_benchmark.py --csv publisher_55_feeds.csv --workers 8
+
+# Custom output file
+python publisher_benchmark.py --csv publisher_55_feeds.csv --output results.csv
+
+# List asset classes first
+python publisher_benchmark.py --csv publisher_55_feeds.csv --list-asset-classes
+
+# Only evaluate FX and metals feeds
+python publisher_benchmark.py --csv publisher_55_feeds.csv --include-asset-class fx metals
+
+# Exclude unsupported asset classes
+python publisher_benchmark.py --csv publisher_55_feeds.csv --exclude-asset-class crypto funding-rate rates
+```
+
+### Complete Workflow Example
+
+```bash
+# 1. Discover what feeds a publisher has
+python publisher_feeds.py --publisher-id 55
+
+# 2. Check what asset classes are benchmarkable
+python publisher_benchmark.py --csv publisher_55_feeds.csv --list-asset-classes
+
+# 3. Run benchmark on supported asset classes only
+python publisher_benchmark.py --csv publisher_55_feeds.csv --include-asset-class fx metals us-equities commodity
+
+# 4. Check results
+cat publisher_55_benchmark_results.csv
+```
+
+### Publisher Benchmark Troubleshooting
+
+#### "Could not extract publisher ID from filename"
+
+**Cause:** Your CSV filename doesn't match the expected pattern.
+
+**Solutions:**
+1. Rename your file to `publisher_{id}_feeds.csv` (e.g., `publisher_55_feeds.csv`)
+2. Or use `--publisher-id` explicitly:
+   ```bash
+   python publisher_benchmark.py --csv my_feeds.csv --publisher-id 55
+   ```
+
+#### "No publisher data found for publisher X"
+
+**Cause:** The publisher didn't publish any data for this feed on this date.
+
+**Solutions:**
+1. Verify the publisher ID is correct
+2. Verify the publisher was active on the specified date
+3. Check if the feed ID is correct
+
+#### "Insufficient observations (N < 100)"
+
+**Cause:** Not enough data points matched between publisher and benchmark.
+
+**Solutions:**
+1. This can happen during market closures or partial trading days
+2. Try a different date with full market hours
+3. Check if the benchmark data exists for this feed/date
+
+---
+
 ## Publisher Feeds Discovery Tool
 
 A tool to discover all feeds that a specific publisher is currently publishing. Useful for understanding what data a publisher provides and generating input CSV files for benchmarking.
