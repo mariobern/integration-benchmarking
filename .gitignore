@@ -1,0 +1,28 @@
+# Credentials - NEVER commit
+config.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+.env
+
+# Output files
+*.csv
+!price_id_list.csv
+quick_benchmark_results.csv
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

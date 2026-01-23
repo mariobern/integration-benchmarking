@@ -1,0 +1,28 @@
+# Pyth Core Clickhouse database connection parameters
+clickhouse:
+  host: # fill in
+  user: # fill in
+  password: # fill in
+  port: 9440
+
+# Lazer Clickhouse database connection parameters
+# Needed if running Lazer related scripts
+lazer_clickhouse_prod:
+  host: # fill in
+  user: # fill in
+  password: # fill in
+  port: 9440
+
+lazer_clickhouse_staging:
+  host: # fill in
+  user: # fill in
+  password: # fill in
+  port: 9440
+
+# Analytics Clickhouse database connection parameters
+# Needed for benchmark evaluation scripts (stores Datascope benchmark data)
+analytics_clickhouse:
+  host: # fill in
+  user: # fill in
+  password: # fill in
+  port: 9440
