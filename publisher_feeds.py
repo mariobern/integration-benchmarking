@@ -10,6 +10,7 @@ Usage:
     python publisher_feeds.py --publisher-id 11 --output my_feeds.csv
     python publisher_feeds.py --publisher-id 11 --asset-class metal
     python publisher_feeds.py --publisher-id 11 --time-window 5
+    python publisher_feeds.py --publisher-id 11 --date-offset 2
 """
 
 import argparse
@@ -143,6 +144,7 @@ def query_feeds_from_junction(
     client,
     publisher_id: int,
     time_window_minutes: int,
+    date_offset_days: int = 1,
     asset_class_filter: Optional[str] = None,
 ) -> list[FeedInfo]:
     """
@@ -161,7 +163,7 @@ def query_feeds_from_junction(
     query = f"""
         SELECT
             fpj.feed_id AS price_id,
-            toDate(fpj.last_updated_at) AS date,
+            toDate(fpj.last_updated_at) - {date_offset_days} AS date,
             COALESCE(fm.asset_type, 'unknown') AS asset_class,
             fm.symbol
         FROM feed_publisher_junction fpj
@@ -192,6 +194,7 @@ def query_feeds_from_updates(
     client,
     publisher_id: int,
     time_window_minutes: int,
+    date_offset_days: int = 1,
     asset_class_filter: Optional[str] = None,
 ) -> list[FeedInfo]:
     """
@@ -210,7 +213,7 @@ def query_feeds_from_updates(
     query = f"""
         SELECT DISTINCT
             pu.price_feed_id AS price_id,
-            toDate(pu.publish_time) AS date,
+            toDate(pu.publish_time) - {date_offset_days} AS date,
             COALESCE(fm.asset_type, 'unknown') AS asset_class,
             fm.symbol
         FROM publisher_updates pu
@@ -240,6 +243,7 @@ def get_publisher_feeds(
     client,
     publisher_id: int,
     time_window_minutes: int = 1,
+    date_offset_days: int = 1,
     asset_class_filter: Optional[str] = None,
 ) -> list[FeedInfo]:
     """
@@ -249,7 +253,7 @@ def get_publisher_feeds(
     """
     # Try fast query using junction table first
     feeds = query_feeds_from_junction(
-        client, publisher_id, time_window_minutes, asset_class_filter
+        client, publisher_id, time_window_minutes, date_offset_days, asset_class_filter
     )
 
     if feeds:
@@ -262,7 +266,7 @@ def get_publisher_feeds(
         file=sys.stderr,
     )
     return query_feeds_from_updates(
-        client, publisher_id, time_window_minutes, asset_class_filter
+        client, publisher_id, time_window_minutes, date_offset_days, asset_class_filter
     )
 
 
@@ -305,6 +309,9 @@ Examples:
   # Use larger time window (5 minutes)
   python publisher_feeds.py --publisher-id 32 --time-window 5
 
+  # Use custom date offset (e.g., 2 days before for older benchmark data)
+  python publisher_feeds.py --publisher-id 11 --date-offset 2
+
 Asset classes: crypto, fx, metal, commodity, equity-us, equity-gb, equity-hk,
                equity-jp, equity-de, equity-fr (etc.), rates, nav,
                crypto-redemption-rate, crypto-index, funding-rate, kalshi, custom
@@ -336,6 +343,12 @@ Note: Equities are categorized by country code (ISO 3166-1 alpha-2) based on
         type=str,
         help="Filter by asset class (e.g., metal, fx, crypto, equity-us, equity-gb)",
     )
+    parser.add_argument(
+        "--date-offset",
+        type=int,
+        default=1,
+        help="Days to subtract from query date for benchmark data availability (default: 1)",
+    )
 
     args = parser.parse_args()
 
@@ -345,6 +358,7 @@ Note: Equities are categorized by country code (ISO 3166-1 alpha-2) based on
 
     print(f"Querying feeds for publisher {args.publisher_id}...")
     print(f"Time window: last {args.time_window} minute(s)")
+    print(f"Date offset: {args.date_offset} day(s) before query date")
     if args.asset_class:
         print(f"Asset class filter: {args.asset_class}")
 
@@ -356,6 +370,7 @@ Note: Equities are categorized by country code (ISO 3166-1 alpha-2) based on
             client,
             args.publisher_id,
             args.time_window,
+            args.date_offset,
             args.asset_class,
         )
 

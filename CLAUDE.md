@@ -28,6 +28,15 @@ python quick_benchmark.py --csv feeds.csv --output results.csv --target-pub-coun
 
 # Increase parallel workers for faster processing
 python quick_benchmark.py --csv price_id_list.csv --workers 8
+
+# List asset classes in a CSV file (discover what's available)
+python quick_benchmark.py --csv publisher_11_feeds.csv --list-asset-classes
+
+# Include only specific asset classes (filter by what has benchmark data)
+python quick_benchmark.py --csv feeds.csv --include-asset-class fx metals us-equities
+
+# Exclude asset classes without benchmark data
+python quick_benchmark.py --csv feeds.csv --exclude-asset-class crypto funding-rate rates
 ```
 
 ### Arguments
@@ -41,6 +50,9 @@ python quick_benchmark.py --csv price_id_list.csv --workers 8
 | `--output` | Output CSV path | `quick_benchmark_results.csv` |
 | `--target-pub-count` | Min publishers for feed readiness | 4 |
 | `--workers` | Parallel workers for CSV processing | 4 |
+| `--include-asset-class` | Only process these asset classes | - |
+| `--exclude-asset-class` | Skip these asset classes | - |
+| `--list-asset-classes` | List unique asset classes in CSV and exit | - |
 
 ## Pass/Fail Criteria
 
@@ -65,7 +77,22 @@ feed_id,date,mode
 346,2025-10-02,metals
 ```
 
-Modes: `fx`, `metals`, `us-equities`
+### Asset Classes (Modes)
+
+Asset classes with benchmark data available:
+- `fx` - Foreign exchange
+- `metals` / `metal` - Precious metals
+- `us-equities` / `equity-us` - US equities
+- `commodity` - Commodities
+
+Asset classes WITHOUT benchmark data (will error):
+- `crypto` - Cryptocurrency
+- `crypto-redemption-rate` - Crypto redemption rates
+- `funding-rate` - Funding rates
+- `rates` - Interest rates
+- `nav` - Net asset value
+
+Use `--list-asset-classes` to discover asset classes in your CSV file.
 
 ## Output
 

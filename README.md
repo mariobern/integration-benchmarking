@@ -113,6 +113,9 @@ feed_id,date,mode
 | `--output FILE` | Output CSV path | `quick_benchmark_results.csv` |
 | `--target-pub-count N` | Min publishers needed for "ready" | `4` |
 | `--workers N` | Parallel workers for faster processing | `4` |
+| `--include-asset-class CLASS [CLASS ...]` | Only process these asset classes | All |
+| `--exclude-asset-class CLASS [CLASS ...]` | Skip these asset classes | None |
+| `--list-asset-classes` | List asset classes in CSV and exit | - |
 
 ## Understanding the Output
 
@@ -131,6 +134,69 @@ Results are saved to `quick_benchmark_results.csv` (or your specified output fil
 
 - **Publisher PASSES** if: `RMSE / spread <= 1.0`
 - **Feed is READY** if: `passing_publishers >= target_pub_count` (default: 4)
+
+## Asset Class Filtering
+
+CSV files may contain feeds from multiple asset classes, but not all asset classes have benchmark data available. Use the filtering options to process only supported asset classes.
+
+### Discovering Asset Classes
+
+First, check what asset classes are in your CSV file:
+
+```bash
+python quick_benchmark.py --csv publisher_11_feeds.csv --list-asset-classes
+```
+
+Output:
+```
+Asset classes in publisher_11_feeds.csv:
+==================================================
+  crypto                      494 feeds  [benchmarkable: N]
+  crypto-redemption-rate      145 feeds  [benchmarkable: N]
+  fx                           50 feeds  [benchmarkable: Y]
+  equity-us                    29 feeds  [benchmarkable: Y]
+  rates                        15 feeds  [benchmarkable: N]
+  commodity                    11 feeds  [benchmarkable: Y]
+  funding-rate                  9 feeds  [benchmarkable: N]
+  metal                         2 feeds  [benchmarkable: Y]
+  nav                           1 feeds  [benchmarkable: N]
+==================================================
+  TOTAL                       756 feeds
+
+Benchmarkable asset classes: commodity, fx, metals, us-equities
+```
+
+### Asset Classes with Benchmark Data
+
+| Asset Class | Has Benchmark Data |
+|-------------|-------------------|
+| `fx` | Yes |
+| `metals` / `metal` | Yes |
+| `us-equities` / `equity-us` | Yes |
+| `commodity` | Yes |
+| `crypto` | No |
+| `crypto-redemption-rate` | No |
+| `funding-rate` | No |
+| `rates` | No |
+| `nav` | No |
+
+### Filtering Examples
+
+```bash
+# Include only benchmarkable asset classes
+python quick_benchmark.py --csv feeds.csv --include-asset-class fx metals us-equities commodity
+
+# Exclude asset classes without benchmark data
+python quick_benchmark.py --csv feeds.csv --exclude-asset-class crypto crypto-redemption-rate funding-rate rates nav
+
+# Process only FX feeds
+python quick_benchmark.py --csv feeds.csv --include-asset-class fx
+
+# Process FX and metals only
+python quick_benchmark.py --csv feeds.csv --include-asset-class fx metals metal
+```
+
+> **Note:** Asset class names are normalized automatically. For example, `metal` and `metals` are treated as the same, as are `equity-us` and `us-equities`.
 
 ## Examples
 
@@ -155,6 +221,15 @@ python quick_benchmark.py --feed-id 346 --date 2025-10-02 --mode metals
 
 # Evaluate a single US equities feed
 python quick_benchmark.py --feed-id 1163 --date 2025-10-02 --mode us-equities
+
+# List asset classes in a CSV file
+python quick_benchmark.py --csv publisher_11_feeds.csv --list-asset-classes
+
+# Process only FX and metals feeds from a mixed CSV
+python quick_benchmark.py --csv publisher_11_feeds.csv --include-asset-class fx metals
+
+# Exclude crypto feeds (no benchmark data available)
+python quick_benchmark.py --csv publisher_11_feeds.csv --exclude-asset-class crypto crypto-redemption-rate
 ```
 
 ---
@@ -220,6 +295,7 @@ Results are saved to `publisher_{id}_feeds.csv` (or your specified output file).
 | `--output FILE` | Output CSV path | `publisher_{id}_feeds.csv` |
 | `--time-window MIN` | Time window in minutes to look back | `1` |
 | `--asset-class TYPE` | Filter by asset class | All |
+| `--date-offset DAYS` | Days to subtract from query date (for benchmark data availability) | `1` |
 
 ### Available Asset Classes
 
@@ -251,17 +327,19 @@ The output CSV has three columns (no header):
 
 ```csv
 price_id,date,asset_class
-345,2026-01-23,metal
-346,2026-01-23,metal
-1163,2026-01-23,equity-us
-1780,2026-01-23,equity-hk
+345,2026-01-22,metal
+346,2026-01-22,metal
+1163,2026-01-22,equity-us
+1780,2026-01-22,equity-hk
 ```
 
 | Column | Description |
 |--------|-------------|
 | `price_id` | The Pyth Lazer feed ID |
-| `date` | Date when the publisher last published this feed |
+| `date` | Date for benchmarking (query date minus `--date-offset`, default 1 day) |
 | `asset_class` | Type of asset (crypto, fx, metal, equity-us, equity-gb, etc.) |
+
+> **Note:** The date is offset by default because Datascope benchmark data is typically only available up to the previous day. If you run the script on 2026-01-23, the output dates will be 2026-01-22 by default. Use `--date-offset 0` if you need same-day dates.
 
 ### Examples
 
@@ -286,6 +364,12 @@ python publisher_feeds.py --publisher-id 32 --time-window 60
 
 # Query with 24-hour window (1440 minutes)
 python publisher_feeds.py --publisher-id 32 --time-window 1440
+
+# Use 2-day offset for older benchmark data
+python publisher_feeds.py --publisher-id 29 --date-offset 2
+
+# No date offset (same day as query)
+python publisher_feeds.py --publisher-id 29 --date-offset 0
 ```
 
 ### Using Output with Benchmark Tool
@@ -386,6 +470,14 @@ The ClickHouse hostname is incorrect. Double-check the `host` values in `config.
 - Verify the feed_id exists in the system
 - Verify the date has data available
 - Verify the mode matches the feed type (fx, metals, or us-equities)
+- For CSV files with mixed asset classes, use `--list-asset-classes` to check which have benchmark data:
+  ```bash
+  python quick_benchmark.py --csv your_file.csv --list-asset-classes
+  ```
+- Use `--include-asset-class` to filter to only benchmarkable asset classes:
+  ```bash
+  python quick_benchmark.py --csv your_file.csv --include-asset-class fx metals us-equities commodity
+  ```
 
 ### Connection timeout
 
