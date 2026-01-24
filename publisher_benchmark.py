@@ -19,6 +19,7 @@ Usage:
 import argparse
 import csv
 import re
+import statistics
 import sys
 import time
 from collections import Counter
@@ -49,6 +50,77 @@ ASSET_CLASS_ALIASES = {
 # Asset classes that have benchmark data available
 BENCHMARKABLE_ASSET_CLASSES = {"fx", "metals", "us-equities", "commodity"}
 
+# Futures contract month codes
+# F=Jan, G=Feb, H=Mar, J=Apr, K=May, M=Jun, N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec
+FUTURES_MONTH_CODES = "FGHJKMNQUVXZ"
+
+
+def is_futures_symbol(symbol: str) -> bool:
+    """
+    Detect if a symbol represents a futures contract.
+
+    Futures symbols follow the pattern:
+    - Commodities.XXX[MONTH][YEAR]/USD (e.g., Commodities.CCH6/USD - Copper March 2026)
+    - Equity.US.XXX[MONTH][YEAR]/USD (e.g., Equity.US.EMH6/USD - E-Mini S&P March 2026)
+
+    Where:
+    - MONTH is one of F,G,H,J,K,M,N,Q,U,V,X,Z (monthly codes)
+    - YEAR is a single digit (5=2025, 6=2026, 7=2027, etc.)
+
+    Special equity index futures:
+    - EM = E-Mini S&P 500
+    - NM = Nasdaq Mini
+    - DM = Dow Jones Mini
+
+    Commodity futures:
+    - CC = Copper
+    - WTI = WTI Crude Oil
+    - BRENT = Brent Crude Oil
+    """
+    if not symbol:
+        return False
+
+    # Extract base symbol (before /USD)
+    if "/" in symbol:
+        base = symbol.split("/")[0]
+    else:
+        base = symbol
+
+    # Get the ticker part (after last .)
+    parts = base.split(".")
+    if len(parts) < 2:
+        return False
+
+    ticker = parts[-1]
+    if len(ticker) < 2:
+        return False
+
+    # Check if ends with month code + year digit
+    month_code = ticker[-2].upper()
+    year_digit = ticker[-1]
+
+    return month_code in FUTURES_MONTH_CODES and year_digit.isdigit()
+
+
+def get_benchmark_table(mode: str, symbol: Optional[str]) -> str:
+    """
+    Determine which benchmark table to use based on mode and symbol.
+
+    Returns:
+        - 'datascope_futures_benchmark_data' for futures contracts
+        - 'datascope_fx_benchmark_data' for fx/metals
+        - 'datascope_global_equities_benchmark_data' for us-equities (non-futures)
+    """
+    # Check if symbol is a futures contract
+    if symbol and is_futures_symbol(symbol):
+        return "datascope_futures_benchmark_data"
+
+    # Fallback to existing logic
+    if mode in ("fx", "metals"):
+        return "datascope_fx_benchmark_data"
+    else:
+        return "datascope_global_equities_benchmark_data"
+
 
 @dataclass
 class PublisherBenchmarkResult:
@@ -66,6 +138,88 @@ class PublisherBenchmarkResult:
     rmse_over_spread: Optional[float]
     error: Optional[str] = None
     execution_time_ms: int = 0
+
+
+def compute_summary_stats(
+    results: list[PublisherBenchmarkResult], publisher_id: int, total_time: float
+) -> dict:
+    """Compute comprehensive summary statistics from benchmark results."""
+    # Basic counts - mutually exclusive: error > pass/fail
+    total_feeds = len(results)
+    error_count = sum(1 for r in results if r.error)
+    pass_count = sum(1 for r in results if r.passes and not r.error)
+    fail_count = sum(1 for r in results if not r.passes and not r.error)
+
+    # Filter results with valid rmse_over_spread for statistical calculations
+    valid_results = [r for r in results if r.rmse_over_spread is not None and r.error is None]
+    valid_rmse_ratios = [r.rmse_over_spread for r in valid_results]
+
+    # Calculate percentiles if we have data
+    if valid_rmse_ratios:
+        sorted_ratios = sorted(valid_rmse_ratios)
+        median_rmse = statistics.median(sorted_ratios)
+        mean_rmse = statistics.mean(sorted_ratios)
+        min_rmse = min(sorted_ratios)
+        max_rmse = max(sorted_ratios)
+
+        # Calculate percentiles (90th and 95th) using proper statistical method
+        n = len(sorted_ratios)
+        if n >= 2:
+            # Use quantiles for accurate percentile calculation
+            # quantiles(data, n=100) returns 99 cut points for 100 quantiles
+            try:
+                quantile_values = statistics.quantiles(sorted_ratios, n=100)
+                p90_rmse = quantile_values[89]  # 90th percentile (0-indexed)
+                p95_rmse = quantile_values[94]  # 95th percentile (0-indexed)
+            except statistics.StatisticsError:
+                # Fall back to simple calculation for very small datasets
+                p90_rmse = sorted_ratios[min(int(n * 0.90), n - 1)]
+                p95_rmse = sorted_ratios[min(int(n * 0.95), n - 1)]
+        else:
+            # Single data point - all percentiles are the same value
+            p90_rmse = p95_rmse = sorted_ratios[0]
+    else:
+        median_rmse = mean_rmse = min_rmse = max_rmse = p90_rmse = p95_rmse = None
+
+    # Observation statistics - only from non-error results with actual data
+    observations = [r.n_observations for r in results if r.error is None and r.n_observations > 0]
+    total_observations = sum(observations) if observations else 0
+    mean_observations = statistics.mean(observations) if observations else 0
+    median_observations = statistics.median(observations) if observations else 0
+
+    # Breakdown by asset class (mode)
+    mode_stats: dict[str, dict[str, int]] = {}
+    for r in results:
+        normalized_mode = normalize_asset_class(r.mode)
+        if normalized_mode not in mode_stats:
+            mode_stats[normalized_mode] = {"pass": 0, "fail": 0, "error": 0}
+        if r.error:
+            mode_stats[normalized_mode]["error"] += 1
+        elif r.passes:
+            mode_stats[normalized_mode]["pass"] += 1
+        else:
+            mode_stats[normalized_mode]["fail"] += 1
+
+    return {
+        "publisher_id": publisher_id,
+        "total_feeds": total_feeds,
+        "pass_count": pass_count,
+        "fail_count": fail_count,
+        "error_count": error_count,
+        "pass_rate_pct": round((pass_count / total_feeds * 100), 2) if total_feeds > 0 else 0,
+        "median_rmse_over_spread": median_rmse,
+        "mean_rmse_over_spread": mean_rmse,
+        "p90_rmse_over_spread": p90_rmse,
+        "p95_rmse_over_spread": p95_rmse,
+        "min_rmse_over_spread": min_rmse,
+        "max_rmse_over_spread": max_rmse,
+        "total_observations": total_observations,
+        "mean_observations_per_feed": round(mean_observations, 1) if mean_observations else 0,
+        "median_observations_per_feed": int(median_observations) if median_observations else 0,
+        "total_time_sec": round(total_time, 2),
+        "avg_time_per_feed_ms": int((total_time / total_feeds * 1000)) if total_feeds > 0 else 0,
+        "mode_stats": mode_stats,
+    }
 
 
 def load_config() -> dict:
@@ -190,11 +344,8 @@ def evaluate_publisher_feed(
 
     divisor = 10 ** abs(exponent)
 
-    # Determine benchmark table based on mode
-    if mode in ("fx", "metals"):
-        benchmark_table = "datascope_fx_benchmark_data"
-    else:
-        benchmark_table = "datascope_global_equities_benchmark_data"
+    # Determine benchmark table based on mode and symbol (handles futures detection)
+    benchmark_table = get_benchmark_table(mode, symbol)
 
     # Query 1: Get publisher prices aggregated by second - FILTERED TO SINGLE PUBLISHER
     publisher_query = f"""
@@ -359,7 +510,6 @@ def evaluate_publisher_feed(
 def process_csv(
     csv_path: Path,
     publisher_id: int,
-    output_path: Path,
     max_workers: int,
     include_asset_classes: list[str] | None = None,
     exclude_asset_classes: list[str] | None = None,
@@ -436,34 +586,37 @@ def process_csv(
                 f"{status} - rmse/spread={rmse_str}, n={result.n_observations}"
             )
 
-    # Write results to CSV
-    write_results_csv(results, output_path)
-
     return results
 
 
-def write_results_csv(results: list[PublisherBenchmarkResult], output_path: Path):
-    """Write benchmark results to CSV file."""
+def write_results_csv(
+    results: list[PublisherBenchmarkResult],
+    output_path: Path,
+    summary_stats: Optional[dict] = None,
+):
+    """Write benchmark results to CSV file with optional summary section."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Define header columns (used for both output and padding summary rows)
+    header = [
+        "publisher_id",
+        "feed_id",
+        "date",
+        "mode",
+        "symbol",
+        "passes",
+        "n_observations",
+        "rmse",
+        "mean_spread",
+        "rmse_over_spread",
+        "error",
+        "execution_time_ms",
+    ]
+    num_cols = len(header)
 
     with open(output_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(
-            [
-                "publisher_id",
-                "feed_id",
-                "date",
-                "mode",
-                "symbol",
-                "passes",
-                "n_observations",
-                "rmse",
-                "mean_spread",
-                "rmse_over_spread",
-                "error",
-                "execution_time_ms",
-            ]
-        )
+        writer.writerow(header)
 
         for r in sorted(results, key=lambda x: (x.date, x.feed_id)):
             writer.writerow(
@@ -482,6 +635,57 @@ def write_results_csv(results: list[PublisherBenchmarkResult], output_path: Path
                     r.execution_time_ms,
                 ]
             )
+
+        # Write summary section if provided
+        if summary_stats:
+            # Empty row separator
+            writer.writerow([""] * num_cols)
+
+            # Summary header
+            writer.writerow(["SUMMARY"] + [""] * (num_cols - 1))
+
+            # Helper to write a summary row
+            def write_summary_row(key: str, value):
+                if value is None:
+                    formatted_value = ""
+                elif isinstance(value, float):
+                    formatted_value = f"{value:.6f}"
+                else:
+                    formatted_value = str(value)
+                writer.writerow([key, formatted_value] + [""] * (num_cols - 2))
+
+            # Core metrics
+            write_summary_row("publisher_id", summary_stats["publisher_id"])
+            write_summary_row("total_feeds", summary_stats["total_feeds"])
+            write_summary_row("pass_count", summary_stats["pass_count"])
+            write_summary_row("fail_count", summary_stats["fail_count"])
+            write_summary_row("error_count", summary_stats["error_count"])
+            write_summary_row("pass_rate_pct", summary_stats["pass_rate_pct"])
+
+            # Quality metrics
+            write_summary_row("median_rmse_over_spread", summary_stats["median_rmse_over_spread"])
+            write_summary_row("mean_rmse_over_spread", summary_stats["mean_rmse_over_spread"])
+            write_summary_row("p90_rmse_over_spread", summary_stats["p90_rmse_over_spread"])
+            write_summary_row("p95_rmse_over_spread", summary_stats["p95_rmse_over_spread"])
+            write_summary_row("min_rmse_over_spread", summary_stats["min_rmse_over_spread"])
+            write_summary_row("max_rmse_over_spread", summary_stats["max_rmse_over_spread"])
+
+            # Coverage metrics
+            write_summary_row("total_observations", summary_stats["total_observations"])
+            write_summary_row("mean_observations_per_feed", summary_stats["mean_observations_per_feed"])
+            write_summary_row("median_observations_per_feed", summary_stats["median_observations_per_feed"])
+
+            # Timing metrics
+            write_summary_row("total_time_sec", summary_stats["total_time_sec"])
+            write_summary_row("avg_time_per_feed_ms", summary_stats["avg_time_per_feed_ms"])
+
+            # Breakdown by asset class
+            mode_stats = summary_stats.get("mode_stats", {})
+            for mode in sorted(mode_stats.keys()):
+                stats = mode_stats[mode]
+                write_summary_row(f"pass_count_{mode}", stats["pass"])
+                write_summary_row(f"fail_count_{mode}", stats["fail"])
+                write_summary_row(f"error_count_{mode}", stats["error"])
 
     print(f"\nResults written to: {output_path}")
 
@@ -603,29 +807,59 @@ Examples:
     results = process_csv(
         args.csv,
         publisher_id,
-        output_path,
         args.workers,
         include_asset_classes=args.include_asset_class,
         exclude_asset_classes=args.exclude_asset_class,
     )
 
-    # Summary
+    # Compute summary statistics
     total_time = time.time() - total_start
-    pass_count = sum(1 for r in results if r.passes)
-    error_count = sum(1 for r in results if r.error)
+    summary_stats = compute_summary_stats(results, publisher_id, total_time)
 
+    # Write results and summary to CSV
+    write_results_csv(results, output_path, summary_stats)
+
+    # Print summary to console
     print(f"\n{'='*60}")
     print(f"SUMMARY - Publisher {publisher_id}")
     print(f"{'='*60}")
-    print(f"Total feeds evaluated: {len(results)}")
-    print(f"PASS (rmse/spread <= 1.0): {pass_count}")
-    print(f"FAIL: {len(results) - pass_count - error_count}")
-    print(f"Errors: {error_count}")
-    print(f"Total time: {total_time:.2f}s")
-    if len(results) > 0:
-        print(f"Average time per feed: {(total_time / len(results) * 1000):.0f}ms")
+    print(f"Total feeds evaluated: {summary_stats['total_feeds']}")
+    print(f"PASS (rmse/spread <= 1.0): {summary_stats['pass_count']}")
+    print(f"FAIL: {summary_stats['fail_count']}")
+    print(f"Errors: {summary_stats['error_count']}")
+    print(f"Pass rate: {summary_stats['pass_rate_pct']:.1f}%")
+    print(f"{'='*60}")
+    if summary_stats['median_rmse_over_spread'] is not None:
+        print(f"Median rmse/spread: {summary_stats['median_rmse_over_spread']:.4f}")
+        print(f"Mean rmse/spread: {summary_stats['mean_rmse_over_spread']:.4f}")
+        print(f"P90 rmse/spread: {summary_stats['p90_rmse_over_spread']:.4f}")
+        print(f"P95 rmse/spread: {summary_stats['p95_rmse_over_spread']:.4f}")
+        print(f"Min rmse/spread: {summary_stats['min_rmse_over_spread']:.4f}")
+        print(f"Max rmse/spread: {summary_stats['max_rmse_over_spread']:.4f}")
+    print(f"{'='*60}")
+    print(f"Total observations: {summary_stats['total_observations']:,}")
+    print(f"Mean observations per feed: {summary_stats['mean_observations_per_feed']:,.1f}")
+    print(f"Median observations per feed: {summary_stats['median_observations_per_feed']:,}")
+    print(f"{'='*60}")
+    print(f"Total time: {summary_stats['total_time_sec']:.2f}s")
+    if summary_stats['total_feeds'] > 0:
+        print(f"Average time per feed: {summary_stats['avg_time_per_feed_ms']}ms")
     else:
         print("No feeds were processed (all filtered out or empty CSV)")
+
+    # Print breakdown by asset class
+    mode_stats = summary_stats.get("mode_stats", {})
+    if mode_stats:
+        print(f"{'='*60}")
+        print("BREAKDOWN BY ASSET CLASS:")
+        for mode in sorted(mode_stats.keys()):
+            stats = mode_stats[mode]
+            total = stats["pass"] + stats["fail"] + stats["error"]
+            pass_rate = (stats["pass"] / total * 100) if total > 0 else 0
+            print(
+                f"  {mode:<15}: {stats['pass']:>3} pass, {stats['fail']:>3} fail, "
+                f"{stats['error']:>3} error ({pass_rate:.1f}% pass rate)"
+            )
 
 
 if __name__ == "__main__":

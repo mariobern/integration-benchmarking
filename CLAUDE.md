@@ -82,8 +82,8 @@ feed_id,date,mode
 Asset classes with benchmark data available:
 - `fx` - Foreign exchange
 - `metals` / `metal` - Precious metals
-- `us-equities` / `equity-us` - US equities
-- `commodity` - Commodities
+- `us-equities` / `equity-us` - US equities (includes equity index futures)
+- `commodity` - Commodities (includes commodity futures)
 
 Asset classes WITHOUT benchmark data (will error):
 - `crypto` - Cryptocurrency
@@ -91,6 +91,25 @@ Asset classes WITHOUT benchmark data (will error):
 - `funding-rate` - Funding rates
 - `rates` - Interest rates
 - `nav` - Net asset value
+
+Use `--list-asset-classes` to discover asset classes in your CSV file.
+
+### Futures Support
+
+The scripts automatically detect futures contracts by their symbol pattern and use the appropriate benchmark table (`datascope_futures_benchmark_data`).
+
+**Futures contract naming convention:**
+- Symbol ends with `[MONTH_CODE][YEAR_DIGIT]` (e.g., `CCH6`, `EMH6`)
+- Month codes: F=Jan, G=Feb, H=Mar, J=Apr, K=May, M=Jun, N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec
+- Year digit: 5=2025, 6=2026, 7=2027, etc.
+
+**Supported futures:**
+- **Commodity futures**: `Commodities.CCH6/USD` (Copper), `Commodities.WTIH6/USD` (WTI Crude)
+- **Equity index futures**:
+  - `Equity.US.EMH6/USD` - E-Mini S&P 500 March 2026
+  - `Equity.US.NMH6/USD` - Nasdaq Mini March 2026
+  - `Equity.US.DMH6/USD` - Dow Jones Mini March 2026
+  - `Equity.US.BRENTH6/USD` - Brent Crude March 2026
 
 Use `--list-asset-classes` to discover asset classes in your CSV file.
 
@@ -103,3 +122,22 @@ Results CSV contains:
 - `passing_publishers`, `failing_publishers` (semicolon-separated IDs)
 - `error` (if any)
 - `execution_time_ms`
+
+## Publisher Benchmark Summary
+
+`publisher_benchmark.py` outputs summary statistics after processing (console + CSV):
+
+**Core metrics:**
+- `pass_count`, `fail_count`, `error_count`, `pass_rate_pct`
+
+**Quality metrics (rmse_over_spread distribution):**
+- `median`, `mean`, `p90`, `p95`, `min`, `max`
+- Interpretation: `< 0.5` excellent, `0.5-1.0` good, `> 1.0` failing (lower is better)
+
+**Coverage metrics:**
+- `total_observations`, `mean_observations_per_feed`, `median_observations_per_feed`
+
+**Asset class breakdown:**
+- `pass_count_{mode}`, `fail_count_{mode}`, `error_count_{mode}` per asset class
+
+Summary is appended to output CSV under a `SUMMARY` header row.
