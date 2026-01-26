@@ -141,3 +141,38 @@ Results CSV contains:
 - `pass_count_{mode}`, `fail_count_{mode}`, `error_count_{mode}` per asset class
 
 Summary is appended to output CSV under a `SUMMARY` header row.
+
+### Advanced Statistical Metrics
+
+The `publisher_benchmark.py` script includes advanced statistical metrics for deeper analysis:
+
+**Per-Feed Metrics:**
+
+| Metric | Description | Interpretation |
+|--------|-------------|----------------|
+| `mean_diff` | Mean of (publisher - benchmark) | Systematic bias; should be ~0 |
+| `std_diff` | Std dev of price differences | Error volatility; lower is better |
+| `mean_pct_diff` | Mean % difference | Relative accuracy |
+| `std_pct_diff` | Std dev of % differences | Relative error volatility |
+| `mae` | Mean Absolute Error | Average deviation; lower is better |
+| `t_statistic` | t-test statistic | Tests if bias is significant |
+| `t_pvalue` | t-test p-value | < 0.05 indicates significant bias |
+| `wilcoxon_statistic` | Wilcoxon test statistic | Non-parametric bias test |
+| `wilcoxon_pvalue` | Wilcoxon p-value | < 0.05 indicates significant bias |
+| `normality_pvalue` | Normality test p-value | >= 0.05 means errors are normally distributed |
+| `mean_abs_z_score` | Mean |z-score| | Typical deviation magnitude; ~0.8 expected |
+
+**Summary Metrics:**
+
+| Metric | Description |
+|--------|-------------|
+| `t_test_significance_rate` | % of feeds with statistically significant bias (p < 0.05) |
+| `normality_rate` | % of feeds with normally distributed errors |
+| `median_z_score` | Typical z-score across all feeds |
+
+**Interpretation Guide:**
+
+The script outputs an interpretation guide explaining:
+- What each metric means
+- How to interpret your results (good/bad thresholds)
+- Actionable recommendations for improving data quality

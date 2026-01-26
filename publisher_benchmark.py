@@ -9,7 +9,14 @@ one publisher instead of all publishers.
 The publisher ID is extracted from the input filename pattern: publisher_{id}_feeds.csv
 
 Pass/Fail Criteria:
-- A publisher PASSES if: rmse_over_spread <= 1.0
+- A publisher PASSES if: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 98%)
+- nrmse = RMSE / (max_benchmark_price - min_benchmark_price)
+- hit_rate = % of observations within 10 basis points (0.1%) of benchmark
+- rmse_over_spread is reported as an additional metric but NOT used for pass/fail
+
+Market Hours Filtering:
+- US equities: Only regular trading hours (9:30 AM - 4:00 PM EST) are evaluated
+- Other asset classes: Full day data is evaluated
 
 Usage:
     python publisher_benchmark.py --csv publisher_55_feeds.csv
@@ -25,11 +32,14 @@ import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import yaml
+from scipy import stats
 
 
 # Asset class normalization mapping (CSV value -> canonical value)
@@ -53,6 +63,12 @@ BENCHMARKABLE_ASSET_CLASSES = {"fx", "metals", "us-equities", "commodity"}
 # Futures contract month codes
 # F=Jan, G=Feb, H=Mar, J=Apr, K=May, M=Jun, N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec
 FUTURES_MONTH_CODES = "FGHJKMNQUVXZ"
+
+# US Equities market hours (EST/EDT) - Regular trading session only
+US_EQUITY_MARKET_OPEN_HOUR = 9
+US_EQUITY_MARKET_OPEN_MINUTE = 30
+US_EQUITY_MARKET_CLOSE_HOUR = 16
+US_EQUITY_MARKET_CLOSE_MINUTE = 0
 
 
 def is_futures_symbol(symbol: str) -> bool:
@@ -102,6 +118,51 @@ def is_futures_symbol(symbol: str) -> bool:
     return month_code in FUTURES_MONTH_CODES and year_digit.isdigit()
 
 
+def get_market_hours_filter_sql(mode: str, date: str, column_name: str = "publish_time") -> str:
+    """
+    Generate SQL WHERE clause for market hours filtering.
+
+    For US equities: 9:30 AM - 4:00 PM EST (converted to UTC)
+    Returns empty string for non-equity modes.
+
+    Args:
+        mode: Asset class (e.g., 'us-equities', 'fx')
+        date: Date string in YYYY-MM-DD format
+        column_name: The timestamp column name to filter on
+
+    Returns:
+        SQL WHERE clause fragment or empty string
+    """
+    if mode not in ("us-equities", "equity-us"):
+        return ""
+
+    # Parse date and create timezone-aware datetimes
+    dt = datetime.strptime(date, "%Y-%m-%d")
+    est = ZoneInfo("America/New_York")
+    utc = ZoneInfo("UTC")
+
+    # Market open: 9:30 AM EST
+    market_open_est = dt.replace(
+        hour=US_EQUITY_MARKET_OPEN_HOUR,
+        minute=US_EQUITY_MARKET_OPEN_MINUTE,
+        tzinfo=est
+    )
+    market_open_utc = market_open_est.astimezone(utc)
+
+    # Market close: 4:00 PM EST
+    market_close_est = dt.replace(
+        hour=US_EQUITY_MARKET_CLOSE_HOUR,
+        minute=US_EQUITY_MARKET_CLOSE_MINUTE,
+        tzinfo=est
+    )
+    market_close_utc = market_close_est.astimezone(utc)
+
+    return f"""
+        AND {column_name} >= '{market_open_utc.strftime('%Y-%m-%d %H:%M:%S')}'
+        AND {column_name} < '{market_close_utc.strftime('%Y-%m-%d %H:%M:%S')}'
+    """
+
+
 def get_benchmark_table(mode: str, symbol: Optional[str]) -> str:
     """
     Determine which benchmark table to use based on mode and symbol.
@@ -122,6 +183,85 @@ def get_benchmark_table(mode: str, symbol: Optional[str]) -> str:
         return "datascope_global_equities_benchmark_data"
 
 
+def compute_statistical_metrics(
+    diffs: list[float],
+    signed_pct_diffs: list[float],
+    min_observations: int = 20,
+) -> dict:
+    """
+    Compute advanced statistical metrics for price differences.
+
+    Args:
+        diffs: List of price differences (publisher - benchmark)
+        signed_pct_diffs: List of signed percentage differences
+        min_observations: Minimum observations for statistical tests
+
+    Returns:
+        Dictionary containing all computed metrics (None for metrics
+        that couldn't be computed due to insufficient data)
+    """
+    result = {
+        "mean_diff": None,
+        "std_diff": None,
+        "mean_pct_diff": None,
+        "std_pct_diff": None,
+        "mae": None,
+        "t_statistic": None,
+        "t_pvalue": None,
+        "wilcoxon_statistic": None,
+        "wilcoxon_pvalue": None,
+        "normality_pvalue": None,
+        "mean_abs_z_score": None,
+    }
+
+    n = len(diffs)
+    if n < 2:
+        return result
+
+    # Basic statistics (always computed if n >= 2)
+    result["mean_diff"] = statistics.mean(diffs)
+    result["std_diff"] = statistics.stdev(diffs)
+    result["mean_pct_diff"] = statistics.mean(signed_pct_diffs)
+    result["std_pct_diff"] = statistics.stdev(signed_pct_diffs) if n >= 2 else None
+    result["mae"] = statistics.mean([abs(d) for d in diffs])
+
+    # Z-score calculation
+    if result["std_diff"] and result["std_diff"] > 0:
+        z_scores = [(d - result["mean_diff"]) / result["std_diff"] for d in diffs]
+        result["mean_abs_z_score"] = statistics.mean([abs(z) for z in z_scores])
+
+    # Statistical tests require minimum observations
+    if n < min_observations:
+        return result
+
+    # One-sample t-test: Is mean difference significantly different from 0?
+    try:
+        t_stat, t_pval = stats.ttest_1samp(diffs, 0)
+        result["t_statistic"] = float(t_stat)
+        result["t_pvalue"] = float(t_pval)
+    except Exception:
+        pass  # Keep as None if test fails
+
+    # Wilcoxon signed-rank test: Non-parametric alternative
+    try:
+        non_zero_diffs = [d for d in diffs if d != 0]
+        if len(non_zero_diffs) >= min_observations:
+            w_stat, w_pval = stats.wilcoxon(non_zero_diffs)
+            result["wilcoxon_statistic"] = float(w_stat)
+            result["wilcoxon_pvalue"] = float(w_pval)
+    except Exception:
+        pass  # Keep as None if test fails
+
+    # D'Agostino-Pearson normality test
+    try:
+        _, norm_pval = stats.normaltest(diffs)
+        result["normality_pvalue"] = float(norm_pval)
+    except Exception:
+        pass  # Keep as None if test fails
+
+    return result
+
+
 @dataclass
 class PublisherBenchmarkResult:
     """Result of a single publisher's benchmark evaluation for one feed."""
@@ -136,6 +276,23 @@ class PublisherBenchmarkResult:
     rmse: Optional[float]
     mean_spread: Optional[float]
     rmse_over_spread: Optional[float]
+    # Metrics for enhanced pass/fail criteria
+    nrmse: Optional[float] = None
+    hit_rate: Optional[float] = None
+    benchmark_price_range: Optional[float] = None
+    # New statistical metrics
+    mean_diff: Optional[float] = None           # Mean of price differences
+    std_diff: Optional[float] = None            # Std dev of price differences
+    mean_pct_diff: Optional[float] = None       # Mean of percentage differences
+    std_pct_diff: Optional[float] = None        # Std dev of percentage differences
+    mae: Optional[float] = None                 # Mean Absolute Error
+    # Statistical tests
+    t_statistic: Optional[float] = None         # t-test statistic
+    t_pvalue: Optional[float] = None            # t-test p-value
+    wilcoxon_statistic: Optional[float] = None  # Wilcoxon signed-rank statistic
+    wilcoxon_pvalue: Optional[float] = None     # Wilcoxon p-value
+    normality_pvalue: Optional[float] = None    # D'Agostino-Pearson normality test p-value
+    mean_abs_z_score: Optional[float] = None    # Mean absolute z-score
     error: Optional[str] = None
     execution_time_ms: int = 0
 
@@ -149,6 +306,17 @@ def compute_summary_stats(
     error_count = sum(1 for r in results if r.error)
     pass_count = sum(1 for r in results if r.passes and not r.error)
     fail_count = sum(1 for r in results if not r.passes and not r.error)
+
+    # Count passes by criterion type (for detailed breakdown)
+    pass_by_nrmse_alone = sum(
+        1 for r in results
+        if r.passes and not r.error and r.nrmse is not None and r.nrmse < 0.01
+    )
+    pass_by_nrmse_and_hit_rate = sum(
+        1 for r in results
+        if r.passes and not r.error and r.nrmse is not None
+        and r.nrmse >= 0.01 and r.nrmse < 0.05 and r.hit_rate is not None and r.hit_rate >= 98
+    )
 
     # Filter results with valid rmse_over_spread for statistical calculations
     valid_results = [r for r in results if r.rmse_over_spread is not None and r.error is None]
@@ -181,6 +349,43 @@ def compute_summary_stats(
     else:
         median_rmse = mean_rmse = min_rmse = max_rmse = p90_rmse = p95_rmse = None
 
+    # NRMSE statistics
+    valid_nrmse_results = [r for r in results if r.nrmse is not None and r.error is None]
+    valid_nrmse_values = [r.nrmse for r in valid_nrmse_results]
+
+    if valid_nrmse_values:
+        sorted_nrmse = sorted(valid_nrmse_values)
+        median_nrmse = statistics.median(sorted_nrmse)
+        mean_nrmse = statistics.mean(sorted_nrmse)
+        min_nrmse = min(sorted_nrmse)
+        max_nrmse = max(sorted_nrmse)
+
+        n = len(sorted_nrmse)
+        if n >= 2:
+            try:
+                quantile_values = statistics.quantiles(sorted_nrmse, n=100)
+                p90_nrmse = quantile_values[89]
+                p95_nrmse = quantile_values[94]
+            except statistics.StatisticsError:
+                p90_nrmse = sorted_nrmse[min(int(n * 0.90), n - 1)]
+                p95_nrmse = sorted_nrmse[min(int(n * 0.95), n - 1)]
+        else:
+            p90_nrmse = p95_nrmse = sorted_nrmse[0]
+    else:
+        median_nrmse = mean_nrmse = min_nrmse = max_nrmse = p90_nrmse = p95_nrmse = None
+
+    # Hit rate statistics
+    valid_hit_rate_results = [r for r in results if r.hit_rate is not None and r.error is None]
+    valid_hit_rates = [r.hit_rate for r in valid_hit_rate_results]
+
+    if valid_hit_rates:
+        median_hit_rate = statistics.median(valid_hit_rates)
+        mean_hit_rate = statistics.mean(valid_hit_rates)
+        min_hit_rate = min(valid_hit_rates)
+        max_hit_rate = max(valid_hit_rates)
+    else:
+        median_hit_rate = mean_hit_rate = min_hit_rate = max_hit_rate = None
+
     # Observation statistics - only from non-error results with actual data
     observations = [r.n_observations for r in results if r.error is None and r.n_observations > 0]
     total_observations = sum(observations) if observations else 0
@@ -200,6 +405,64 @@ def compute_summary_stats(
         else:
             mode_stats[normalized_mode]["fail"] += 1
 
+    # MAE statistics
+    valid_mae_results = [r for r in results if r.mae is not None and r.error is None]
+    valid_mae_values = [r.mae for r in valid_mae_results]
+
+    if valid_mae_values:
+        sorted_mae = sorted(valid_mae_values)
+        median_mae = statistics.median(sorted_mae)
+        mean_mae = statistics.mean(sorted_mae)
+        n = len(sorted_mae)
+        if n >= 2:
+            try:
+                quantile_values = statistics.quantiles(sorted_mae, n=100)
+                p90_mae = quantile_values[89]
+                p95_mae = quantile_values[94]
+            except statistics.StatisticsError:
+                p90_mae = sorted_mae[min(int(n * 0.90), n - 1)]
+                p95_mae = sorted_mae[min(int(n * 0.95), n - 1)]
+        else:
+            p90_mae = p95_mae = sorted_mae[0]
+    else:
+        median_mae = mean_mae = p90_mae = p95_mae = None
+
+    # Mean difference statistics
+    valid_mean_diff = [r.mean_diff for r in results if r.mean_diff is not None and r.error is None]
+    if valid_mean_diff:
+        median_mean_diff = statistics.median(valid_mean_diff)
+        mean_mean_diff = statistics.mean(valid_mean_diff)
+    else:
+        median_mean_diff = mean_mean_diff = None
+
+    # T-test summary (count of significant results)
+    significant_t_tests = sum(
+        1 for r in results
+        if r.t_pvalue is not None and r.t_pvalue < 0.05 and r.error is None
+    )
+    total_t_tests = sum(
+        1 for r in results
+        if r.t_pvalue is not None and r.error is None
+    )
+
+    # Normality test summary
+    normal_distributions = sum(
+        1 for r in results
+        if r.normality_pvalue is not None and r.normality_pvalue >= 0.05 and r.error is None
+    )
+    total_normality_tests = sum(
+        1 for r in results
+        if r.normality_pvalue is not None and r.error is None
+    )
+
+    # Mean absolute z-score statistics
+    valid_z_scores = [r.mean_abs_z_score for r in results if r.mean_abs_z_score is not None and r.error is None]
+    if valid_z_scores:
+        median_z_score = statistics.median(valid_z_scores)
+        mean_z_score = statistics.mean(valid_z_scores)
+    else:
+        median_z_score = mean_z_score = None
+
     return {
         "publisher_id": publisher_id,
         "total_feeds": total_feeds,
@@ -207,18 +470,50 @@ def compute_summary_stats(
         "fail_count": fail_count,
         "error_count": error_count,
         "pass_rate_pct": round((pass_count / total_feeds * 100), 2) if total_feeds > 0 else 0,
+        # Pass criteria breakdown
+        "pass_by_nrmse_alone": pass_by_nrmse_alone,
+        "pass_by_nrmse_and_hit_rate": pass_by_nrmse_and_hit_rate,
+        # NRMSE statistics
+        "median_nrmse": median_nrmse,
+        "mean_nrmse": mean_nrmse,
+        "p90_nrmse": p90_nrmse,
+        "p95_nrmse": p95_nrmse,
+        "min_nrmse": min_nrmse,
+        "max_nrmse": max_nrmse,
+        # Hit rate statistics
+        "median_hit_rate": median_hit_rate,
+        "mean_hit_rate": mean_hit_rate,
+        "min_hit_rate": min_hit_rate,
+        "max_hit_rate": max_hit_rate,
+        # rmse_over_spread statistics (legacy, for reference)
         "median_rmse_over_spread": median_rmse,
         "mean_rmse_over_spread": mean_rmse,
         "p90_rmse_over_spread": p90_rmse,
         "p95_rmse_over_spread": p95_rmse,
         "min_rmse_over_spread": min_rmse,
         "max_rmse_over_spread": max_rmse,
+        # Coverage metrics
         "total_observations": total_observations,
         "mean_observations_per_feed": round(mean_observations, 1) if mean_observations else 0,
         "median_observations_per_feed": int(median_observations) if median_observations else 0,
         "total_time_sec": round(total_time, 2),
         "avg_time_per_feed_ms": int((total_time / total_feeds * 1000)) if total_feeds > 0 else 0,
         "mode_stats": mode_stats,
+        # New statistical metrics
+        "median_mae": median_mae,
+        "mean_mae": mean_mae,
+        "p90_mae": p90_mae,
+        "p95_mae": p95_mae,
+        "median_mean_diff": median_mean_diff,
+        "mean_mean_diff": mean_mean_diff,
+        "significant_t_tests": significant_t_tests,
+        "total_t_tests": total_t_tests,
+        "t_test_significance_rate": round((significant_t_tests / total_t_tests * 100), 2) if total_t_tests > 0 else None,
+        "normal_distributions": normal_distributions,
+        "total_normality_tests": total_normality_tests,
+        "normality_rate": round((normal_distributions / total_normality_tests * 100), 2) if total_normality_tests > 0 else None,
+        "median_z_score": median_z_score,
+        "mean_z_score": mean_z_score,
     }
 
 
@@ -347,6 +642,10 @@ def evaluate_publisher_feed(
     # Determine benchmark table based on mode and symbol (handles futures detection)
     benchmark_table = get_benchmark_table(mode, symbol)
 
+    # Get market hours filter for US equities (regular trading session only)
+    publisher_market_filter = get_market_hours_filter_sql(mode, date, "publish_time")
+    benchmark_market_filter = get_market_hours_filter_sql(mode, date, "date_time")
+
     # Query 1: Get publisher prices aggregated by second - FILTERED TO SINGLE PUBLISHER
     publisher_query = f"""
         SELECT
@@ -359,6 +658,7 @@ def evaluate_publisher_feed(
           AND toDate(publish_time) = '{date}'
           AND (status = 'ACCEPTED' OR (status = 'REJECTED' AND status_reason = 'UNAUTHORIZED'))
           AND price IS NOT NULL
+          {publisher_market_filter}
         GROUP BY ts_second
         ORDER BY ts_second
     """
@@ -374,6 +674,7 @@ def evaluate_publisher_feed(
           AND pyth_lazer_id = {feed_id}
           AND bid_price IS NOT NULL
           AND ask_price IS NOT NULL
+          {benchmark_market_filter}
         GROUP BY ts_second
         ORDER BY ts_second
     """
@@ -425,6 +726,10 @@ def evaluate_publisher_feed(
         # Compute metrics for this publisher
         squared_errors = []
         spreads = []
+        pct_diffs = []  # For hit_rate calculation (absolute)
+        benchmark_prices = []  # For nrmse calculation
+        diffs = []  # Raw price differences for statistical tests
+        signed_pct_diffs = []  # Signed percentage differences
 
         for row in pub_result.result_rows:
             ts, pub_price, _ = row
@@ -433,8 +738,16 @@ def evaluate_publisher_feed(
                 continue
 
             bench_price, spread = benchmark_by_ts[ts]
-            squared_errors.append((pub_price - bench_price) ** 2)
+            diff = pub_price - bench_price
+            pct_diff = abs(diff / bench_price) * 100  # Percentage difference (absolute)
+            signed_pct_diff = (diff / bench_price) * 100  # Signed percentage difference
+
+            squared_errors.append(diff ** 2)
             spreads.append(spread)
+            pct_diffs.append(pct_diff)
+            benchmark_prices.append(bench_price)
+            diffs.append(diff)
+            signed_pct_diffs.append(signed_pct_diff)
 
         n_observations = len(squared_errors)
 
@@ -457,24 +770,32 @@ def evaluate_publisher_feed(
         rmse = (sum(squared_errors) / n_observations) ** 0.5
         mean_spread = sum(spreads) / n_observations
 
-        if mean_spread <= 0:
-            return PublisherBenchmarkResult(
-                publisher_id=publisher_id,
-                feed_id=feed_id,
-                date=date,
-                mode=mode,
-                symbol=symbol,
-                passes=False,
-                n_observations=n_observations,
-                rmse=rmse,
-                mean_spread=mean_spread,
-                rmse_over_spread=None,
-                error="Mean spread is zero or negative",
-                execution_time_ms=int((time.time() - start_time) * 1000),
-            )
+        # Calculate nrmse (RMSE normalized by benchmark price range)
+        benchmark_range = max(benchmark_prices) - min(benchmark_prices)
+        if benchmark_range > 0:
+            nrmse = rmse / benchmark_range
+        else:
+            nrmse = None
 
-        rmse_over_spread = rmse / mean_spread
-        passes = rmse_over_spread <= 1.0
+        # Calculate hit_rate (% within 10 basis points = 0.1%)
+        hits_within_10bps = sum(1 for pct in pct_diffs if pct <= 0.1)
+        hit_rate = (hits_within_10bps / n_observations) * 100
+
+        # Calculate rmse_over_spread (additional metric, not required for pass)
+        if mean_spread > 0:
+            rmse_over_spread = rmse / mean_spread
+        else:
+            rmse_over_spread = None
+
+        # New pass/fail logic:
+        # passes if: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 98)
+        if nrmse is not None:
+            passes = nrmse < 0.01 or (nrmse < 0.05 and hit_rate >= 98)
+        else:
+            passes = False
+
+        # Compute advanced statistical metrics
+        stat_metrics = compute_statistical_metrics(diffs, signed_pct_diffs)
 
         return PublisherBenchmarkResult(
             publisher_id=publisher_id,
@@ -487,6 +808,20 @@ def evaluate_publisher_feed(
             rmse=rmse,
             mean_spread=mean_spread,
             rmse_over_spread=rmse_over_spread,
+            nrmse=nrmse,
+            hit_rate=hit_rate,
+            benchmark_price_range=benchmark_range,
+            mean_diff=stat_metrics["mean_diff"],
+            std_diff=stat_metrics["std_diff"],
+            mean_pct_diff=stat_metrics["mean_pct_diff"],
+            std_pct_diff=stat_metrics["std_pct_diff"],
+            mae=stat_metrics["mae"],
+            t_statistic=stat_metrics["t_statistic"],
+            t_pvalue=stat_metrics["t_pvalue"],
+            wilcoxon_statistic=stat_metrics["wilcoxon_statistic"],
+            wilcoxon_pvalue=stat_metrics["wilcoxon_pvalue"],
+            normality_pvalue=stat_metrics["normality_pvalue"],
+            mean_abs_z_score=stat_metrics["mean_abs_z_score"],
             execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
@@ -580,10 +915,11 @@ def process_csv(
             if result.error:
                 status = f"ERROR: {result.error[:50]}"
 
-            rmse_str = f"{result.rmse_over_spread:.3f}" if result.rmse_over_spread is not None else "N/A"
+            nrmse_str = f"{result.nrmse:.4f}" if result.nrmse is not None else "N/A"
+            hit_rate_str = f"{result.hit_rate:.1f}%" if result.hit_rate is not None else "N/A"
             print(
                 f"  [{result.execution_time_ms:>4}ms] Feed {result.feed_id} ({result.symbol or 'unknown'}): "
-                f"{status} - rmse/spread={rmse_str}, n={result.n_observations}"
+                f"{status} - nrmse={nrmse_str}, hit_rate={hit_rate_str}, n={result.n_observations}"
             )
 
     return results
@@ -606,9 +942,24 @@ def write_results_csv(
         "symbol",
         "passes",
         "n_observations",
+        "nrmse",
+        "hit_rate",
+        "benchmark_price_range",
         "rmse",
         "mean_spread",
         "rmse_over_spread",
+        # New statistical metrics
+        "mean_diff",
+        "std_diff",
+        "mean_pct_diff",
+        "std_pct_diff",
+        "mae",
+        "t_statistic",
+        "t_pvalue",
+        "wilcoxon_statistic",
+        "wilcoxon_pvalue",
+        "normality_pvalue",
+        "mean_abs_z_score",
         "error",
         "execution_time_ms",
     ]
@@ -628,9 +979,24 @@ def write_results_csv(
                     r.symbol or "",
                     r.passes,
                     r.n_observations,
+                    f"{r.nrmse:.6f}" if r.nrmse is not None else "",
+                    f"{r.hit_rate:.2f}" if r.hit_rate is not None else "",
+                    f"{r.benchmark_price_range:.6f}" if r.benchmark_price_range is not None else "",
                     f"{r.rmse:.6f}" if r.rmse is not None else "",
                     f"{r.mean_spread:.6f}" if r.mean_spread is not None else "",
                     f"{r.rmse_over_spread:.6f}" if r.rmse_over_spread is not None else "",
+                    # New statistical metrics
+                    f"{r.mean_diff:.8f}" if r.mean_diff is not None else "",
+                    f"{r.std_diff:.8f}" if r.std_diff is not None else "",
+                    f"{r.mean_pct_diff:.6f}" if r.mean_pct_diff is not None else "",
+                    f"{r.std_pct_diff:.6f}" if r.std_pct_diff is not None else "",
+                    f"{r.mae:.8f}" if r.mae is not None else "",
+                    f"{r.t_statistic:.4f}" if r.t_statistic is not None else "",
+                    f"{r.t_pvalue:.6f}" if r.t_pvalue is not None else "",
+                    f"{r.wilcoxon_statistic:.4f}" if r.wilcoxon_statistic is not None else "",
+                    f"{r.wilcoxon_pvalue:.6f}" if r.wilcoxon_pvalue is not None else "",
+                    f"{r.normality_pvalue:.6f}" if r.normality_pvalue is not None else "",
+                    f"{r.mean_abs_z_score:.4f}" if r.mean_abs_z_score is not None else "",
                     r.error or "",
                     r.execution_time_ms,
                 ]
@@ -662,7 +1028,25 @@ def write_results_csv(
             write_summary_row("error_count", summary_stats["error_count"])
             write_summary_row("pass_rate_pct", summary_stats["pass_rate_pct"])
 
-            # Quality metrics
+            # Pass criteria breakdown
+            write_summary_row("pass_by_nrmse_alone", summary_stats["pass_by_nrmse_alone"])
+            write_summary_row("pass_by_nrmse_and_hit_rate", summary_stats["pass_by_nrmse_and_hit_rate"])
+
+            # NRMSE quality metrics (primary)
+            write_summary_row("median_nrmse", summary_stats["median_nrmse"])
+            write_summary_row("mean_nrmse", summary_stats["mean_nrmse"])
+            write_summary_row("p90_nrmse", summary_stats["p90_nrmse"])
+            write_summary_row("p95_nrmse", summary_stats["p95_nrmse"])
+            write_summary_row("min_nrmse", summary_stats["min_nrmse"])
+            write_summary_row("max_nrmse", summary_stats["max_nrmse"])
+
+            # Hit rate metrics
+            write_summary_row("median_hit_rate", summary_stats["median_hit_rate"])
+            write_summary_row("mean_hit_rate", summary_stats["mean_hit_rate"])
+            write_summary_row("min_hit_rate", summary_stats["min_hit_rate"])
+            write_summary_row("max_hit_rate", summary_stats["max_hit_rate"])
+
+            # RMSE over spread metrics (reference, not used for pass/fail)
             write_summary_row("median_rmse_over_spread", summary_stats["median_rmse_over_spread"])
             write_summary_row("mean_rmse_over_spread", summary_stats["mean_rmse_over_spread"])
             write_summary_row("p90_rmse_over_spread", summary_stats["p90_rmse_over_spread"])
@@ -679,6 +1063,22 @@ def write_results_csv(
             write_summary_row("total_time_sec", summary_stats["total_time_sec"])
             write_summary_row("avg_time_per_feed_ms", summary_stats["avg_time_per_feed_ms"])
 
+            # New statistical summary metrics
+            write_summary_row("median_mae", summary_stats.get("median_mae"))
+            write_summary_row("mean_mae", summary_stats.get("mean_mae"))
+            write_summary_row("p90_mae", summary_stats.get("p90_mae"))
+            write_summary_row("p95_mae", summary_stats.get("p95_mae"))
+            write_summary_row("median_mean_diff", summary_stats.get("median_mean_diff"))
+            write_summary_row("mean_mean_diff", summary_stats.get("mean_mean_diff"))
+            write_summary_row("significant_t_tests", summary_stats.get("significant_t_tests"))
+            write_summary_row("total_t_tests", summary_stats.get("total_t_tests"))
+            write_summary_row("t_test_significance_rate", summary_stats.get("t_test_significance_rate"))
+            write_summary_row("normal_distributions", summary_stats.get("normal_distributions"))
+            write_summary_row("total_normality_tests", summary_stats.get("total_normality_tests"))
+            write_summary_row("normality_rate", summary_stats.get("normality_rate"))
+            write_summary_row("median_z_score", summary_stats.get("median_z_score"))
+            write_summary_row("mean_z_score", summary_stats.get("mean_z_score"))
+
             # Breakdown by asset class
             mode_stats = summary_stats.get("mode_stats", {})
             for mode in sorted(mode_stats.keys()):
@@ -688,6 +1088,102 @@ def write_results_csv(
                 write_summary_row(f"error_count_{mode}", stats["error"])
 
     print(f"\nResults written to: {output_path}")
+
+
+def print_interpretation_guide(summary_stats: dict) -> None:
+    """Print an interpretive guide explaining what the metrics mean."""
+    print(f"\n{'='*70}")
+    print("INTERPRETATION GUIDE - What These Numbers Mean")
+    print(f"{'='*70}")
+
+    print("\n--- PASS/FAIL CRITERIA ---")
+    print("Your feed PASSES if: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 98%)")
+    print("  - nrmse: RMSE normalized by benchmark price range (lower is better)")
+    print("  - hit_rate: % of prices within 10 basis points of benchmark (higher is better)")
+
+    print("\n--- ACCURACY METRICS ---")
+    print("MAE (Mean Absolute Error):")
+    print("  - Average absolute deviation from benchmark price")
+    print("  - Interpretation: Lower is better; should be small relative to asset price")
+    if summary_stats.get("median_mae") is not None:
+        print(f"  - Your median MAE: {summary_stats['median_mae']:.8f}")
+
+    mean_diff = summary_stats.get("mean_mean_diff")
+    if mean_diff is not None:
+        print(f"\nMean Difference (Systematic Bias): {mean_diff:.8f}")
+        if abs(mean_diff) < 1e-8:
+            print("  - Your prices show NO systematic bias (excellent)")
+        elif mean_diff > 0:
+            print("  - Your prices tend to be HIGHER than benchmark")
+            print("  - ACTION: Review price source calibration")
+        else:
+            print("  - Your prices tend to be LOWER than benchmark")
+            print("  - ACTION: Review price source calibration")
+
+    print("\n--- STATISTICAL TESTS ---")
+
+    t_rate = summary_stats.get("t_test_significance_rate")
+    total_t = summary_stats.get("total_t_tests", 0)
+    sig_t = summary_stats.get("significant_t_tests", 0)
+    if t_rate is not None:
+        print(f"\nT-Test Significance: {sig_t}/{total_t} feeds ({t_rate:.1f}%)")
+        print("  - Tests if mean price difference is statistically different from zero")
+        if t_rate > 50:
+            print("  - HIGH rate (>50%) suggests systematic pricing bias across many feeds")
+            print("  - ACTION: Investigate price source accuracy and calibration")
+        elif t_rate > 20:
+            print("  - MODERATE rate suggests some feeds have systematic bias")
+            print("  - ACTION: Review failing feeds individually")
+        else:
+            print("  - LOW rate (<20%) is good - differences appear mostly random")
+
+    norm_rate = summary_stats.get("normality_rate")
+    total_norm = summary_stats.get("total_normality_tests", 0)
+    normal_count = summary_stats.get("normal_distributions", 0)
+    if norm_rate is not None:
+        print(f"\nNormality Test: {normal_count}/{total_norm} feeds ({norm_rate:.1f}%) have normally distributed errors")
+        if norm_rate >= 70:
+            print("  - HIGH rate indicates consistent, predictable error patterns")
+            print("  - Errors are likely due to latency/timing rather than data issues")
+        elif norm_rate >= 40:
+            print("  - MODERATE rate - mixed error patterns")
+        else:
+            print("  - LOW rate suggests outliers or irregular error patterns")
+            print("  - ACTION: Investigate data quality issues, latency spikes, or stale prices")
+
+    median_z = summary_stats.get("median_z_score")
+    if median_z is not None:
+        print(f"\nMedian Z-Score: {median_z:.4f}")
+        print("  - Average deviation from mean in standard deviation units")
+        print("  - Expected value for normal distribution: ~0.8")
+        if median_z > 1.5:
+            print("  - HIGH z-scores indicate frequent large deviations (outliers)")
+            print("  - ACTION: Add spike detection or validate price updates")
+        elif median_z < 0.5:
+            print("  - LOW z-scores indicate very stable, consistent pricing (excellent)")
+        else:
+            print("  - NORMAL range - typical error volatility")
+
+    print(f"\n{'='*70}")
+    print("HOW TO IMPROVE YOUR DATA QUALITY")
+    print(f"{'='*70}")
+    print("1. REDUCE SYSTEMATIC BIAS:")
+    print("   - Calibrate your price source against benchmark")
+    print("   - Check for rounding or truncation issues")
+    print("   - Verify timezone handling is correct")
+    print("\n2. REDUCE RANDOM ERROR:")
+    print("   - Improve data freshness (reduce latency)")
+    print("   - Increase update frequency during volatile periods")
+    print("   - Use faster data sources")
+    print("\n3. REDUCE OUTLIERS:")
+    print("   - Add spike detection before publishing")
+    print("   - Validate price updates against recent history")
+    print("   - Implement circuit breakers for extreme moves")
+    print("\n4. INCREASE HIT RATE:")
+    print("   - Target: >98% of prices within 10 basis points")
+    print("   - Monitor real-time deviation from benchmark")
+    print("   - Alert on sustained deviations")
+    print(f"{'='*70}\n")
 
 
 def main():
@@ -820,27 +1316,52 @@ Examples:
     write_results_csv(results, output_path, summary_stats)
 
     # Print summary to console
-    print(f"\n{'='*60}")
+    print(f"\n{'='*70}")
     print(f"SUMMARY - Publisher {publisher_id}")
-    print(f"{'='*60}")
+    print(f"{'='*70}")
+    print("Pass criteria: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 98%)")
+    print(f"{'='*70}")
     print(f"Total feeds evaluated: {summary_stats['total_feeds']}")
-    print(f"PASS (rmse/spread <= 1.0): {summary_stats['pass_count']}")
+    print(f"PASS: {summary_stats['pass_count']}")
+    print(f"  - by nrmse < 0.01 alone: {summary_stats['pass_by_nrmse_alone']}")
+    print(f"  - by nrmse < 0.05 + hit_rate >= 98%: {summary_stats['pass_by_nrmse_and_hit_rate']}")
     print(f"FAIL: {summary_stats['fail_count']}")
     print(f"Errors: {summary_stats['error_count']}")
     print(f"Pass rate: {summary_stats['pass_rate_pct']:.1f}%")
-    print(f"{'='*60}")
+    print(f"{'='*70}")
+    print("NRMSE Statistics (lower is better):")
+    if summary_stats['median_nrmse'] is not None:
+        print(f"  Median: {summary_stats['median_nrmse']:.6f}")
+        print(f"  Mean: {summary_stats['mean_nrmse']:.6f}")
+        print(f"  P90: {summary_stats['p90_nrmse']:.6f}")
+        print(f"  P95: {summary_stats['p95_nrmse']:.6f}")
+        print(f"  Min: {summary_stats['min_nrmse']:.6f}")
+        print(f"  Max: {summary_stats['max_nrmse']:.6f}")
+    else:
+        print("  No valid NRMSE data")
+    print(f"{'='*70}")
+    print("Hit Rate Statistics (higher is better, % within 10 bps):")
+    if summary_stats['median_hit_rate'] is not None:
+        print(f"  Median: {summary_stats['median_hit_rate']:.2f}%")
+        print(f"  Mean: {summary_stats['mean_hit_rate']:.2f}%")
+        print(f"  Min: {summary_stats['min_hit_rate']:.2f}%")
+        print(f"  Max: {summary_stats['max_hit_rate']:.2f}%")
+    else:
+        print("  No valid hit rate data")
+    print(f"{'='*70}")
+    print("RMSE/Spread Statistics (reference metric, not used for pass/fail):")
     if summary_stats['median_rmse_over_spread'] is not None:
-        print(f"Median rmse/spread: {summary_stats['median_rmse_over_spread']:.4f}")
-        print(f"Mean rmse/spread: {summary_stats['mean_rmse_over_spread']:.4f}")
-        print(f"P90 rmse/spread: {summary_stats['p90_rmse_over_spread']:.4f}")
-        print(f"P95 rmse/spread: {summary_stats['p95_rmse_over_spread']:.4f}")
-        print(f"Min rmse/spread: {summary_stats['min_rmse_over_spread']:.4f}")
-        print(f"Max rmse/spread: {summary_stats['max_rmse_over_spread']:.4f}")
-    print(f"{'='*60}")
+        print(f"  Median: {summary_stats['median_rmse_over_spread']:.4f}")
+        print(f"  Mean: {summary_stats['mean_rmse_over_spread']:.4f}")
+        print(f"  P90: {summary_stats['p90_rmse_over_spread']:.4f}")
+        print(f"  P95: {summary_stats['p95_rmse_over_spread']:.4f}")
+    else:
+        print("  No valid rmse/spread data")
+    print(f"{'='*70}")
     print(f"Total observations: {summary_stats['total_observations']:,}")
     print(f"Mean observations per feed: {summary_stats['mean_observations_per_feed']:,.1f}")
     print(f"Median observations per feed: {summary_stats['median_observations_per_feed']:,}")
-    print(f"{'='*60}")
+    print(f"{'='*70}")
     print(f"Total time: {summary_stats['total_time_sec']:.2f}s")
     if summary_stats['total_feeds'] > 0:
         print(f"Average time per feed: {summary_stats['avg_time_per_feed_ms']}ms")
@@ -860,6 +1381,9 @@ Examples:
                 f"  {mode:<15}: {stats['pass']:>3} pass, {stats['fail']:>3} fail, "
                 f"{stats['error']:>3} error ({pass_rate:.1f}% pass rate)"
             )
+
+    # Print interpretation guide
+    print_interpretation_guide(summary_stats)
 
 
 if __name__ == "__main__":
