@@ -33,6 +33,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -40,6 +41,13 @@ from zoneinfo import ZoneInfo
 import clickhouse_connect
 import yaml
 from scipy import stats
+
+
+class TradingSession(Enum):
+    """Trading session types for US equities."""
+    REGULAR = "regular"
+    PREMARKET = "premarket"
+    AFTERHOURS = "afterhours"
 
 
 # Asset class normalization mapping (CSV value -> canonical value)
@@ -69,6 +77,14 @@ US_EQUITY_MARKET_OPEN_HOUR = 9
 US_EQUITY_MARKET_OPEN_MINUTE = 30
 US_EQUITY_MARKET_CLOSE_HOUR = 16
 US_EQUITY_MARKET_CLOSE_MINUTE = 0
+
+# US Equities extended hours (EST/EDT)
+# Pre-market: 4:00 AM - 9:30 AM EST
+US_EQUITY_PREMARKET_OPEN_HOUR = 4
+US_EQUITY_PREMARKET_OPEN_MINUTE = 0
+# After-hours: 4:00 PM - 8:00 PM EST
+US_EQUITY_AFTERHOURS_CLOSE_HOUR = 20
+US_EQUITY_AFTERHOURS_CLOSE_MINUTE = 0
 
 
 def is_futures_symbol(symbol: str) -> bool:
@@ -160,6 +176,66 @@ def get_market_hours_filter_sql(mode: str, date: str, column_name: str = "publis
     return f"""
         AND {column_name} >= '{market_open_utc.strftime('%Y-%m-%d %H:%M:%S')}'
         AND {column_name} < '{market_close_utc.strftime('%Y-%m-%d %H:%M:%S')}'
+    """
+
+
+def get_extended_hours_filter_sql(
+    session: TradingSession,
+    date: str,
+    column_name: str = "publish_time"
+) -> str:
+    """
+    Generate SQL WHERE clause for extended hours filtering.
+
+    For US equities extended hours:
+    - Pre-market: 4:00 AM - 9:30 AM EST
+    - After-hours: 4:00 PM - 8:00 PM EST
+
+    Args:
+        session: Which extended hours session (PREMARKET or AFTERHOURS)
+        date: Date string in YYYY-MM-DD format
+        column_name: The timestamp column name to filter on
+
+    Returns:
+        SQL WHERE clause fragment
+    """
+    dt = datetime.strptime(date, "%Y-%m-%d")
+    est = ZoneInfo("America/New_York")
+    utc = ZoneInfo("UTC")
+
+    if session == TradingSession.PREMARKET:
+        # Pre-market: 4:00 AM - 9:30 AM EST
+        start_est = dt.replace(
+            hour=US_EQUITY_PREMARKET_OPEN_HOUR,
+            minute=US_EQUITY_PREMARKET_OPEN_MINUTE,
+            tzinfo=est
+        )
+        end_est = dt.replace(
+            hour=US_EQUITY_MARKET_OPEN_HOUR,
+            minute=US_EQUITY_MARKET_OPEN_MINUTE,
+            tzinfo=est
+        )
+    elif session == TradingSession.AFTERHOURS:
+        # After-hours: 4:00 PM - 8:00 PM EST
+        start_est = dt.replace(
+            hour=US_EQUITY_MARKET_CLOSE_HOUR,
+            minute=US_EQUITY_MARKET_CLOSE_MINUTE,
+            tzinfo=est
+        )
+        end_est = dt.replace(
+            hour=US_EQUITY_AFTERHOURS_CLOSE_HOUR,
+            minute=US_EQUITY_AFTERHOURS_CLOSE_MINUTE,
+            tzinfo=est
+        )
+    else:
+        return ""
+
+    start_utc = start_est.astimezone(utc)
+    end_utc = end_est.astimezone(utc)
+
+    return f"""
+        AND {column_name} >= '{start_utc.strftime('%Y-%m-%d %H:%M:%S')}'
+        AND {column_name} < '{end_utc.strftime('%Y-%m-%d %H:%M:%S')}'
     """
 
 
@@ -263,6 +339,21 @@ def compute_statistical_metrics(
 
 
 @dataclass
+class ExtendedHoursMetrics:
+    """Metrics for a single extended hours session (pre-market or after-hours)."""
+    session: TradingSession
+    n_observations: int
+    rmse: Optional[float]
+    mean_spread: Optional[float]
+    rmse_over_spread: Optional[float]
+    nrmse: Optional[float]
+    hit_rate: Optional[float]
+    benchmark_price_range: Optional[float]
+    passes: bool
+    error: Optional[str] = None
+
+
+@dataclass
 class PublisherBenchmarkResult:
     """Result of a single publisher's benchmark evaluation for one feed."""
 
@@ -293,12 +384,18 @@ class PublisherBenchmarkResult:
     wilcoxon_pvalue: Optional[float] = None     # Wilcoxon p-value
     normality_pvalue: Optional[float] = None    # D'Agostino-Pearson normality test p-value
     mean_abs_z_score: Optional[float] = None    # Mean absolute z-score
+    # Extended hours results (only populated when --extended-hours is used)
+    premarket_metrics: Optional[ExtendedHoursMetrics] = None
+    afterhours_metrics: Optional[ExtendedHoursMetrics] = None
     error: Optional[str] = None
     execution_time_ms: int = 0
 
 
 def compute_summary_stats(
-    results: list[PublisherBenchmarkResult], publisher_id: int, total_time: float
+    results: list[PublisherBenchmarkResult],
+    publisher_id: int,
+    total_time: float,
+    include_extended_hours: bool = False,
 ) -> dict:
     """Compute comprehensive summary statistics from benchmark results."""
     # Basic counts - mutually exclusive: error > pass/fail
@@ -463,6 +560,51 @@ def compute_summary_stats(
     else:
         median_z_score = mean_z_score = None
 
+    # Extended hours statistics (only for US equities when enabled)
+    extended_hours_stats = {}
+    if include_extended_hours:
+        # Filter US equity results with extended hours data
+        us_equity_results = [
+            r for r in results
+            if normalize_asset_class(r.mode) == "us-equities" and r.error is None
+        ]
+
+        # Pre-market statistics
+        premarket_results = [r.premarket_metrics for r in us_equity_results if r.premarket_metrics]
+        pm_pass = sum(1 for pm in premarket_results if pm.passes and not pm.error)
+        pm_fail = sum(1 for pm in premarket_results if not pm.passes and not pm.error)
+        pm_error = sum(1 for pm in premarket_results if pm.error)
+        pm_total = len(premarket_results)
+
+        pm_nrmse_values = [pm.nrmse for pm in premarket_results if pm.nrmse is not None and not pm.error]
+        pm_hit_rate_values = [pm.hit_rate for pm in premarket_results if pm.hit_rate is not None and not pm.error]
+
+        extended_hours_stats["premarket_total_feeds"] = pm_total
+        extended_hours_stats["premarket_pass_count"] = pm_pass
+        extended_hours_stats["premarket_fail_count"] = pm_fail
+        extended_hours_stats["premarket_error_count"] = pm_error
+        extended_hours_stats["premarket_pass_rate_pct"] = round((pm_pass / pm_total * 100), 2) if pm_total > 0 else 0
+        extended_hours_stats["premarket_median_nrmse"] = statistics.median(pm_nrmse_values) if pm_nrmse_values else None
+        extended_hours_stats["premarket_median_hit_rate"] = statistics.median(pm_hit_rate_values) if pm_hit_rate_values else None
+
+        # After-hours statistics
+        afterhours_results = [r.afterhours_metrics for r in us_equity_results if r.afterhours_metrics]
+        ah_pass = sum(1 for ah in afterhours_results if ah.passes and not ah.error)
+        ah_fail = sum(1 for ah in afterhours_results if not ah.passes and not ah.error)
+        ah_error = sum(1 for ah in afterhours_results if ah.error)
+        ah_total = len(afterhours_results)
+
+        ah_nrmse_values = [ah.nrmse for ah in afterhours_results if ah.nrmse is not None and not ah.error]
+        ah_hit_rate_values = [ah.hit_rate for ah in afterhours_results if ah.hit_rate is not None and not ah.error]
+
+        extended_hours_stats["afterhours_total_feeds"] = ah_total
+        extended_hours_stats["afterhours_pass_count"] = ah_pass
+        extended_hours_stats["afterhours_fail_count"] = ah_fail
+        extended_hours_stats["afterhours_error_count"] = ah_error
+        extended_hours_stats["afterhours_pass_rate_pct"] = round((ah_pass / ah_total * 100), 2) if ah_total > 0 else 0
+        extended_hours_stats["afterhours_median_nrmse"] = statistics.median(ah_nrmse_values) if ah_nrmse_values else None
+        extended_hours_stats["afterhours_median_hit_rate"] = statistics.median(ah_hit_rate_values) if ah_hit_rate_values else None
+
     return {
         "publisher_id": publisher_id,
         "total_feeds": total_feeds,
@@ -514,6 +656,8 @@ def compute_summary_stats(
         "normality_rate": round((normal_distributions / total_normality_tests * 100), 2) if total_normality_tests > 0 else None,
         "median_z_score": median_z_score,
         "mean_z_score": mean_z_score,
+        # Extended hours statistics (empty dict if not enabled)
+        "extended_hours": extended_hours_stats,
     }
 
 
@@ -602,6 +746,121 @@ def get_feed_metadata(client_lazer, feed_id: int) -> tuple[Optional[str], Option
     return None, None
 
 
+def evaluate_session_metrics(
+    client_lazer,
+    client_analytics,
+    publisher_id: int,
+    feed_id: int,
+    date: str,
+    divisor: float,
+    benchmark_table: str,
+    publisher_time_filter: str,
+    benchmark_time_filter: str,
+    min_observations: int = 100,
+) -> tuple[int, Optional[float], Optional[float], Optional[float],
+           Optional[float], Optional[float], Optional[float], Optional[str]]:
+    """
+    Evaluate metrics for a single trading session.
+
+    Returns:
+        Tuple of (n_observations, rmse, mean_spread, rmse_over_spread,
+                  nrmse, hit_rate, benchmark_price_range, error)
+    """
+    # Query publisher prices
+    publisher_query = f"""
+        SELECT
+            toStartOfSecond(publish_time) AS ts_second,
+            avg(price) / {divisor} AS avg_price,
+            count() AS update_count
+        FROM publisher_updates
+        WHERE price_feed_id = {feed_id}
+          AND publisher_id = {publisher_id}
+          AND toDate(publish_time) = '{date}'
+          AND (status = 'ACCEPTED' OR (status = 'REJECTED' AND status_reason = 'UNAUTHORIZED'))
+          AND price IS NOT NULL
+          {publisher_time_filter}
+        GROUP BY ts_second
+        ORDER BY ts_second
+    """
+
+    # Query benchmark prices
+    benchmark_query = f"""
+        SELECT
+            toStartOfSecond(date_time) AS ts_second,
+            avg(COALESCE(price, (bid_price + ask_price) / 2)) AS avg_price,
+            avg(ask_price - bid_price) AS avg_spread
+        FROM {benchmark_table}
+        WHERE toDate(date_time) = '{date}'
+          AND pyth_lazer_id = {feed_id}
+          AND bid_price IS NOT NULL
+          AND ask_price IS NOT NULL
+          {benchmark_time_filter}
+        GROUP BY ts_second
+        ORDER BY ts_second
+    """
+
+    try:
+        pub_result = client_lazer.query(publisher_query)
+        bench_result = client_analytics.query(benchmark_query)
+
+        if not pub_result.result_rows:
+            return (0, None, None, None, None, None, None,
+                    f"No publisher data for session")
+
+        if not bench_result.result_rows:
+            return (0, None, None, None, None, None, None,
+                    "No benchmark data for session")
+
+        # Build benchmark lookup dict
+        benchmark_by_ts = {
+            row[0]: (row[1], row[2])
+            for row in bench_result.result_rows
+            if row[1] is not None and row[2] is not None
+        }
+
+        # Compute metrics
+        squared_errors = []
+        spreads = []
+        pct_diffs = []
+        benchmark_prices = []
+
+        for row in pub_result.result_rows:
+            ts, pub_price, _ = row
+            if ts not in benchmark_by_ts:
+                continue
+            bench_price, spread = benchmark_by_ts[ts]
+            diff = pub_price - bench_price
+            pct_diff = abs(diff / bench_price) * 100
+
+            squared_errors.append(diff ** 2)
+            spreads.append(spread)
+            pct_diffs.append(pct_diff)
+            benchmark_prices.append(bench_price)
+
+        n_observations = len(squared_errors)
+
+        if n_observations < min_observations:
+            return (n_observations, None, None, None, None, None, None,
+                    f"Insufficient observations ({n_observations} < {min_observations})")
+
+        rmse = (sum(squared_errors) / n_observations) ** 0.5
+        mean_spread = sum(spreads) / n_observations
+
+        benchmark_range = max(benchmark_prices) - min(benchmark_prices)
+        nrmse = rmse / benchmark_range if benchmark_range > 0 else None
+
+        hits_within_10bps = sum(1 for pct in pct_diffs if pct <= 0.1)
+        hit_rate = (hits_within_10bps / n_observations) * 100
+
+        rmse_over_spread = rmse / mean_spread if mean_spread > 0 else None
+
+        return (n_observations, rmse, mean_spread, rmse_over_spread,
+                nrmse, hit_rate, benchmark_range, None)
+
+    except Exception as e:
+        return (0, None, None, None, None, None, None, str(e))
+
+
 def evaluate_publisher_feed(
     client_lazer,
     client_analytics,
@@ -609,7 +868,7 @@ def evaluate_publisher_feed(
     feed_id: int,
     date: str,
     mode: str,
-    tolerance_seconds: int = 60,
+    include_extended_hours: bool = False,
 ) -> PublisherBenchmarkResult:
     """
     Evaluate a single publisher's data quality for one feed.
@@ -797,6 +1056,79 @@ def evaluate_publisher_feed(
         # Compute advanced statistical metrics
         stat_metrics = compute_statistical_metrics(diffs, signed_pct_diffs)
 
+        # Evaluate extended hours if requested and applicable (US equities only)
+        premarket_metrics = None
+        afterhours_metrics = None
+
+        if include_extended_hours and mode in ("us-equities", "equity-us"):
+            # Pre-market evaluation (4:00 AM - 9:30 AM EST)
+            premarket_pub_filter = get_extended_hours_filter_sql(
+                TradingSession.PREMARKET, date, "publish_time"
+            )
+            premarket_bench_filter = get_extended_hours_filter_sql(
+                TradingSession.PREMARKET, date, "date_time"
+            )
+            pm_result = evaluate_session_metrics(
+                client_lazer, client_analytics, publisher_id, feed_id, date,
+                divisor, benchmark_table,
+                premarket_pub_filter, premarket_bench_filter,
+                min_observations=50  # Lower threshold for extended hours
+            )
+            pm_n_obs, pm_rmse, pm_spread, pm_ros, pm_nrmse, pm_hr, pm_range, pm_err = pm_result
+
+            # Determine pass/fail for pre-market
+            if pm_nrmse is not None and pm_hr is not None:
+                pm_passes = pm_nrmse < 0.01 or (pm_nrmse < 0.05 and pm_hr >= 98)
+            else:
+                pm_passes = False
+
+            premarket_metrics = ExtendedHoursMetrics(
+                session=TradingSession.PREMARKET,
+                n_observations=pm_n_obs,
+                rmse=pm_rmse,
+                mean_spread=pm_spread,
+                rmse_over_spread=pm_ros,
+                nrmse=pm_nrmse,
+                hit_rate=pm_hr,
+                benchmark_price_range=pm_range,
+                passes=pm_passes,
+                error=pm_err,
+            )
+
+            # After-hours evaluation (4:00 PM - 8:00 PM EST)
+            afterhours_pub_filter = get_extended_hours_filter_sql(
+                TradingSession.AFTERHOURS, date, "publish_time"
+            )
+            afterhours_bench_filter = get_extended_hours_filter_sql(
+                TradingSession.AFTERHOURS, date, "date_time"
+            )
+            ah_result = evaluate_session_metrics(
+                client_lazer, client_analytics, publisher_id, feed_id, date,
+                divisor, benchmark_table,
+                afterhours_pub_filter, afterhours_bench_filter,
+                min_observations=50  # Lower threshold for extended hours
+            )
+            ah_n_obs, ah_rmse, ah_spread, ah_ros, ah_nrmse, ah_hr, ah_range, ah_err = ah_result
+
+            # Determine pass/fail for after-hours
+            if ah_nrmse is not None and ah_hr is not None:
+                ah_passes = ah_nrmse < 0.01 or (ah_nrmse < 0.05 and ah_hr >= 98)
+            else:
+                ah_passes = False
+
+            afterhours_metrics = ExtendedHoursMetrics(
+                session=TradingSession.AFTERHOURS,
+                n_observations=ah_n_obs,
+                rmse=ah_rmse,
+                mean_spread=ah_spread,
+                rmse_over_spread=ah_ros,
+                nrmse=ah_nrmse,
+                hit_rate=ah_hr,
+                benchmark_price_range=ah_range,
+                passes=ah_passes,
+                error=ah_err,
+            )
+
         return PublisherBenchmarkResult(
             publisher_id=publisher_id,
             feed_id=feed_id,
@@ -822,6 +1154,8 @@ def evaluate_publisher_feed(
             wilcoxon_pvalue=stat_metrics["wilcoxon_pvalue"],
             normality_pvalue=stat_metrics["normality_pvalue"],
             mean_abs_z_score=stat_metrics["mean_abs_z_score"],
+            premarket_metrics=premarket_metrics,
+            afterhours_metrics=afterhours_metrics,
             execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
@@ -848,6 +1182,7 @@ def process_csv(
     max_workers: int,
     include_asset_classes: list[str] | None = None,
     exclude_asset_classes: list[str] | None = None,
+    include_extended_hours: bool = False,
 ) -> list[PublisherBenchmarkResult]:
     """Process feeds from CSV file with parallel execution for a single publisher."""
     config = load_config()
@@ -900,6 +1235,7 @@ def process_csv(
             feed_id,
             date,
             mode,
+            include_extended_hours=include_extended_hours,
         )
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -929,6 +1265,7 @@ def write_results_csv(
     results: list[PublisherBenchmarkResult],
     output_path: Path,
     summary_stats: Optional[dict] = None,
+    include_extended_hours: bool = False,
 ):
     """Write benchmark results to CSV file with optional summary section."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -960,9 +1297,26 @@ def write_results_csv(
         "wilcoxon_pvalue",
         "normality_pvalue",
         "mean_abs_z_score",
-        "error",
-        "execution_time_ms",
     ]
+
+    # Add extended hours columns if enabled
+    if include_extended_hours:
+        header.extend([
+            # Pre-market columns
+            "premarket_n_observations",
+            "premarket_nrmse",
+            "premarket_hit_rate",
+            "premarket_passes",
+            "premarket_error",
+            # After-hours columns
+            "afterhours_n_observations",
+            "afterhours_nrmse",
+            "afterhours_hit_rate",
+            "afterhours_passes",
+            "afterhours_error",
+        ])
+
+    header.extend(["error", "execution_time_ms"])
     num_cols = len(header)
 
     with open(output_path, "w", newline="") as f:
@@ -970,37 +1324,55 @@ def write_results_csv(
         writer.writerow(header)
 
         for r in sorted(results, key=lambda x: (x.date, x.feed_id)):
-            writer.writerow(
-                [
-                    r.publisher_id,
-                    r.feed_id,
-                    r.date,
-                    r.mode,
-                    r.symbol or "",
-                    r.passes,
-                    r.n_observations,
-                    f"{r.nrmse:.6f}" if r.nrmse is not None else "",
-                    f"{r.hit_rate:.2f}" if r.hit_rate is not None else "",
-                    f"{r.benchmark_price_range:.6f}" if r.benchmark_price_range is not None else "",
-                    f"{r.rmse:.6f}" if r.rmse is not None else "",
-                    f"{r.mean_spread:.6f}" if r.mean_spread is not None else "",
-                    f"{r.rmse_over_spread:.6f}" if r.rmse_over_spread is not None else "",
-                    # New statistical metrics
-                    f"{r.mean_diff:.8f}" if r.mean_diff is not None else "",
-                    f"{r.std_diff:.8f}" if r.std_diff is not None else "",
-                    f"{r.mean_pct_diff:.6f}" if r.mean_pct_diff is not None else "",
-                    f"{r.std_pct_diff:.6f}" if r.std_pct_diff is not None else "",
-                    f"{r.mae:.8f}" if r.mae is not None else "",
-                    f"{r.t_statistic:.4f}" if r.t_statistic is not None else "",
-                    f"{r.t_pvalue:.6f}" if r.t_pvalue is not None else "",
-                    f"{r.wilcoxon_statistic:.4f}" if r.wilcoxon_statistic is not None else "",
-                    f"{r.wilcoxon_pvalue:.6f}" if r.wilcoxon_pvalue is not None else "",
-                    f"{r.normality_pvalue:.6f}" if r.normality_pvalue is not None else "",
-                    f"{r.mean_abs_z_score:.4f}" if r.mean_abs_z_score is not None else "",
-                    r.error or "",
-                    r.execution_time_ms,
-                ]
-            )
+            row = [
+                r.publisher_id,
+                r.feed_id,
+                r.date,
+                r.mode,
+                r.symbol or "",
+                r.passes,
+                r.n_observations,
+                f"{r.nrmse:.6f}" if r.nrmse is not None else "",
+                f"{r.hit_rate:.2f}" if r.hit_rate is not None else "",
+                f"{r.benchmark_price_range:.6f}" if r.benchmark_price_range is not None else "",
+                f"{r.rmse:.6f}" if r.rmse is not None else "",
+                f"{r.mean_spread:.6f}" if r.mean_spread is not None else "",
+                f"{r.rmse_over_spread:.6f}" if r.rmse_over_spread is not None else "",
+                # New statistical metrics
+                f"{r.mean_diff:.8f}" if r.mean_diff is not None else "",
+                f"{r.std_diff:.8f}" if r.std_diff is not None else "",
+                f"{r.mean_pct_diff:.6f}" if r.mean_pct_diff is not None else "",
+                f"{r.std_pct_diff:.6f}" if r.std_pct_diff is not None else "",
+                f"{r.mae:.8f}" if r.mae is not None else "",
+                f"{r.t_statistic:.4f}" if r.t_statistic is not None else "",
+                f"{r.t_pvalue:.6f}" if r.t_pvalue is not None else "",
+                f"{r.wilcoxon_statistic:.4f}" if r.wilcoxon_statistic is not None else "",
+                f"{r.wilcoxon_pvalue:.6f}" if r.wilcoxon_pvalue is not None else "",
+                f"{r.normality_pvalue:.6f}" if r.normality_pvalue is not None else "",
+                f"{r.mean_abs_z_score:.4f}" if r.mean_abs_z_score is not None else "",
+            ]
+
+            # Add extended hours data if enabled
+            if include_extended_hours:
+                pm = r.premarket_metrics
+                ah = r.afterhours_metrics
+                row.extend([
+                    # Pre-market
+                    pm.n_observations if pm else "",
+                    f"{pm.nrmse:.6f}" if pm and pm.nrmse is not None else "",
+                    f"{pm.hit_rate:.2f}" if pm and pm.hit_rate is not None else "",
+                    pm.passes if pm else "",
+                    pm.error or "" if pm else "",
+                    # After-hours
+                    ah.n_observations if ah else "",
+                    f"{ah.nrmse:.6f}" if ah and ah.nrmse is not None else "",
+                    f"{ah.hit_rate:.2f}" if ah and ah.hit_rate is not None else "",
+                    ah.passes if ah else "",
+                    ah.error or "" if ah else "",
+                ])
+
+            row.extend([r.error or "", r.execution_time_ms])
+            writer.writerow(row)
 
         # Write summary section if provided
         if summary_stats:
@@ -1086,6 +1458,26 @@ def write_results_csv(
                 write_summary_row(f"pass_count_{mode}", stats["pass"])
                 write_summary_row(f"fail_count_{mode}", stats["fail"])
                 write_summary_row(f"error_count_{mode}", stats["error"])
+
+            # Extended hours summary (if enabled)
+            ext_stats = summary_stats.get("extended_hours", {})
+            if ext_stats:
+                write_summary_row("", "")  # Separator
+                write_summary_row("EXTENDED_HOURS", "")
+                write_summary_row("premarket_total_feeds", ext_stats.get("premarket_total_feeds"))
+                write_summary_row("premarket_pass_count", ext_stats.get("premarket_pass_count"))
+                write_summary_row("premarket_fail_count", ext_stats.get("premarket_fail_count"))
+                write_summary_row("premarket_error_count", ext_stats.get("premarket_error_count"))
+                write_summary_row("premarket_pass_rate_pct", ext_stats.get("premarket_pass_rate_pct"))
+                write_summary_row("premarket_median_nrmse", ext_stats.get("premarket_median_nrmse"))
+                write_summary_row("premarket_median_hit_rate", ext_stats.get("premarket_median_hit_rate"))
+                write_summary_row("afterhours_total_feeds", ext_stats.get("afterhours_total_feeds"))
+                write_summary_row("afterhours_pass_count", ext_stats.get("afterhours_pass_count"))
+                write_summary_row("afterhours_fail_count", ext_stats.get("afterhours_fail_count"))
+                write_summary_row("afterhours_error_count", ext_stats.get("afterhours_error_count"))
+                write_summary_row("afterhours_pass_rate_pct", ext_stats.get("afterhours_pass_rate_pct"))
+                write_summary_row("afterhours_median_nrmse", ext_stats.get("afterhours_median_nrmse"))
+                write_summary_row("afterhours_median_hit_rate", ext_stats.get("afterhours_median_hit_rate"))
 
     print(f"\nResults written to: {output_path}")
 
@@ -1250,6 +1642,14 @@ Examples:
         action="store_true",
         help="List unique asset classes in the CSV file and exit",
     )
+    parser.add_argument(
+        "--extended-hours",
+        action="store_true",
+        help="Include extended hours evaluation for US equities. "
+             "Pre-market: 4:00 AM - 9:30 AM EST, After-hours: 4:00 PM - 8:00 PM EST. "
+             "Adds separate columns for pre-market and after-hours metrics. "
+             "Only affects us-equities; other asset classes are unchanged.",
+    )
 
     args = parser.parse_args()
 
@@ -1306,14 +1706,21 @@ Examples:
         args.workers,
         include_asset_classes=args.include_asset_class,
         exclude_asset_classes=args.exclude_asset_class,
+        include_extended_hours=args.extended_hours,
     )
 
     # Compute summary statistics
     total_time = time.time() - total_start
-    summary_stats = compute_summary_stats(results, publisher_id, total_time)
+    summary_stats = compute_summary_stats(
+        results, publisher_id, total_time,
+        include_extended_hours=args.extended_hours,
+    )
 
     # Write results and summary to CSV
-    write_results_csv(results, output_path, summary_stats)
+    write_results_csv(
+        results, output_path, summary_stats,
+        include_extended_hours=args.extended_hours,
+    )
 
     # Print summary to console
     print(f"\n{'='*70}")
@@ -1381,6 +1788,50 @@ Examples:
                 f"  {mode:<15}: {stats['pass']:>3} pass, {stats['fail']:>3} fail, "
                 f"{stats['error']:>3} error ({pass_rate:.1f}% pass rate)"
             )
+
+    # Print extended hours summary if enabled
+    if args.extended_hours:
+        ext_stats = summary_stats.get("extended_hours", {})
+        if ext_stats:
+            print(f"\n{'='*70}")
+            print("EXTENDED HOURS - US EQUITIES ONLY")
+            print(f"{'='*70}")
+
+            # Pre-market
+            print("\nPRE-MARKET (4:00 AM - 9:30 AM EST):")
+            pm_total = ext_stats.get("premarket_total_feeds", 0)
+            if pm_total > 0:
+                print(f"  Total feeds: {pm_total}")
+                print(f"  PASS: {ext_stats.get('premarket_pass_count', 0)}")
+                print(f"  FAIL: {ext_stats.get('premarket_fail_count', 0)}")
+                print(f"  Errors: {ext_stats.get('premarket_error_count', 0)}")
+                print(f"  Pass rate: {ext_stats.get('premarket_pass_rate_pct', 0):.1f}%")
+                pm_nrmse = ext_stats.get("premarket_median_nrmse")
+                pm_hr = ext_stats.get("premarket_median_hit_rate")
+                if pm_nrmse is not None:
+                    print(f"  Median NRMSE: {pm_nrmse:.6f}")
+                if pm_hr is not None:
+                    print(f"  Median Hit Rate: {pm_hr:.2f}%")
+            else:
+                print("  No pre-market data available")
+
+            # After-hours
+            print("\nAFTER-HOURS (4:00 PM - 8:00 PM EST):")
+            ah_total = ext_stats.get("afterhours_total_feeds", 0)
+            if ah_total > 0:
+                print(f"  Total feeds: {ah_total}")
+                print(f"  PASS: {ext_stats.get('afterhours_pass_count', 0)}")
+                print(f"  FAIL: {ext_stats.get('afterhours_fail_count', 0)}")
+                print(f"  Errors: {ext_stats.get('afterhours_error_count', 0)}")
+                print(f"  Pass rate: {ext_stats.get('afterhours_pass_rate_pct', 0):.1f}%")
+                ah_nrmse = ext_stats.get("afterhours_median_nrmse")
+                ah_hr = ext_stats.get("afterhours_median_hit_rate")
+                if ah_nrmse is not None:
+                    print(f"  Median NRMSE: {ah_nrmse:.6f}")
+                if ah_hr is not None:
+                    print(f"  Median Hit Rate: {ah_hr:.2f}%")
+            else:
+                print("  No after-hours data available")
 
     # Print interpretation guide
     print_interpretation_guide(summary_stats)

@@ -176,3 +176,35 @@ The script outputs an interpretation guide explaining:
 - What each metric means
 - How to interpret your results (good/bad thresholds)
 - Actionable recommendations for improving data quality
+
+### Extended Hours Support (US Equities)
+
+The `publisher_benchmark.py` script supports evaluation of US equities during extended trading hours:
+
+```bash
+# Include extended hours evaluation
+python publisher_benchmark.py --csv publisher_55_feeds.csv --extended-hours
+```
+
+**Trading Sessions:**
+
+| Session | Time (EST) | Flag Required |
+|---------|-----------|---------------|
+| Regular Hours | 9:30 AM - 4:00 PM | Always evaluated |
+| Pre-market | 4:00 AM - 9:30 AM | `--extended-hours` |
+| After-hours | 4:00 PM - 8:00 PM | `--extended-hours` |
+
+**Important Notes:**
+- Extended hours evaluation only applies to `us-equities` asset class
+- Other asset classes (fx, metals, commodity) are unaffected
+- Regular hours results are always shown separately (not mixed with extended hours)
+- Extended hours typically have lower liquidity and may have higher error rates
+- Minimum observation threshold for extended hours is 50 (vs 100 for regular hours)
+
+**Extended Hours Output:**
+
+When `--extended-hours` is enabled, the CSV output includes additional columns:
+- `premarket_n_observations`, `premarket_nrmse`, `premarket_hit_rate`, `premarket_passes`, `premarket_error`
+- `afterhours_n_observations`, `afterhours_nrmse`, `afterhours_hit_rate`, `afterhours_passes`, `afterhours_error`
+
+The console summary includes a separate "EXTENDED HOURS" section with aggregate statistics for pre-market and after-hours sessions.
