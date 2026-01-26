@@ -47,7 +47,7 @@ feed_id,date,mode
 
 ## Pass/Fail Criteria
 
-- **Publisher PASSES** if: `rmse_over_spread <= 1.0`
+- **Publisher PASSES** if: `nrmse < 0.01` OR (`nrmse < 0.05` AND `hit_rate >= 98%`)
 - **Feed is READY** if: `passing_publishers >= target_pub_count` (default: 4)
 
 ## Quick Examples
@@ -61,6 +61,9 @@ python quick_benchmark.py --feed-id 327 --date 2025-10-06 --mode fx
 
 # Evaluate one publisher across multiple feeds (faster)
 python publisher_benchmark.py --csv publisher_55_feeds.csv
+
+# Include extended hours for US equities (pre-market + after-hours)
+python publisher_benchmark.py --csv publisher_55_feeds.csv --extended-hours
 
 # Discover what feeds a publisher has
 python publisher_feeds.py --publisher-id 29

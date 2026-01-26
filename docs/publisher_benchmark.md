@@ -37,6 +37,7 @@ python publisher_benchmark.py --csv publisher_55_feeds.csv --include-asset-class
 | `--include-asset-class` | Only process these asset classes | All |
 | `--exclude-asset-class` | Skip these asset classes | None |
 | `--list-asset-classes` | List asset classes in CSV and exit | - |
+| `--extended-hours` | Include pre-market and after-hours evaluation for US equities | Disabled |
 
 ## Output
 
@@ -56,7 +57,9 @@ Results CSV contains:
 
 ## Pass/Fail Criteria
 
-- **Publisher PASSES** if: `rmse_over_spread <= 1.0`
+- **Publisher PASSES** if: `nrmse < 0.01` OR (`nrmse < 0.05` AND `hit_rate >= 98%`)
+- `nrmse` = RMSE normalized by benchmark price range (lower is better)
+- `hit_rate` = % of prices within 10 basis points of benchmark (higher is better)
 - Minimum 100 observations required for valid evaluation
 
 ## Summary Statistics
@@ -82,6 +85,43 @@ After processing, the script outputs a summary (console + CSV):
 **Coverage metrics:** `total_observations`, `mean_observations_per_feed`
 
 **Asset class breakdown:** `pass_count_{mode}`, `fail_count_{mode}`, `error_count_{mode}`
+
+## Extended Hours (US Equities)
+
+Evaluate US equities during extended trading sessions using `--extended-hours`:
+
+```bash
+python publisher_benchmark.py --csv publisher_55_feeds.csv --extended-hours
+```
+
+### Trading Sessions
+
+| Session | Time (EST) | Flag Required |
+|---------|-----------|---------------|
+| Regular Hours | 9:30 AM - 4:00 PM | Always evaluated |
+| Pre-market | 4:00 AM - 9:30 AM | `--extended-hours` |
+| After-hours | 4:00 PM - 8:00 PM | `--extended-hours` |
+
+### Extended Hours Output
+
+When enabled, the CSV includes additional columns:
+
+| Column | Description |
+|--------|-------------|
+| `premarket_n_observations` | Data points in pre-market session |
+| `premarket_nrmse` | NRMSE for pre-market |
+| `premarket_hit_rate` | Hit rate for pre-market |
+| `premarket_passes` | Pass/fail for pre-market |
+| `premarket_error` | Error message if any |
+| `afterhours_*` | Same metrics for after-hours |
+
+### Notes
+
+- Extended hours only applies to `us-equities` asset class
+- Other asset classes (fx, metals, commodity) are unaffected
+- Regular hours results remain separate (not mixed with extended hours)
+- Lower observation threshold (50 vs 100) for extended sessions
+- Extended hours typically have lower liquidity and may have higher error rates
 
 Example console output:
 ```
