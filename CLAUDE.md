@@ -36,7 +36,7 @@ python quick_benchmark.py --csv publisher_11_feeds.csv --list-asset-classes
 python quick_benchmark.py --csv feeds.csv --include-asset-class fx metals us-equities
 
 # Exclude asset classes without benchmark data
-python quick_benchmark.py --csv feeds.csv --exclude-asset-class crypto funding-rate rates
+python quick_benchmark.py --csv feeds.csv --exclude-asset-class crypto funding-rate nav
 ```
 
 ### Arguments
@@ -84,12 +84,12 @@ Asset classes with benchmark data available:
 - `metals` / `metal` - Precious metals
 - `us-equities` / `equity-us` - US equities (includes equity index futures)
 - `commodity` - Commodities (includes commodity futures)
+- `us-treasuries` / `treasuries` / `rates` - US Treasury bonds (uses yield values instead of prices)
 
 Asset classes WITHOUT benchmark data (will error):
 - `crypto` - Cryptocurrency
 - `crypto-redemption-rate` - Crypto redemption rates
 - `funding-rate` - Funding rates
-- `rates` - Interest rates
 - `nav` - Net asset value
 
 Use `--list-asset-classes` to discover asset classes in your CSV file.

@@ -61,12 +61,14 @@ ASSET_CLASS_ALIASES = {
     "crypto": "crypto",
     "crypto-redemption-rate": "crypto-redemption-rate",
     "funding-rate": "funding-rate",
-    "rates": "rates",
+    "rates": "us-treasuries",
     "nav": "nav",
+    "us-treasuries": "us-treasuries",
+    "treasuries": "us-treasuries",
 }
 
 # Asset classes that have benchmark data available
-BENCHMARKABLE_ASSET_CLASSES = {"fx", "metals", "us-equities", "commodity"}
+BENCHMARKABLE_ASSET_CLASSES = {"fx", "metals", "us-equities", "commodity", "us-treasuries"}
 
 # Futures contract month codes
 # F=Jan, G=Feb, H=Mar, J=Apr, K=May, M=Jun, N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec
@@ -246,6 +248,7 @@ def get_benchmark_table(mode: str, symbol: Optional[str]) -> str:
     Returns:
         - 'datascope_futures_benchmark_data' for futures contracts
         - 'datascope_fx_benchmark_data' for fx/metals
+        - 'datascope_us_treasury_benchmark_data' for us-treasuries
         - 'datascope_global_equities_benchmark_data' for us-equities (non-futures)
     """
     # Check if symbol is a futures contract
@@ -255,8 +258,28 @@ def get_benchmark_table(mode: str, symbol: Optional[str]) -> str:
     # Fallback to existing logic
     if mode in ("fx", "metals"):
         return "datascope_fx_benchmark_data"
+    elif mode == "us-treasuries":
+        return "datascope_us_treasury_benchmark_data"
     else:
         return "datascope_global_equities_benchmark_data"
+
+
+def get_benchmark_columns(mode: str) -> tuple[str, str, str]:
+    """
+    Get the correct column names for benchmark data based on mode.
+
+    Treasuries use yield columns instead of price columns.
+
+    Args:
+        mode: The normalized asset class (e.g., 'fx', 'us-treasuries')
+
+    Returns:
+        Tuple of (price_column, bid_column, ask_column)
+    """
+    if mode == "us-treasuries":
+        return ("yield", "bid_yield", "ask_yield")
+    else:
+        return ("price", "bid_price", "ask_price")
 
 
 def compute_statistical_metrics(
@@ -752,6 +775,7 @@ def evaluate_session_metrics(
     publisher_id: int,
     feed_id: int,
     date: str,
+    mode: str,
     divisor: float,
     benchmark_table: str,
     publisher_time_filter: str,
@@ -766,6 +790,9 @@ def evaluate_session_metrics(
         Tuple of (n_observations, rmse, mean_spread, rmse_over_spread,
                   nrmse, hit_rate, benchmark_price_range, error)
     """
+    # Get correct column names for this mode (treasuries use yield columns)
+    price_col, bid_col, ask_col = get_benchmark_columns(mode)
+
     # Query publisher prices
     publisher_query = f"""
         SELECT
@@ -783,17 +810,17 @@ def evaluate_session_metrics(
         ORDER BY ts_second
     """
 
-    # Query benchmark prices
+    # Query benchmark prices (uses yield columns for treasuries, price columns otherwise)
     benchmark_query = f"""
         SELECT
             toStartOfSecond(date_time) AS ts_second,
-            avg(COALESCE(price, (bid_price + ask_price) / 2)) AS avg_price,
-            avg(ask_price - bid_price) AS avg_spread
+            avg(COALESCE({price_col}, ({bid_col} + {ask_col}) / 2)) AS avg_price,
+            avg({ask_col} - {bid_col}) AS avg_spread
         FROM {benchmark_table}
         WHERE toDate(date_time) = '{date}'
           AND pyth_lazer_id = {feed_id}
-          AND bid_price IS NOT NULL
-          AND ask_price IS NOT NULL
+          AND {bid_col} IS NOT NULL
+          AND {ask_col} IS NOT NULL
           {benchmark_time_filter}
         GROUP BY ts_second
         ORDER BY ts_second
@@ -878,6 +905,9 @@ def evaluate_publisher_feed(
     """
     start_time = time.time()
 
+    # Normalize mode early for consistent handling throughout the function
+    mode = normalize_asset_class(mode)
+
     # Get feed metadata
     symbol, exponent = get_feed_metadata(client_lazer, feed_id)
     if exponent is None:
@@ -901,6 +931,9 @@ def evaluate_publisher_feed(
     # Determine benchmark table based on mode and symbol (handles futures detection)
     benchmark_table = get_benchmark_table(mode, symbol)
 
+    # Get correct column names for this mode (treasuries use yield columns)
+    price_col, bid_col, ask_col = get_benchmark_columns(mode)
+
     # Get market hours filter for US equities (regular trading session only)
     publisher_market_filter = get_market_hours_filter_sql(mode, date, "publish_time")
     benchmark_market_filter = get_market_hours_filter_sql(mode, date, "date_time")
@@ -922,17 +955,17 @@ def evaluate_publisher_feed(
         ORDER BY ts_second
     """
 
-    # Query 2: Get benchmark prices aggregated by second
+    # Query 2: Get benchmark prices aggregated by second (uses yield columns for treasuries)
     benchmark_query = f"""
         SELECT
             toStartOfSecond(date_time) AS ts_second,
-            avg(COALESCE(price, (bid_price + ask_price) / 2)) AS avg_price,
-            avg(ask_price - bid_price) AS avg_spread
+            avg(COALESCE({price_col}, ({bid_col} + {ask_col}) / 2)) AS avg_price,
+            avg({ask_col} - {bid_col}) AS avg_spread
         FROM {benchmark_table}
         WHERE toDate(date_time) = '{date}'
           AND pyth_lazer_id = {feed_id}
-          AND bid_price IS NOT NULL
-          AND ask_price IS NOT NULL
+          AND {bid_col} IS NOT NULL
+          AND {ask_col} IS NOT NULL
           {benchmark_market_filter}
         GROUP BY ts_second
         ORDER BY ts_second
@@ -1070,7 +1103,7 @@ def evaluate_publisher_feed(
             )
             pm_result = evaluate_session_metrics(
                 client_lazer, client_analytics, publisher_id, feed_id, date,
-                divisor, benchmark_table,
+                mode, divisor, benchmark_table,
                 premarket_pub_filter, premarket_bench_filter,
                 min_observations=50  # Lower threshold for extended hours
             )
@@ -1104,7 +1137,7 @@ def evaluate_publisher_feed(
             )
             ah_result = evaluate_session_metrics(
                 client_lazer, client_analytics, publisher_id, feed_id, date,
-                divisor, benchmark_table,
+                mode, divisor, benchmark_table,
                 afterhours_pub_filter, afterhours_bench_filter,
                 min_observations=50  # Lower threshold for extended hours
             )
