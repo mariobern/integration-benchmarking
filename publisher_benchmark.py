@@ -48,6 +48,7 @@ class TradingSession(Enum):
     REGULAR = "regular"
     PREMARKET = "premarket"
     AFTERHOURS = "afterhours"
+    OVERNIGHT = "overnight"
 
 
 # Asset class normalization mapping (CSV value -> canonical value)
@@ -87,6 +88,14 @@ US_EQUITY_PREMARKET_OPEN_MINUTE = 0
 # After-hours: 4:00 PM - 8:00 PM EST
 US_EQUITY_AFTERHOURS_CLOSE_HOUR = 20
 US_EQUITY_AFTERHOURS_CLOSE_MINUTE = 0
+# Overnight: 8:00 PM - 4:00 AM EST (next day)
+US_EQUITY_OVERNIGHT_START_HOUR = 20
+US_EQUITY_OVERNIGHT_START_MINUTE = 0
+US_EQUITY_OVERNIGHT_END_HOUR = 4
+US_EQUITY_OVERNIGHT_END_MINUTE = 0
+
+# Reference publisher for overnight benchmark (Blue Ocean ATS)
+OVERNIGHT_REFERENCE_PUBLISHER_ID = 32
 
 
 def is_futures_symbol(symbol: str) -> bool:
@@ -241,6 +250,57 @@ def get_extended_hours_filter_sql(
     """
 
 
+def get_overnight_hours_filter_sql(
+    date: str,
+    column_name: str = "publish_time"
+) -> str:
+    """
+    Generate SQL WHERE clause for overnight hours filtering.
+
+    Overnight session for US equities: 8:00 PM - 4:00 AM EST (next day).
+    This spans two calendar days: 8 PM on the given date to 4 AM the next day.
+
+    In UTC (EST = UTC-5 or EDT = UTC-4):
+    - 8:00 PM EST = 01:00 UTC (next day)
+    - 4:00 AM EST = 09:00 UTC (same day as UTC conversion)
+
+    Args:
+        date: Date string in YYYY-MM-DD format (the trading date, not the calendar date)
+        column_name: The timestamp column name to filter on
+
+    Returns:
+        SQL WHERE clause fragment
+    """
+    from datetime import timedelta
+
+    dt = datetime.strptime(date, "%Y-%m-%d")
+    est = ZoneInfo("America/New_York")
+    utc = ZoneInfo("UTC")
+
+    # Overnight start: 8:00 PM EST on the given date
+    overnight_start_est = dt.replace(
+        hour=US_EQUITY_OVERNIGHT_START_HOUR,
+        minute=US_EQUITY_OVERNIGHT_START_MINUTE,
+        tzinfo=est
+    )
+
+    # Overnight end: 4:00 AM EST the next day
+    next_day = dt + timedelta(days=1)
+    overnight_end_est = next_day.replace(
+        hour=US_EQUITY_OVERNIGHT_END_HOUR,
+        minute=US_EQUITY_OVERNIGHT_END_MINUTE,
+        tzinfo=est
+    )
+
+    overnight_start_utc = overnight_start_est.astimezone(utc)
+    overnight_end_utc = overnight_end_est.astimezone(utc)
+
+    return f"""
+        AND {column_name} >= '{overnight_start_utc.strftime('%Y-%m-%d %H:%M:%S')}'
+        AND {column_name} < '{overnight_end_utc.strftime('%Y-%m-%d %H:%M:%S')}'
+    """
+
+
 def get_benchmark_table(mode: str, symbol: Optional[str]) -> str:
     """
     Determine which benchmark table to use based on mode and symbol.
@@ -377,6 +437,28 @@ class ExtendedHoursMetrics:
 
 
 @dataclass
+class OvernightMetrics:
+    """
+    Metrics for overnight session (8 PM - 4 AM ET) using publisher 32 as benchmark.
+
+    Unlike ExtendedHoursMetrics which uses Datascope as benchmark, overnight metrics
+    use publisher 32 (Blue Ocean ATS) as the reference. This is a publisher-vs-publisher
+    comparison, not an official benchmark comparison.
+    """
+    n_observations: int
+    n_reference_observations: int  # How many observations from publisher 32
+    rmse: Optional[float]
+    mean_spread: Optional[float]  # Spread from reference publisher
+    rmse_over_spread: Optional[float]
+    nrmse: Optional[float]
+    hit_rate: Optional[float]
+    reference_price_range: Optional[float]
+    passes: bool
+    reference_publisher_id: int = OVERNIGHT_REFERENCE_PUBLISHER_ID
+    error: Optional[str] = None
+
+
+@dataclass
 class PublisherBenchmarkResult:
     """Result of a single publisher's benchmark evaluation for one feed."""
 
@@ -410,6 +492,9 @@ class PublisherBenchmarkResult:
     # Extended hours results (only populated when --extended-hours is used)
     premarket_metrics: Optional[ExtendedHoursMetrics] = None
     afterhours_metrics: Optional[ExtendedHoursMetrics] = None
+    # Overnight results (only populated when --overnight is used)
+    # Uses publisher 32 as benchmark instead of Datascope
+    overnight_metrics: Optional[OvernightMetrics] = None
     error: Optional[str] = None
     execution_time_ms: int = 0
 
@@ -419,6 +504,7 @@ def compute_summary_stats(
     publisher_id: int,
     total_time: float,
     include_extended_hours: bool = False,
+    include_overnight: bool = False,
 ) -> dict:
     """Compute comprehensive summary statistics from benchmark results."""
     # Basic counts - mutually exclusive: error > pass/fail
@@ -628,6 +714,33 @@ def compute_summary_stats(
         extended_hours_stats["afterhours_median_nrmse"] = statistics.median(ah_nrmse_values) if ah_nrmse_values else None
         extended_hours_stats["afterhours_median_hit_rate"] = statistics.median(ah_hit_rate_values) if ah_hit_rate_values else None
 
+    # Overnight statistics (only for US equities when enabled, uses publisher 32 as benchmark)
+    overnight_stats = {}
+    if include_overnight:
+        # Filter US equity results with overnight data
+        us_equity_results = [
+            r for r in results
+            if normalize_asset_class(r.mode) == "us-equities" and r.error is None
+        ]
+
+        overnight_results = [r.overnight_metrics for r in us_equity_results if r.overnight_metrics]
+        on_pass = sum(1 for on in overnight_results if on.passes and not on.error)
+        on_fail = sum(1 for on in overnight_results if not on.passes and not on.error)
+        on_error = sum(1 for on in overnight_results if on.error)
+        on_total = len(overnight_results)
+
+        on_nrmse_values = [on.nrmse for on in overnight_results if on.nrmse is not None and not on.error]
+        on_hit_rate_values = [on.hit_rate for on in overnight_results if on.hit_rate is not None and not on.error]
+
+        overnight_stats["overnight_total_feeds"] = on_total
+        overnight_stats["overnight_pass_count"] = on_pass
+        overnight_stats["overnight_fail_count"] = on_fail
+        overnight_stats["overnight_error_count"] = on_error
+        overnight_stats["overnight_pass_rate_pct"] = round((on_pass / on_total * 100), 2) if on_total > 0 else 0
+        overnight_stats["overnight_median_nrmse"] = statistics.median(on_nrmse_values) if on_nrmse_values else None
+        overnight_stats["overnight_median_hit_rate"] = statistics.median(on_hit_rate_values) if on_hit_rate_values else None
+        overnight_stats["overnight_reference_publisher_id"] = OVERNIGHT_REFERENCE_PUBLISHER_ID
+
     return {
         "publisher_id": publisher_id,
         "total_feeds": total_feeds,
@@ -681,6 +794,8 @@ def compute_summary_stats(
         "mean_z_score": mean_z_score,
         # Extended hours statistics (empty dict if not enabled)
         "extended_hours": extended_hours_stats,
+        # Overnight statistics (empty dict if not enabled)
+        "overnight": overnight_stats,
     }
 
 
@@ -767,6 +882,31 @@ def get_feed_metadata(client_lazer, feed_id: int) -> tuple[Optional[str], Option
     if result.result_rows:
         return result.result_rows[0][0], result.result_rows[0][1]
     return None, None
+
+
+def get_symbols_for_feeds(client_lazer, feed_ids: list[int]) -> dict[int, Optional[str]]:
+    """
+    Batch query symbols for multiple feed IDs.
+
+    Args:
+        client_lazer: ClickHouse client for Lazer cluster
+        feed_ids: List of feed IDs to look up
+
+    Returns:
+        Dictionary mapping feed_id -> symbol (or None if not found)
+    """
+    if not feed_ids:
+        return {}
+
+    feed_ids_str = ",".join(map(str, feed_ids))
+    query = f"""
+        SELECT pyth_lazer_id, symbol
+        FROM feeds_metadata_latest
+        FINAL
+        WHERE pyth_lazer_id IN ({feed_ids_str})
+    """
+    result = client_lazer.query(query)
+    return {row[0]: row[1] for row in result.result_rows}
 
 
 def evaluate_session_metrics(
@@ -888,6 +1028,203 @@ def evaluate_session_metrics(
         return (0, None, None, None, None, None, None, str(e))
 
 
+def evaluate_overnight_session(
+    client_lazer,
+    publisher_id: int,
+    feed_id: int,
+    date: str,
+    divisor: float,
+    min_observations: int = 50,
+    reference_publisher_id: int = OVERNIGHT_REFERENCE_PUBLISHER_ID,
+) -> OvernightMetrics:
+    """
+    Evaluate a publisher's overnight session data against publisher 32 (Blue Ocean ATS).
+
+    Unlike Datascope benchmarking, this queries both the target publisher and the
+    reference publisher from the same publisher_updates table on the Lazer cluster.
+
+    Args:
+        client_lazer: ClickHouse client for Lazer cluster
+        publisher_id: The publisher to evaluate
+        feed_id: The feed ID to evaluate
+        date: Date string in YYYY-MM-DD format
+        divisor: Price divisor (10^|exponent|)
+        min_observations: Minimum observations required for valid metrics
+        reference_publisher_id: Publisher ID to use as benchmark (default: 32)
+
+    Returns:
+        OvernightMetrics with evaluation results
+    """
+    # Get overnight time filter
+    overnight_filter = get_overnight_hours_filter_sql(date, "publish_time")
+
+    # Query publisher prices for overnight session
+    publisher_query = f"""
+        SELECT
+            toStartOfSecond(publish_time) AS ts_second,
+            avg(price) / {divisor} AS avg_price,
+            count() AS update_count
+        FROM publisher_updates
+        WHERE price_feed_id = {feed_id}
+          AND publisher_id = {publisher_id}
+          AND toDate(publish_time) >= '{date}'
+          AND (status = 'ACCEPTED' OR (status = 'REJECTED' AND status_reason = 'UNAUTHORIZED'))
+          AND price IS NOT NULL
+          {overnight_filter}
+        GROUP BY ts_second
+        ORDER BY ts_second
+    """
+
+    # Query reference publisher (32) prices for overnight session
+    # Include spread data from bid/ask if available
+    reference_query = f"""
+        SELECT
+            toStartOfSecond(publish_time) AS ts_second,
+            avg(price) / {divisor} AS avg_price,
+            avg(best_ask_price - best_bid_price) / {divisor} AS avg_spread,
+            count() AS update_count
+        FROM publisher_updates
+        WHERE price_feed_id = {feed_id}
+          AND publisher_id = {reference_publisher_id}
+          AND toDate(publish_time) >= '{date}'
+          AND (status = 'ACCEPTED' OR (status = 'REJECTED' AND status_reason = 'UNAUTHORIZED'))
+          AND price IS NOT NULL
+          {overnight_filter}
+        GROUP BY ts_second
+        ORDER BY ts_second
+    """
+
+    try:
+        pub_result = client_lazer.query(publisher_query)
+        ref_result = client_lazer.query(reference_query)
+
+        if not pub_result.result_rows:
+            return OvernightMetrics(
+                n_observations=0,
+                n_reference_observations=0,
+                rmse=None,
+                mean_spread=None,
+                rmse_over_spread=None,
+                nrmse=None,
+                hit_rate=None,
+                reference_price_range=None,
+                passes=False,
+                reference_publisher_id=reference_publisher_id,
+                error=f"No publisher {publisher_id} data for overnight session",
+            )
+
+        if not ref_result.result_rows:
+            return OvernightMetrics(
+                n_observations=0,
+                n_reference_observations=0,
+                rmse=None,
+                mean_spread=None,
+                rmse_over_spread=None,
+                nrmse=None,
+                hit_rate=None,
+                reference_price_range=None,
+                passes=False,
+                reference_publisher_id=reference_publisher_id,
+                error=f"No reference publisher {reference_publisher_id} data for overnight session",
+            )
+
+        # Build reference lookup dict
+        # reference_by_ts: ts -> (price, spread)
+        reference_by_ts = {}
+        for row in ref_result.result_rows:
+            ts, ref_price, ref_spread, _ = row
+            if ref_price is not None:
+                # Use a default spread if bid/ask not available
+                spread = ref_spread if ref_spread is not None and ref_spread > 0 else None
+                reference_by_ts[ts] = (ref_price, spread)
+
+        n_reference_observations = len(reference_by_ts)
+
+        # Compute metrics
+        squared_errors = []
+        spreads = []
+        pct_diffs = []
+        reference_prices = []
+
+        for row in pub_result.result_rows:
+            ts, pub_price, _ = row
+            if ts not in reference_by_ts:
+                continue
+
+            ref_price, spread = reference_by_ts[ts]
+            diff = pub_price - ref_price
+            pct_diff = abs(diff / ref_price) * 100 if ref_price != 0 else 0
+
+            squared_errors.append(diff ** 2)
+            if spread is not None:
+                spreads.append(spread)
+            pct_diffs.append(pct_diff)
+            reference_prices.append(ref_price)
+
+        n_observations = len(squared_errors)
+
+        if n_observations < min_observations:
+            return OvernightMetrics(
+                n_observations=n_observations,
+                n_reference_observations=n_reference_observations,
+                rmse=None,
+                mean_spread=None,
+                rmse_over_spread=None,
+                nrmse=None,
+                hit_rate=None,
+                reference_price_range=None,
+                passes=False,
+                reference_publisher_id=reference_publisher_id,
+                error=f"Insufficient matched observations ({n_observations} < {min_observations})",
+            )
+
+        rmse = (sum(squared_errors) / n_observations) ** 0.5
+        mean_spread = sum(spreads) / len(spreads) if spreads else None
+
+        reference_range = max(reference_prices) - min(reference_prices)
+        nrmse = rmse / reference_range if reference_range > 0 else None
+
+        hits_within_10bps = sum(1 for pct in pct_diffs if pct <= 0.1)
+        hit_rate = (hits_within_10bps / n_observations) * 100
+
+        rmse_over_spread = rmse / mean_spread if mean_spread and mean_spread > 0 else None
+
+        # Apply same pass/fail criteria as regular sessions
+        if nrmse is not None:
+            passes = nrmse < 0.01 or (nrmse < 0.05 and hit_rate >= 98)
+        else:
+            passes = False
+
+        return OvernightMetrics(
+            n_observations=n_observations,
+            n_reference_observations=n_reference_observations,
+            rmse=rmse,
+            mean_spread=mean_spread,
+            rmse_over_spread=rmse_over_spread,
+            nrmse=nrmse,
+            hit_rate=hit_rate,
+            reference_price_range=reference_range,
+            passes=passes,
+            reference_publisher_id=reference_publisher_id,
+            error=None,
+        )
+
+    except Exception as e:
+        return OvernightMetrics(
+            n_observations=0,
+            n_reference_observations=0,
+            rmse=None,
+            mean_spread=None,
+            rmse_over_spread=None,
+            nrmse=None,
+            hit_rate=None,
+            reference_price_range=None,
+            passes=False,
+            reference_publisher_id=reference_publisher_id,
+            error=str(e),
+        )
+
+
 def evaluate_publisher_feed(
     client_lazer,
     client_analytics,
@@ -896,12 +1233,23 @@ def evaluate_publisher_feed(
     date: str,
     mode: str,
     include_extended_hours: bool = False,
+    include_overnight: bool = False,
 ) -> PublisherBenchmarkResult:
     """
     Evaluate a single publisher's data quality for one feed.
 
     This is significantly faster than quick_benchmark.py because it only
     queries data for ONE publisher instead of all publishers.
+
+    Args:
+        client_lazer: ClickHouse client for Lazer cluster
+        client_analytics: ClickHouse client for Analytics cluster (Datascope)
+        publisher_id: The publisher to evaluate
+        feed_id: The feed ID to evaluate
+        date: Date string in YYYY-MM-DD format
+        mode: Asset class (fx, metals, us-equities, etc.)
+        include_extended_hours: If True, evaluate pre-market and after-hours sessions
+        include_overnight: If True, evaluate overnight session using publisher 32 as benchmark
     """
     start_time = time.time()
 
@@ -1162,6 +1510,36 @@ def evaluate_publisher_feed(
                 error=ah_err,
             )
 
+        # Evaluate overnight session if requested and applicable (US equities only)
+        # Uses publisher 32 (Blue Ocean ATS) as benchmark instead of Datascope
+        overnight_metrics = None
+
+        if include_overnight and mode in ("us-equities", "equity-us"):
+            # Skip overnight evaluation if the publisher being evaluated IS the reference
+            if publisher_id == OVERNIGHT_REFERENCE_PUBLISHER_ID:
+                overnight_metrics = OvernightMetrics(
+                    n_observations=0,
+                    n_reference_observations=0,
+                    rmse=None,
+                    mean_spread=None,
+                    rmse_over_spread=None,
+                    nrmse=None,
+                    hit_rate=None,
+                    reference_price_range=None,
+                    passes=False,
+                    reference_publisher_id=OVERNIGHT_REFERENCE_PUBLISHER_ID,
+                    error=f"Cannot evaluate publisher {publisher_id} against itself as reference",
+                )
+            else:
+                overnight_metrics = evaluate_overnight_session(
+                    client_lazer,
+                    publisher_id,
+                    feed_id,
+                    date,
+                    divisor,
+                    min_observations=50,  # Lower threshold for overnight
+                )
+
         return PublisherBenchmarkResult(
             publisher_id=publisher_id,
             feed_id=feed_id,
@@ -1189,6 +1567,7 @@ def evaluate_publisher_feed(
             mean_abs_z_score=stat_metrics["mean_abs_z_score"],
             premarket_metrics=premarket_metrics,
             afterhours_metrics=afterhours_metrics,
+            overnight_metrics=overnight_metrics,
             execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
@@ -1216,6 +1595,8 @@ def process_csv(
     include_asset_classes: list[str] | None = None,
     exclude_asset_classes: list[str] | None = None,
     include_extended_hours: bool = False,
+    include_overnight: bool = False,
+    feed_id_filter: set[int] | None = None,
 ) -> list[PublisherBenchmarkResult]:
     """Process feeds from CSV file with parallel execution for a single publisher."""
     config = load_config()
@@ -1255,6 +1636,22 @@ def process_csv(
 
     if skipped_by_filter > 0:
         print(f"Filtered out {skipped_by_filter} feeds by asset class")
+
+    # Apply feed ID filter if provided
+    skipped_by_feed_id = 0
+    if feed_id_filter and feeds_to_process:
+        filtered_feeds = []
+        for feed_tuple in feeds_to_process:
+            feed_id = feed_tuple[0]
+            if feed_id in feed_id_filter:
+                filtered_feeds.append(feed_tuple)
+            else:
+                skipped_by_feed_id += 1
+
+        feeds_to_process = filtered_feeds
+        if skipped_by_feed_id > 0:
+            print(f"Filtered out {skipped_by_feed_id} feeds by feed ID (kept {len(feeds_to_process)} matching: {', '.join(map(str, sorted(feed_id_filter)))})")
+
     print(f"Processing {len(feeds_to_process)} feeds for publisher {publisher_id} with {max_workers} workers...")
     results = []
 
@@ -1269,6 +1666,7 @@ def process_csv(
             date,
             mode,
             include_extended_hours=include_extended_hours,
+            include_overnight=include_overnight,
         )
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -1299,6 +1697,7 @@ def write_results_csv(
     output_path: Path,
     summary_stats: Optional[dict] = None,
     include_extended_hours: bool = False,
+    include_overnight: bool = False,
 ):
     """Write benchmark results to CSV file with optional summary section."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1347,6 +1746,18 @@ def write_results_csv(
             "afterhours_hit_rate",
             "afterhours_passes",
             "afterhours_error",
+        ])
+
+    # Add overnight columns if enabled (uses publisher 32 as benchmark)
+    if include_overnight:
+        header.extend([
+            "overnight_n_observations",
+            "overnight_n_reference_observations",
+            "overnight_nrmse",
+            "overnight_hit_rate",
+            "overnight_passes",
+            "overnight_reference_publisher_id",
+            "overnight_error",
         ])
 
     header.extend(["error", "execution_time_ms"])
@@ -1402,6 +1813,19 @@ def write_results_csv(
                     f"{ah.hit_rate:.2f}" if ah and ah.hit_rate is not None else "",
                     ah.passes if ah else "",
                     ah.error or "" if ah else "",
+                ])
+
+            # Add overnight data if enabled
+            if include_overnight:
+                on = r.overnight_metrics
+                row.extend([
+                    on.n_observations if on else "",
+                    on.n_reference_observations if on else "",
+                    f"{on.nrmse:.6f}" if on and on.nrmse is not None else "",
+                    f"{on.hit_rate:.2f}" if on and on.hit_rate is not None else "",
+                    on.passes if on else "",
+                    on.reference_publisher_id if on else "",
+                    on.error or "" if on else "",
                 ])
 
             row.extend([r.error or "", r.execution_time_ms])
@@ -1511,6 +1935,20 @@ def write_results_csv(
                 write_summary_row("afterhours_pass_rate_pct", ext_stats.get("afterhours_pass_rate_pct"))
                 write_summary_row("afterhours_median_nrmse", ext_stats.get("afterhours_median_nrmse"))
                 write_summary_row("afterhours_median_hit_rate", ext_stats.get("afterhours_median_hit_rate"))
+
+            # Overnight summary (if enabled)
+            overnight_stats = summary_stats.get("overnight", {})
+            if overnight_stats:
+                write_summary_row("", "")  # Separator
+                write_summary_row("OVERNIGHT_SESSION", "")
+                write_summary_row("overnight_reference_publisher_id", overnight_stats.get("overnight_reference_publisher_id"))
+                write_summary_row("overnight_total_feeds", overnight_stats.get("overnight_total_feeds"))
+                write_summary_row("overnight_pass_count", overnight_stats.get("overnight_pass_count"))
+                write_summary_row("overnight_fail_count", overnight_stats.get("overnight_fail_count"))
+                write_summary_row("overnight_error_count", overnight_stats.get("overnight_error_count"))
+                write_summary_row("overnight_pass_rate_pct", overnight_stats.get("overnight_pass_rate_pct"))
+                write_summary_row("overnight_median_nrmse", overnight_stats.get("overnight_median_nrmse"))
+                write_summary_row("overnight_median_hit_rate", overnight_stats.get("overnight_median_hit_rate"))
 
     print(f"\nResults written to: {output_path}")
 
@@ -1631,6 +2069,15 @@ Examples:
 
   # Include only specific asset classes
   python publisher_benchmark.py --csv publisher_55_feeds.csv --include-asset-class fx metals us-equities
+
+  # Test specific feed IDs only
+  python publisher_benchmark.py --csv publisher_55_feeds.csv --feed-id 327 1163
+
+  # Combine feed ID filter with asset class filter
+  python publisher_benchmark.py --csv publisher_55_feeds.csv --include-asset-class us-equities --feed-id 500 501
+
+  # Test specific feed ID with overnight session
+  python publisher_benchmark.py --csv publisher_55_feeds.csv --feed-id 500 --overnight
 """,
     )
 
@@ -1671,6 +2118,15 @@ Examples:
         help="Exclude feeds with these asset classes (e.g., crypto funding-rate)",
     )
     parser.add_argument(
+        "--feed-id",
+        type=int,
+        nargs="+",
+        metavar="ID",
+        dest="feed_ids",
+        help="Only process these specific feed IDs (e.g., 327 1163 346). "
+             "Useful for testing specific feeds from the CSV.",
+    )
+    parser.add_argument(
         "--list-asset-classes",
         action="store_true",
         help="List unique asset classes in the CSV file and exit",
@@ -1681,6 +2137,15 @@ Examples:
         help="Include extended hours evaluation for US equities. "
              "Pre-market: 4:00 AM - 9:30 AM EST, After-hours: 4:00 PM - 8:00 PM EST. "
              "Adds separate columns for pre-market and after-hours metrics. "
+             "Only affects us-equities; other asset classes are unchanged.",
+    )
+    parser.add_argument(
+        "--overnight",
+        action="store_true",
+        help="Include overnight session evaluation for US equities (8 PM - 4 AM EST). "
+             "Uses publisher 32 (Blue Ocean ATS) as the benchmark reference instead of Datascope. "
+             "This is a publisher-vs-publisher comparison, not an official benchmark. "
+             "Independent of --extended-hours; both flags can be used together. "
              "Only affects us-equities; other asset classes are unchanged.",
     )
 
@@ -1733,6 +2198,9 @@ Examples:
 
     total_start = time.time()
 
+    # Convert feed ID list to set for efficient lookup
+    feed_id_filter = set(args.feed_ids) if args.feed_ids else None
+
     results = process_csv(
         args.csv,
         publisher_id,
@@ -1740,6 +2208,8 @@ Examples:
         include_asset_classes=args.include_asset_class,
         exclude_asset_classes=args.exclude_asset_class,
         include_extended_hours=args.extended_hours,
+        include_overnight=args.overnight,
+        feed_id_filter=feed_id_filter,
     )
 
     # Compute summary statistics
@@ -1747,12 +2217,14 @@ Examples:
     summary_stats = compute_summary_stats(
         results, publisher_id, total_time,
         include_extended_hours=args.extended_hours,
+        include_overnight=args.overnight,
     )
 
     # Write results and summary to CSV
     write_results_csv(
         results, output_path, summary_stats,
         include_extended_hours=args.extended_hours,
+        include_overnight=args.overnight,
     )
 
     # Print summary to console
@@ -1865,6 +2337,34 @@ Examples:
                     print(f"  Median Hit Rate: {ah_hr:.2f}%")
             else:
                 print("  No after-hours data available")
+
+    # Print overnight summary if enabled
+    if args.overnight:
+        overnight_stats = summary_stats.get("overnight", {})
+        if overnight_stats:
+            print(f"\n{'='*70}")
+            print("OVERNIGHT SESSION - US EQUITIES ONLY")
+            print(f"{'='*70}")
+            print(f"Benchmark reference: Publisher {overnight_stats.get('overnight_reference_publisher_id', 32)} (Blue Ocean ATS)")
+            print("NOTE: This is a publisher-vs-publisher comparison, not an official benchmark.")
+            print(f"{'='*70}")
+
+            on_total = overnight_stats.get("overnight_total_feeds", 0)
+            if on_total > 0:
+                print(f"\nOVERNIGHT (8:00 PM - 4:00 AM EST):")
+                print(f"  Total feeds: {on_total}")
+                print(f"  PASS: {overnight_stats.get('overnight_pass_count', 0)}")
+                print(f"  FAIL: {overnight_stats.get('overnight_fail_count', 0)}")
+                print(f"  Errors: {overnight_stats.get('overnight_error_count', 0)}")
+                print(f"  Pass rate: {overnight_stats.get('overnight_pass_rate_pct', 0):.1f}%")
+                on_nrmse = overnight_stats.get("overnight_median_nrmse")
+                on_hr = overnight_stats.get("overnight_median_hit_rate")
+                if on_nrmse is not None:
+                    print(f"  Median NRMSE: {on_nrmse:.6f}")
+                if on_hr is not None:
+                    print(f"  Median Hit Rate: {on_hr:.2f}%")
+            else:
+                print("  No overnight data available")
 
     # Print interpretation guide
     print_interpretation_guide(summary_stats)

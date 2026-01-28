@@ -208,3 +208,106 @@ When `--extended-hours` is enabled, the CSV output includes additional columns:
 - `afterhours_n_observations`, `afterhours_nrmse`, `afterhours_hit_rate`, `afterhours_passes`, `afterhours_error`
 
 The console summary includes a separate "EXTENDED HOURS" section with aggregate statistics for pre-market and after-hours sessions.
+
+### Feed ID Filtering
+
+The `publisher_benchmark.py` script supports filtering by specific feed IDs:
+
+```bash
+# Test specific feed IDs only
+python publisher_benchmark.py --csv publisher_55_feeds.csv --feed-id 327 1163
+
+# Combine feed ID filter with asset class filter
+python publisher_benchmark.py --csv publisher_55_feeds.csv --include-asset-class us-equities --feed-id 500 501
+
+# Test specific feed ID with overnight session
+python publisher_benchmark.py --csv publisher_55_feeds.csv --feed-id 500 --overnight
+```
+
+**Notes:**
+- Feed IDs are matched exactly against the CSV input
+- Feed ID filtering is applied after asset class filtering
+- Useful for testing specific feeds without modifying the CSV file
+
+### Overnight Session Support (US Equities)
+
+The `publisher_benchmark.py` script supports evaluation of US equities during the overnight session (8 PM - 4 AM ET). Unlike extended hours which use Datascope as benchmark, **overnight uses publisher 32 (Blue Ocean ATS) as the reference**.
+
+```bash
+# Include overnight session evaluation
+python publisher_benchmark.py --csv publisher_55_feeds.csv --overnight
+
+# Combine with extended hours for full 24-hour coverage
+python publisher_benchmark.py --csv publisher_55_feeds.csv --extended-hours --overnight
+```
+
+**Trading Sessions:**
+
+| Session | Time (EST) | Benchmark Source | Flag Required |
+|---------|-----------|------------------|---------------|
+| Regular Hours | 9:30 AM - 4:00 PM | Datascope | Always evaluated |
+| Pre-market | 4:00 AM - 9:30 AM | Datascope | `--extended-hours` |
+| After-hours | 4:00 PM - 8:00 PM | Datascope | `--extended-hours` |
+| Overnight | 8:00 PM - 4:00 AM | Publisher 32 | `--overnight` |
+
+**Important Caveats:**
+
+- **Not an official benchmark:** Publisher 32 is another data provider, not a regulated exchange feed like Datascope
+- **Publisher-vs-publisher comparison:** Metrics show deviation from publisher 32, not from an authoritative source
+- **Circular validation risk:** If publisher 32 has errors, all comparisons will be affected
+- Cannot evaluate publisher 32 against itself (will show error in results)
+
+**Overnight Output:**
+
+When `--overnight` is enabled, the CSV output includes additional columns:
+- `overnight_n_observations`, `overnight_n_reference_observations`
+- `overnight_nrmse`, `overnight_hit_rate`, `overnight_passes`
+- `overnight_reference_publisher_id`, `overnight_error`
+
+The console summary includes a separate "OVERNIGHT SESSION" section with aggregate statistics.
+
+**Why Publisher 32?**
+
+Publisher 32 (Blue Ocean ATS) provides overnight US equity data when Datascope is not available. This enables comparison of overnight data quality across publishers, even though it's a peer comparison rather than an official benchmark.
+
+## Publisher Performance Portal (Self-Service API)
+
+Located in `portal/` directory. FastAPI-based REST API for publishers to view their benchmark performance.
+
+### Running the Test API
+
+```bash
+# Start test server with mock data (4 test publishers: 11, 32, 55, 99)
+python portal/test_api.py
+```
+
+**Troubleshooting: Server won't start / shuts down immediately**
+
+If you see `[Errno 98] address already in use`, port 8000 is occupied:
+```bash
+# Kill existing process on port 8000
+fuser -k 8000/tcp
+
+# Then restart
+python portal/test_api.py
+```
+
+### API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Health check |
+| `GET /docs` | Interactive Swagger docs |
+| `GET /publishers/` | List all publishers with summary stats |
+| `GET /publishers/{id}/summary` | Publisher daily summary |
+| `GET /publishers/{id}/feeds` | Publisher's feed results (filter with `?passes=false`) |
+| `GET /leaderboard/` | Publisher rankings |
+| `GET /feeds/` | List all feeds |
+
+### Test Data
+
+The test server creates:
+- 4 publishers (IDs: 11, 32, 55, 99)
+- 6 feeds (EUR/USD, GBP/USD, XAU/USD, AAPL, MSFT, GOOGL)
+- 7 days of benchmark results
+- Database: `test_benchmark.db` (SQLite)
