@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Publisher Performance Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <h1 class="header__title">Publisher Performance Dashboard</h1>
+      <div class="header__controls">
+        <div class="control-group">
+          <label for="publisherId">Publisher:</label>
+          <select id="publisherId">
+            <option value="">Loading...</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="targetDate">Date:</label>
+          <input type="date" id="targetDate">
+        </div>
+        <button class="btn btn--primary" onclick="refreshDashboard()">Refresh</button>
+      </div>
+    </header>
+
+    <!-- Summary Cards -->
+    <div class="summary-cards" id="summaryCards">
+      <div class="summary-card summary-card--pass">
+        <div class="summary-card__label">Pass Rate</div>
+        <div class="summary-card__value" id="passRate">--</div>
+      </div>
+      <div class="summary-card summary-card--info">
+        <div class="summary-card__label">Median NRMSE</div>
+        <div class="summary-card__value" id="medianNrmse">--</div>
+      </div>
+      <div class="summary-card summary-card--info">
+        <div class="summary-card__label">Median Uptime</div>
+        <div class="summary-card__value" id="medianUptime">--</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card__label">Total Feeds</div>
+        <div class="summary-card__value" id="totalFeeds">--</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab tab--active" data-tab="benchmark" onclick="switchTab('benchmark')">Benchmark</div>
+      <div class="tab" data-tab="uptime" onclick="switchTab('uptime')">Uptime</div>
+      <div class="tab" data-tab="trends" onclick="switchTab('trends')">Trends</div>
+      <div class="tab" data-tab="alerts" onclick="switchTab('alerts')">Alerts</div>
+    </div>
+
+    <!-- Tab Content: Benchmark -->
+    <div class="tab-content tab-content--active" id="tab-benchmark">
+      <div class="data-table-container">
+        <table class="data-table" id="benchmarkTable">
+          <thead>
+            <tr>
+              <th>Feed</th>
+              <th>Asset Class</th>
+              <th>NRMSE</th>
+              <th>Hit Rate</th>
+              <th>Observations</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="benchmarkTableBody">
+            <tr><td colspan="6" class="loading">Loading data...</td></tr>
+          </tbody>
+        </table>
+        <div class="pagination" id="benchmarkPagination">
+          <div class="pagination__info" id="benchmarkPaginationInfo">--</div>
+          <div class="pagination__buttons">
+            <button class="btn" onclick="prevBenchmarkPage()" id="benchmarkPrevBtn" disabled>&lt; Prev</button>
+            <button class="btn" onclick="nextBenchmarkPage()" id="benchmarkNextBtn" disabled>Next &gt;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Content: Uptime -->
+    <div class="tab-content" id="tab-uptime">
+      <div class="data-table-container">
+        <table class="data-table" id="uptimeTable">
+          <thead>
+            <tr>
+              <th>Feed ID</th>
+              <th>Asset Class</th>
+              <th>Session</th>
+              <th>Uptime %</th>
+              <th>Downtime</th>
+              <th>Period</th>
+            </tr>
+          </thead>
+          <tbody id="uptimeTableBody">
+            <tr><td colspan="6" class="loading">Loading data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab Content: Trends -->
+    <div class="tab-content" id="tab-trends">
+      <div class="chart-container">
+        <h3 class="chart-container__title">Benchmark Trend (30 Days)</h3>
+        <canvas id="benchmarkTrendChart"></canvas>
+      </div>
+      <div class="chart-container">
+        <h3 class="chart-container__title">Uptime Trend (30 Days)</h3>
+        <canvas id="uptimeTrendChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Tab Content: Alerts -->
+    <div class="tab-content" id="tab-alerts">
+      <div class="alerts-section">
+        <h3 class="alerts-section__title">Issues to Address</h3>
+        <div id="alertsList">
+          <div class="loading">Loading alerts...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

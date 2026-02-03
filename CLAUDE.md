@@ -300,9 +300,108 @@ python portal/test_api.py
 | `GET /docs` | Interactive Swagger docs |
 | `GET /publishers/` | List all publishers with summary stats |
 | `GET /publishers/{id}/summary` | Publisher daily summary |
+| `GET /publishers/{id}/dashboard` | Combined benchmark + uptime dashboard |
 | `GET /publishers/{id}/feeds` | Publisher's feed results (filter with `?passes=false`) |
+| `GET /publishers/{id}/trends` | Time series trend data |
 | `GET /leaderboard/` | Publisher rankings |
 | `GET /feeds/` | List all feeds |
+| `GET /benchmarks/uptime` | Uptime data with session filters |
+| `GET /benchmarks/uptime/summary` | Aggregated uptime by asset class |
+| `GET /benchmarks/trend/benchmark` | Historical benchmark metrics |
+| `GET /benchmarks/trend/uptime` | Historical uptime metrics |
+
+### Publisher Dashboard (Frontend)
+
+The portal includes a web-based dashboard at `/ui/dashboard.html`:
+
+```bash
+# Start the API server
+uvicorn portal.api.main:app --reload
+
+# Open dashboard in browser
+open http://localhost:8000/ui/dashboard.html
+```
+
+**Dashboard Features:**
+- Summary cards: Pass rate, median NRMSE, median uptime, total feeds
+- Tabs: Benchmark results, Uptime data, Trends (30-day charts), Alerts
+- Filtering: By publisher, date, asset class, pass/fail status
+- Pagination for large result sets
+- Real-time alerts for failing feeds and low uptime
+
+### Uptime Calculation
+
+The portal tracks publisher uptime using session-aware windows:
+
+| Session | Time (EST) | Asset Classes |
+|---------|-----------|---------------|
+| Regular | 9:30 AM - 4:00 PM | US Equities |
+| Premarket | 4:00 AM - 9:30 AM | US Equities |
+| Afterhours | 4:00 PM - 8:00 PM | US Equities |
+| Overnight | 8:00 PM - 4:00 AM | US Equities |
+| Regular | 24 hours (with maintenance) | FX, Metals |
+
+**Uptime Methodology (200ms Gap-Based):**
+
+The portal uses a **200ms gap-based** calculation method:
+- Orders all publisher updates by timestamp
+- Calculates gap between each consecutive update
+- Any gap > 200ms contributes to downtime: `downtime += (gap - 200ms)`
+- Also accounts for gaps at period start (first update) and end (last update)
+
+**Why 200ms threshold?**
+- Publishers are expected to send updates frequently (multiple per second)
+- A 200ms gap indicates the publisher missed an update cycle
+- This is more accurate than 1-second window counting, which can show 100% uptime even when publishers have 500ms+ gaps
+
+**UptimeResult fields:**
+- `uptime_pct` - Percentage uptime (0-100)
+- `downtime_ms` - Total downtime in milliseconds
+- `max_gap_ms` - Maximum gap between consecutive updates
+- `gaps_over_threshold` - Count of gaps exceeding 200ms
+
+**Configurable threshold:**
+```python
+from portal.batch.uptime_calculator import UptimeCalculator
+
+# Default 200ms threshold
+calc = UptimeCalculator()
+
+# Custom threshold (e.g., 100ms for stricter requirement)
+calc = UptimeCalculator(gap_threshold_ms=100)
+```
+
+### Uptime Verification Script
+
+Use `verify_uptime.py` to compare uptime calculation methods:
+
+```bash
+# Verify a publisher's uptime
+python verify_uptime.py --publisher-id 55 --date 2026-01-28
+
+# Include extended hours sessions
+python verify_uptime.py --publisher-id 55 --date 2026-01-28 --extended-hours
+
+# Export results to CSV
+python verify_uptime.py --publisher-id 55 --date 2026-01-28 --output results.csv
+```
+
+The script compares:
+- **1-second window method** - Counts seconds with at least one update (legacy)
+- **200ms gap-based method** - Measures actual gaps between updates (current)
+
+This helps identify publishers with inflated uptime numbers from the legacy method.
+
+### Running Tests
+
+```bash
+# Run all portal tests
+pytest portal/tests/ -v
+
+# Run specific test file
+pytest portal/tests/test_uptime_calculator.py -v
+pytest portal/tests/test_dashboard_api.py -v
+```
 
 ### Test Data
 
@@ -311,3 +410,47 @@ The test server creates:
 - 6 feeds (EUR/USD, GBP/USD, XAU/USD, AAPL, MSFT, GOOGL)
 - 7 days of benchmark results
 - Database: `test_benchmark.db` (SQLite)
+
+### Running Daily Benchmark Batch (Production)
+
+To populate the portal database with benchmark and uptime data for all publishers:
+
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Run batch for a specific date (yesterday by default)
+python -m portal.batch.daily_benchmark_runner --date 2026-01-30 --overnight --workers 16
+
+# Dry run (don't store results)
+python -m portal.batch.daily_benchmark_runner --date 2026-01-30 --dry-run
+
+# Run for specific publisher only
+python -m portal.batch.daily_benchmark_runner --date 2026-01-30 --publisher-id 55
+
+# Skip extended hours (faster)
+python -m portal.batch.daily_benchmark_runner --date 2026-01-30 --no-extended-hours
+```
+
+**What it does:**
+1. Discovers all active publishers from ClickHouse (last 5 minutes of activity)
+2. For each publisher:
+   - Generates feed list via `publisher_feeds.py`
+   - Runs `publisher_benchmark.py` with all benchmarkable asset classes
+   - Computes session-aware uptime via `uptime_runner.py`
+   - Stores results in PostgreSQL
+   - Computes daily summary aggregates
+
+**Expected duration:**
+- Per publisher: 1-10 minutes (depends on feed count)
+- All publishers (~40): 60-120 minutes with 16 workers
+
+**Database tables populated:**
+- `benchmark_results` - Individual publisher/feed results (~50 metrics)
+- `publisher_daily_summary` - Aggregated daily stats per publisher
+- `publisher_feed_daily_uptime` - Per-feed uptime by session
+- `publisher_daily_uptime_summary` - Aggregated uptime per publisher
+
+**Known issues:**
+- `publisher_feeds.py` generates dates based on "today" minus offset, not the target date. If running for historical dates, the benchmark_date in results may not match the target date. Fix by updating benchmark_date after the batch completes if needed.
+- Publisher 71 may fail due to infinite t_statistic values - a numeric precision issue with certain edge cases.

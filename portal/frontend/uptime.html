@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Publisher Uptime</title>
+    <style>
+      body {
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        margin: 24px;
+        color: #111;
+      }
+      .controls {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+      label {
+        display: flex;
+        flex-direction: column;
+        font-size: 12px;
+        gap: 4px;
+      }
+      input, select, button {
+        padding: 6px 8px;
+        font-size: 14px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      th, td {
+        border-bottom: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+        font-size: 13px;
+      }
+      th {
+        background: #f6f6f6;
+      }
+      .muted {
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Publisher Uptime</h1>
+    <p class="muted">Session-aware uptime from the daily batch. Holiday calendars not applied yet.</p>
+
+    <div class="controls">
+      <label>
+        Publisher ID
+        <input id="publisherId" type="number" placeholder="55" />
+      </label>
+      <label>
+        Date (YYYY-MM-DD)
+        <input id="targetDate" type="date" />
+      </label>
+      <label>
+        Session
+        <input id="session" type="text" placeholder="regular" />
+      </label>
+      <label>
+        Asset Class
+        <input id="assetClass" type="text" placeholder="fx" />
+      </label>
+      <label>
+        Feed ID
+        <input id="feedId" type="number" placeholder="123" />
+      </label>
+      <label>
+        &nbsp;
+        <button id="loadBtn">Load</button>
+      </label>
+    </div>
+
+    <h2>Summary</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Asset Class</th>
+          <th>Session</th>
+          <th>Total Feeds</th>
+          <th>Mean Uptime %</th>
+          <th>Median Uptime %</th>
+          <th>Min Uptime %</th>
+          <th>Max Uptime %</th>
+        </tr>
+      </thead>
+      <tbody id="uptimeSummaryBody"></tbody>
+    </table>
+
+    <h2>Details</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Feed</th>
+          <th>Asset Class</th>
+          <th>Session</th>
+          <th>Uptime %</th>
+          <th>Downtime (ms)</th>
+          <th>Period (ms)</th>
+        </tr>
+      </thead>
+      <tbody id="uptimeBody"></tbody>
+    </table>
+
+    <script src="./uptime.js"></script>
+  </body>
+</html>

@@ -1,0 +1,20 @@
+[Unit]
+Description=Run daily publisher benchmarks at 6 AM UTC
+Documentation=https://github.com/pyth-network/integration-benchmarking
+
+[Timer]
+# Run daily at 6:00 AM UTC
+# This gives time for benchmark data (Datascope) to be available for T-1
+OnCalendar=*-*-* 06:00:00 UTC
+
+# If the system was off when the timer should have fired, run it when system starts
+Persistent=true
+
+# Add some randomness to avoid thundering herd
+RandomizedDelaySec=300
+
+# Accuracy - how close to the scheduled time
+AccuracySec=60
+
+[Install]
+WantedBy=timers.target

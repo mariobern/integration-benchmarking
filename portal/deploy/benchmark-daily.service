@@ -1,0 +1,35 @@
+[Unit]
+Description=Daily Publisher Benchmark Runner
+Documentation=https://github.com/pyth-network/integration-benchmarking
+After=network.target postgresql.service
+
+[Service]
+Type=oneshot
+User=benchmark
+Group=benchmark
+WorkingDirectory=/opt/integration-benchmarking
+Environment=PYTHONPATH=/opt/integration-benchmarking
+
+# Load environment variables from file
+EnvironmentFile=/opt/integration-benchmarking/portal/.env
+
+# Run the batch job
+ExecStart=/opt/integration-benchmarking/venv/bin/python -m portal.batch.daily_benchmark_runner
+
+# Timeout after 2 hours
+TimeoutStartSec=7200
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=benchmark-daily
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/integration-benchmarking/logs
+
+[Install]
+WantedBy=multi-user.target
