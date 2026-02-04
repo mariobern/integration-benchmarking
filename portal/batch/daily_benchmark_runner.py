@@ -606,7 +606,7 @@ def process_publisher(
 
         # Step 1: Generate feeds CSV
         logger.info(f"  Generating feeds list...")
-        if not run_publisher_feeds(publisher_id, feeds_csv, date_offset=1, time_window=5):
+        if not run_publisher_feeds(publisher_id, feeds_csv, date_offset=1, time_window=60):
             logger.error(f"  Failed to generate feeds for publisher {publisher_id}")
             return (0, 0, 1)
 
@@ -730,8 +730,8 @@ def main():
     parser.add_argument(
         "--time-window",
         type=int,
-        default=5,
-        help="Time window in minutes to discover active publishers (default: 5)",
+        default=60,
+        help="Time window in minutes to discover active publishers (default: 60)",
     )
 
     args = parser.parse_args()

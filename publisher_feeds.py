@@ -349,7 +349,6 @@ Note: Equities are categorized by country code (ISO 3166-1 alpha-2) based on
         default=1,
         help="Days to subtract from query date for benchmark data availability (default: 1)",
     )
-
     args = parser.parse_args()
 
     # Set default output path if not provided
