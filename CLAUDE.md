@@ -433,7 +433,7 @@ python -m portal.batch.daily_benchmark_runner --date 2026-01-30 --no-extended-ho
 ```
 
 **What it does:**
-1. Discovers all active publishers from ClickHouse (last 5 minutes of activity)
+1. Discovers all active publishers from ClickHouse (last 60 minutes of activity via `feed_publisher_junction`)
 2. For each publisher:
    - Generates feed list via `publisher_feeds.py`
    - Runs `publisher_benchmark.py` with all benchmarkable asset classes

@@ -62,21 +62,22 @@ def get_clickhouse_client():
     return clickhouse_connect.get_client(**config)
 
 
-def get_active_publishers(client, target_date: date) -> list[int]:
+def get_active_publishers(client, time_window_minutes: int = 5) -> list[int]:
     """
-    Query all publishers that published on the target date.
+    Query all publishers with recent activity.
 
     Args:
         client: ClickHouse client
-        target_date: The date to discover publishers for
+        time_window_minutes: How far back to look for activity
 
     Returns:
         List of active publisher IDs
     """
     query = f"""
         SELECT DISTINCT publisher_id
-        FROM publisher_updates
-        WHERE toDate(publish_time) = '{target_date}'
+        FROM feed_publisher_junction
+        FINAL
+        WHERE last_updated_at >= now() - INTERVAL {time_window_minutes} MINUTE
         ORDER BY publisher_id
     """
     result = client.query(query)
@@ -86,7 +87,8 @@ def get_active_publishers(client, target_date: date) -> list[int]:
 def run_publisher_feeds(
     publisher_id: int,
     output_path: Path,
-    target_date: date,
+    date_offset: int = 1,
+    time_window: int = 5,
 ) -> bool:
     """
     Run publisher_feeds.py to generate feeds CSV for a publisher.
@@ -94,7 +96,8 @@ def run_publisher_feeds(
     Args:
         publisher_id: Publisher ID to query
         output_path: Path to write CSV output
-        target_date: The date to discover feeds for
+        date_offset: Days to subtract for benchmark data availability
+        time_window: Time window in minutes to look back
 
     Returns:
         True if successful, False otherwise
@@ -104,7 +107,8 @@ def run_publisher_feeds(
         str(PUBLISHER_FEEDS_SCRIPT),
         "--publisher-id", str(publisher_id),
         "--output", str(output_path),
-        "--date", str(target_date),
+        "--date-offset", str(date_offset),
+        "--time-window", str(time_window),
     ]
 
     try:
@@ -602,7 +606,7 @@ def process_publisher(
 
         # Step 1: Generate feeds CSV
         logger.info(f"  Generating feeds list...")
-        if not run_publisher_feeds(publisher_id, feeds_csv, target_date=target_date):
+        if not run_publisher_feeds(publisher_id, feeds_csv, date_offset=1, time_window=60):
             logger.error(f"  Failed to generate feeds for publisher {publisher_id}")
             return (0, 0, 1)
 
@@ -723,6 +727,13 @@ def main():
         action="store_true",
         help="Run without storing results in database",
     )
+    parser.add_argument(
+        "--time-window",
+        type=int,
+        default=60,
+        help="Time window in minutes to discover active publishers (default: 60)",
+    )
+
     args = parser.parse_args()
 
     # Determine target date
@@ -744,11 +755,11 @@ def main():
         publishers = [args.publisher_id]
         logger.info(f"Processing single publisher: {args.publisher_id}")
     else:
-        logger.info(f"Discovering publishers active on {target_date}...")
+        logger.info(f"Discovering active publishers (last {args.time_window} minutes)...")
         try:
             client = get_clickhouse_client()
-            publishers = get_active_publishers(client, target_date)
-            logger.info(f"Found {len(publishers)} publishers active on {target_date}")
+            publishers = get_active_publishers(client, args.time_window)
+            logger.info(f"Found {len(publishers)} active publishers")
         except Exception as e:
             logger.error(f"Failed to connect to ClickHouse: {e}")
             sys.exit(1)

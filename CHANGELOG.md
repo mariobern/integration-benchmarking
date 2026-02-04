@@ -2,19 +2,16 @@
 
 ## 2026-02-04
 
-### Fixed
+### Reverted
 
-- **Date-based publisher and feed discovery** — The daily batch runner (`daily_benchmark_runner.py`) now discovers publishers and feeds based on the target date instead of looking at the last N minutes of real-time activity. Previously, running `--date 2026-01-28` would find publishers active *right now* rather than those that were active on Jan 28. This caused missed publishers (offline at batch time) and incorrect feed lists (feeds added/removed after the target date).
-
-### Added
-
-- **`--date` flag for `publisher_feeds.py`** — New argument to query all feeds a publisher published on a specific date (`--date 2026-01-28`). Uses `publisher_updates` table for accurate historical discovery. The existing `--time-window` real-time mode is preserved as the default for standalone usage.
+- **Revert date-based publisher and feed discovery** — The date-based approach introduced in `301c129` queried `publisher_updates` (a massive time-series table with billions of rows) using `toDate(publish_time)`, which caused full table scans and made the batch runner hang indefinitely. Reverted publisher and feed discovery back to using `feed_publisher_junction` (a small pre-aggregated metadata table) with time-window filtering. The default time window for the batch runner is now 60 minutes (up from 5) for better coverage.
 
 ### Removed
 
-- **`--time-window` flag from `daily_benchmark_runner.py`** — No longer needed since publisher discovery is now date-based. The `publisher_feeds.py` script still supports `--time-window` for standalone real-time usage.
+- **`--date` flag from `publisher_feeds.py`** — Removed the date-based discovery mode that queried `publisher_updates`. The `--time-window` approach via `feed_publisher_junction` is used exclusively.
 
 ### Changed
 
-- `get_active_publishers()` queries `publisher_updates WHERE toDate(publish_time) = target_date` instead of `feed_publisher_junction WHERE last_updated_at >= now() - INTERVAL N MINUTE`.
-- `run_publisher_feeds()` passes `--date` to `publisher_feeds.py` instead of `--time-window` and `--date-offset`.
+- `get_active_publishers()` reverted to query `feed_publisher_junction FINAL` instead of `publisher_updates`.
+- `run_publisher_feeds()` passes `--date-offset` and `--time-window` instead of `--date`.
+- Default `--time-window` for `daily_benchmark_runner.py` increased from 5 to 60 minutes for broader publisher coverage.
