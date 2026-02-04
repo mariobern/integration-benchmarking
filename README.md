@@ -65,8 +65,8 @@ python publisher_benchmark.py --csv publisher_55_feeds.csv
 # Include extended hours for US equities (pre-market + after-hours)
 python publisher_benchmark.py --csv publisher_55_feeds.csv --extended-hours
 
-# Discover what feeds a publisher has
-python publisher_feeds.py --publisher-id 29
+# Discover what feeds a publisher published on a specific date
+python publisher_feeds.py --publisher-id 29 --date 2026-01-28
 
 # List asset classes in a CSV (check what's benchmarkable)
 python quick_benchmark.py --csv feeds.csv --list-asset-classes

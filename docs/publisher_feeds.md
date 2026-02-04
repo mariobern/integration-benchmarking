@@ -1,21 +1,21 @@
 # Publisher Feeds Discovery Tool
 
-Discovers all feeds that a specific publisher is currently publishing. Generates CSV files compatible with the benchmark tools.
+Discovers all feeds that a specific publisher is publishing. Generates CSV files compatible with the benchmark tools.
 
 ## Usage
 
 ```bash
-# Get all feeds for a publisher
-python publisher_feeds.py --publisher-id 29
+# Get all feeds a publisher published on a specific date
+python publisher_feeds.py --publisher-id 29 --date 2026-01-28
 
 # Filter by asset class
-python publisher_feeds.py --publisher-id 29 --asset-class metal
+python publisher_feeds.py --publisher-id 29 --date 2026-01-28 --asset-class metal
 
 # Custom output file
-python publisher_feeds.py --publisher-id 29 --output my_feeds.csv
+python publisher_feeds.py --publisher-id 29 --date 2026-01-28 --output my_feeds.csv
 
-# Larger time window for less active publishers
-python publisher_feeds.py --publisher-id 32 --time-window 60
+# Real-time discovery (current activity, last N minutes)
+python publisher_feeds.py --publisher-id 29 --time-window 5
 ```
 
 ## Arguments
@@ -23,10 +23,18 @@ python publisher_feeds.py --publisher-id 32 --time-window 60
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `--publisher-id` | Publisher ID to query (required) | - |
+| `--date` | Target date (YYYY-MM-DD) to discover feeds published on that day | - |
 | `--output` | Output CSV path | `publisher_{id}_feeds.csv` |
-| `--time-window` | Minutes to look back | 1 |
 | `--asset-class` | Filter by asset class | All |
-| `--date-offset` | Days to subtract from query date | 1 |
+| `--time-window` | Minutes to look back (real-time mode, used when `--date` is not set) | 1 |
+| `--date-offset` | Days to subtract from query date (real-time mode only) | 1 |
+
+### Discovery Modes
+
+- **Date-based** (`--date`): Queries `publisher_updates` for all feeds the publisher published on the specified date. This is the recommended mode for benchmarking, as it gives an accurate picture of what was actually published that day.
+- **Real-time** (`--time-window`): Queries recent activity from `now()` minus the time window. Useful for checking what a publisher is currently publishing.
+
+The daily batch runner uses date-based discovery automatically.
 
 ## Output Format
 
@@ -39,7 +47,7 @@ price_id,date,asset_class
 1163,2026-01-22,equity-us
 ```
 
-> **Note:** Date is offset by 1 day by default because benchmark data is typically available up to the previous day.
+> **Note:** When using `--date`, the output date matches the target date. When using `--time-window`, the date is offset by `--date-offset` days (default 1) because benchmark data is typically available up to the previous day.
 
 ## Asset Classes
 
@@ -62,8 +70,8 @@ price_id,date,asset_class
 ## Using with Benchmark Tools
 
 ```bash
-# Generate feeds list
-python publisher_feeds.py --publisher-id 29 --asset-class metal
+# Generate feeds list for a specific date
+python publisher_feeds.py --publisher-id 29 --date 2026-01-28 --asset-class metal
 
 # Run benchmark on those feeds
 python quick_benchmark.py --csv publisher_29_feeds.csv

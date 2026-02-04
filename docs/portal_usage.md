@@ -90,14 +90,22 @@ To populate data for the dashboard:
 python -m portal.batch.daily_benchmark_runner
 ```
 
+The batch runner discovers publishers and their feeds based on the **target date** — it queries `publisher_updates` for all publishers that actually published on that day and the feeds they published. By default, the target date is yesterday.
+
 Options:
 
 ```bash
-# Specific date
+# Specific date (discovers publishers/feeds active on that date)
 python -m portal.batch.daily_benchmark_runner --date 2025-01-25
 
 # Specific publisher
 python -m portal.batch.daily_benchmark_runner --publisher-id 55
+
+# Include overnight session (US equities, uses publisher 32 as reference)
+python -m portal.batch.daily_benchmark_runner --date 2025-01-25 --overnight
+
+# Skip extended hours (faster)
+python -m portal.batch.daily_benchmark_runner --date 2025-01-25 --no-extended-hours
 
 # Dry run (no database writes)
 python -m portal.batch.daily_benchmark_runner --dry-run
