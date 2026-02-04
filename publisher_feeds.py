@@ -190,6 +190,53 @@ def query_feeds_from_junction(
     return feeds
 
 
+def query_feeds_by_date(
+    client,
+    publisher_id: int,
+    target_date: str,
+    asset_class_filter: Optional[str] = None,
+) -> list[FeedInfo]:
+    """
+    Query feeds published by a publisher on a specific date.
+
+    Uses publisher_updates table to find all feeds that had activity
+    on the target date. This gives an accurate picture of what the
+    publisher was actually publishing on that day.
+    """
+    asset_filter = ""
+    if asset_class_filter:
+        if asset_class_filter.startswith("equity-"):
+            asset_filter = "AND fm.asset_type = 'equity'"
+        else:
+            asset_filter = f"AND fm.asset_type = '{asset_class_filter}'"
+
+    query = f"""
+        SELECT DISTINCT
+            pu.price_feed_id AS price_id,
+            COALESCE(fm.asset_type, 'unknown') AS asset_class,
+            fm.symbol
+        FROM publisher_updates pu
+        LEFT JOIN feeds_metadata_latest fm ON pu.price_feed_id = fm.pyth_lazer_id
+        WHERE pu.publisher_id = {publisher_id}
+          AND toDate(pu.publish_time) = '{target_date}'
+          {asset_filter}
+        ORDER BY fm.asset_type, pu.price_feed_id
+    """
+
+    result = client.query(query)
+    feeds = []
+    for row in result.result_rows:
+        price_id, asset_type, symbol = row[0], row[1], row[2]
+        asset_class = categorize_asset_class(asset_type, symbol)
+
+        if asset_class_filter and asset_class_filter.startswith("equity-"):
+            if asset_class != asset_class_filter:
+                continue
+
+        feeds.append(FeedInfo(price_id=price_id, date=target_date, asset_class=asset_class))
+    return feeds
+
+
 def query_feeds_from_updates(
     client,
     publisher_id: int,
@@ -245,13 +292,23 @@ def get_publisher_feeds(
     time_window_minutes: int = 1,
     date_offset_days: int = 1,
     asset_class_filter: Optional[str] = None,
+    target_date: Optional[str] = None,
 ) -> list[FeedInfo]:
     """
-    Get all feeds for a publisher, trying junction table first then falling back.
+    Get all feeds for a publisher.
+
+    If target_date is provided, queries all feeds published on that specific date.
+    Otherwise, uses the time-window approach (junction table first, then fallback).
 
     Returns list of FeedInfo objects.
     """
-    # Try fast query using junction table first
+    # Date-based discovery: find all feeds published on the target date
+    if target_date:
+        return query_feeds_by_date(
+            client, publisher_id, target_date, asset_class_filter
+        )
+
+    # Time-window discovery: try junction table first, then fallback
     feeds = query_feeds_from_junction(
         client, publisher_id, time_window_minutes, date_offset_days, asset_class_filter
     )
@@ -349,6 +406,13 @@ Note: Equities are categorized by country code (ISO 3166-1 alpha-2) based on
         default=1,
         help="Days to subtract from query date for benchmark data availability (default: 1)",
     )
+    parser.add_argument(
+        "--date",
+        type=str,
+        help="Target date (YYYY-MM-DD) to discover feeds published on that day. "
+             "When provided, queries all feeds the publisher published on this date "
+             "instead of using the time-window approach.",
+    )
 
     args = parser.parse_args()
 
@@ -357,8 +421,11 @@ Note: Equities are categorized by country code (ISO 3166-1 alpha-2) based on
         args.output = Path(f"publisher_{args.publisher_id}_feeds.csv")
 
     print(f"Querying feeds for publisher {args.publisher_id}...")
-    print(f"Time window: last {args.time_window} minute(s)")
-    print(f"Date offset: {args.date_offset} day(s) before query date")
+    if args.date:
+        print(f"Target date: {args.date} (querying full day)")
+    else:
+        print(f"Time window: last {args.time_window} minute(s)")
+        print(f"Date offset: {args.date_offset} day(s) before query date")
     if args.asset_class:
         print(f"Asset class filter: {args.asset_class}")
 
@@ -372,13 +439,20 @@ Note: Equities are categorized by country code (ISO 3166-1 alpha-2) based on
             args.time_window,
             args.date_offset,
             args.asset_class,
+            target_date=args.date,
         )
 
         if not feeds:
-            print(
-                f"\nNo feeds found for publisher {args.publisher_id} "
-                f"in the last {args.time_window} minute(s)."
-            )
+            if args.date:
+                print(
+                    f"\nNo feeds found for publisher {args.publisher_id} "
+                    f"on {args.date}."
+                )
+            else:
+                print(
+                    f"\nNo feeds found for publisher {args.publisher_id} "
+                    f"in the last {args.time_window} minute(s)."
+                )
             print("Try increasing --time-window or check if the publisher is active.")
             sys.exit(0)
 

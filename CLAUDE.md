@@ -452,5 +452,4 @@ python -m portal.batch.daily_benchmark_runner --date 2026-01-30 --no-extended-ho
 - `publisher_daily_uptime_summary` - Aggregated uptime per publisher
 
 **Known issues:**
-- `publisher_feeds.py` generates dates based on "today" minus offset, not the target date. If running for historical dates, the benchmark_date in results may not match the target date. Fix by updating benchmark_date after the batch completes if needed.
 - Publisher 71 may fail due to infinite t_statistic values - a numeric precision issue with certain edge cases.
