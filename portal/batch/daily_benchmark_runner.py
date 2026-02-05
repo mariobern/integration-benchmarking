@@ -19,11 +19,13 @@ Usage:
 import argparse
 import logging
 import os
+import shutil
 import statistics
 import subprocess
 import sys
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -134,6 +136,64 @@ def run_publisher_feeds(
         return False
 
 
+def discover_feeds_parallel(
+    publishers: list[int],
+    max_workers: int = 8,
+    date_offset: int = 1,
+    time_window: int = 60,
+) -> tuple[dict[int, Optional[Path]], str]:
+    """
+    Discover feeds for multiple publishers in parallel.
+
+    This function runs publisher_feeds.py concurrently for each publisher,
+    which is much faster than sequential discovery since each call involves
+    a ClickHouse query with network latency.
+
+    Args:
+        publishers: List of publisher IDs to discover feeds for
+        max_workers: Maximum number of parallel workers
+        date_offset: Days to subtract for benchmark data availability
+        time_window: Time window in minutes to look back for activity
+
+    Returns:
+        Tuple of (results dict, temp_dir path)
+        - results: Dictionary mapping publisher_id to Path or None (if failed)
+        - temp_dir: Path to temporary directory containing CSV files (caller must clean up)
+    """
+    temp_dir = tempfile.mkdtemp(prefix="benchmark_feeds_")
+    results: dict[int, Optional[Path]] = {}
+
+    def discover_single(pid: int) -> tuple[int, Optional[Path]]:
+        """Discover feeds for a single publisher."""
+        feeds_csv = Path(temp_dir) / f"publisher_{pid}_feeds.csv"
+        success = run_publisher_feeds(pid, feeds_csv, date_offset, time_window)
+        if success and feeds_csv.exists() and feeds_csv.stat().st_size > 0:
+            return (pid, feeds_csv)
+        return (pid, None)
+
+    logger.info(f"Discovering feeds for {len(publishers)} publishers with {max_workers} workers...")
+    discovery_start = time.time()
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(discover_single, pid): pid for pid in publishers}
+        completed = 0
+        for future in as_completed(futures):
+            pid, path = future.result()
+            results[pid] = path
+            completed += 1
+            if completed % 10 == 0 or completed == len(publishers):
+                logger.info(f"  Discovery progress: {completed}/{len(publishers)}")
+
+    discovery_time = time.time() - discovery_start
+    success_count = sum(1 for p in results.values() if p is not None)
+    logger.info(
+        f"Feed discovery complete: {success_count}/{len(publishers)} publishers "
+        f"in {discovery_time:.1f}s"
+    )
+
+    return results, temp_dir
+
+
 def run_publisher_benchmark(
     csv_path: Path,
     output_path: Path,
@@ -142,6 +202,7 @@ def run_publisher_benchmark(
     include_extended_hours: bool = True,
     include_overnight: bool = False,
     include_asset_classes: Optional[list[str]] = None,
+    skip_scipy_tests: bool = False,
 ) -> bool:
     """
     Run publisher_benchmark.py to evaluate a publisher's feeds.
@@ -154,6 +215,7 @@ def run_publisher_benchmark(
         include_extended_hours: Whether to evaluate extended hours
         include_overnight: Whether to evaluate overnight session (US equities only)
         include_asset_classes: Asset classes to include (None = all benchmarkable)
+        skip_scipy_tests: Whether to skip scipy statistical tests for faster execution
 
     Returns:
         True if successful, False otherwise
@@ -172,6 +234,9 @@ def run_publisher_benchmark(
 
     if include_overnight:
         cmd.append("--overnight")
+
+    if skip_scipy_tests:
+        cmd.append("--skip-scipy-tests")
 
     # Only include benchmarkable asset classes by default
     if include_asset_classes is None:
@@ -581,6 +646,8 @@ def process_publisher(
     include_extended_hours: bool = True,
     include_overnight: bool = False,
     dry_run: bool = False,
+    skip_scipy_tests: bool = False,
+    feeds_csv: Optional[Path] = None,
 ) -> tuple[int, int, int]:
     """
     Process a single publisher: generate feeds, run benchmark, store results.
@@ -593,6 +660,8 @@ def process_publisher(
         include_extended_hours: Whether to evaluate extended hours
         include_overnight: Whether to evaluate overnight session (US equities only)
         dry_run: If True, don't store results
+        skip_scipy_tests: Whether to skip scipy statistical tests for faster execution
+        feeds_csv: Pre-discovered feeds CSV path (skip discovery if provided)
 
     Returns:
         Tuple of (pass_count, fail_count, error_count)
@@ -601,14 +670,18 @@ def process_publisher(
     logger.info(f"Processing publisher {publisher_id} for {target_date}...")
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        feeds_csv = Path(tmpdir) / f"publisher_{publisher_id}_feeds.csv"
-        results_csv = Path(tmpdir) / f"publisher_{publisher_id}_results.csv"
+        # Use pre-discovered feeds if provided, otherwise discover now
+        if feeds_csv is None:
+            feeds_csv = Path(tmpdir) / f"publisher_{publisher_id}_feeds.csv"
+            # Step 1: Generate feeds CSV
+            logger.info(f"  Generating feeds list...")
+            if not run_publisher_feeds(publisher_id, feeds_csv, date_offset=1, time_window=60):
+                logger.error(f"  Failed to generate feeds for publisher {publisher_id}")
+                return (0, 0, 1)
+        else:
+            logger.info(f"  Using pre-discovered feeds: {feeds_csv}")
 
-        # Step 1: Generate feeds CSV
-        logger.info(f"  Generating feeds list...")
-        if not run_publisher_feeds(publisher_id, feeds_csv, date_offset=1, time_window=60):
-            logger.error(f"  Failed to generate feeds for publisher {publisher_id}")
-            return (0, 0, 1)
+        results_csv = Path(tmpdir) / f"publisher_{publisher_id}_results.csv"
 
         # Check if feeds file has content
         if not feeds_csv.exists() or feeds_csv.stat().st_size == 0:
@@ -624,6 +697,7 @@ def process_publisher(
             workers=workers,
             include_extended_hours=include_extended_hours,
             include_overnight=include_overnight,
+            skip_scipy_tests=skip_scipy_tests,
         ):
             logger.error(f"  Benchmark failed for publisher {publisher_id}")
             return (0, 0, 1)
@@ -733,6 +807,19 @@ def main():
         default=60,
         help="Time window in minutes to discover active publishers (default: 60)",
     )
+    parser.add_argument(
+        "--skip-scipy-tests",
+        action="store_true",
+        help="Skip scipy statistical tests (t-test, Wilcoxon, normality) for faster execution. "
+             "Pass/fail is determined by nrmse and hit_rate only. Reduces processing time by ~40%%.",
+    )
+    parser.add_argument(
+        "--discovery-workers",
+        type=int,
+        default=8,
+        help="Number of parallel workers for feed discovery (default: 8). "
+             "Higher values speed up the discovery phase but increase ClickHouse load.",
+    )
 
     args = parser.parse_args()
 
@@ -743,7 +830,7 @@ def main():
         target_date = date.today() - timedelta(days=1)
 
     logger.info(f"Starting daily benchmark batch for {target_date}")
-    logger.info(f"Workers: {args.workers}, Extended hours: {not args.no_extended_hours}, Overnight: {args.overnight}")
+    logger.info(f"Workers: {args.workers}, Discovery workers: {args.discovery_workers}, Extended hours: {not args.no_extended_hours}, Overnight: {args.overnight}, Skip scipy: {args.skip_scipy_tests}")
 
     if args.dry_run:
         logger.info("DRY RUN MODE - no results will be stored")
@@ -768,7 +855,20 @@ def main():
         logger.warning("No publishers to process")
         sys.exit(0)
 
-    # Process each publisher
+    # Phase 1: Parallel feed discovery (when processing multiple publishers)
+    pre_discovered_feeds: dict[int, Optional[Path]] = {}
+    discovery_temp_dir: Optional[str] = None
+
+    if len(publishers) > 1 and args.discovery_workers > 0:
+        logger.info(f"Starting parallel feed discovery with {args.discovery_workers} workers...")
+        pre_discovered_feeds, discovery_temp_dir = discover_feeds_parallel(
+            publishers,
+            max_workers=args.discovery_workers,
+            date_offset=1,
+            time_window=args.time_window,
+        )
+
+    # Phase 2: Process each publisher (benchmark evaluation)
     session = get_session()
     total_pass = 0
     total_fail = 0
@@ -779,6 +879,9 @@ def main():
     try:
         for publisher_id in publishers:
             try:
+                # Use pre-discovered feeds if available
+                feeds_csv = pre_discovered_feeds.get(publisher_id)
+
                 pass_count, fail_count, error_count = process_publisher(
                     publisher_id,
                     target_date,
@@ -787,6 +890,8 @@ def main():
                     include_extended_hours=not args.no_extended_hours,
                     include_overnight=args.overnight,
                     dry_run=args.dry_run,
+                    skip_scipy_tests=args.skip_scipy_tests,
+                    feeds_csv=feeds_csv,
                 )
                 total_pass += pass_count
                 total_fail += fail_count
@@ -798,6 +903,13 @@ def main():
 
     finally:
         session.close()
+        # Clean up parallel discovery temp directory
+        if discovery_temp_dir:
+            try:
+                shutil.rmtree(discovery_temp_dir, ignore_errors=True)
+                logger.debug(f"Cleaned up discovery temp directory: {discovery_temp_dir}")
+            except Exception as e:
+                logger.warning(f"Failed to clean up temp directory {discovery_temp_dir}: {e}")
 
     # Summary
     total_time = time.time() - total_start

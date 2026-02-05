@@ -1,0 +1,494 @@
+#!/usr/bin/env python3
+"""
+Check Datascope benchmark data availability across all asset classes.
+
+This script queries the analytics ClickHouse cluster to discover all instruments
+available in Datascope benchmark tables, outputting:
+1. A human-readable SUMMARY.md with instrument counts and breakdown
+2. A CSV with full instrument details (pyth_lazer_id, ric, dates)
+3. A history.csv log for tracking availability over time
+
+Usage:
+    python check_benchmark_availability.py
+    python check_benchmark_availability.py --output-dir my_output/
+    python check_benchmark_availability.py --date 2026-01-15
+"""
+
+import argparse
+import csv
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
+import clickhouse_connect
+import yaml
+
+
+# Benchmark tables and their asset class mappings
+# Note: datascope_fx_benchmark_data contains both FX pairs and metals (XAU, XAG, XPT, XPD)
+# The generate_summary_markdown function separates them in the output
+BENCHMARK_TABLES = {
+    "datascope_global_equities_benchmark_data": "us-equities",
+    "datascope_fx_benchmark_data": "fx",  # Also contains metals (XAU, XAG, XPT, XPD)
+    "datascope_futures_benchmark_data": "futures",
+    "datascope_us_treasury_benchmark_data": "us-treasuries",
+}
+
+
+@dataclass
+class InstrumentInfo:
+    """Information about a single benchmark instrument."""
+
+    asset_class: str
+    benchmark_table: str
+    pyth_lazer_id: int
+    ric: str
+    earliest_date: str
+    latest_date: str
+
+
+@dataclass
+class AssetClassSummary:
+    """Summary statistics for an asset class."""
+
+    asset_class: str
+    instrument_count: int
+    earliest_date: str
+    latest_date: str
+    instruments: list[InstrumentInfo]
+
+
+def load_config() -> dict:
+    """Load database configuration from config.yaml."""
+    config_path = Path("config.yaml")
+    if not config_path.exists():
+        raise FileNotFoundError(
+            "config.yaml not found. Copy config.yaml.sample to config.yaml and fill in credentials."
+        )
+    with open(config_path) as f:
+        return yaml.safe_load(f)
+
+
+def get_analytics_client(config: dict):
+    """Create ClickHouse client for Analytics database (Datascope benchmark data)."""
+    analytics_cfg = config["analytics_clickhouse"]
+    return clickhouse_connect.get_client(
+        host=analytics_cfg["host"],
+        username=analytics_cfg["user"],
+        password=analytics_cfg["password"],
+        secure=True,
+        connect_timeout=60,
+        send_receive_timeout=300,
+    )
+
+
+def query_table_instruments(
+    client, table: str, asset_class: str
+) -> list[InstrumentInfo]:
+    """Query distinct instruments from a benchmark table."""
+    query = f"""
+        SELECT
+            pyth_lazer_id,
+            ric,
+            MIN(toDate(date_time)) AS earliest_date,
+            MAX(toDate(date_time)) AS latest_date
+        FROM {table}
+        WHERE pyth_lazer_id IS NOT NULL
+        GROUP BY pyth_lazer_id, ric
+        ORDER BY pyth_lazer_id
+    """
+    try:
+        result = client.query(query)
+        instruments = []
+        for row in result.result_rows:
+            instruments.append(
+                InstrumentInfo(
+                    asset_class=asset_class,
+                    benchmark_table=table,
+                    pyth_lazer_id=row[0],
+                    ric=row[1] or "",
+                    earliest_date=str(row[2]),
+                    latest_date=str(row[3]),
+                )
+            )
+        return instruments
+    except Exception as e:
+        print(f"  Warning: Failed to query {table}: {e}")
+        return []
+
+
+def get_all_instruments(client) -> dict[str, AssetClassSummary]:
+    """Query all benchmark tables and return instrument summaries."""
+    summaries = {}
+
+    for table, asset_class in BENCHMARK_TABLES.items():
+        print(f"Querying {table}...")
+        instruments = query_table_instruments(client, table, asset_class)
+
+        if instruments:
+            earliest = min(i.earliest_date for i in instruments)
+            latest = max(i.latest_date for i in instruments)
+        else:
+            earliest = ""
+            latest = ""
+
+        summaries[asset_class] = AssetClassSummary(
+            asset_class=asset_class,
+            instrument_count=len(instruments),
+            earliest_date=earliest,
+            latest_date=latest,
+            instruments=instruments,
+        )
+        print(f"  Found {len(instruments)} instruments")
+
+    return summaries
+
+
+def categorize_equities(instruments: list[InstrumentInfo]) -> dict[str, int]:
+    """Categorize equities by exchange based on RIC suffix."""
+    categories = defaultdict(int)
+    for inst in instruments:
+        ric = inst.ric
+        if ric.endswith(".O") or ric.endswith(".OQ"):
+            categories["NASDAQ"] += 1
+        elif ric.endswith(".N") or ric.endswith(".NY"):
+            categories["NYSE"] += 1
+        elif ric.endswith(".A"):
+            categories["NYSE ARCA"] += 1
+        elif ric.endswith(".Z"):
+            categories["BATS"] += 1
+        else:
+            categories["Other"] += 1
+    return dict(sorted(categories.items(), key=lambda x: -x[1]))
+
+
+def extract_fx_pairs(instruments: list[InstrumentInfo]) -> list[str]:
+    """Extract FX pair names from RICs."""
+    pairs = []
+    for inst in instruments:
+        ric = inst.ric
+        # FX RICs like EUR=, GBP=, etc.
+        if ric.endswith("="):
+            pairs.append(ric[:-1])
+        else:
+            pairs.append(ric)
+    return sorted(set(pairs))
+
+
+def extract_metal_names(instruments: list[InstrumentInfo]) -> list[str]:
+    """Extract metal names from RICs."""
+    metal_map = {
+        "XAU": "Gold (XAU)",
+        "XAG": "Silver (XAG)",
+        "XPT": "Platinum (XPT)",
+        "XPD": "Palladium (XPD)",
+    }
+    names = []
+    for inst in instruments:
+        ric = inst.ric
+        for code, name in metal_map.items():
+            if code in ric:
+                names.append(name)
+                break
+        else:
+            names.append(ric)
+    return sorted(set(names))
+
+
+def extract_futures_names(instruments: list[InstrumentInfo]) -> list[str]:
+    """Extract futures contract base names."""
+    # Common futures symbols
+    futures_map = {
+        "ES": "E-Mini S&P 500 (ES)",
+        "NQ": "E-Mini Nasdaq-100 (NQ)",
+        "YM": "Mini Dow (YM)",
+        "EM": "E-Mini S&P 500 (EM)",
+        "NM": "Nasdaq Mini (NM)",
+        "DM": "Dow Mini (DM)",
+        "CL": "WTI Crude Oil (CL)",
+        "LCO": "Brent Crude (LCO)",
+        "HG": "Copper (HG)",
+        "GC": "Gold (GC)",
+        "SI": "Silver (SI)",
+        "NG": "Natural Gas (NG)",
+        "ZB": "30-Year Treasury (ZB)",
+        "ZN": "10-Year Treasury (ZN)",
+        "CC": "Cocoa (CC)",
+        "WTI": "WTI Crude (WTI)",
+        "BRENT": "Brent Crude (BRENT)",
+    }
+    names = set()
+    for inst in instruments:
+        ric = inst.ric.upper()
+        matched = False
+        for code, name in futures_map.items():
+            if code in ric:
+                names.add(name)
+                matched = True
+                break
+        if not matched:
+            # Extract base symbol (remove month/year codes)
+            names.add(inst.ric)
+    return sorted(names)
+
+
+def extract_treasury_names(instruments: list[InstrumentInfo]) -> list[str]:
+    """Extract treasury maturity names."""
+    maturities = []
+    for inst in instruments:
+        ric = inst.ric
+        # Common patterns: US1MT=RR, US3MT=RR, US1YT=RR, US10YT=RR, etc.
+        if "1M" in ric:
+            maturities.append("1-Month")
+        elif "3M" in ric:
+            maturities.append("3-Month")
+        elif "6M" in ric:
+            maturities.append("6-Month")
+        elif "1Y" in ric:
+            maturities.append("1-Year")
+        elif "2Y" in ric:
+            maturities.append("2-Year")
+        elif "3Y" in ric:
+            maturities.append("3-Year")
+        elif "5Y" in ric:
+            maturities.append("5-Year")
+        elif "7Y" in ric:
+            maturities.append("7-Year")
+        elif "10Y" in ric:
+            maturities.append("10-Year")
+        elif "20Y" in ric:
+            maturities.append("20-Year")
+        elif "30Y" in ric:
+            maturities.append("30-Year")
+        else:
+            maturities.append(ric)
+    return sorted(set(maturities), key=lambda x: _maturity_sort_key(x))
+
+
+def _maturity_sort_key(maturity: str) -> int:
+    """Sort key for treasury maturities."""
+    order = [
+        "1-Month",
+        "3-Month",
+        "6-Month",
+        "1-Year",
+        "2-Year",
+        "3-Year",
+        "5-Year",
+        "7-Year",
+        "10-Year",
+        "20-Year",
+        "30-Year",
+    ]
+    try:
+        return order.index(maturity)
+    except ValueError:
+        return 999
+
+
+def generate_summary_markdown(
+    summaries: dict[str, AssetClassSummary], check_date: str
+) -> str:
+    """Generate SUMMARY.md content."""
+    lines = [
+        "# Datascope Benchmark Data Availability",
+        "",
+        f"Last updated: {check_date}",
+        "",
+        "## Summary",
+        "",
+        "| Asset Class | Instruments | Earliest | Latest |",
+        "|-------------|-------------|----------|--------|",
+    ]
+
+    total = 0
+    for asset_class in ["us-equities", "fx", "futures", "us-treasuries"]:
+        summary = summaries.get(asset_class)
+        if summary:
+            lines.append(
+                f"| {asset_class.title().replace('-', ' ')} | {summary.instrument_count} | "
+                f"{summary.earliest_date} | {summary.latest_date} |"
+            )
+            total += summary.instrument_count
+
+    lines.extend(
+        [
+            "",
+            f"**Total: {total} instruments**",
+            "",
+        ]
+    )
+
+    # US Equities breakdown
+    equities = summaries.get("us-equities")
+    if equities and equities.instruments:
+        categories = categorize_equities(equities.instruments)
+        lines.append("## US Equities Breakdown")
+        lines.append("")
+        for exchange, count in categories.items():
+            lines.append(f"- {exchange}: {count}")
+        lines.append("")
+
+    # FX pairs
+    fx = summaries.get("fx")
+    if fx and fx.instruments:
+        pairs = extract_fx_pairs(fx.instruments)
+        # Separate metals from FX
+        metals = [p for p in pairs if any(m in p for m in ["XAU", "XAG", "XPT", "XPD"])]
+        fx_only = [p for p in pairs if p not in metals]
+
+        lines.append(f"## FX Pairs ({len(fx_only)})")
+        lines.append("")
+        lines.append(", ".join(fx_only[:20]))
+        if len(fx_only) > 20:
+            lines.append(f"... and {len(fx_only) - 20} more")
+        lines.append("")
+
+        if metals:
+            metal_names = extract_metal_names(
+                [i for i in fx.instruments if any(m in i.ric for m in ["XAU", "XAG", "XPT", "XPD"])]
+            )
+            lines.append(f"## Metals ({len(metal_names)})")
+            lines.append("")
+            lines.append(", ".join(metal_names))
+            lines.append("")
+
+    # Futures
+    futures = summaries.get("futures")
+    if futures and futures.instruments:
+        names = extract_futures_names(futures.instruments)
+        lines.append(f"## Futures ({futures.instrument_count})")
+        lines.append("")
+        lines.append(", ".join(names[:15]))
+        if len(names) > 15:
+            lines.append(f"... and {len(names) - 15} more")
+        lines.append("")
+
+    # Treasuries
+    treasuries = summaries.get("us-treasuries")
+    if treasuries and treasuries.instruments:
+        names = extract_treasury_names(treasuries.instruments)
+        lines.append(f"## US Treasuries ({treasuries.instrument_count})")
+        lines.append("")
+        lines.append(", ".join(names))
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def write_instruments_csv(
+    summaries: dict[str, AssetClassSummary], output_path: Path
+) -> None:
+    """Write full instrument list to CSV."""
+    with open(output_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "asset_class",
+                "benchmark_table",
+                "pyth_lazer_id",
+                "ric",
+                "earliest_date",
+                "latest_date",
+            ]
+        )
+        for summary in summaries.values():
+            for inst in summary.instruments:
+                writer.writerow(
+                    [
+                        inst.asset_class,
+                        inst.benchmark_table,
+                        inst.pyth_lazer_id,
+                        inst.ric,
+                        inst.earliest_date,
+                        inst.latest_date,
+                    ]
+                )
+
+
+def append_history_csv(
+    summaries: dict[str, AssetClassSummary], output_path: Path, check_date: str
+) -> None:
+    """Append daily counts to history.csv."""
+    file_exists = output_path.exists()
+
+    with open(output_path, "a", newline="") as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(
+                [
+                    "check_date",
+                    "asset_class",
+                    "instrument_count",
+                    "earliest_date",
+                    "latest_date",
+                ]
+            )
+        for summary in summaries.values():
+            writer.writerow(
+                [
+                    check_date,
+                    summary.asset_class,
+                    summary.instrument_count,
+                    summary.earliest_date,
+                    summary.latest_date,
+                ]
+            )
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Check Datascope benchmark data availability"
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("benchmark_availability"),
+        help="Directory for output files (default: benchmark_availability/)",
+    )
+    parser.add_argument(
+        "--date",
+        type=str,
+        default=str(date.today()),
+        help="Check date label (default: today)",
+    )
+    args = parser.parse_args()
+
+    # Create output directory
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+
+    print("Loading configuration...")
+    config = load_config()
+
+    print("Connecting to ClickHouse Analytics...")
+    client = get_analytics_client(config)
+
+    print("\nQuerying benchmark tables...")
+    summaries = get_all_instruments(client)
+
+    # Calculate total
+    total = sum(s.instrument_count for s in summaries.values())
+    print(f"\nTotal instruments found: {total}")
+
+    # Write SUMMARY.md
+    summary_path = args.output_dir / "SUMMARY.md"
+    summary_content = generate_summary_markdown(summaries, args.date)
+    with open(summary_path, "w") as f:
+        f.write(summary_content)
+    print(f"\nWrote summary to {summary_path}")
+
+    # Write instruments CSV
+    instruments_path = args.output_dir / f"instruments_{args.date}.csv"
+    write_instruments_csv(summaries, instruments_path)
+    print(f"Wrote {total} instruments to {instruments_path}")
+
+    # Append to history
+    history_path = args.output_dir / "history.csv"
+    append_history_csv(summaries, history_path, args.date)
+    print(f"Appended counts to {history_path}")
+
+    print("\nDone!")
+
+
+if __name__ == "__main__":
+    main()

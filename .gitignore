@@ -17,6 +17,11 @@ env/
 !price_id_list.csv
 quick_benchmark_results.csv
 
+# Benchmark availability - track summary but ignore daily instrument lists
+!benchmark_availability/SUMMARY.md
+!benchmark_availability/history.csv
+benchmark_availability/instruments_*.csv
+
 # IDE
 .idea/
 .vscode/

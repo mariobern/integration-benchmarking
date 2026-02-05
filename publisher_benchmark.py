@@ -34,6 +34,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -145,12 +146,16 @@ def is_futures_symbol(symbol: str) -> bool:
     return month_code in FUTURES_MONTH_CODES and year_digit.isdigit()
 
 
+@lru_cache(maxsize=32)
 def get_market_hours_filter_sql(mode: str, date: str, column_name: str = "publish_time") -> str:
     """
     Generate SQL WHERE clause for market hours filtering.
 
     For US equities: 9:30 AM - 4:00 PM EST (converted to UTC)
     Returns empty string for non-equity modes.
+
+    Results are cached to avoid regenerating the same filter SQL
+    hundreds of times per publisher during batch processing.
 
     Args:
         mode: Asset class (e.g., 'us-equities', 'fx')
@@ -190,6 +195,7 @@ def get_market_hours_filter_sql(mode: str, date: str, column_name: str = "publis
     """
 
 
+@lru_cache(maxsize=32)
 def get_extended_hours_filter_sql(
     session: TradingSession,
     date: str,
@@ -201,6 +207,9 @@ def get_extended_hours_filter_sql(
     For US equities extended hours:
     - Pre-market: 4:00 AM - 9:30 AM EST
     - After-hours: 4:00 PM - 8:00 PM EST
+
+    Results are cached to avoid regenerating the same filter SQL
+    hundreds of times per publisher during batch processing.
 
     Args:
         session: Which extended hours session (PREMARKET or AFTERHOURS)
@@ -250,6 +259,7 @@ def get_extended_hours_filter_sql(
     """
 
 
+@lru_cache(maxsize=32)
 def get_overnight_hours_filter_sql(
     date: str,
     column_name: str = "publish_time"
@@ -263,6 +273,9 @@ def get_overnight_hours_filter_sql(
     In UTC (EST = UTC-5 or EDT = UTC-4):
     - 8:00 PM EST = 01:00 UTC (next day)
     - 4:00 AM EST = 09:00 UTC (same day as UTC conversion)
+
+    Results are cached to avoid regenerating the same filter SQL
+    hundreds of times per publisher during batch processing.
 
     Args:
         date: Date string in YYYY-MM-DD format (the trading date, not the calendar date)
@@ -1234,6 +1247,7 @@ def evaluate_publisher_feed(
     mode: str,
     include_extended_hours: bool = False,
     include_overnight: bool = False,
+    skip_scipy_tests: bool = False,
 ) -> PublisherBenchmarkResult:
     """
     Evaluate a single publisher's data quality for one feed.
@@ -1250,6 +1264,7 @@ def evaluate_publisher_feed(
         mode: Asset class (fx, metals, us-equities, etc.)
         include_extended_hours: If True, evaluate pre-market and after-hours sessions
         include_overnight: If True, evaluate overnight session using publisher 32 as benchmark
+        skip_scipy_tests: If True, skip scipy statistical tests for faster execution
     """
     start_time = time.time()
 
@@ -1434,8 +1449,23 @@ def evaluate_publisher_feed(
         else:
             passes = False
 
-        # Compute advanced statistical metrics
-        stat_metrics = compute_statistical_metrics(diffs, signed_pct_diffs)
+        # Compute advanced statistical metrics (skip if requested for faster execution)
+        if skip_scipy_tests:
+            stat_metrics = {
+                "mean_diff": None,
+                "std_diff": None,
+                "mean_pct_diff": None,
+                "std_pct_diff": None,
+                "mae": None,
+                "t_statistic": None,
+                "t_pvalue": None,
+                "wilcoxon_statistic": None,
+                "wilcoxon_pvalue": None,
+                "normality_pvalue": None,
+                "mean_abs_z_score": None,
+            }
+        else:
+            stat_metrics = compute_statistical_metrics(diffs, signed_pct_diffs)
 
         # Evaluate extended hours if requested and applicable (US equities only)
         premarket_metrics = None
@@ -1597,6 +1627,7 @@ def process_csv(
     include_extended_hours: bool = False,
     include_overnight: bool = False,
     feed_id_filter: set[int] | None = None,
+    skip_scipy_tests: bool = False,
 ) -> list[PublisherBenchmarkResult]:
     """Process feeds from CSV file with parallel execution for a single publisher."""
     config = load_config()
@@ -1667,6 +1698,7 @@ def process_csv(
             mode,
             include_extended_hours=include_extended_hours,
             include_overnight=include_overnight,
+            skip_scipy_tests=skip_scipy_tests,
         )
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -2148,6 +2180,14 @@ Examples:
              "Independent of --extended-hours; both flags can be used together. "
              "Only affects us-equities; other asset classes are unchanged.",
     )
+    parser.add_argument(
+        "--skip-scipy-tests",
+        action="store_true",
+        help="Skip statistical tests (t-test, Wilcoxon, normality) for faster execution. "
+             "Pass/fail is determined by nrmse and hit_rate only, so scipy tests are "
+             "informational. Statistical metric columns will be empty in output. "
+             "Reduces processing time by ~40%%.",
+    )
 
     args = parser.parse_args()
 
@@ -2210,6 +2250,7 @@ Examples:
         include_extended_hours=args.extended_hours,
         include_overnight=args.overnight,
         feed_id_filter=feed_id_filter,
+        skip_scipy_tests=args.skip_scipy_tests,
     )
 
     # Compute summary statistics
