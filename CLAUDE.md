@@ -177,6 +177,29 @@ The script outputs an interpretation guide explaining:
 - How to interpret your results (good/bad thresholds)
 - Actionable recommendations for improving data quality
 
+### Performance Optimization Flags
+
+The `publisher_benchmark.py` script includes flags for faster execution:
+
+```bash
+# Skip statistical tests (t-test, Wilcoxon, normality) for faster execution
+python publisher_benchmark.py --csv publisher_55_feeds.csv --skip-scipy-tests
+```
+
+| Flag | Description | Impact |
+|------|-------------|--------|
+| `--skip-scipy-tests` | Skip scipy statistical tests | ~30-50% faster execution. Metrics like `t_statistic`, `t_pvalue`, `wilcoxon_statistic`, `wilcoxon_pvalue`, `normality_pvalue` will be null. |
+
+**When to use `--skip-scipy-tests`:**
+- Daily batch processing where statistical metrics aren't needed
+- Quick validation runs
+- When you only need pass/fail results (based on NRMSE and hit rate)
+
+**When NOT to use:**
+- Deep quality analysis requiring bias detection
+- Investigating specific publisher issues
+- When statistical significance of errors matters
+
 ### Extended Hours Support (US Equities)
 
 The `publisher_benchmark.py` script supports evaluation of US equities during extended trading hours:
@@ -422,6 +445,9 @@ source venv/bin/activate
 # Run batch for a specific date (yesterday by default)
 python -m portal.batch.daily_benchmark_runner --date 2026-01-30 --overnight --workers 16
 
+# Fast batch with all optimizations (recommended for production)
+python -m portal.batch.daily_benchmark_runner --date 2026-01-30 --overnight --workers 16 --discovery-workers 8 --skip-scipy-tests
+
 # Dry run (don't store results)
 python -m portal.batch.daily_benchmark_runner --date 2026-01-30 --dry-run
 
@@ -431,6 +457,17 @@ python -m portal.batch.daily_benchmark_runner --date 2026-01-30 --publisher-id 5
 # Skip extended hours (faster)
 python -m portal.batch.daily_benchmark_runner --date 2026-01-30 --no-extended-hours
 ```
+
+**Performance Optimization Flags:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--discovery-workers` | Parallel workers for feed discovery phase | 8 |
+| `--skip-scipy-tests` | Skip statistical tests for faster benchmark execution | False |
+
+**Optimization impact:**
+- `--discovery-workers 8`: Parallelizes feed discovery across publishers, reducing discovery time from sequential (~40s per publisher) to parallel (~10s total)
+- `--skip-scipy-tests`: Skips t-test, Wilcoxon, and normality tests, reducing per-feed benchmark time by ~30-50%
 
 **What it does:**
 1. Discovers all active publishers from ClickHouse (last 60 minutes of activity via `feed_publisher_junction`)

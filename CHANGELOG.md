@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-02-06
+
+### Added
+
+- **`--skip-scipy-tests` flag for `publisher_benchmark.py`** — Skips scipy statistical tests (t-test, Wilcoxon, normality) for faster execution. Useful for batch processing where statistical metrics aren't needed. Reduces per-feed benchmark time by ~30-50%.
+
+- **`--skip-scipy-tests` flag for `daily_benchmark_runner.py`** — Passes the flag through to `publisher_benchmark.py` during batch processing.
+
+- **`--discovery-workers` flag for `daily_benchmark_runner.py`** — Controls the number of parallel workers for feed discovery phase. Default is 8. Parallelizes `publisher_feeds.py` calls across publishers.
+
+- **Parallel feed discovery via `discover_feeds_parallel()`** — New function that runs feed discovery for multiple publishers concurrently using ThreadPoolExecutor. Creates a shared temporary directory for all discovered feed CSV files.
+
+### Changed
+
+- **LRU cache on timezone filter functions** — Added `@lru_cache(maxsize=32)` decorator to `get_market_hours_filter_sql()`, `get_extended_hours_filter_sql()`, and `get_overnight_hours_filter_sql()` functions. These functions are called repeatedly with the same parameters across feeds, so caching eliminates redundant SQL generation.
+
 ## 2026-02-04
 
 ### Reverted
