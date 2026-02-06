@@ -293,6 +293,63 @@ The console summary includes a separate "OVERNIGHT SESSION" section with aggrega
 
 Publisher 32 (Blue Ocean ATS) provides overnight US equity data when Datascope is not available. This enables comparison of overnight data quality across publishers, even though it's a peer comparison rather than an official benchmark.
 
+## Source Upload CSV Generator
+
+`generate_source_upload.py` automates creating `source_upload` CSV files for Datascope instrument onboarding. Given a list of US equity tickers, it resolves each to its Reuters Instrument Code (RIC), company name, and Pyth identifiers.
+
+### Running Source Upload Generator
+
+```bash
+# From comma-separated tickers
+python generate_source_upload.py --tickers AAPL,NVDA,META
+
+# From a file (one ticker per line or CSV)
+python generate_source_upload.py --ticker-file tickers.txt
+
+# Custom output path
+python generate_source_upload.py --tickers AAPL,NVDA --output my_upload.csv
+
+# Offline mode (skip ClickHouse, use NASDAQ Trader only)
+python generate_source_upload.py --tickers AAPL,NVDA --no-clickhouse
+
+# Force re-download NASDAQ Trader data
+python generate_source_upload.py --tickers AAPL --force-refresh
+```
+
+### Source Upload Arguments
+
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `--tickers` | Comma-separated ticker list | - |
+| `--ticker-file` | File with one ticker per line (or CSV) | - |
+| `--output` | Output CSV path | `source_upload.csv` |
+| `--no-clickhouse` | Skip ClickHouse lookups (offline mode) | False |
+| `--us-stocks-path` | Path to US-Stock-Symbols repo | `../US-Stock-Symbols` |
+| `--force-refresh` | Re-download NASDAQ Trader data (ignores cache) | False |
+
+### RIC Resolution Strategy
+
+Three-tier resolution (ordered by reliability):
+
+1. **Datascope ClickHouse** (most accurate) — queries `datascope_global_equities_benchmark_data` for existing RICs. This is the exact RIC Datascope uses for benchmarking.
+2. **NASDAQ Trader** (offline fallback) — downloads and parses `nasdaqlisted.txt` (all NASDAQ -> `.O`) and `otherlisted.txt` (exchange-specific suffixes). Correct for ~84% of tickers.
+3. **Default `.N`** — for tickers not found in any source, defaults to NYSE suffix and flags for manual review.
+
+### Source Upload Output Format
+
+```csv
+source_value, source_type, pyth_id, pythnet_id, pyth_lazer_id, valid_from, valid_to, ticker, asset_full_name, asset_class
+AAPL.O,RIC,equity.aapl,Equity.US.AAPL/USD,922,,,AAPL,Apple Inc. - Common Stock,Equity
+TSM.N,RIC,equity.tsm,Equity.US.TSM/USD,1436,,,TSM,Taiwan Semiconductor Manufacturing Company Ltd.,American Depositary Shares
+```
+
+### Edge Cases
+
+- **Dotted tickers** (BRK.B) → RIC uses `BRKb.N` format (lowercase class, no dot)
+- **Multiple Datascope RICs** (e.g., TSM.N + TSM.Z) → picks by row count, warns user
+- **ADR detection** → classified as "American Depositary Shares" if name contains ADR keywords or country is non-US
+- **NASDAQ Trader caching** → files cached in `.nasdaq_cache/` with 24h TTL; `--force-refresh` bypasses
+
 ## Publisher Performance Portal (Self-Service API)
 
 Located in `portal/` directory. FastAPI-based REST API for publishers to view their benchmark performance.
