@@ -350,6 +350,90 @@ TSM.N,RIC,equity.tsm,Equity.US.TSM/USD,1436,,,TSM,Taiwan Semiconductor Manufactu
 - **ADR detection** → classified as "American Depositary Shares" if name contains ADR keywords or country is non-US
 - **NASDAQ Trader caching** → files cached in `.nasdaq_cache/` with 24h TTL; `--force-refresh` bypasses
 
+## ISIN Resolver
+
+`isin_resolver.py` is a standalone utility that resolves ticker symbols to International Securities Identification Numbers (ISINs) using a multi-tier strategy. ISINs provide a universal, unambiguous identifier that can be used to look up the exact primary RIC for any security via the Datascope DSS API.
+
+### Running the ISIN Resolver
+
+```bash
+# Resolve tickers from command line
+python isin_resolver.py --tickers AAPL,MSFT,TSM,SPY
+
+# Resolve from a file (one ticker per line or CSV)
+python isin_resolver.py --ticker-file tickers.txt
+
+# Resolve all tickers from ric.csv (strips exchange suffixes)
+python isin_resolver.py --ric-csv ric.csv
+
+# Skip yfinance lookups (faster, offline — Tier 1 only)
+python isin_resolver.py --tickers AAPL,MSFT --no-yfinance
+
+# Force re-resolve (ignore cache)
+python isin_resolver.py --tickers AAPL --force-refresh
+
+# Output results to CSV
+python isin_resolver.py --ric-csv ric.csv --output isins.csv
+
+# Verbose logging
+python isin_resolver.py --tickers AAPL -v
+```
+
+### ISIN Resolver Arguments
+
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `--tickers` | Comma-separated ticker list | - |
+| `--ticker-file` | File with tickers (one per line or CSV) | - |
+| `--ric-csv` | RIC CSV file (extracts tickers, strips suffix) | - |
+| `--output` | Output CSV path | Console only |
+| `--no-yfinance` | Skip yfinance lookups (Tier 1 only) | False |
+| `--force-refresh` | Ignore cache, re-resolve all | False |
+| `--verbose`, `-v` | Enable verbose logging | False |
+
+### Resolution Strategy
+
+Three-tier resolution (ordered by speed):
+
+1. **FinanceDatabase** (Tier 1) — Bulk lookup from 158K+ equity database. Local, instant, free. Covers ~55% of ric.csv tickers. ETFs are NOT covered (no ISIN/CUSIP columns for ETFs in this source).
+2. **yfinance** (Tier 2) — Per-ticker Yahoo Finance lookup (~1-2s each). Covers ETFs and many additional equities. Returns `-` for ~96 well-known tickers (BAC, JPM, QQQ, BRK.B, etc.) — known gap.
+3. **CUSIP computation** — If Tier 1 provides a CUSIP but no ISIN, computes the ISIN algorithmically via python-stdnum (zero API calls).
+
+**Combined coverage against ric.csv: 86.4%** (612/708 unique tickers). Remaining 13.6% will be covered by Datascope DSS API integration (Phase 2).
+
+### ISIN Resolver Output
+
+Console output includes a resolution summary with per-source counts and ISIN country prefix breakdown.
+
+CSV output (`--output`) contains:
+- `ticker`, `isin`, `cusip`, `source`, `company_name`, `exchange`, `warnings`
+
+### Caching
+
+Results are cached in `.isin_cache/isin_map.json` with a 7-day TTL. Use `--force-refresh` to bypass.
+
+### Programmatic Usage
+
+```python
+from isin_resolver import ISINResolver
+
+resolver = ISINResolver(use_yfinance=True)
+result = resolver.resolve("AAPL")
+print(result.isin)       # US0378331005
+print(result.cusip)      # 037833100
+print(result.source)     # financedatabase
+
+# Batch resolve
+results = resolver.resolve_batch(["AAPL", "MSFT", "SPY"])
+resolver.save_cache()
+```
+
+### Running Tests
+
+```bash
+pytest tests/test_isin_resolver.py -v
+```
+
 ## Publisher Performance Portal (Self-Service API)
 
 Located in `portal/` directory. FastAPI-based REST API for publishers to view their benchmark performance.

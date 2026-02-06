@@ -4,6 +4,8 @@
 
 ### Added
 
+- **`isin_resolver.py`** — New standalone utility that resolves ticker symbols to International Securities Identification Numbers (ISINs) using a tiered strategy: FinanceDatabase (158K+ equities, instant local lookup), yfinance (per-ticker Yahoo Finance fallback), and CUSIP→ISIN computation via python-stdnum. Achieves 86.4% coverage against ric.csv (612/708 tickers). Includes JSON file caching with 7-day TTL, CLI with `--tickers`/`--ticker-file`/`--ric-csv` inputs, and CSV output. Handles dotted tickers (BRK.B→BRK-B), BOM-encoded CSVs, ADRs with non-US ISINs, and ETFs. Tests at `tests/test_isin_resolver.py` (49 tests).
+
 - **`generate_source_upload.py`** — New script to automate creation of `source_upload` CSV files for Datascope US equity onboarding. Given a list of tickers, resolves each to its Reuters Instrument Code (RIC), company name, and Pyth identifiers using a 3-tier strategy: Datascope ClickHouse (most accurate), NASDAQ Trader listings (offline fallback), and default `.N` suffix (flagged for review). Handles dotted tickers (BRK.B → BRKb.N), ADR classification, NASDAQ Trader caching (24h TTL), and parameterized ClickHouse queries. Supports `--no-clickhouse` for offline mode and `--force-refresh` to bypass cache.
 
 - **`--skip-scipy-tests` flag for `publisher_benchmark.py`** — Skips scipy statistical tests (t-test, Wilcoxon, normality) for faster execution. Useful for batch processing where statistical metrics aren't needed. Reduces per-feed benchmark time by ~30-50%.

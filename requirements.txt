@@ -2,6 +2,11 @@ clickhouse-connect>=0.7.0
 PyYAML>=6.0
 scipy>=1.11.0
 
+# ISIN resolution
+financedatabase>=2.3.0
+python-stdnum>=2.0
+yfinance>=1.1.0
+
 # Portal dependencies
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
