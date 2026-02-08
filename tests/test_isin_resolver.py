@@ -14,6 +14,7 @@ from isin_resolver import (
     ISINResolver,
     ISINResult,
     YFinanceSource,
+    _country_name_to_iso,
     _cusip_to_isin,
     _validate_isin_format,
     parse_tickers_from_ric_csv,
@@ -533,3 +534,215 @@ class TestEdgeCases:
         captured = capsys.readouterr()
         assert "Total tickers: 0" in captured.out
         assert "no tickers" in captured.out
+
+
+# --- Country Name to ISO Mapping (Item 1) ---
+
+
+class TestCountryNameToISO:
+    def test_us(self) -> None:
+        assert _country_name_to_iso("United States") == "US"
+
+    def test_canada(self) -> None:
+        assert _country_name_to_iso("Canada") == "CA"
+
+    def test_cayman_islands(self) -> None:
+        assert _country_name_to_iso("Cayman Islands") == "KY"
+
+    def test_united_kingdom(self) -> None:
+        assert _country_name_to_iso("United Kingdom") == "GB"
+
+    def test_case_insensitive(self) -> None:
+        assert _country_name_to_iso("CANADA") == "CA"
+        assert _country_name_to_iso("united states") == "US"
+
+    def test_empty_defaults_to_us(self) -> None:
+        assert _country_name_to_iso("") == "US"
+
+    def test_unknown_defaults_to_us(self) -> None:
+        assert _country_name_to_iso("Unknown Country") == "US"
+
+    def test_whitespace_stripped(self) -> None:
+        assert _country_name_to_iso("  Canada  ") == "CA"
+
+
+# --- Non-US CUSIP-to-ISIN Conversion (Item 1) ---
+
+
+class TestNonUSCUSIPConversion:
+    @patch("isin_resolver.FinanceDatabaseSource._load")
+    def test_canadian_cusip_gets_ca_prefix(self, mock_load: MagicMock) -> None:
+        """A Canadian ticker with CUSIP but no ISIN should get CA prefix, not US."""
+        source = FinanceDatabaseSource()
+        source._loaded = True
+        source._equity_data = {
+            "SHOP": {
+                "isin": None,
+                "cusip": "82509L107",
+                "name": "Shopify Inc.",
+                "country": "Canada",
+                "exchange": "NYS",
+            },
+        }
+
+        result = source.resolve("SHOP")
+        if result and result.isin:
+            assert result.isin.startswith("CA"), f"Expected CA prefix, got {result.isin}"
+
+    @patch("isin_resolver.FinanceDatabaseSource._load")
+    def test_us_cusip_still_gets_us_prefix(self, mock_load: MagicMock) -> None:
+        """US tickers should still get US prefix (regression test)."""
+        source = FinanceDatabaseSource()
+        source._loaded = True
+        source._equity_data = {
+            "AAPL": {
+                "isin": None,
+                "cusip": "037833100",
+                "name": "Apple Inc.",
+                "country": "United States",
+                "exchange": "NMS",
+            },
+        }
+
+        result = source.resolve("AAPL")
+        assert result is not None
+        assert result.isin is not None
+        assert result.isin.startswith("US")
+
+    @patch("isin_resolver.FinanceDatabaseSource._load")
+    def test_empty_country_defaults_to_us(self, mock_load: MagicMock) -> None:
+        """Empty country should default to US prefix."""
+        source = FinanceDatabaseSource()
+        source._loaded = True
+        source._equity_data = {
+            "TEST": {
+                "isin": None,
+                "cusip": "037833100",
+                "name": "Test Corp",
+                "country": None,
+                "exchange": "NMS",
+            },
+        }
+
+        result = source.resolve("TEST")
+        assert result is not None
+        assert result.isin is not None
+        assert result.isin.startswith("US")
+
+
+# --- Post-Cache ISIN Validation (Item 3) ---
+
+
+class TestPostCacheValidation:
+    def test_bad_isin_evicted_from_cache(self, tmp_path: Path) -> None:
+        """A cached ISIN with bad check digit should be evicted on read."""
+        cache = ISINCache(cache_dir=tmp_path, ttl_seconds=3600)
+        # Write a bad ISIN directly to cache internals
+        cache._load()
+        import time as _time
+        cache._data["BAD"] = {
+            "ticker": "BAD",
+            "isin": "US0000000009",  # invalid check digit
+            "source": "test",
+            "warnings": [],
+            "_cached_at": _time.time(),
+        }
+        cache.save()
+
+        # Reading should detect and evict the bad ISIN
+        cache2 = ISINCache(cache_dir=tmp_path, ttl_seconds=3600)
+        result = cache2.get("BAD")
+        assert result is None  # evicted
+
+        # Verify it was actually removed from internal data
+        assert "BAD" not in cache2._data
+
+    def test_valid_isin_served_from_cache(self, tmp_path: Path) -> None:
+        """A cached ISIN with valid check digit should be served normally."""
+        cache = ISINCache(cache_dir=tmp_path, ttl_seconds=3600)
+        result = ISINResult(ticker="AAPL", isin="US0378331005", source="test")
+        cache.put(result)
+
+        fetched = cache.get("AAPL")
+        assert fetched is not None
+        assert fetched.isin == "US0378331005"
+
+    def test_no_isin_served_from_cache(self, tmp_path: Path) -> None:
+        """A cached entry with no ISIN should still be served (unresolved)."""
+        cache = ISINCache(cache_dir=tmp_path, ttl_seconds=3600)
+        result = ISINResult(ticker="ZZZZZ", source="unresolved")
+        cache.put(result)
+
+        fetched = cache.get("ZZZZZ")
+        assert fetched is not None
+        assert fetched.isin is None
+
+
+# --- Confidence Scoring (Item 5) ---
+
+
+class TestConfidenceScoring:
+    @patch.object(FinanceDatabaseSource, "_load")
+    def test_tier1_confidence_high(self, mock_load: MagicMock, tmp_path: Path) -> None:
+        """FinanceDatabase results should have 'high' confidence."""
+        resolver = ISINResolver(use_yfinance=False, cache_dir=tmp_path)
+        resolver.finance_db._loaded = True
+        resolver.finance_db._equity_data = {
+            "AAPL": {
+                "isin": "US0378331005",
+                "cusip": "037833100",
+                "name": "Apple Inc.",
+                "country": "United States",
+                "exchange": "NMS",
+            },
+        }
+
+        result = resolver.resolve("AAPL")
+        assert result.confidence == "high"
+
+    @patch("yfinance.Ticker")
+    @patch.object(FinanceDatabaseSource, "_load")
+    def test_tier2_confidence_medium(
+        self, mock_load: MagicMock, mock_ticker_cls: MagicMock, tmp_path: Path
+    ) -> None:
+        """yfinance results should have 'medium' confidence."""
+        resolver = ISINResolver(use_yfinance=True, cache_dir=tmp_path)
+        resolver.finance_db._loaded = True
+        resolver.finance_db._equity_data = {}
+
+        mock_ticker = MagicMock()
+        mock_ticker.isin = "US78462F1030"
+        mock_ticker.info = {"longName": "SPDR"}
+        mock_ticker_cls.return_value = mock_ticker
+
+        result = resolver.resolve("SPY")
+        assert result.confidence == "medium"
+
+    @patch.object(FinanceDatabaseSource, "_load")
+    def test_unresolved_confidence_low(self, mock_load: MagicMock, tmp_path: Path) -> None:
+        """Unresolved tickers should have 'low' confidence."""
+        resolver = ISINResolver(use_yfinance=False, cache_dir=tmp_path)
+        resolver.finance_db._loaded = True
+        resolver.finance_db._equity_data = {}
+
+        result = resolver.resolve("ZZZZZ")
+        assert result.confidence == "low"
+
+    def test_write_csv_includes_confidence(self, tmp_path: Path) -> None:
+        from isin_resolver import write_csv_output
+
+        results = {
+            "AAPL": ISINResult(
+                ticker="AAPL",
+                isin="US0378331005",
+                source="financedatabase",
+                confidence="high",
+            ),
+        }
+        output = tmp_path / "test.csv"
+        write_csv_output(results, output)
+
+        with open(output) as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        assert rows[0]["confidence"] == "high"

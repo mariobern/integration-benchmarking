@@ -64,10 +64,36 @@ ADR_KEYWORDS = [
 # Ticker format: 1-5 uppercase letters, optional dot + single letter (share class)
 TICKER_PATTERN = re.compile(r"^[A-Z]{1,5}(\.[A-Z])?$")
 
+# RIC format: 1-6 uppercase letters + optional lowercase share class letter + dot + exchange suffix
+RIC_PATTERN = re.compile(r"^[A-Za-z]{1,6}[a-z]?\.(N|O|OQ|P|Z|A|K|PK|TO)$")
+
+# Valid RIC exchange suffixes for quick checks
+VALID_RIC_SUFFIXES = {".N", ".O", ".OQ", ".P", ".Z", ".A", ".K", ".PK", ".TO"}
+
+# Primary exchange suffixes — prefer these over alternative venues
+# .N (NYSE) and .O/.OQ (NASDAQ) are primary listings;
+# .Z (BATS), .P (ARCA), .K (IEX) are alternative venues
+PRIMARY_EXCHANGE_SUFFIXES = {".N", ".O", ".OQ"}
+
+# Map NASDAQ Trader exchange codes to RIC suffixes for disambiguation
+_EXCHANGE_CODE_TO_RIC_SUFFIX: dict[str, str] = {
+    "Q": ".O",   # NASDAQ
+    "N": ".N",   # NYSE
+    "P": ".P",   # NYSE Arca
+    "Z": ".Z",   # BATS
+    "A": ".A",   # NYSE American (AMEX)
+    "V": ".V",   # IEXG
+}
+
 
 def validate_ticker(ticker: str) -> bool:
     """Validate that a ticker matches expected US equity format."""
     return bool(TICKER_PATTERN.match(ticker.upper()))
+
+
+def validate_ric(ric: str) -> bool:
+    """Validate that a RIC matches expected format (e.g., AAPL.O, BRKb.N)."""
+    return bool(RIC_PATTERN.match(ric))
 
 
 def ticker_to_ric_base(ticker: str) -> str:
@@ -100,6 +126,7 @@ class TickerInfo:
     asset_class: str = "Equity"
     pyth_lazer_id: Optional[int] = None
     ric_source: str = ""  # "datascope", "nasdaq_trader", "default"
+    confidence: str = ""  # "high", "medium", "low", "manual_review"
     warnings: list[str] = field(default_factory=list)
 
 
@@ -117,6 +144,7 @@ class SourceUploadRow:
     ticker: str = ""
     asset_full_name: str = ""
     asset_class: str = "Equity"
+    confidence: str = ""  # "high", "medium", "low", "manual_review"
 
 
 # --- Config & ClickHouse ---
@@ -370,6 +398,25 @@ class NasdaqTraderSource:
 
         return None
 
+    def get_exchange_suffix(self, ticker: str) -> Optional[str]:
+        """Get the expected RIC exchange suffix for a ticker based on NASDAQ Trader data.
+
+        Returns the suffix (e.g., '.N', '.O') or None if ticker not found.
+        """
+        self._load()
+        upper = ticker.upper()
+        lookup_forms = [upper]
+        if "." in upper:
+            lookup_forms.append(ticker_to_ric_base(upper))
+
+        for form in lookup_forms:
+            if form in self._nasdaq_tickers:
+                return ".O"  # All NASDAQ-listed -> .O
+            if form in self._other_tickers:
+                exchange, _ = self._other_tickers[form]
+                return OTHER_EXCHANGE_SUFFIX_MAP.get(exchange, ".N")
+        return None
+
 
 # --- US Stock Symbols Source ---
 
@@ -438,6 +485,56 @@ def classify_asset(name: str, country: str = "") -> str:
 # --- Core Resolution ---
 
 
+def _disambiguate_rics(
+    rics: list[str],
+    ticker: str,
+    nasdaq_source: NasdaqTraderSource,
+) -> tuple[str, list[str]]:
+    """Choose the best RIC from multiple Datascope RICs for a ticker.
+
+    Strategy (ranked):
+      1. Match NASDAQ Trader exchange suffix
+      2. Prefer primary exchange (.N, .O, .OQ) over alternatives (.Z, .P, .K)
+      3. Row count tiebreaker (first in list = highest count)
+
+    Returns (chosen_ric, warnings).
+    """
+    warnings: list[str] = []
+    if len(rics) == 1:
+        return rics[0], warnings
+
+    # Extract suffix from each RIC
+    def _suffix(ric: str) -> str:
+        dot = ric.rfind(".")
+        return ric[dot:] if dot > 0 else ""
+
+    # Strategy 1: NASDAQ Trader cross-reference
+    expected_suffix = nasdaq_source.get_exchange_suffix(ticker)
+    if expected_suffix:
+        for ric in rics:
+            if _suffix(ric) == expected_suffix:
+                warnings.append(
+                    f"Multiple Datascope RICs: {', '.join(rics)}; "
+                    f"chose {ric} (matches NASDAQ Trader exchange)"
+                )
+                return ric, warnings
+
+    # Strategy 2: Prefer primary exchange
+    for ric in rics:
+        if _suffix(ric) in PRIMARY_EXCHANGE_SUFFIXES:
+            warnings.append(
+                f"Multiple Datascope RICs: {', '.join(rics)}; "
+                f"chose {ric} (primary exchange)"
+            )
+            return ric, warnings
+
+    # Strategy 3: Row count tiebreaker (first = highest count)
+    warnings.append(
+        f"Multiple Datascope RICs: {', '.join(rics)}; using {rics[0]} (highest row count)"
+    )
+    return rics[0], warnings
+
+
 def resolve_tickers(
     tickers: list[str],
     clickhouse_lookup: Optional[ClickHouseLookup],
@@ -463,6 +560,11 @@ def resolve_tickers(
         print("Querying feeds_metadata for pyth_lazer_ids...")
         lazer_ids = clickhouse_lookup.lookup_lazer_ids(tickers)
         print(f"  Found lazer IDs for {len(lazer_ids)} tickers")
+    else:
+        print(
+            "WARNING: Datascope ClickHouse unavailable. All RICs will come from "
+            "NASDAQ Trader (~16% error rate) or default .N suffix."
+        )
 
     for ticker in tickers:
         upper = ticker.upper()
@@ -472,15 +574,10 @@ def resolve_tickers(
         # Tier 1: Datascope ClickHouse
         ds_rics = datascope_rics.get(upper, [])
         if ds_rics:
-            if len(ds_rics) == 1:
-                info.ric = ds_rics[0]
-            else:
-                # Multiple RICs - prefer one with a matching lazer_id
-                info.ric = ds_rics[0]  # default to first
-                info.warnings.append(
-                    f"Multiple Datascope RICs: {', '.join(ds_rics)}; using {info.ric}"
-                )
+            info.ric, ds_warnings = _disambiguate_rics(ds_rics, upper, nasdaq_source)
+            info.warnings.extend(ds_warnings)
             info.ric_source = "datascope"
+            info.confidence = "high"
 
         # Tier 2: NASDAQ Trader
         if not info.ric:
@@ -488,15 +585,26 @@ def resolve_tickers(
             if nasdaq_result:
                 info.ric, info.name = nasdaq_result
                 info.ric_source = "nasdaq_trader"
+                info.confidence = "medium"
 
         # Tier 3: Default .N
         if not info.ric:
             ric_base = ticker_to_ric_base(upper)
             info.ric = f"{ric_base}.N"
             info.ric_source = "default"
+            info.confidence = "low"
             info.warnings.append(
                 f"Not found in Datascope or NASDAQ Trader; defaulting to {info.ric}"
             )
+
+        # RIC format validation
+        if info.ric and not validate_ric(info.ric):
+            info.warnings.append(f"RIC '{info.ric}' failed format validation")
+            info.confidence = "manual_review"
+
+        # Downgrade confidence if any warnings exist
+        if info.warnings and info.confidence not in ("low", "manual_review"):
+            info.confidence = "manual_review"
 
         # Resolve name if not yet set (Datascope doesn't provide names)
         if not info.name:
@@ -539,6 +647,7 @@ def build_rows(infos: list[TickerInfo]) -> list[SourceUploadRow]:
                 ticker=info.ticker,
                 asset_full_name=info.name,
                 asset_class=info.asset_class,
+                confidence=info.confidence,
             )
         )
     return rows
@@ -552,7 +661,7 @@ def write_csv(rows: list[SourceUploadRow], output_path: Path) -> None:
         # Write header as raw string to match reference format (space after commas)
         f.write(
             "source_value, source_type, pyth_id, pythnet_id, pyth_lazer_id, "
-            "valid_from, valid_to, ticker, asset_full_name, asset_class\n"
+            "valid_from, valid_to, ticker, asset_full_name, asset_class, confidence\n"
         )
         # Write data rows with standard csv.writer (no space after commas)
         writer = csv.writer(f)
@@ -568,6 +677,7 @@ def write_csv(rows: list[SourceUploadRow], output_path: Path) -> None:
                 row.ticker,
                 row.asset_full_name,
                 row.asset_class,
+                row.confidence,
             ])
 
     print(f"\nWrote {len(rows)} rows to {output_path}")
@@ -577,13 +687,18 @@ def print_summary(infos: list[TickerInfo]) -> None:
     """Print resolution summary to console."""
     total = len(infos)
     by_source = {"datascope": 0, "nasdaq_trader": 0, "default": 0}
+    by_confidence: dict[str, int] = {}
     with_lazer = 0
+    invalid_ric_count = 0
     warnings = []
 
     for info in infos:
         by_source[info.ric_source] = by_source.get(info.ric_source, 0) + 1
+        by_confidence[info.confidence] = by_confidence.get(info.confidence, 0) + 1
         if info.pyth_lazer_id:
             with_lazer += 1
+        if info.ric and not validate_ric(info.ric):
+            invalid_ric_count += 1
         for w in info.warnings:
             warnings.append(f"  {info.ticker}: {w}")
 
@@ -597,8 +712,17 @@ def print_summary(infos: list[TickerInfo]) -> None:
     print(f"  NASDAQ Trader:        {by_source['nasdaq_trader']}")
     print(f"  Default (.N):         {by_source['default']}")
     print()
+    print("Confidence level:")
+    for level in ["high", "medium", "low", "manual_review"]:
+        count = by_confidence.get(level, 0)
+        if count:
+            print(f"  {level}: {count}")
+    print()
     print(f"With pyth_lazer_id: {with_lazer}/{total}")
     print(f"Without pyth_lazer_id: {total - with_lazer}/{total}")
+
+    if invalid_ric_count:
+        print(f"\nInvalid RIC format: {invalid_ric_count} (flagged for manual review)")
 
     if warnings:
         print(f"\nWarnings ({len(warnings)}):")

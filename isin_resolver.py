@@ -65,6 +65,7 @@ class ISINResult:
     company_name: Optional[str] = None
     exchange: Optional[str] = None
     warnings: tuple[str, ...] = ()
+    confidence: str = ""  # "high", "medium", "low" — based on resolution source
 
     def to_dict(self) -> dict[str, Any]:
         return {**asdict(self), "warnings": list(self.warnings)}
@@ -110,7 +111,13 @@ class ISINCache:
         if time.time() - cached_at > self.ttl_seconds:
             return None
         result_data = {k: v for k, v in entry.items() if k != "_cached_at"}
-        return ISINResult.from_dict(result_data)
+        result = ISINResult.from_dict(result_data)
+        # Post-cache validation: evict ISINs with bad check digits
+        if result.isin and not validate_isin(result.isin):
+            logger.warning("Cached ISIN for %s failed validation, evicting", ticker)
+            del self._data[ticker.upper()]
+            return None
+        return result
 
     def put(self, result: ISINResult) -> None:
         self._load()
@@ -141,6 +148,46 @@ def _clean_pandas_value(val: object) -> Optional[str]:
         return None
     s = str(val)
     return s if s else None
+
+
+# --- Country Mapping ---
+
+# Map common FinanceDatabase country names to ISO 3166-1 alpha-2 codes
+# Used for non-US CUSIP-to-ISIN conversion
+_COUNTRY_TO_ISO: dict[str, str] = {
+    "united states": "US",
+    "canada": "CA",
+    "united kingdom": "GB",
+    "cayman islands": "KY",
+    "bermuda": "BM",
+    "ireland": "IE",
+    "israel": "IL",
+    "netherlands": "NL",
+    "switzerland": "CH",
+    "luxembourg": "LU",
+    "japan": "JP",
+    "china": "CN",
+    "hong kong": "HK",
+    "brazil": "BR",
+    "mexico": "MX",
+    "australia": "AU",
+    "singapore": "SG",
+    "south korea": "KR",
+    "india": "IN",
+    "germany": "DE",
+    "france": "FR",
+    "taiwan": "TW",
+}
+
+
+def _country_name_to_iso(country_name: str) -> str:
+    """Convert a FinanceDatabase country name to ISO 3166-1 alpha-2 code.
+
+    Returns 'US' if the country is not recognized.
+    """
+    if not country_name:
+        return "US"
+    return _COUNTRY_TO_ISO.get(country_name.strip().lower(), "US")
 
 
 # --- Tier 1: FinanceDatabase ---
@@ -215,9 +262,10 @@ class FinanceDatabaseSource:
         isin = entry.get("isin")
         cusip = entry.get("cusip")
 
-        # If we have CUSIP but no ISIN, compute it
+        # If we have CUSIP but no ISIN, compute it using the correct country
         if cusip and not isin:
-            isin = _cusip_to_isin(cusip)
+            country_iso = _country_name_to_iso(entry.get("country", ""))
+            isin = _cusip_to_isin(cusip, country=country_iso)
 
         if not isin:
             return None
@@ -229,6 +277,7 @@ class FinanceDatabaseSource:
             source="financedatabase",
             company_name=entry.get("name"),
             exchange=entry.get("exchange"),
+            confidence="high",
         )
 
     def resolve_batch(self, tickers: list[str]) -> dict[str, ISINResult]:
@@ -264,7 +313,7 @@ class YFinanceSource:
             t = yf.Ticker(yf_ticker)
             isin = t.isin
         except (ValueError, KeyError, AttributeError, ConnectionError, OSError) as e:
-            logger.debug("yfinance lookup failed for %s: %s", ticker, e)
+            logger.warning("yfinance lookup failed for %s: %s", ticker, e)
             return None
 
         # yfinance returns "-" when ISIN is not available
@@ -295,6 +344,7 @@ class YFinanceSource:
             cusip=cusip,
             source="yfinance",
             company_name=name,
+            confidence="medium",
         )
 
 
@@ -401,6 +451,7 @@ class ISINResolver:
             ticker=upper,
             source="unresolved",
             warnings=tuple(warnings) if warnings else ("No ISIN found in any source",),
+            confidence="low",
         )
 
     def resolve_batch(self, tickers: list[str]) -> dict[str, ISINResult]:
@@ -460,6 +511,7 @@ class ISINResolver:
                     ticker=ticker,
                     source="unresolved",
                     warnings=tuple(warnings),
+                    confidence="low",
                 )
 
         return results
@@ -549,7 +601,7 @@ def write_csv_output(results: dict[str, ISINResult], output_path: Path) -> None:
     """Write ISIN results to CSV."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    fieldnames = ["ticker", "isin", "cusip", "source", "company_name", "exchange", "warnings"]
+    fieldnames = ["ticker", "isin", "cusip", "source", "confidence", "company_name", "exchange", "warnings"]
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -560,6 +612,7 @@ def write_csv_output(results: dict[str, ISINResult], output_path: Path) -> None:
                 "isin": r.isin or "",
                 "cusip": r.cusip or "",
                 "source": r.source,
+                "confidence": r.confidence,
                 "company_name": r.company_name or "",
                 "exchange": r.exchange or "",
                 "warnings": "; ".join(r.warnings) if r.warnings else "",
