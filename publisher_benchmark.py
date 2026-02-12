@@ -43,6 +43,8 @@ import clickhouse_connect
 import yaml
 from scipy import stats
 
+from date_utils import expand_date_args, validate_date_args
+
 
 class TradingSession(Enum):
     """Trading session types for US equities."""
@@ -146,7 +148,7 @@ def is_futures_symbol(symbol: str) -> bool:
     return month_code in FUTURES_MONTH_CODES and year_digit.isdigit()
 
 
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=128)
 def get_market_hours_filter_sql(mode: str, date: str, column_name: str = "publish_time") -> str:
     """
     Generate SQL WHERE clause for market hours filtering.
@@ -195,7 +197,7 @@ def get_market_hours_filter_sql(mode: str, date: str, column_name: str = "publis
     """
 
 
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=128)
 def get_extended_hours_filter_sql(
     session: TradingSession,
     date: str,
@@ -259,7 +261,7 @@ def get_extended_hours_filter_sql(
     """
 
 
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=128)
 def get_overnight_hours_filter_sql(
     date: str,
     column_name: str = "publish_time"
@@ -754,6 +756,30 @@ def compute_summary_stats(
         overnight_stats["overnight_median_hit_rate"] = statistics.median(on_hit_rate_values) if on_hit_rate_values else None
         overnight_stats["overnight_reference_publisher_id"] = OVERNIGHT_REFERENCE_PUBLISHER_ID
 
+    per_date_breakdown: dict[str, dict[str, int | float | None]] = {}
+    results_by_date: dict[str, list[PublisherBenchmarkResult]] = {}
+    for result in results:
+        results_by_date.setdefault(result.date, []).append(result)
+
+    for date_value in sorted(results_by_date):
+        date_results = results_by_date[date_value]
+        date_total = len(date_results)
+        date_pass = sum(1 for r in date_results if r.passes and not r.error)
+        date_fail = sum(1 for r in date_results if not r.passes and not r.error)
+        date_error = sum(1 for r in date_results if r.error)
+        date_nrmse = [r.nrmse for r in date_results if r.nrmse is not None and not r.error]
+        date_hit_rate = [r.hit_rate for r in date_results if r.hit_rate is not None and not r.error]
+
+        per_date_breakdown[date_value] = {
+            "total": date_total,
+            "pass": date_pass,
+            "fail": date_fail,
+            "error": date_error,
+            "pass_rate_pct": round((date_pass / date_total * 100), 2) if date_total > 0 else 0,
+            "median_nrmse": statistics.median(date_nrmse) if date_nrmse else None,
+            "median_hit_rate": statistics.median(date_hit_rate) if date_hit_rate else None,
+        }
+
     return {
         "publisher_id": publisher_id,
         "total_feeds": total_feeds,
@@ -805,6 +831,7 @@ def compute_summary_stats(
         "normality_rate": round((normal_distributions / total_normality_tests * 100), 2) if total_normality_tests > 0 else None,
         "median_z_score": median_z_score,
         "mean_z_score": mean_z_score,
+        "per_date_breakdown": per_date_breakdown,
         # Extended hours statistics (empty dict if not enabled)
         "extended_hours": extended_hours_stats,
         # Overnight statistics (empty dict if not enabled)
@@ -1632,6 +1659,7 @@ def process_csv(
     csv_path: Path,
     publisher_id: int,
     max_workers: int,
+    date_override: list[str] | None = None,
     include_asset_classes: list[str] | None = None,
     exclude_asset_classes: list[str] | None = None,
     include_extended_hours: bool = False,
@@ -1652,7 +1680,7 @@ def process_csv(
         exclude_normalized = {normalize_asset_class(ac) for ac in exclude_asset_classes}
 
     # Read CSV
-    feeds_to_process = []
+    feeds_raw: list[tuple[int, str, str]] = []
     skipped_by_filter = 0
     with open(csv_path) as f:
         reader = csv.reader(f)
@@ -1673,25 +1701,46 @@ def process_csv(
                 skipped_by_filter += 1
                 continue
 
-            feeds_to_process.append((int(feed_id), date, mode))
+            feeds_raw.append((int(feed_id), date, mode))
 
     if skipped_by_filter > 0:
         print(f"Filtered out {skipped_by_filter} feeds by asset class")
 
     # Apply feed ID filter if provided
     skipped_by_feed_id = 0
-    if feed_id_filter and feeds_to_process:
+    if feed_id_filter and feeds_raw:
         filtered_feeds = []
-        for feed_tuple in feeds_to_process:
+        for feed_tuple in feeds_raw:
             feed_id = feed_tuple[0]
             if feed_id in feed_id_filter:
                 filtered_feeds.append(feed_tuple)
             else:
                 skipped_by_feed_id += 1
 
-        feeds_to_process = filtered_feeds
+        feeds_raw = filtered_feeds
         if skipped_by_feed_id > 0:
-            print(f"Filtered out {skipped_by_feed_id} feeds by feed ID (kept {len(feeds_to_process)} matching: {', '.join(map(str, sorted(feed_id_filter)))})")
+            print(
+                f"Filtered out {skipped_by_feed_id} feeds by feed ID "
+                f"(kept {len(feeds_raw)} matching: {', '.join(map(str, sorted(feed_id_filter)))})"
+            )
+
+    if date_override:
+        unique_feed_modes = sorted({(feed_id, mode) for feed_id, _, mode in feeds_raw})
+        feeds_to_process = [
+            (feed_id, date_value, mode)
+            for feed_id, mode in unique_feed_modes
+            for date_value in date_override
+        ]
+        print(
+            f"Applied date override: {date_override[0]} to {date_override[-1]} "
+            f"({len(date_override)} date(s))"
+        )
+        print(
+            f"Expanded {len(unique_feed_modes)} unique feed/mode pairs to "
+            f"{len(feeds_to_process)} feed-date evaluations"
+        )
+    else:
+        feeds_to_process = feeds_raw
 
     print(f"Processing {len(feeds_to_process)} feeds for publisher {publisher_id} with {max_workers} workers...")
     results = []
@@ -1992,6 +2041,47 @@ def write_results_csv(
                 write_summary_row("overnight_median_nrmse", overnight_stats.get("overnight_median_nrmse"))
                 write_summary_row("overnight_median_hit_rate", overnight_stats.get("overnight_median_hit_rate"))
 
+            per_date_breakdown = summary_stats.get("per_date_breakdown", {})
+            if len(per_date_breakdown) > 1:
+                writer.writerow([""] * num_cols)
+                writer.writerow(["PER_DATE_BREAKDOWN"] + [""] * (num_cols - 1))
+                writer.writerow(
+                    [
+                        "date",
+                        "total",
+                        "pass",
+                        "fail",
+                        "error",
+                        "pass_rate_pct",
+                        "median_nrmse",
+                        "median_hit_rate",
+                    ]
+                    + [""] * (num_cols - 8)
+                )
+                for date_value in sorted(per_date_breakdown):
+                    date_stats = per_date_breakdown[date_value]
+                    writer.writerow(
+                        [
+                            date_value,
+                            date_stats.get("total", ""),
+                            date_stats.get("pass", ""),
+                            date_stats.get("fail", ""),
+                            date_stats.get("error", ""),
+                            f"{date_stats.get('pass_rate_pct', 0):.2f}",
+                            (
+                                f"{date_stats['median_nrmse']:.6f}"
+                                if date_stats.get("median_nrmse") is not None
+                                else ""
+                            ),
+                            (
+                                f"{date_stats['median_hit_rate']:.2f}"
+                                if date_stats.get("median_hit_rate") is not None
+                                else ""
+                            ),
+                        ]
+                        + [""] * (num_cols - 8)
+                    )
+
     print(f"\nResults written to: {output_path}")
 
 
@@ -2146,6 +2236,20 @@ Examples:
         help="Number of parallel workers (default: 4)",
     )
     parser.add_argument(
+        "--date",
+        nargs="+",
+        metavar="YYYY-MM-DD",
+        help="Override CSV dates with these explicit date(s)",
+    )
+    parser.add_argument(
+        "--start-date",
+        help="Override CSV dates with range start (inclusive, YYYY-MM-DD)",
+    )
+    parser.add_argument(
+        "--end-date",
+        help="Override CSV dates with range end (inclusive, YYYY-MM-DD)",
+    )
+    parser.add_argument(
         "--include-asset-class",
         type=str,
         nargs="+",
@@ -2201,6 +2305,15 @@ Examples:
 
     args = parser.parse_args()
 
+    date_override: list[str] | None = None
+    if not args.list_asset_classes:
+        try:
+            validate_date_args(args)
+            resolved_dates = expand_date_args(args.date, args.start_date, args.end_date)
+            date_override = resolved_dates if resolved_dates else None
+        except ValueError as e:
+            parser.error(str(e))
+
     # Validate CSV file exists
     if not args.csv.exists():
         print(f"Error: CSV file '{args.csv}' not found")
@@ -2255,6 +2368,7 @@ Examples:
         args.csv,
         publisher_id,
         args.workers,
+        date_override=date_override,
         include_asset_classes=args.include_asset_class,
         exclude_asset_classes=args.exclude_asset_class,
         include_extended_hours=args.extended_hours,
@@ -2343,6 +2457,34 @@ Examples:
             print(
                 f"  {mode:<15}: {stats['pass']:>3} pass, {stats['fail']:>3} fail, "
                 f"{stats['error']:>3} error ({pass_rate:.1f}% pass rate)"
+            )
+
+    per_date_breakdown = summary_stats.get("per_date_breakdown", {})
+    if len(per_date_breakdown) > 1:
+        print(f"\n{'='*70}")
+        print("PER-DATE BREAKDOWN")
+        print("Date          Total  Pass  Fail  Error  Pass%  Med NRMSE  Med Hit%")
+        for date_value in sorted(per_date_breakdown):
+            date_stats = per_date_breakdown[date_value]
+            median_nrmse = (
+                f"{date_stats['median_nrmse']:.6f}"
+                if date_stats.get("median_nrmse") is not None
+                else "N/A"
+            )
+            median_hit_rate = (
+                f"{date_stats['median_hit_rate']:.2f}%"
+                if date_stats.get("median_hit_rate") is not None
+                else "N/A"
+            )
+            print(
+                f"{date_value:<12}  "
+                f"{int(date_stats.get('total', 0)):>5}  "
+                f"{int(date_stats.get('pass', 0)):>4}  "
+                f"{int(date_stats.get('fail', 0)):>4}  "
+                f"{int(date_stats.get('error', 0)):>5}  "
+                f"{float(date_stats.get('pass_rate_pct', 0)):>5.1f}%  "
+                f"{median_nrmse:>9}  "
+                f"{median_hit_rate:>8}"
             )
 
     # Print extended hours summary if enabled

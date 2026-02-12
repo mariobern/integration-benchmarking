@@ -41,6 +41,8 @@ from zoneinfo import ZoneInfo
 import clickhouse_connect
 import yaml
 
+from date_utils import expand_date_args, validate_date_args
+
 
 class TradingSession(Enum):
     """Trading session types for US equities."""
@@ -300,7 +302,7 @@ def is_futures_symbol(symbol: str) -> bool:
     return month_code in FUTURES_MONTH_CODES and year_digit.isdigit()
 
 
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=128)
 def get_market_hours_filter_sql(mode: str, date: str, column_name: str = "publish_time") -> str:
     """Generate SQL WHERE clause for regular market hours filtering."""
 
@@ -331,7 +333,7 @@ def get_market_hours_filter_sql(mode: str, date: str, column_name: str = "publis
     """
 
 
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=128)
 def get_extended_hours_filter_sql(
     session: TradingSession,
     date: str,
@@ -377,7 +379,7 @@ def get_extended_hours_filter_sql(
     """
 
 
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=128)
 def get_overnight_hours_filter_sql(date: str, column_name: str = "publish_time") -> str:
     """Generate SQL WHERE clause for overnight session filtering (8 PM - 4 AM ET)."""
 
@@ -1724,6 +1726,17 @@ def compute_summary_stats(
         else:
             mode_stats[mode]["not_ready"] += 1
 
+    per_date_stats: dict[str, dict[str, int]] = {}
+    for r in results:
+        if r.date not in per_date_stats:
+            per_date_stats[r.date] = {"ready": 0, "not_ready": 0, "error": 0}
+        if r.error:
+            per_date_stats[r.date]["error"] += 1
+        elif r.ready:
+            per_date_stats[r.date]["ready"] += 1
+        else:
+            per_date_stats[r.date]["not_ready"] += 1
+
     extended_hours_stats = {}
     if include_extended_hours:
         pm_pass = sum(r.premarket_passing_count or 0 for r in results)
@@ -1776,6 +1789,7 @@ def compute_summary_stats(
         "nrmse": nrmse_stats,
         "hit_rate": hit_rate_stats,
         "mode_stats": mode_stats,
+        "per_date_stats": per_date_stats,
         "extended_hours": extended_hours_stats,
         "overnight": overnight_stats,
         "total_time_sec": total_time,
@@ -1848,7 +1862,20 @@ Examples:
 
     parser.add_argument("--csv", type=Path, help="CSV file containing feed_id,date,mode columns")
     parser.add_argument("--feed-id", type=int, help="Single feed ID to evaluate")
-    parser.add_argument("--date", help="Date for single feed evaluation (YYYY-MM-DD)")
+    parser.add_argument(
+        "--date",
+        nargs="+",
+        metavar="YYYY-MM-DD",
+        help="Date(s) for single feed evaluation (YYYY-MM-DD)",
+    )
+    parser.add_argument(
+        "--start-date",
+        help="Range start date (inclusive, YYYY-MM-DD) for single-feed mode",
+    )
+    parser.add_argument(
+        "--end-date",
+        help="Range end date (inclusive, YYYY-MM-DD) for single-feed mode",
+    )
     parser.add_argument(
         "--mode",
         choices=[
@@ -1929,13 +1956,28 @@ Examples:
 
     args = parser.parse_args()
 
+    single_feed_dates: list[str] = []
+
     if args.list_asset_classes:
         if not args.csv:
             parser.error("--list-asset-classes requires --csv")
-    elif args.csv and (args.feed_id or args.date or args.mode):
-        parser.error("Use either --csv OR (--feed-id, --date, --mode), not both")
-    elif not args.csv and not (args.feed_id and args.date and args.mode):
-        parser.error("Either --csv or all of (--feed-id, --date, --mode) required")
+    elif args.csv and (args.feed_id or args.date or args.start_date or args.end_date or args.mode):
+        parser.error(
+            "Use either --csv OR (--feed-id, --date/--start-date+--end-date, --mode), not both"
+        )
+    elif not args.csv and not (args.feed_id and args.mode):
+        parser.error(
+            "Either --csv or all of (--feed-id, --date/--start-date+--end-date, --mode) required"
+        )
+
+    if not args.csv:
+        try:
+            validate_date_args(args)
+            single_feed_dates = expand_date_args(args.date, args.start_date, args.end_date)
+        except ValueError as e:
+            parser.error(str(e))
+        if not single_feed_dates:
+            parser.error("Single-feed mode requires --date or --start-date/--end-date")
 
     if not args.csv and (args.include_asset_class or args.exclude_asset_class):
         parser.error("--include-asset-class and --exclude-asset-class only apply to --csv mode")
@@ -2001,22 +2043,52 @@ Examples:
         )
     else:
         config = load_config()
-        client_lazer, client_analytics = get_clients(config)
+        results = []
 
-        result = evaluate_feed_two_queries(
-            client_lazer,
-            client_analytics,
-            args.feed_id,
-            args.date,
-            args.mode,
-            target_pub_count=args.target_pub_count,
-            include_extended_hours=args.extended_hours,
-            include_overnight=args.overnight,
-            skip_scipy_tests=args.skip_scipy_tests,
-            include_detailed=args.detailed,
-        )
+        if args.workers > 1 and len(single_feed_dates) > 1:
 
-        results = [result]
+            def evaluate_single(date_value: str) -> BenchmarkResult:
+                client_lazer, client_analytics = get_clients(config)
+                return evaluate_feed_two_queries(
+                    client_lazer,
+                    client_analytics,
+                    args.feed_id,
+                    date_value,
+                    args.mode,
+                    target_pub_count=args.target_pub_count,
+                    include_extended_hours=args.extended_hours,
+                    include_overnight=args.overnight,
+                    skip_scipy_tests=args.skip_scipy_tests,
+                    include_detailed=args.detailed,
+                )
+
+            worker_count = min(args.workers, len(single_feed_dates))
+            with ThreadPoolExecutor(max_workers=worker_count) as executor:
+                futures = {
+                    executor.submit(evaluate_single, date_value): date_value
+                    for date_value in single_feed_dates
+                }
+                for future in as_completed(futures):
+                    results.append(future.result())
+        else:
+            client_lazer, client_analytics = get_clients(config)
+            for date_value in single_feed_dates:
+                results.append(
+                    evaluate_feed_two_queries(
+                        client_lazer,
+                        client_analytics,
+                        args.feed_id,
+                        date_value,
+                        args.mode,
+                        target_pub_count=args.target_pub_count,
+                        include_extended_hours=args.extended_hours,
+                        include_overnight=args.overnight,
+                        skip_scipy_tests=args.skip_scipy_tests,
+                        include_detailed=args.detailed,
+                    )
+                )
+
+        results.sort(key=lambda r: (r.date, r.feed_id))
         write_results_csv(
             results,
             args.output,
@@ -2078,6 +2150,16 @@ Examples:
             )
     else:
         print("  No feeds processed")
+
+    per_date_stats = summary.get("per_date_stats", {})
+    if len(per_date_stats) > 1:
+        print("\nPer-date breakdown:")
+        for date_value in sorted(per_date_stats):
+            stats = per_date_stats[date_value]
+            print(
+                f"  {date_value:<12} ready={stats['ready']:<4} "
+                f"not_ready={stats['not_ready']:<4} error={stats['error']:<4}"
+            )
 
     if args.extended_hours:
         ext = summary["extended_hours"]

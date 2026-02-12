@@ -23,6 +23,8 @@ from typing import Optional
 import clickhouse_connect
 import yaml
 
+from date_utils import expand_date_args, validate_date_args
+
 
 @dataclass
 class FeedInfo:
@@ -349,7 +351,27 @@ Note: Equities are categorized by country code (ISO 3166-1 alpha-2) based on
         default=1,
         help="Days to subtract from query date for benchmark data availability (default: 1)",
     )
+    parser.add_argument(
+        "--date",
+        nargs="+",
+        metavar="YYYY-MM-DD",
+        help="Explicit date(s) for output rows. Overrides --date-offset.",
+    )
+    parser.add_argument(
+        "--start-date",
+        help="Range start date (inclusive, YYYY-MM-DD). Requires --end-date.",
+    )
+    parser.add_argument(
+        "--end-date",
+        help="Range end date (inclusive, YYYY-MM-DD). Requires --start-date.",
+    )
     args = parser.parse_args()
+    try:
+        validate_date_args(args)
+    except ValueError as e:
+        parser.error(str(e))
+
+    dates = expand_date_args(args.date, args.start_date, args.end_date)
 
     # Set default output path if not provided
     if args.output is None:
@@ -357,7 +379,11 @@ Note: Equities are categorized by country code (ISO 3166-1 alpha-2) based on
 
     print(f"Querying feeds for publisher {args.publisher_id}...")
     print(f"Time window: last {args.time_window} minute(s)")
-    print(f"Date offset: {args.date_offset} day(s) before query date")
+    if dates:
+        print(f"Output dates ({len(dates)}): {dates[0]} to {dates[-1]}")
+        print("Date flags override --date-offset for CSV output rows")
+    else:
+        print(f"Date offset: {args.date_offset} day(s) before query date")
     if args.asset_class:
         print(f"Asset class filter: {args.asset_class}")
 
@@ -365,7 +391,7 @@ Note: Equities are categorized by country code (ISO 3166-1 alpha-2) based on
         config = load_config()
         client = get_lazer_client(config)
 
-        feeds = get_publisher_feeds(
+        discovered_feeds = get_publisher_feeds(
             client,
             args.publisher_id,
             args.time_window,
@@ -373,13 +399,22 @@ Note: Equities are categorized by country code (ISO 3166-1 alpha-2) based on
             args.asset_class,
         )
 
-        if not feeds:
+        if not discovered_feeds:
             print(
                 f"\nNo feeds found for publisher {args.publisher_id} "
                 f"in the last {args.time_window} minute(s)."
             )
             print("Try increasing --time-window or check if the publisher is active.")
             sys.exit(0)
+
+        unique_feed_count = len(discovered_feeds)
+        feeds = discovered_feeds
+        if dates:
+            feeds = [
+                FeedInfo(price_id=feed.price_id, date=date_value, asset_class=feed.asset_class)
+                for feed in discovered_feeds
+                for date_value in dates
+            ]
 
         # Write results
         write_csv(feeds, args.output)
@@ -389,9 +424,13 @@ Note: Equities are categorized by country code (ISO 3166-1 alpha-2) based on
         print("SUMMARY")
         print(f"{'='*50}")
         print(f"Publisher ID: {args.publisher_id}")
-        print(f"Total feeds: {len(feeds)}")
+        print(f"Unique feeds: {unique_feed_count}")
+        unique_dates = sorted({feed.date for feed in feeds})
+        if unique_dates:
+            print(f"Date range: {unique_dates[0]} to {unique_dates[-1]} ({len(unique_dates)} date(s))")
+        print(f"Total output rows: {len(feeds)}")
 
-        summary = get_asset_class_summary(feeds)
+        summary = get_asset_class_summary(discovered_feeds)
         print("\nFeeds by asset class:")
         for asset_class, count in summary.items():
             print(f"  {asset_class}: {count}")
