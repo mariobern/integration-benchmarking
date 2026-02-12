@@ -631,3 +631,84 @@ python -m portal.batch.daily_benchmark_runner --date 2026-01-30 --no-extended-ho
 
 **Known issues:**
 - Publisher 71 may fail due to infinite t_statistic values - a numeric precision issue with certain edge cases.
+
+## NASDAQ LUDP Trading Halt History
+
+`trading_halt_history.py` downloads Limit Up-Limit Down (LUDP) trading halt data from NASDAQ Trader's public RSS feed. LUDP halts are SEC-mandated circuit breakers that trigger when a stock's price moves beyond its allowable trading band.
+
+### Running the Halt History Downloader
+
+```bash
+# Download all LUDP halts from the past year (default: 365 days)
+python trading_halt_history.py
+
+# Custom lookback period (e.g., last 30 days)
+python trading_halt_history.py --days 30
+
+# Custom output path
+python trading_halt_history.py --output my_halts.csv
+
+# Slower request rate (be more polite to the server)
+python trading_halt_history.py --delay 0.5
+```
+
+### Trading Halt Arguments
+
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `--days` | Number of calendar days to look back | 365 |
+| `--output` | Output CSV file path | `ludp_halts.csv` |
+| `--delay` | Delay between requests in seconds | 0.2 |
+
+### Data Source
+
+- **NASDAQ Trader RSS feed**: `https://www.nasdaqtrader.com/rss.aspx?feed=tradehalts&haltdate=MMDDYYYY`
+- Free, public, no authentication required
+- One request per business day (~250 requests for a full year)
+- Only business days are queried (weekends/holidays return empty feeds)
+
+### How It Works
+
+1. Generates all business days in the lookback period using `pandas.bdate_range()`
+2. Fetches the RSS halt feed for each business day
+3. Parses the HTML table in each RSS entry to extract halt details
+4. Filters for `LUDP` reason code only (ignores other halt types like `M`, `T1`, etc.)
+5. Sorts results by date (ascending), then halt time (ascending)
+6. Writes to CSV and prints a summary with top halted tickers
+
+### Output CSV Format
+
+```csv
+date,ticker,halt_time,resume_time,market
+2025-02-10,BOWNU,09:30:18,09:35:18,Q
+2025-02-10,BDRX,09:32:52,09:37:52,Q
+```
+
+| Column | Description |
+|--------|-------------|
+| `date` | Halt date (YYYY-MM-DD) |
+| `ticker` | Stock symbol |
+| `halt_time` | Time halt began (HH:MM:SS ET) |
+| `resume_time` | Time trading resumed (HH:MM:SS ET) |
+| `market` | Exchange code: Q=NASDAQ, P=NYSE Arca, A=NYSE American, Z=BATS |
+
+### LUDP Halt Reason Codes
+
+The script filters for `LUDP` only. Other common halt reason codes in the feed (excluded):
+- `M` — Volatility Trading Pause (Market-Wide Circuit Breaker)
+- `T1` — News Pending
+- `T2` — News Dissemination
+- `T12` — IPO Halt / Additional Information Requested
+
+### Performance
+
+- ~250 requests for a full year at 0.2s delay = ~2-3 minutes total
+- Retries failed requests up to 3 times with exponential backoff
+- Progress logged every 10 business days
+
+### Typical Results (1 Year)
+
+- ~9,000-10,000 LUDP halts per year
+- ~1,200 unique tickers
+- Most halts occur in small-cap/micro-cap stocks
+- Halts cluster around market open (9:30-10:30 AM ET)
