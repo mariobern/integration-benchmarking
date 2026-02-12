@@ -964,16 +964,18 @@ def evaluate_session_metrics(
     """
 
     # Query benchmark prices (uses yield columns for treasuries, price columns otherwise)
+    # Allow rows with only price (no bid/ask) for extended hours trade-only data
     benchmark_query = f"""
         SELECT
             toStartOfSecond(date_time) AS ts_second,
             avg(COALESCE({price_col}, ({bid_col} + {ask_col}) / 2)) AS avg_price,
-            avg({ask_col} - {bid_col}) AS avg_spread
+            avg(CASE WHEN {ask_col} IS NOT NULL AND {bid_col} IS NOT NULL
+                     THEN {ask_col} - {bid_col} ELSE NULL END) AS avg_spread
         FROM {benchmark_table}
         WHERE toDate(date_time) = '{date}'
           AND pyth_lazer_id = {feed_id}
-          AND {bid_col} IS NOT NULL
-          AND {ask_col} IS NOT NULL
+          AND ({bid_col} IS NOT NULL AND {ask_col} IS NOT NULL
+               OR {price_col} IS NOT NULL)
           {benchmark_time_filter}
         GROUP BY ts_second
         ORDER BY ts_second
@@ -991,11 +993,11 @@ def evaluate_session_metrics(
             return (0, None, None, None, None, None, None,
                     "No benchmark data for session")
 
-        # Build benchmark lookup dict
+        # Build benchmark lookup dict (allow rows with price but no spread)
         benchmark_by_ts = {
             row[0]: (row[1], row[2])
             for row in bench_result.result_rows
-            if row[1] is not None and row[2] is not None
+            if row[1] is not None
         }
 
         # Compute metrics
@@ -1013,7 +1015,8 @@ def evaluate_session_metrics(
             pct_diff = abs(diff / bench_price) * 100
 
             squared_errors.append(diff ** 2)
-            spreads.append(spread)
+            if spread is not None:
+                spreads.append(spread)
             pct_diffs.append(pct_diff)
             benchmark_prices.append(bench_price)
 
@@ -1024,7 +1027,8 @@ def evaluate_session_metrics(
                     f"Insufficient observations ({n_observations} < {min_observations})")
 
         rmse = (sum(squared_errors) / n_observations) ** 0.5
-        mean_spread = sum(spreads) / n_observations
+        n_spreads = len(spreads)
+        mean_spread = sum(spreads) / n_spreads if n_spreads > 0 else None
 
         benchmark_range = max(benchmark_prices) - min(benchmark_prices)
         nrmse = rmse / benchmark_range if benchmark_range > 0 else None
@@ -1032,7 +1036,9 @@ def evaluate_session_metrics(
         hits_within_10bps = sum(1 for pct in pct_diffs if pct <= 0.1)
         hit_rate = (hits_within_10bps / n_observations) * 100
 
-        rmse_over_spread = rmse / mean_spread if mean_spread > 0 else None
+        rmse_over_spread = (
+            rmse / mean_spread if mean_spread and mean_spread > 0 else None
+        )
 
         return (n_observations, rmse, mean_spread, rmse_over_spread,
                 nrmse, hit_rate, benchmark_range, None)
@@ -1319,16 +1325,18 @@ def evaluate_publisher_feed(
     """
 
     # Query 2: Get benchmark prices aggregated by second (uses yield columns for treasuries)
+    # Allow rows with only price (no bid/ask) for extended hours trade-only data
     benchmark_query = f"""
         SELECT
             toStartOfSecond(date_time) AS ts_second,
             avg(COALESCE({price_col}, ({bid_col} + {ask_col}) / 2)) AS avg_price,
-            avg({ask_col} - {bid_col}) AS avg_spread
+            avg(CASE WHEN {ask_col} IS NOT NULL AND {bid_col} IS NOT NULL
+                     THEN {ask_col} - {bid_col} ELSE NULL END) AS avg_spread
         FROM {benchmark_table}
         WHERE toDate(date_time) = '{date}'
           AND pyth_lazer_id = {feed_id}
-          AND {bid_col} IS NOT NULL
-          AND {ask_col} IS NOT NULL
+          AND ({bid_col} IS NOT NULL AND {ask_col} IS NOT NULL
+               OR {price_col} IS NOT NULL)
           {benchmark_market_filter}
         GROUP BY ts_second
         ORDER BY ts_second
@@ -1371,11 +1379,11 @@ def evaluate_publisher_feed(
                 execution_time_ms=int((time.time() - start_time) * 1000),
             )
 
-        # Build benchmark lookup dict (skip rows with None values)
+        # Build benchmark lookup dict (allow rows with price but no spread)
         benchmark_by_ts = {
             row[0]: (row[1], row[2])
             for row in bench_result.result_rows
-            if row[1] is not None and row[2] is not None
+            if row[1] is not None
         }
 
         # Compute metrics for this publisher
@@ -1398,7 +1406,8 @@ def evaluate_publisher_feed(
             signed_pct_diff = (diff / bench_price) * 100  # Signed percentage difference
 
             squared_errors.append(diff ** 2)
-            spreads.append(spread)
+            if spread is not None:
+                spreads.append(spread)
             pct_diffs.append(pct_diff)
             benchmark_prices.append(bench_price)
             diffs.append(diff)
@@ -1423,7 +1432,8 @@ def evaluate_publisher_feed(
             )
 
         rmse = (sum(squared_errors) / n_observations) ** 0.5
-        mean_spread = sum(spreads) / n_observations
+        n_spreads = len(spreads)
+        mean_spread = sum(spreads) / n_spreads if n_spreads > 0 else None
 
         # Calculate nrmse (RMSE normalized by benchmark price range)
         benchmark_range = max(benchmark_prices) - min(benchmark_prices)
@@ -1437,7 +1447,7 @@ def evaluate_publisher_feed(
         hit_rate = (hits_within_10bps / n_observations) * 100
 
         # Calculate rmse_over_spread (additional metric, not required for pass)
-        if mean_spread > 0:
+        if mean_spread and mean_spread > 0:
             rmse_over_spread = rmse / mean_spread
         else:
             rmse_over_spread = None
