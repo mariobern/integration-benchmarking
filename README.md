@@ -44,10 +44,16 @@ Discovers all feeds a publisher is actively sending data for, outputting a CSV r
 
 ```bash
 # Discover feeds for publisher 29 (last 60 minutes of activity)
-python publisher_feeds.py --publisher-id 29
+python publisher_feeds.py --publisher-id 29 --time-window 60
 
 # Filter to FX only, with date offset for yesterday
 python publisher_feeds.py --publisher-id 55 --asset-class fx --date-offset 1
+
+# Emit multiple dates per discovered feed
+python publisher_feeds.py --publisher-id 55 --date 2026-02-10 2026-02-11
+
+# Emit a date range per discovered feed
+python publisher_feeds.py --publisher-id 55 --start-date 2026-02-10 --end-date 2026-02-12
 ```
 
 **How it works:** Two-tier query strategy — first queries the fast `feed_publisher_junction` materialized view, then falls back to `publisher_updates` if no results. Equity country codes and asset class normalization are handled automatically.
@@ -56,9 +62,12 @@ python publisher_feeds.py --publisher-id 55 --asset-class fx --date-offset 1
 |----------|-------------|---------|
 | `--publisher-id` | Publisher ID (required) | - |
 | `--output` | Output CSV path | `publisher_{id}_feeds.csv` |
-| `--time-window` | Minutes to look for activity | 60 |
+| `--time-window` | Minutes to look for activity | 1 |
 | `--asset-class` | Filter by asset class | All |
-| `--date-offset` | Days to offset from today | 0 |
+| `--date-offset` | Days to offset from today | 1 |
+| `--date` | Explicit output date(s), overrides `--date-offset` | - |
+| `--start-date` | Range start date (inclusive), requires `--end-date` | - |
+| `--end-date` | Range end date (inclusive), requires `--start-date` | - |
 
 See [publisher_feeds.md](docs/publisher_feeds.md) for full details.
 
@@ -73,6 +82,14 @@ python publisher_benchmark.py --csv publisher_55_feeds.csv --publisher-id 55
 # Full evaluation: extended hours + overnight + fast mode
 python publisher_benchmark.py --csv publisher_55_feeds.csv --publisher-id 55 \
   --extended-hours --overnight --skip-scipy-tests
+
+# Override CSV dates with explicit dates
+python publisher_benchmark.py --csv publisher_55_feeds.csv --publisher-id 55 \
+  --date 2026-02-10 2026-02-11
+
+# Override CSV dates with a date range
+python publisher_benchmark.py --csv publisher_55_feeds.csv --publisher-id 55 \
+  --start-date 2026-02-10 --end-date 2026-02-12
 ```
 
 **Pass/fail criteria:**
@@ -83,6 +100,7 @@ python publisher_benchmark.py --csv publisher_55_feeds.csv --publisher-id 55 \
 - Overnight (`--overnight`): 8 PM - 4 AM ET, uses publisher 32 (Blue Ocean ATS) as reference
 - Feed filtering (`--feed-id 327 1163`): test specific feeds without editing CSV
 - Fast mode (`--skip-scipy-tests`): skip t-test/Wilcoxon/normality for ~30-50% speedup
+- Date override (`--date` or `--start-date/--end-date`): ignore CSV date column and evaluate each `(feed_id, mode)` across selected dates
 
 | Argument | Description | Default |
 |----------|-------------|---------|
@@ -90,6 +108,9 @@ python publisher_benchmark.py --csv publisher_55_feeds.csv --publisher-id 55 \
 | `--publisher-id` | Publisher ID (required) | - |
 | `--output` | Output CSV path | `publisher_{id}_benchmark_results.csv` |
 | `--workers` | Parallel workers | 4 |
+| `--date` | Override CSV date column with explicit date(s) | - |
+| `--start-date` | Override CSV date column with range start | - |
+| `--end-date` | Override CSV date column with range end | - |
 | `--extended-hours` | Include pre-market + after-hours | Off |
 | `--overnight` | Include overnight session | Off |
 | `--skip-scipy-tests` | Skip statistical tests | Off |

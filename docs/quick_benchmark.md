@@ -19,6 +19,12 @@ python quick_benchmark.py --csv price_id_list.csv
 # Process a single feed
 python quick_benchmark.py --feed-id 327 --date 2025-10-06 --mode fx
 
+# Process a single feed for multiple explicit dates
+python quick_benchmark.py --feed-id 327 --date 2025-10-06 2025-10-07 --mode fx
+
+# Process a single feed for an inclusive date range
+python quick_benchmark.py --feed-id 327 --start-date 2025-10-06 --end-date 2025-10-10 --mode fx
+
 # Custom output and readiness threshold
 python quick_benchmark.py --csv feeds.csv --output results.csv --target-pub-count 6
 
@@ -47,7 +53,9 @@ python quick_benchmark.py --csv price_id_list.csv --filter-feed-id 327 1163
 |----------|-------------|---------|
 | `--csv` | CSV file with `feed_id,date,mode` rows | - |
 | `--feed-id` | Single feed ID to evaluate | - |
-| `--date` | Date for single feed evaluation (`YYYY-MM-DD`) | - |
+| `--date` | Date(s) for single-feed mode (`YYYY-MM-DD` list) | - |
+| `--start-date` | Range start date (inclusive) for single-feed mode | - |
+| `--end-date` | Range end date (inclusive) for single-feed mode | - |
 | `--mode` | Single-feed mode: `fx`, `metals`, `us-equities`, `commodity`, `us-treasuries`, `treasuries`, `rates` | - |
 | `--output` | Output CSV path | `quick_benchmark_results.csv` |
 | `--target-pub-count` | Minimum passing publishers for feed readiness | `4` |
@@ -63,7 +71,8 @@ python quick_benchmark.py --csv price_id_list.csv --filter-feed-id 327 1163
 
 ## Input Mode Rules
 
-- Use either `--csv` **or** all of `--feed-id --date --mode`.
+- Use either `--csv` **or** single-feed mode (`--feed-id`, `--mode`, and either `--date` or `--start-date/--end-date`).
+- `--date` and `--start-date/--end-date` are mutually exclusive.
 - `--include-asset-class`, `--exclude-asset-class`, `--filter-feed-id`, and `--list-asset-classes` apply to CSV mode only.
 - `--extended-hours` and `--overnight` only apply to `us-equities`; other modes run normal regular-session checks.
 
@@ -121,6 +130,8 @@ Additional section when `--detailed` is enabled:
 - Includes per-publisher metrics such as `nrmse`, `hit_rate`, `rmse_over_spread`,
   statistical metrics (`mean_diff`, `t_pvalue`, `wilcoxon_pvalue`, etc.),
   plus session-specific detail columns when `--extended-hours` / `--overnight` are used.
+
+When multiple dates are evaluated in single-feed mode, console output includes a per-date readiness breakdown.
 
 ## Asset Class Filtering
 

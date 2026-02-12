@@ -24,6 +24,14 @@ python publisher_benchmark.py --csv publisher_55_feeds.csv --workers 8
 
 # Filter by asset class
 python publisher_benchmark.py --csv publisher_55_feeds.csv --include-asset-class fx metals
+
+# Override CSV dates with explicit date list
+python publisher_benchmark.py --csv publisher_55_feeds.csv --publisher-id 55 \
+  --date 2026-02-10 2026-02-11
+
+# Override CSV dates with inclusive date range
+python publisher_benchmark.py --csv publisher_55_feeds.csv --publisher-id 55 \
+  --start-date 2026-02-10 --end-date 2026-02-12
 ```
 
 ## Arguments
@@ -34,10 +42,24 @@ python publisher_benchmark.py --csv publisher_55_feeds.csv --include-asset-class
 | `--publisher-id` | Publisher ID to evaluate | Extracted from filename |
 | `--output` | Output CSV path | `publisher_{id}_benchmark_results.csv` |
 | `--workers` | Parallel workers | 4 |
+| `--date` | Override CSV dates with explicit date(s) | - |
+| `--start-date` | Override CSV dates with range start (inclusive) | - |
+| `--end-date` | Override CSV dates with range end (inclusive) | - |
 | `--include-asset-class` | Only process these asset classes | All |
 | `--exclude-asset-class` | Skip these asset classes | None |
+| `--feed-id` | Only process these feed IDs | All |
 | `--list-asset-classes` | List asset classes in CSV and exit | - |
 | `--extended-hours` | Include pre-market and after-hours evaluation for US equities | Disabled |
+| `--overnight` | Include overnight session evaluation for US equities | Disabled |
+| `--skip-scipy-tests` | Skip t-test/Wilcoxon/normality metrics for speed | Disabled |
+
+## Date Override Behavior
+
+Input CSV rows are `feed_id,date,mode`.
+
+- Default behavior: uses each row's date as-is.
+- With `--date` or `--start-date/--end-date`: CSV date column is ignored.
+- Override mode evaluates each unique `(feed_id, mode)` pair across all selected dates.
 
 ## Output
 
@@ -47,8 +69,9 @@ Results CSV contains:
 |--------|---------|
 | `publisher_id` | The publisher that was evaluated |
 | `feed_id` | The feed that was evaluated |
+| `date` | Evaluation date |
 | `symbol` | Feed symbol (e.g., EUR/USD) |
-| `passes` | `True` if rmse/spread <= 1.0 |
+| `passes` | `True` if pass criteria are met |
 | `n_observations` | Number of matched data points |
 | `rmse` | Root Mean Square Error vs benchmark |
 | `mean_spread` | Average benchmark spread |
@@ -85,6 +108,10 @@ After processing, the script outputs a summary (console + CSV):
 **Coverage metrics:** `total_observations`, `mean_observations_per_feed`
 
 **Asset class breakdown:** `pass_count_{mode}`, `fail_count_{mode}`, `error_count_{mode}`
+
+**Per-date breakdown (when multiple dates are evaluated):**
+- Console includes `PER-DATE BREAKDOWN` with total/pass/fail/error and median quality metrics per date.
+- Output CSV appends a `PER_DATE_BREAKDOWN` section after `SUMMARY`.
 
 ## Extended Hours (US Equities)
 
@@ -128,8 +155,10 @@ Example console output:
 ============================================================
 SUMMARY - Publisher 55
 ============================================================
+Pass criteria: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 98%)
+============================================================
 Total feeds evaluated: 92
-PASS (rmse/spread <= 1.0): 67
+PASS: 67
 FAIL: 8
 Errors: 17
 Pass rate: 89.3%

@@ -1,5 +1,51 @@
 # Changelog
 
+## 2026-02-12
+
+### Added
+
+- **Multi-date support across benchmark scripts**:
+  - New shared helper module: `date_utils.py` (`expand_date_args`, `validate_date_args`).
+  - `publisher_feeds.py`: supports `--date` (list) and `--start-date/--end-date` (range) for output row dates.
+  - `quick_benchmark.py`: single-feed mode supports multi-date list/range and evaluates one run per resolved date.
+  - `publisher_benchmark.py`: date override flags (`--date`, `--start-date`, `--end-date`) ignore CSV date column and evaluate each unique `(feed_id, mode)` across selected dates.
+- **Per-date reporting for multi-date runs**:
+  - `quick_benchmark.py`: console `Per-date breakdown` section when multiple dates are evaluated.
+  - `publisher_benchmark.py`: console `PER-DATE BREAKDOWN` and CSV `PER_DATE_BREAKDOWN` summary section.
+- **Full feed-level benchmark flow in `quick_benchmark.py`** — expanded from lightweight output to full feed readiness workflow with feed-level metrics, detailed publisher output, and session-aware evaluation paths.
+
+### Changed
+
+- **LRU cache sizing for timezone SQL helpers** — increased from `maxsize=32` to `maxsize=128` in `quick_benchmark.py` and `publisher_benchmark.py` to reduce cache churn during multi-date runs.
+- **Documentation refresh** — updated benchmark tool docs to reflect full quick-benchmark behavior and new date semantics.
+
+### Fixed
+
+- **Trade-only benchmark handling in `publisher_benchmark.py`** — query logic now accepts rows where benchmark `price` exists but `bid/ask` is missing (common in extended sessions), reducing false "no benchmark data" outcomes.
+
+### Data
+
+- Refreshed `benchmark_availability/SUMMARY.md`, `benchmark_availability/history.csv`, and `price_id_list.csv`.
+
+## 2026-02-09
+
+### Added
+
+- **`isin_resolver_v2.py`** — new resolver with manual overrides, ADR-aware matching, and broader ticker normalization support.
+- **ISIN research and usage docs** — added `docs/isin_research.md` and `docs/isin_resolver_v2.md`.
+
+### Changed
+
+- **README expansion** — added fuller tool documentation, argument references, and end-to-end workflow guidance.
+
+## 2026-02-08
+
+### Changed
+
+- **ISIN/RIC reliability improvements** in `generate_source_upload.py` and `isin_resolver.py`, with substantial test coverage additions in:
+  - `tests/test_generate_source_upload.py`
+  - `tests/test_isin_resolver.py`
+
 ## 2026-02-06
 
 ### Added

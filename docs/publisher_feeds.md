@@ -16,6 +16,12 @@ python publisher_feeds.py --publisher-id 29 --asset-class metal
 
 # Custom output file
 python publisher_feeds.py --publisher-id 29 --output my_feeds.csv
+
+# Emit multiple dates per discovered feed
+python publisher_feeds.py --publisher-id 29 --date 2026-02-10 2026-02-11
+
+# Emit an inclusive date range per discovered feed
+python publisher_feeds.py --publisher-id 29 --start-date 2026-02-10 --end-date 2026-02-12
 ```
 
 ## Arguments
@@ -27,12 +33,17 @@ python publisher_feeds.py --publisher-id 29 --output my_feeds.csv
 | `--asset-class` | Filter by asset class | All |
 | `--time-window` | Minutes to look back for recent activity | 1 |
 | `--date-offset` | Days to subtract from query date for benchmark data availability | 1 |
+| `--date` | Explicit output date(s), overrides `--date-offset` | - |
+| `--start-date` | Range start date (inclusive), requires `--end-date` | - |
+| `--end-date` | Range end date (inclusive), requires `--start-date` | - |
 
 ### How Discovery Works
 
 The script queries `feed_publisher_junction` (a small pre-aggregated metadata table) for feeds with recent activity within the time window. If no results are found, it falls back to querying `publisher_updates` with the same time window.
 
 The daily batch runner uses this same approach with a 60-minute time window for broader publisher coverage.
+
+When `--date` or `--start-date/--end-date` is provided, discovery logic is unchanged. Only the output CSV rows are expanded to the selected dates.
 
 ## Output Format
 
@@ -43,9 +54,12 @@ price_id,date,asset_class
 345,2026-01-22,metal
 346,2026-01-22,metal
 1163,2026-01-22,equity-us
+345,2026-01-23,metal
+346,2026-01-23,metal
+1163,2026-01-23,equity-us
 ```
 
-> **Note:** The output date is offset by `--date-offset` days (default 1) because benchmark data is typically available up to the previous day.
+> **Note:** `--date-offset` controls output dates only when explicit date flags are not provided.
 
 ## Asset Classes
 
