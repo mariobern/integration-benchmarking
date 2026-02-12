@@ -23,6 +23,15 @@ python quick_benchmark.py --csv price_id_list.csv
 # Process a single feed
 python quick_benchmark.py --feed-id 327 --date 2025-10-06 --mode fx
 
+# Multiple feed IDs (cartesian product with dates)
+python quick_benchmark.py --feed-id 327 328 329 --date 2025-10-06 --mode fx
+
+# Multiple feed IDs × multiple dates
+python quick_benchmark.py --feed-id 327 328 --date 2025-10-06 2025-10-07 --mode fx
+
+# Date range (all calendar days between start and end)
+python quick_benchmark.py --feed-id 327 --start-date 2025-10-01 --end-date 2025-10-06 --mode fx
+
 # Custom output and target publisher count
 python quick_benchmark.py --csv feeds.csv --output results.csv --target-pub-count 6
 
@@ -44,15 +53,22 @@ python quick_benchmark.py --csv feeds.csv --exclude-asset-class crypto funding-r
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `--csv` | CSV file with feed_id,date,mode columns | - |
-| `--feed-id` | Single feed ID to evaluate | - |
-| `--date` | Date for single feed (YYYY-MM-DD) | - |
+| `--feed-id` | Feed ID(s) to evaluate (one or more) | - |
+| `--date` | Date(s) for feed evaluation (YYYY-MM-DD, one or more) | - |
+| `--start-date` | Range start date (inclusive, YYYY-MM-DD) | - |
+| `--end-date` | Range end date (inclusive, YYYY-MM-DD) | - |
 | `--mode` | Market type: `fx`, `metals`, `us-equities` | - |
 | `--output` | Output CSV path | `quick_benchmark_results.csv` |
 | `--target-pub-count` | Min publishers for feed readiness | 4 |
-| `--workers` | Parallel workers for CSV processing | 4 |
-| `--include-asset-class` | Only process these asset classes | - |
-| `--exclude-asset-class` | Skip these asset classes | - |
+| `--workers` | Parallel workers for processing | 4 |
+| `--include-asset-class` | Only process these asset classes (CSV mode) | - |
+| `--exclude-asset-class` | Skip these asset classes (CSV mode) | - |
 | `--list-asset-classes` | List unique asset classes in CSV and exit | - |
+| `--extended-hours` | Include pre-market and after-hours (US equities) | False |
+| `--overnight` | Include overnight session vs publisher 32 | False |
+| `--skip-scipy-tests` | Skip statistical tests for faster runs | False |
+| `--detailed` | Output per-publisher detailed rows | False |
+| `--filter-feed-id` | Filter CSV to specific feed IDs | - |
 
 ## Pass/Fail Criteria
 

@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Multi-feed-id support in `quick_benchmark.py`** — `--feed-id` now accepts one or more IDs (e.g., `--feed-id 327 328 329`). Creates a cartesian product of feed IDs × dates for parallel evaluation.
 - **Multi-date support across benchmark scripts**:
   - New shared helper module: `date_utils.py` (`expand_date_args`, `validate_date_args`).
   - `publisher_feeds.py`: supports `--date` (list) and `--start-date/--end-date` (range) for output row dates.
