@@ -1843,6 +1843,12 @@ Examples:
   # Process a single feed
   python quick_benchmark.py --feed-id 327 --date 2025-10-06 --mode fx
 
+  # Multiple feed IDs
+  python quick_benchmark.py --feed-id 327 328 329 --date 2025-10-06 --mode fx
+
+  # Multiple feed IDs × multiple dates (cartesian product)
+  python quick_benchmark.py --feed-id 327 328 --date 2025-10-06 2025-10-07 --mode fx
+
   # Include US-equity extended hours
   python quick_benchmark.py --feed-id 1163 --date 2025-10-02 --mode us-equities --extended-hours
 
@@ -1861,7 +1867,8 @@ Examples:
     )
 
     parser.add_argument("--csv", type=Path, help="CSV file containing feed_id,date,mode columns")
-    parser.add_argument("--feed-id", type=int, help="Single feed ID to evaluate")
+    parser.add_argument("--feed-id", type=int, nargs="+", metavar="ID",
+                        help="Feed ID(s) to evaluate")
     parser.add_argument(
         "--date",
         nargs="+",
@@ -2045,14 +2052,19 @@ Examples:
         config = load_config()
         results = []
 
-        if args.workers > 1 and len(single_feed_dates) > 1:
+        # Build cartesian product of feed_ids × dates
+        feed_date_pairs = [
+            (fid, d) for fid in args.feed_id for d in single_feed_dates
+        ]
 
-            def evaluate_single(date_value: str) -> BenchmarkResult:
+        if args.workers > 1 and len(feed_date_pairs) > 1:
+
+            def evaluate_single(feed_id: int, date_value: str) -> BenchmarkResult:
                 client_lazer, client_analytics = get_clients(config)
                 return evaluate_feed_two_queries(
                     client_lazer,
                     client_analytics,
-                    args.feed_id,
+                    feed_id,
                     date_value,
                     args.mode,
                     target_pub_count=args.target_pub_count,
@@ -2062,22 +2074,22 @@ Examples:
                     include_detailed=args.detailed,
                 )
 
-            worker_count = min(args.workers, len(single_feed_dates))
+            worker_count = min(args.workers, len(feed_date_pairs))
             with ThreadPoolExecutor(max_workers=worker_count) as executor:
                 futures = {
-                    executor.submit(evaluate_single, date_value): date_value
-                    for date_value in single_feed_dates
+                    executor.submit(evaluate_single, fid, d): (fid, d)
+                    for fid, d in feed_date_pairs
                 }
                 for future in as_completed(futures):
                     results.append(future.result())
         else:
             client_lazer, client_analytics = get_clients(config)
-            for date_value in single_feed_dates:
+            for feed_id, date_value in feed_date_pairs:
                 results.append(
                     evaluate_feed_two_queries(
                         client_lazer,
                         client_analytics,
-                        args.feed_id,
+                        feed_id,
                         date_value,
                         args.mode,
                         target_pub_count=args.target_pub_count,
