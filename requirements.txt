@@ -16,6 +16,9 @@ alembic>=1.13.0
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
 
+# Trading halt history
+feedparser>=6.0.0
+
 # Testing
 pytest>=7.0.0
 httpx>=0.25.0
