@@ -250,7 +250,33 @@ The console summary includes a separate "EXTENDED HOURS" section with aggregate 
 
 ### Feed ID Filtering
 
-The `publisher_benchmark.py` script supports filtering by specific feed IDs:
+`publisher_benchmark.py` supports two input modes:
+
+1. CSV mode: `--csv feeds.csv` (optional `--feed-id` filter)
+2. Single-feed mode: `--publisher-id`, `--feed-id`, `--date`/`--start-date+--end-date`, and `--mode` (no CSV required)
+
+### Single-Feed Mode (No CSV)
+
+```bash
+# Single feed, single date
+python publisher_benchmark.py --publisher-id 55 --feed-id 327 --date 2025-10-06 --mode fx
+
+# Multiple feed IDs × multiple dates
+python publisher_benchmark.py --publisher-id 55 --feed-id 327 328 --date 2025-10-06 2025-10-07 --mode us-equities
+
+# Date range
+python publisher_benchmark.py --publisher-id 55 --feed-id 327 --start-date 2025-10-01 --end-date 2025-10-06 --mode fx
+```
+
+**Notes:**
+- `--csv` is optional
+- In single-feed mode, `--publisher-id` and `--mode` are required
+- In single-feed mode, you must provide either `--date` or `--start-date` + `--end-date`
+- `--include-asset-class`, `--exclude-asset-class`, and `--list-asset-classes` are CSV-only
+
+### Feed ID Filtering (CSV Mode)
+
+In CSV mode, `--feed-id` filters rows from the CSV input:
 
 ```bash
 # Test specific feed IDs only

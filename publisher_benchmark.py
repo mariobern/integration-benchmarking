@@ -6,7 +6,8 @@ This script evaluates a SINGLE publisher's data quality against benchmark data (
 It is significantly faster than quick_benchmark.py because it only queries and evaluates
 one publisher instead of all publishers.
 
-The publisher ID is extracted from the input filename pattern: publisher_{id}_feeds.csv
+The publisher ID can be extracted from CSV filename pattern: publisher_{id}_feeds.csv.
+In single-feed mode (without CSV), publisher ID must be provided explicitly.
 
 Pass/Fail Criteria:
 - A publisher PASSES if: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 98%)
@@ -21,6 +22,7 @@ Market Hours Filtering:
 Usage:
     python publisher_benchmark.py --csv publisher_55_feeds.csv
     python publisher_benchmark.py --csv feeds.csv --publisher-id 55
+    python publisher_benchmark.py --publisher-id 55 --feed-id 327 --date 2025-10-06 --mode fx
 """
 
 import argparse
@@ -2210,13 +2212,21 @@ Examples:
 
   # Test specific feed ID with overnight session
   python publisher_benchmark.py --csv publisher_55_feeds.csv --feed-id 500 --overnight
+
+  # Single-feed mode (no CSV needed)
+  python publisher_benchmark.py --publisher-id 55 --feed-id 327 --date 2025-10-06 --mode fx
+
+  # Multiple feed IDs × multiple dates
+  python publisher_benchmark.py --publisher-id 55 --feed-id 327 328 --date 2025-10-06 2025-10-07 --mode us-equities
+
+  # Date range
+  python publisher_benchmark.py --publisher-id 55 --feed-id 327 --start-date 2025-10-01 --end-date 2025-10-06 --mode fx
 """,
     )
 
     parser.add_argument(
         "--csv",
         type=Path,
-        required=True,
         help="CSV file containing feed_id,date,mode columns",
     )
     parser.add_argument(
@@ -2239,15 +2249,20 @@ Examples:
         "--date",
         nargs="+",
         metavar="YYYY-MM-DD",
-        help="Override CSV dates with these explicit date(s)",
+        help="Date(s) to evaluate in single-feed mode, or override CSV dates",
     )
     parser.add_argument(
         "--start-date",
-        help="Override CSV dates with range start (inclusive, YYYY-MM-DD)",
+        help="Range start date in single-feed mode, or CSV override start (inclusive, YYYY-MM-DD)",
     )
     parser.add_argument(
         "--end-date",
-        help="Override CSV dates with range end (inclusive, YYYY-MM-DD)",
+        help="Range end date in single-feed mode, or CSV override end (inclusive, YYYY-MM-DD)",
+    )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        help="Asset class: fx, metals, us-equities, commodity, us-treasuries",
     )
     parser.add_argument(
         "--include-asset-class",
@@ -2269,8 +2284,7 @@ Examples:
         nargs="+",
         metavar="ID",
         dest="feed_ids",
-        help="Only process these specific feed IDs (e.g., 327 1163 346). "
-             "Useful for testing specific feeds from the CSV.",
+        help="Feed ID(s) to evaluate in single-feed mode, or specific IDs to filter from CSV mode.",
     )
     parser.add_argument(
         "--list-asset-classes",
@@ -2305,17 +2319,39 @@ Examples:
 
     args = parser.parse_args()
 
+    if args.list_asset_classes and not args.csv:
+        parser.error("--list-asset-classes requires --csv")
+
+    if not args.csv and (args.include_asset_class or args.exclude_asset_class):
+        parser.error("--include-asset-class and --exclude-asset-class only apply to --csv mode")
+
+    if args.csv and args.mode:
+        parser.error("--mode is for single-feed mode. Use either --csv OR (--feed-id, --date, --mode)")
+    elif not args.csv and not (args.feed_ids and args.mode):
+        parser.error("Either --csv or all of (--feed-id, --date, --mode) are required")
+
     date_override: list[str] | None = None
-    if not args.list_asset_classes:
+    resolved_dates: list[str] = []
+    if args.csv and not args.list_asset_classes:
         try:
             validate_date_args(args)
             resolved_dates = expand_date_args(args.date, args.start_date, args.end_date)
             date_override = resolved_dates if resolved_dates else None
         except ValueError as e:
             parser.error(str(e))
+    elif not args.csv:
+        try:
+            validate_date_args(args)
+            resolved_dates = expand_date_args(args.date, args.start_date, args.end_date)
+        except ValueError as e:
+            parser.error(str(e))
+        if not resolved_dates:
+            parser.error("Single-feed mode requires --date or --start-date/--end-date")
+        if args.publisher_id is None:
+            parser.error("--publisher-id is required in single-feed mode")
 
     # Validate CSV file exists
-    if not args.csv.exists():
+    if args.csv and not args.csv.exists():
         print(f"Error: CSV file '{args.csv}' not found")
         sys.exit(1)
 
@@ -2337,7 +2373,7 @@ Examples:
 
     # Determine publisher ID
     publisher_id = args.publisher_id
-    if publisher_id is None:
+    if args.csv and publisher_id is None:
         publisher_id = extract_publisher_id_from_filename(args.csv.name)
         if publisher_id is None:
             print(f"Error: Could not extract publisher ID from filename '{args.csv.name}'")
@@ -2364,18 +2400,68 @@ Examples:
     # Convert feed ID list to set for efficient lookup
     feed_id_filter = set(args.feed_ids) if args.feed_ids else None
 
-    results = process_csv(
-        args.csv,
-        publisher_id,
-        args.workers,
-        date_override=date_override,
-        include_asset_classes=args.include_asset_class,
-        exclude_asset_classes=args.exclude_asset_class,
-        include_extended_hours=args.extended_hours,
-        include_overnight=args.overnight,
-        feed_id_filter=feed_id_filter,
-        skip_scipy_tests=args.skip_scipy_tests,
-    )
+    if args.csv:
+        results = process_csv(
+            args.csv,
+            publisher_id,
+            args.workers,
+            date_override=date_override,
+            include_asset_classes=args.include_asset_class,
+            exclude_asset_classes=args.exclude_asset_class,
+            include_extended_hours=args.extended_hours,
+            include_overnight=args.overnight,
+            feed_id_filter=feed_id_filter,
+            skip_scipy_tests=args.skip_scipy_tests,
+        )
+    else:
+        config = load_config()
+        results = []
+        feed_date_pairs = [
+            (feed_id, date_value, args.mode)
+            for feed_id in args.feed_ids
+            for date_value in resolved_dates
+        ]
+
+        print(
+            f"Processing {len(feed_date_pairs)} feed-date evaluations "
+            f"for publisher {publisher_id} with {args.workers} workers..."
+        )
+
+        def evaluate_single(args_tuple):
+            feed_id, date_value, mode = args_tuple
+            client_lazer, client_analytics = get_clients(config)
+            return evaluate_publisher_feed(
+                client_lazer,
+                client_analytics,
+                publisher_id,
+                feed_id,
+                date_value,
+                mode,
+                include_extended_hours=args.extended_hours,
+                include_overnight=args.overnight,
+                skip_scipy_tests=args.skip_scipy_tests,
+            )
+
+        with ThreadPoolExecutor(max_workers=args.workers) as executor:
+            futures = {
+                executor.submit(evaluate_single, task): task for task in feed_date_pairs
+            }
+
+            for future in as_completed(futures):
+                result = future.result()
+                results.append(result)
+
+                status = "PASS" if result.passes else "FAIL"
+                if result.error:
+                    status = f"ERROR: {result.error[:50]}"
+
+                nrmse_str = f"{result.nrmse:.4f}" if result.nrmse is not None else "N/A"
+                hit_rate_str = f"{result.hit_rate:.1f}%" if result.hit_rate is not None else "N/A"
+                print(
+                    f"  [{result.execution_time_ms:>4}ms] Feed {result.feed_id} "
+                    f"({result.symbol or 'unknown'}): {status} - nrmse={nrmse_str}, "
+                    f"hit_rate={hit_rate_str}, n={result.n_observations}"
+                )
 
     # Compute summary statistics
     total_time = time.time() - total_start
