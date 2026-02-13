@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-02-13
+
+### Added
+
+- **`feed_uptime.py`** — new feed-centric uptime script that discovers publishers per feed and computes per-publisher/session uptime using the gap-based method.
+- **`docs/feed_uptime.md`** — dedicated usage guide for `feed_uptime.py` with CLI modes, session behavior, threshold controls, and output schema.
+
+### Changed
+
+- **`feed_uptime.py` threshold controls** — added `--one-second-gap` to switch default threshold from `200ms` to `1000ms`; custom `--gap-threshold` remains available.
+- **README documentation** — added `feed_uptime.py` to the tools overview and a dedicated usage section with examples.
+
 ## 2026-02-12
 
 ### Added

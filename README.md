@@ -32,6 +32,7 @@ python quick_benchmark.py --csv price_id_list.csv
 | `quick_benchmark.py` | Evaluate all publishers for a feed (feed readiness) | [Details](docs/quick_benchmark.md) |
 | `publisher_benchmark.py` | Evaluate a single publisher's data quality | [Details](docs/publisher_benchmark.md) |
 | `publisher_feeds.py` | Discover feeds a publisher is actively publishing | [Details](docs/publisher_feeds.md) |
+| `feed_uptime.py` | Evaluate per-publisher uptime from a feed-centric view | [Details](docs/feed_uptime.md) |
 | `verify_uptime.py` | Compare uptime calculation methods | [Details](docs/portal_usage.md) |
 | `check_benchmark_availability.py` | Audit Datascope instrument coverage | [Details](docs/check_benchmark_availability.md) |
 | `generate_source_upload.py` | Generate CSVs for Datascope instrument onboarding | [Details](docs/generate_source_upload.md) |
@@ -145,6 +146,41 @@ python verify_uptime.py --publisher-id 55 --date 2026-01-28 --extended-hours --o
 | `--output` | Export to CSV | Console only |
 
 See [portal_usage.md](docs/portal_usage.md) for uptime methodology details.
+
+## Feed Uptime (`feed_uptime.py`)
+
+Evaluates uptime from a **feed-centric** perspective: for each feed/date/mode, it discovers all contributing publishers and computes per-publisher uptime.
+
+```bash
+# Process feeds from CSV
+python feed_uptime.py --csv price_id_list.csv
+
+# Single feed/date
+python feed_uptime.py --feed-id 327 --date 2026-01-28 --mode fx
+
+# Multi-feed × multi-date (cartesian product)
+python feed_uptime.py --feed-id 327 328 --date 2026-01-28 2026-01-29 --mode fx
+
+# Date range
+python feed_uptime.py --feed-id 327 --start-date 2026-01-28 --end-date 2026-01-31 --mode fx
+
+# US equities session flags
+python feed_uptime.py --csv feeds.csv --extended-hours --overnight
+
+# Threshold options
+python feed_uptime.py --csv feeds.csv --one-second-gap
+python feed_uptime.py --csv feeds.csv --gap-threshold 500
+```
+
+**Key behavior:**
+- Uses gap-based uptime only (default threshold: `200ms`).
+- Optional threshold overrides:
+  - `--one-second-gap` sets threshold to `1000ms`.
+  - `--gap-threshold N` sets a custom threshold.
+- Supports CSV filtering with `--include-asset-class`, `--exclude-asset-class`, and `--filter-feed-id`.
+- Writes long-format per-publisher rows plus a `FEED SUMMARY` section.
+
+See [feed_uptime.md](docs/feed_uptime.md) for full usage and output details.
 
 ## End-to-End Workflow
 
