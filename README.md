@@ -33,6 +33,7 @@ python quick_benchmark.py --csv price_id_list.csv
 | `publisher_benchmark.py` | Evaluate a single publisher's data quality | [Details](docs/publisher_benchmark.md) |
 | `publisher_feeds.py` | Discover feeds a publisher is actively publishing | [Details](docs/publisher_feeds.md) |
 | `feed_uptime.py` | Evaluate per-publisher uptime from a feed-centric view | [Details](docs/feed_uptime.md) |
+| `feed_readiness.py` | Combined benchmark + uptime readiness verdict per feed | [Details](docs/feed_readiness.md) |
 | `verify_uptime.py` | Compare uptime calculation methods | [Details](docs/portal_usage.md) |
 | `check_benchmark_availability.py` | Audit Datascope instrument coverage | [Details](docs/check_benchmark_availability.md) |
 | `generate_source_upload.py` | Generate CSVs for Datascope instrument onboarding | [Details](docs/generate_source_upload.md) |
@@ -183,6 +184,24 @@ python feed_uptime.py --csv feeds.csv --precise --gap-threshold 100
 - Writes long-format per-publisher rows and appends a `PUBLISHER SUMMARY` matrix for multi-date runs.
 
 See [feed_uptime.md](docs/feed_uptime.md) for full usage and output details.
+
+## Feed Readiness (`feed_readiness.py`)
+
+Evaluates feed readiness using **both** benchmark quality and regular-session uptime.
+A feed is marked ready only when enough publishers pass both checks.
+
+```bash
+# Single feed/date
+python feed_readiness.py --feed-id 327 --date 2026-02-10 --mode fx
+
+# Multi-date combined readiness
+python feed_readiness.py --feed-id 327 --start-date 2026-02-10 --end-date 2026-02-12 --mode fx
+
+# CSV batch
+python feed_readiness.py --csv price_id_list.csv --output feed_readiness_results.csv --workers 8
+```
+
+See [feed_readiness.md](docs/feed_readiness.md) for full usage and output details.
 
 ## End-to-End Workflow
 
