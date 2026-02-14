@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-02-14
+
+### Added
+
+- **`feed_readiness.py`** — new combined readiness script that orchestrates benchmark quality (`quick_benchmark_95.py`) and uptime (`feed_uptime.py`) into a single per-feed verdict, with publisher-level bucket classification (`fully_passing`, `benchmark_only`, `uptime_only`, `both_failing`) and optional detailed consistency reporting.
+- **`docs/feed_readiness.md`** — dedicated usage guide for `feed_readiness.py` covering CLI modes, readiness logic, benchmarkable asset-class behavior, CSV output schema, and multi-date detailed consistency sections.
+
 ## 2026-02-13
 
 ### Added
