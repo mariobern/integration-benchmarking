@@ -1431,6 +1431,245 @@ def process_csv(
     return results
 
 
+def compute_publisher_summary(
+    results: list[BenchmarkResult],
+    include_extended_hours: bool = False,
+    include_overnight: bool = False,
+) -> dict:
+    """Build cross-date publisher pass/fail matrix from detailed results."""
+
+    def _status_from_regular(detail: PublisherFeedMetrics) -> str:
+        if detail.error:
+            return "ERROR"
+        return "PASS" if detail.passes else "FAIL"
+
+    def _status_from_session(metrics: Optional[ExtendedHoursMetrics | OvernightMetrics]) -> Optional[str]:
+        if metrics is None:
+            return None
+        if metrics.error:
+            return "ERROR"
+        return "PASS" if metrics.passes else "FAIL"
+
+    def _session_stats(session_results: dict[str, str]) -> dict:
+        pass_count = sum(1 for status in session_results.values() if status == "PASS")
+        fail_count = sum(1 for status in session_results.values() if status == "FAIL")
+        error_count = sum(1 for status in session_results.values() if status == "ERROR")
+        dates_seen = len(session_results)
+        pass_rate = (pass_count / dates_seen * 100) if dates_seen > 0 else None
+        return {
+            "dates_seen": dates_seen,
+            "pass_count": pass_count,
+            "fail_count": fail_count,
+            "error_count": error_count,
+            "pass_rate": pass_rate,
+        }
+
+    dates = sorted({r.date for r in results})
+
+    publisher_sessions: dict[int, dict[str, dict[str, str]]] = {}
+    for result in sorted(results, key=lambda r: (r.date, r.feed_id)):
+        for detail in (result.publisher_details or []):
+            pub_sessions = publisher_sessions.setdefault(
+                detail.publisher_id,
+                {
+                    TradingSession.REGULAR.value: {},
+                    TradingSession.PREMARKET.value: {},
+                    TradingSession.AFTERHOURS.value: {},
+                    TradingSession.OVERNIGHT.value: {},
+                },
+            )
+
+            pub_sessions[TradingSession.REGULAR.value][result.date] = _status_from_regular(detail)
+
+            if include_extended_hours:
+                pm_status = _status_from_session(detail.premarket_metrics)
+                if pm_status is not None:
+                    pub_sessions[TradingSession.PREMARKET.value][result.date] = pm_status
+
+                ah_status = _status_from_session(detail.afterhours_metrics)
+                if ah_status is not None:
+                    pub_sessions[TradingSession.AFTERHOURS.value][result.date] = ah_status
+
+            if include_overnight:
+                on_status = _status_from_session(detail.overnight_metrics)
+                if on_status is not None:
+                    pub_sessions[TradingSession.OVERNIGHT.value][result.date] = on_status
+
+    rows = []
+    for publisher_id, session_results in publisher_sessions.items():
+        regular_results = session_results[TradingSession.REGULAR.value]
+        regular_stats = _session_stats(regular_results)
+        rows.append(
+            {
+                "publisher_id": publisher_id,
+                "dates_seen": regular_stats["dates_seen"],
+                "sessions": {
+                    TradingSession.REGULAR.value: {
+                        "results": dict(sorted(regular_results.items())),
+                        **regular_stats,
+                    },
+                    TradingSession.PREMARKET.value: {
+                        "results": dict(
+                            sorted(session_results[TradingSession.PREMARKET.value].items())
+                        ),
+                        **_session_stats(session_results[TradingSession.PREMARKET.value]),
+                    },
+                    TradingSession.AFTERHOURS.value: {
+                        "results": dict(
+                            sorted(session_results[TradingSession.AFTERHOURS.value].items())
+                        ),
+                        **_session_stats(session_results[TradingSession.AFTERHOURS.value]),
+                    },
+                    TradingSession.OVERNIGHT.value: {
+                        "results": dict(
+                            sorted(session_results[TradingSession.OVERNIGHT.value].items())
+                        ),
+                        **_session_stats(session_results[TradingSession.OVERNIGHT.value]),
+                    },
+                },
+            }
+        )
+
+    rows.sort(
+        key=lambda row: (
+            -(row["sessions"][TradingSession.REGULAR.value]["pass_rate"] or 0),
+            row["publisher_id"],
+        )
+    )
+
+    def _compute_classifications(session_name: str) -> dict[str, list[int]]:
+        always_passing = []
+        always_failing = []
+        intermittent = []
+        for row in rows:
+            statuses = list(row["sessions"][session_name]["results"].values())
+            if not statuses:
+                continue
+            if all(status == "PASS" for status in statuses):
+                always_passing.append(row["publisher_id"])
+            elif all(status == "FAIL" for status in statuses):
+                always_failing.append(row["publisher_id"])
+            else:
+                intermittent.append(row["publisher_id"])
+        return {
+            "always_passing": always_passing,
+            "always_failing": always_failing,
+            "intermittent": intermittent,
+        }
+
+    return {
+        "dates": dates,
+        "rows": rows,
+        "classifications": {
+            TradingSession.REGULAR.value: _compute_classifications(TradingSession.REGULAR.value),
+            TradingSession.PREMARKET.value: _compute_classifications(
+                TradingSession.PREMARKET.value
+            ),
+            TradingSession.AFTERHOURS.value: _compute_classifications(
+                TradingSession.AFTERHOURS.value
+            ),
+            TradingSession.OVERNIGHT.value: _compute_classifications(
+                TradingSession.OVERNIGHT.value
+            ),
+        },
+    }
+
+
+def write_publisher_summary_csv(
+    writer: csv.writer,
+    publisher_summary: dict,
+    include_extended_hours: bool = False,
+    include_overnight: bool = False,
+) -> None:
+    """Write PUBLISHER SUMMARY section with cross-date consistency metrics."""
+
+    def _format_rate(rate: Optional[float]) -> str:
+        return f"{rate:.2f}%" if rate is not None else ""
+
+    def _format_results(session_data: dict) -> str:
+        return ";".join(
+            f"{date_value}:{status}" for date_value, status in session_data["results"].items()
+        )
+
+    writer.writerow([])
+    writer.writerow(["PUBLISHER SUMMARY"])
+
+    summary_header = [
+        "publisher_id",
+        "dates_seen",
+        "regular_pass_dates",
+        "regular_fail_dates",
+        "regular_pass_rate",
+        "regular_results",
+    ]
+
+    if include_extended_hours:
+        summary_header.extend(
+            [
+                "premarket_pass_dates",
+                "premarket_fail_dates",
+                "premarket_pass_rate",
+                "premarket_results",
+                "afterhours_pass_dates",
+                "afterhours_fail_dates",
+                "afterhours_pass_rate",
+                "afterhours_results",
+            ]
+        )
+
+    if include_overnight:
+        summary_header.extend(
+            [
+                "overnight_pass_dates",
+                "overnight_fail_dates",
+                "overnight_pass_rate",
+                "overnight_results",
+            ]
+        )
+
+    writer.writerow(summary_header)
+
+    for row in publisher_summary["rows"]:
+        regular = row["sessions"][TradingSession.REGULAR.value]
+        csv_row = [
+            row["publisher_id"],
+            row["dates_seen"],
+            regular["pass_count"],
+            regular["fail_count"],
+            _format_rate(regular["pass_rate"]),
+            _format_results(regular),
+        ]
+
+        if include_extended_hours:
+            premarket = row["sessions"][TradingSession.PREMARKET.value]
+            afterhours = row["sessions"][TradingSession.AFTERHOURS.value]
+            csv_row.extend(
+                [
+                    premarket["pass_count"],
+                    premarket["fail_count"],
+                    _format_rate(premarket["pass_rate"]),
+                    _format_results(premarket),
+                    afterhours["pass_count"],
+                    afterhours["fail_count"],
+                    _format_rate(afterhours["pass_rate"]),
+                    _format_results(afterhours),
+                ]
+            )
+
+        if include_overnight:
+            overnight = row["sessions"][TradingSession.OVERNIGHT.value]
+            csv_row.extend(
+                [
+                    overnight["pass_count"],
+                    overnight["fail_count"],
+                    _format_rate(overnight["pass_rate"]),
+                    _format_results(overnight),
+                ]
+            )
+
+        writer.writerow(csv_row)
+
+
 def write_results_csv(
     results: list[BenchmarkResult],
     output_path: Path,
@@ -1652,6 +1891,20 @@ def write_results_csv(
                     row.append(d.error or "")
                     writer.writerow(row)
 
+            unique_dates = {r.date for r in results}
+            if len(unique_dates) > 1:
+                publisher_summary = compute_publisher_summary(
+                    results,
+                    include_extended_hours=include_extended_hours,
+                    include_overnight=include_overnight,
+                )
+                write_publisher_summary_csv(
+                    writer,
+                    publisher_summary,
+                    include_extended_hours=include_extended_hours,
+                    include_overnight=include_overnight,
+                )
+
     print(f"\nResults written to: {output_path}")
 
 
@@ -1829,6 +2082,78 @@ def print_interpretation_guide(summary_stats: dict) -> None:
             print("Interpretation: frequent misses vs benchmark; review latency and pricing logic.")
 
     print("Suggested focus: investigate feeds with low median_hit_rate and high median_nrmse first.")
+
+
+def print_publisher_summary(
+    publisher_summary: dict,
+    include_extended_hours: bool = False,
+    include_overnight: bool = False,
+) -> None:
+    """Print cross-date publisher consistency summary."""
+
+    def _format_console_rate(rate: Optional[float]) -> str:
+        return f"{rate:.1f}%" if rate is not None else "N/A"
+
+    def _format_console_results(session_data: dict) -> str:
+        entries = []
+        for date_value, status in session_data["results"].items():
+            mm_dd = datetime.strptime(date_value, "%Y-%m-%d").strftime("%m-%d")
+            entries.append(f"{mm_dd}:{status}")
+        return " ".join(entries)
+
+    def _print_session_block(title: str, session_name: str) -> None:
+        print(f"\n{title}:")
+        print("  Publisher  Pass  Fail  Rate    Results")
+
+        printed_any = False
+        for row in publisher_summary["rows"]:
+            session_data = row["sessions"][session_name]
+            if session_data["dates_seen"] == 0:
+                continue
+
+            print(
+                f"  {row['publisher_id']:<9} "
+                f"{session_data['pass_count']:<5} "
+                f"{session_data['fail_count']:<5} "
+                f"{_format_console_rate(session_data['pass_rate']):<7} "
+                f"{_format_console_results(session_data)}"
+            )
+            printed_any = True
+
+        if not printed_any:
+            print("  No evaluable publisher results")
+            return
+
+        classifications = publisher_summary["classifications"][session_name]
+
+        def _format_group(group: list[int]) -> str:
+            return ", ".join(str(x) for x in group) if group else "-"
+
+        print(
+            f"\n  Always passing: {_format_group(classifications['always_passing'])} "
+            f"({len(classifications['always_passing'])} publishers)"
+        )
+        print(
+            f"  Always failing: {_format_group(classifications['always_failing'])} "
+            f"({len(classifications['always_failing'])} publishers)"
+        )
+        print(
+            f"  Intermittent: {_format_group(classifications['intermittent'])} "
+            f"({len(classifications['intermittent'])} publishers)"
+        )
+
+    print(f"\n{'='*70}")
+    print(f"PUBLISHER CONSISTENCY (across {len(publisher_summary['dates'])} dates)")
+    print(f"{'='*70}")
+
+    _print_session_block("REGULAR SESSION", TradingSession.REGULAR.value)
+
+    if include_extended_hours:
+        _print_session_block("PREMARKET", TradingSession.PREMARKET.value)
+        _print_session_block("AFTERHOURS", TradingSession.AFTERHOURS.value)
+
+    if include_overnight:
+        _print_session_block("OVERNIGHT", TradingSession.OVERNIGHT.value)
 
 
 def main():
@@ -2210,6 +2535,18 @@ Examples:
     print(f"\nTiming: total={summary['total_time_sec']:.2f}s, avg_per_feed={summary['avg_time_ms']:.0f}ms")
 
     print_interpretation_guide(summary)
+
+    if args.detailed and len({r.date for r in results}) > 1:
+        publisher_summary = compute_publisher_summary(
+            results,
+            include_extended_hours=args.extended_hours,
+            include_overnight=args.overnight,
+        )
+        print_publisher_summary(
+            publisher_summary,
+            include_extended_hours=args.extended_hours,
+            include_overnight=args.overnight,
+        )
 
 
 if __name__ == "__main__":

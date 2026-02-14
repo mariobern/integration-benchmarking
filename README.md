@@ -39,6 +39,12 @@ python quick_benchmark.py --csv price_id_list.csv
 | `isin_resolver_v2.py` | Resolve tickers to ISINs (multi-tier) | [Details](docs/isin_resolver_v2.md) |
 | `portal/` | Self-service FastAPI dashboard + daily batch runner | [Details](docs/portal_usage.md) |
 
+## Quick Benchmark Notes
+
+- `quick_benchmark.py --detailed` appends a `PUBLISHER DETAIL` section to output CSV.
+- With `--detailed` and more than one evaluated date, it also appends `PUBLISHER SUMMARY` (cross-date publisher pass/fail matrix).
+- In that same multi-date detailed mode, console output adds `PUBLISHER CONSISTENCY` with per-session PASS/FAIL/ERROR timelines.
+
 ## Publisher Feeds Discovery (`publisher_feeds.py`)
 
 Discovers all feeds a publisher is actively sending data for, outputting a CSV ready for `publisher_benchmark.py`.
@@ -149,36 +155,32 @@ See [portal_usage.md](docs/portal_usage.md) for uptime methodology details.
 
 ## Feed Uptime (`feed_uptime.py`)
 
-Evaluates uptime from a **feed-centric** perspective: for each feed/date/mode, it discovers all contributing publishers and computes per-publisher uptime.
+Evaluates uptime from a **feed-centric** perspective: for each feed/date/mode, it discovers all contributing publishers and computes per-publisher/session uptime.
 
 ```bash
 # Process feeds from CSV
 python feed_uptime.py --csv price_id_list.csv
 
 # Single feed/date
-python feed_uptime.py --feed-id 327 --date 2026-01-28 --mode fx
+python feed_uptime.py --feed-id 922 --date 2026-02-09 --mode us-equities
 
-# Multi-feed × multi-date (cartesian product)
-python feed_uptime.py --feed-id 327 328 --date 2026-01-28 2026-01-29 --mode fx
-
-# Date range
-python feed_uptime.py --feed-id 327 --start-date 2026-01-28 --end-date 2026-01-31 --mode fx
+# Multi-date range
+python feed_uptime.py --feed-id 922 --start-date 2026-02-09 --end-date 2026-02-12 --mode us-equities
 
 # US equities session flags
-python feed_uptime.py --csv feeds.csv --extended-hours --overnight
+python feed_uptime.py --feed-id 922 --date 2026-02-09 --mode us-equities --extended-hours --overnight
 
 # Threshold options
-python feed_uptime.py --csv feeds.csv --one-second-gap
-python feed_uptime.py --csv feeds.csv --gap-threshold 500
+python feed_uptime.py --csv feeds.csv --uptime-threshold 95
+python feed_uptime.py --csv feeds.csv --precise --gap-threshold 100
 ```
 
 **Key behavior:**
-- Uses gap-based uptime only (default threshold: `200ms`).
-- Optional threshold overrides:
-  - `--one-second-gap` sets threshold to `1000ms`.
-  - `--gap-threshold N` sets a custom threshold.
+- Default method is `1s window` uptime.
+- `--precise` switches to gap-based uptime (default threshold `200ms`).
+- `--uptime-threshold` controls pass/fail classification (default `95.0`).
 - Supports CSV filtering with `--include-asset-class`, `--exclude-asset-class`, and `--filter-feed-id`.
-- Writes long-format per-publisher rows plus a `FEED SUMMARY` section.
+- Writes long-format per-publisher rows and appends a `PUBLISHER SUMMARY` matrix for multi-date runs.
 
 See [feed_uptime.md](docs/feed_uptime.md) for full usage and output details.
 

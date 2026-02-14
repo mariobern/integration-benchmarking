@@ -1,8 +1,8 @@
 # Feed Uptime Tool
 
-Measures **per-publisher uptime** for each feed/date/mode tuple using a gap-based method.
+Measures **per-publisher uptime** for each feed/date/mode tuple from a feed-centric view.
 
-This is the feed-centric counterpart to `verify_uptime.py`:
+This is the feed-level counterpart to `verify_uptime.py`:
 - `verify_uptime.py`: one publisher across many feeds
 - `feed_uptime.py`: one or many feeds, with all contributing publishers
 
@@ -12,129 +12,132 @@ This is the feed-centric counterpart to `verify_uptime.py`:
 |----------|---------------|
 | Compare publishers on the same feed | Yes |
 | Batch uptime checks across many feeds/dates | Yes |
-| Compare 1-second vs gap-based uptime methods | Use `verify_uptime.py` |
+| Validate 1s-window vs gap-based methods for one publisher | Use `verify_uptime.py` |
 
 ## Usage
 
 ```bash
-# Process feeds from CSV file
+# CSV mode (feed_id,date,mode rows)
 python feed_uptime.py --csv price_id_list.csv
 
-# Process a single feed
-python feed_uptime.py --feed-id 327 --date 2026-01-28 --mode fx
+# Single feed/date
+python feed_uptime.py --feed-id 922 --date 2026-02-09 --mode us-equities
 
-# Multiple feed IDs × multiple explicit dates (cartesian product)
-python feed_uptime.py --feed-id 327 328 --date 2026-01-28 2026-01-29 --mode fx
-
-# Inclusive date range
-python feed_uptime.py --feed-id 327 --start-date 2026-01-28 --end-date 2026-01-31 --mode fx
+# Multi-date range
+python feed_uptime.py --feed-id 922 --start-date 2026-02-09 --end-date 2026-02-12 --mode us-equities
 
 # US equities sessions
-python feed_uptime.py --csv feeds.csv --extended-hours --overnight
+python feed_uptime.py --feed-id 922 --date 2026-02-09 --mode us-equities --extended-hours --overnight
 
 # CSV filters
 python feed_uptime.py --csv feeds.csv --include-asset-class us-equities fx
 python feed_uptime.py --csv feeds.csv --exclude-asset-class crypto
-python feed_uptime.py --csv feeds.csv --filter-feed-id 327 1163
+python feed_uptime.py --csv feeds.csv --filter-feed-id 922 327
 python feed_uptime.py --csv feeds.csv --list-asset-classes
 
-# Threshold control
-python feed_uptime.py --csv feeds.csv --one-second-gap
-python feed_uptime.py --csv feeds.csv --gap-threshold 500
-
-# Output + parallelism
-python feed_uptime.py --csv feeds.csv --output feed_uptime_results.csv --workers 8
+# Controls
+python feed_uptime.py --csv feeds.csv --uptime-threshold 95
+python feed_uptime.py --csv feeds.csv --precise --gap-threshold 100
+python feed_uptime.py --csv feeds.csv --output results.csv --workers 8
 ```
 
 ## Arguments
 
 | Argument | Description | Default |
 |----------|-------------|---------|
-| `--csv` | CSV file with `feed_id,date,mode` rows | - |
-| `--feed-id` | Feed ID(s) for single-feed mode | - |
-| `--date` | Date(s) for single-feed mode (`YYYY-MM-DD` list) | - |
-| `--start-date` | Range start date (inclusive) for single-feed mode | - |
-| `--end-date` | Range end date (inclusive) for single-feed mode | - |
-| `--mode` | Asset class for single-feed mode (for example `fx`, `metals`, `us-equities`) | - |
+| `--csv` | CSV with `feed_id,date,mode` rows | - |
+| `--feed-id` | Feed ID(s) (single-feed mode) | - |
+| `--date` | Date(s) `YYYY-MM-DD` | - |
+| `--start-date` / `--end-date` | Inclusive date range | - |
+| `--mode` | Asset class (single-feed mode) | - |
 | `--output` | Output CSV path | `feed_uptime_results.csv` |
-| `--workers` | Parallel worker threads | `4` |
-| `--include-asset-class` | Only process these asset classes (CSV mode only) | All |
-| `--exclude-asset-class` | Exclude these asset classes (CSV mode only) | None |
-| `--list-asset-classes` | List unique asset classes in CSV and exit | Off |
-| `--filter-feed-id` | Only process these feed IDs (CSV mode only) | All |
-| `--extended-hours` | Include `premarket` and `afterhours` sessions (US equities only) | Off |
-| `--overnight` | Include `overnight` session (US equities only) | Off |
-| `--one-second-gap` | Use 1000ms threshold instead of default 200ms | Off |
-| `--gap-threshold` | Custom gap threshold in ms (mutually exclusive with `--one-second-gap`) | `200` |
+| `--workers` | Parallel workers | `4` |
+| `--include-asset-class` | Only these classes (CSV mode) | All |
+| `--exclude-asset-class` | Exclude these classes (CSV mode) | None |
+| `--list-asset-classes` | List classes and exit (CSV mode) | Off |
+| `--filter-feed-id` | Only these feed IDs (CSV mode) | All |
+| `--extended-hours` | Include premarket + afterhours (US equities) | Off |
+| `--overnight` | Include overnight session (US equities) | Off |
+| `--precise` | Use 200ms gap-based method instead of default 1s window | Off |
+| `--gap-threshold` | Gap threshold in ms for `--precise` mode | `200` |
+| `--uptime-threshold` | Pass threshold percentage | `95.0` |
 
 ## Input Mode Rules
 
 - Use either `--csv` **or** single-feed mode (`--feed-id`, `--mode`, and either `--date` or `--start-date/--end-date`).
 - `--date` and `--start-date/--end-date` are mutually exclusive.
-- `--include-asset-class`, `--exclude-asset-class`, `--filter-feed-id`, and `--list-asset-classes` apply to CSV mode only.
-- `--one-second-gap` and `--gap-threshold` cannot be used together.
+- `--include-asset-class`, `--exclude-asset-class`, `--filter-feed-id`, and `--list-asset-classes` are CSV-only.
+- `--gap-threshold` customization requires `--precise`.
+
+## Uptime Methods
+
+### Default: 1-second window
+
+- Uptime is `seconds_with_data / total_seconds * 100`.
+- Consistent with portal-style window uptime interpretation.
+
+### `--precise`: gap-based
+
+- Computes gaps between consecutive updates.
+- For each gap above threshold, downtime contribution is `gap_ms - threshold_ms`.
+- Includes start/end gap handling.
+- Threshold is controlled by `--gap-threshold` (default `200ms`).
 
 ## Session Behavior
 
 Session windows come from `portal.batch.uptime_sessions.get_session_windows(...)`.
 
-- Default: includes only regular sessions.
-- `--extended-hours`: includes `premarket` + `afterhours` for US equities feeds.
-- `--overnight`: includes `overnight` for US equities feeds.
-- For non-US-equities asset classes, extended/overnight flags have no effect.
-
-## Uptime Method
-
-`feed_uptime.py` uses a gap-based uptime model only:
-
-- For each publisher and session window, consecutive update gaps are measured.
-- Downtime accumulates when `gap_ms > threshold_ms`:
-  - contribution = `gap_ms - threshold_ms`
-- Start/end gaps are also accounted for.
-- `uptime_pct = (period_ms - downtime_ms) / period_ms * 100`
-
-Threshold options:
-- default: `200ms`
-- `--one-second-gap`: `1000ms`
-- `--gap-threshold N`: custom `N` ms
+- Default includes regular sessions.
+- `--extended-hours` adds premarket and afterhours for US equities.
+- `--overnight` adds overnight for US equities.
+- For non-US-equities, extended/overnight flags are ignored.
 
 ## Output
 
-The output CSV is long-format: one row per `(feed_id, date, publisher_id, session)`.
+Detail output is long-format: one row per `(feed_id, date, publisher_id, session)`.
 
-Detail columns:
+### Default detail columns (1-second window)
 
 | Column | Meaning |
 |--------|---------|
 | `feed_id`, `date`, `mode`, `symbol` | Feed identity |
-| `publisher_id` | Publisher in that feed |
-| `session` | Session label (`regular`, `premarket`, `afterhours`, `overnight`, etc.) |
-| `uptime_pct` | Uptime percentage for that publisher/session |
-| `downtime_ms` | Total downtime in milliseconds |
-| `period_length_ms` | Session window length in milliseconds |
-| `updates_total` | Number of updates in session |
-| `updates_per_second` | Average update rate in session |
-| `max_gap_ms` | Largest observed inter-update gap |
-| `gaps_over_threshold` | Count of gaps above threshold |
+| `publisher_id`, `session` | Publisher/session identity |
+| `uptime_pct` | Uptime percentage |
+| `passes` | `uptime_pct >= uptime_threshold` |
+| `seconds_with_data`, `total_seconds` | 1-second method coverage |
+| `updates_total`, `updates_per_second` | Update volume and rate |
 
-After detail rows, the file appends:
+### `--precise` detail columns
+
+| Column | Meaning |
+|--------|---------|
+| `feed_id`, `date`, `mode`, `symbol` | Feed identity |
+| `publisher_id`, `session` | Publisher/session identity |
+| `uptime_pct` | Uptime percentage |
+| `passes` | `uptime_pct >= uptime_threshold` |
+| `downtime_ms`, `period_length_ms` | Gap-method downtime/period |
+| `updates_total`, `updates_per_second` | Update volume and rate |
+| `max_gap_ms`, `gaps_over_threshold` | Gap severity/count |
+
+### Appended publisher summary matrix (multi-date runs)
+
+When multiple dates are evaluated, CSV appends:
 
 - blank line
-- `FEED SUMMARY`
-- per-feed/per-session aggregates:
-  - `median_uptime_pct`
-  - `mean_uptime_pct`
-  - `min_uptime_pct`
-  - `max_uptime_pct`
+- `PUBLISHER SUMMARY`
+- one row per publisher with per-session date pass/fail rollups:
+  - `{session}_pass_dates`
+  - `{session}_fail_dates`
+  - `{session}_pass_rate`
+  - `{session}_results` (e.g., `02-09:PASS;02-10:FAIL`)
 
 ## Console Summary
 
 Console output includes:
 - total feeds evaluated
 - unique publisher-feed combinations
-- configured gap threshold
-- per-session uptime distribution stats
-- regular-session per-asset-class medians
-- timing totals
-
-If a feed fails to evaluate (for example, connection/query/session issues), the error is shown in console.
+- method (`1s window` or `{N}ms gap-based`)
+- pass threshold
+- per-session uptime distribution + pass/fail counts
+- timing
+- publisher consistency section for multi-date runs

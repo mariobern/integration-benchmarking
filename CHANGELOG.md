@@ -4,12 +4,21 @@
 
 ### Added
 
-- **`feed_uptime.py`** — new feed-centric uptime script that discovers publishers per feed and computes per-publisher/session uptime using the gap-based method.
+- **`feed_uptime.py`** — new feed-centric uptime script that discovers publishers per feed and computes per-publisher/session uptime with default 1-second window mode plus optional precise gap mode.
 - **`docs/feed_uptime.md`** — dedicated usage guide for `feed_uptime.py` with CLI modes, session behavior, threshold controls, and output schema.
 
 ### Changed
 
-- **`feed_uptime.py` threshold controls** — added `--one-second-gap` to switch default threshold from `200ms` to `1000ms`; custom `--gap-threshold` remains available.
+- **`feed_uptime.py` modes and thresholds**:
+  - Default uptime method is now `1s window`.
+  - Added `--precise` to use gap-based uptime.
+  - Added `--uptime-threshold` (default `95.0`) for pass/fail classification.
+  - `--gap-threshold` is used with `--precise` (default `200ms`).
+  - Added publisher consistency matrix output (`PUBLISHER SUMMARY`) for multi-date runs.
+- **`quick_benchmark.py` detailed multi-date publisher consistency reporting**:
+  - Added CSV `PUBLISHER SUMMARY` section (after `PUBLISHER DETAIL`) for cross-date PASS/FAIL/ERROR matrix by publisher.
+  - Added console `PUBLISHER CONSISTENCY` section with per-session pass/fail rates and date timelines.
+  - Gated to runs using `--detailed` with more than one unique evaluated date.
 - **README documentation** — added `feed_uptime.py` to the tools overview and a dedicated usage section with examples.
 
 ## 2026-02-12

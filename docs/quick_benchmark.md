@@ -43,6 +43,10 @@ python quick_benchmark.py --csv price_id_list.csv --skip-scipy-tests
 # Append per-publisher detail rows to output CSV
 python quick_benchmark.py --csv price_id_list.csv --detailed
 
+# Multi-date detailed run with cross-date publisher consistency summary
+python quick_benchmark.py --feed-id 922 --start-date 2026-02-09 --end-date 2026-02-12 \
+  --mode us-equities --extended-hours --overnight --detailed --workers 16 --output 922_test.csv
+
 # Restrict CSV run to specific feed IDs
 python quick_benchmark.py --csv price_id_list.csv --filter-feed-id 327 1163
 ```
@@ -130,6 +134,18 @@ Additional section when `--detailed` is enabled:
 - Includes per-publisher metrics such as `nrmse`, `hit_rate`, `rmse_over_spread`,
   statistical metrics (`mean_diff`, `t_pvalue`, `wilcoxon_pvalue`, etc.),
   plus session-specific detail columns when `--extended-hours` / `--overnight` are used.
+- If more than one unique date is evaluated, appends a `PUBLISHER SUMMARY` section:
+  - Cross-date matrix per `publisher_id` for regular session (`PASS`, `FAIL`, `ERROR`)
+  - Optional premarket/afterhours columns with `--extended-hours`
+  - Optional overnight columns with `--overnight`
+  - Pass/fail counts and pass rates per session
+
+Console additions for multi-date detailed runs:
+
+- Prints `PUBLISHER CONSISTENCY (across N dates)` after summary + interpretation.
+- Includes regular-session table for all publishers.
+- Includes premarket/afterhours and overnight tables when enabled.
+- Uses short `MM-DD` date labels in console and full `YYYY-MM-DD` in CSV.
 
 When multiple dates are evaluated in single-feed mode, console output includes a per-date readiness breakdown.
 

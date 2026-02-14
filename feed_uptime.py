@@ -2,9 +2,8 @@
 """
 Feed-centric uptime measurement script.
 
-This script evaluates uptime per publisher for each feed/date/mode tuple using
-the 200ms gap-based method. It supports CSV batch mode and direct feed/date CLI
-arguments using the same patterns as quick_benchmark.py.
+Default mode uses a 1-second window uptime method. Use --precise to switch to
+gap-based uptime (default 200ms threshold).
 """
 
 import argparse
@@ -44,7 +43,8 @@ ASSET_CLASS_ALIASES = {
 }
 
 DEFAULT_GAP_THRESHOLD_MS = 200
-ONE_SECOND_GAP_THRESHOLD_MS = 1000
+DEFAULT_UPTIME_THRESHOLD_PCT = 95.0
+SESSION_ORDER = ["regular", "premarket", "afterhours", "overnight"]
 
 
 @dataclass(frozen=True)
@@ -52,12 +52,15 @@ class PublisherSessionUptime:
     publisher_id: int
     session: str
     uptime_pct: float
-    downtime_ms: int
-    period_length_ms: int
+    passes: bool
+    seconds_with_data: int
+    total_seconds: int
     updates_total: int
     updates_per_second: float
+    downtime_ms: Optional[int]
+    period_length_ms: Optional[int]
     max_gap_ms: Optional[int]
-    gaps_over_threshold: int
+    gaps_over_threshold: Optional[int]
 
 
 @dataclass(frozen=True)
@@ -157,13 +160,74 @@ def get_feed_symbol(client, feed_id: int) -> Optional[str]:
     return None
 
 
+def compute_uptime_1s_window(
+    client,
+    publisher_id: int,
+    feed_id: int,
+    start_utc: datetime,
+    end_utc: datetime,
+) -> dict:
+    """
+    Compute uptime using 1-second window method.
+
+    Uptime is the percentage of seconds containing at least one update.
+    """
+    start_str = start_utc.strftime("%Y-%m-%d %H:%M:%S")
+    end_str = end_utc.strftime("%Y-%m-%d %H:%M:%S")
+
+    query = f"""
+        WITH
+            parseDateTimeBestEffort('{start_str}') AS start_time,
+            parseDateTimeBestEffort('{end_str}') AS end_time,
+            dateDiff('second', start_time, end_time) AS total_seconds,
+            per_second AS (
+                SELECT
+                    toStartOfSecond(publish_time) AS second_start,
+                    count() AS update_count
+                FROM publisher_updates
+                PREWHERE price_feed_id = {feed_id}
+                    AND publisher_id = {publisher_id}
+                WHERE publish_time >= start_time
+                    AND publish_time < end_time
+                GROUP BY second_start
+            )
+        SELECT
+            sum(update_count) AS updates_total,
+            count() AS seconds_with_data,
+            total_seconds,
+            if(total_seconds = 0, 0, updates_total / total_seconds) AS updates_per_second,
+            if(total_seconds = 0, 0, seconds_with_data * 100.0 / total_seconds) AS uptime_pct
+        FROM per_second
+    """
+    result = client.query(query)
+
+    total_seconds = int((end_utc - start_utc).total_seconds())
+    if not result.result_rows or result.result_rows[0][0] is None:
+        return {
+            "uptime_pct": 0.0,
+            "seconds_with_data": 0,
+            "total_seconds": max(0, total_seconds),
+            "updates_total": 0,
+            "updates_per_second": 0.0,
+        }
+
+    row = result.result_rows[0]
+    return {
+        "uptime_pct": float(row[4] or 0),
+        "seconds_with_data": int(row[1] or 0),
+        "total_seconds": int(row[2] or 0),
+        "updates_total": int(row[0] or 0),
+        "updates_per_second": float(row[3] or 0),
+    }
+
+
 def compute_uptime_200ms_gap(
     client,
     publisher_id: int,
     feed_id: int,
     start_utc: datetime,
     end_utc: datetime,
-    gap_threshold_ms: int = 200,
+    gap_threshold_ms: int = DEFAULT_GAP_THRESHOLD_MS,
 ) -> dict:
     """
     Compute uptime using accurate gap-based method.
@@ -243,7 +307,6 @@ def compute_uptime_200ms_gap(
             ) AS total_downtime_ms
         FROM gap_stats
     """
-
     result = client.query(query)
 
     if not result.result_rows:
@@ -309,7 +372,9 @@ def evaluate_feed_uptime(
     mode: str,
     include_extended_hours: bool = False,
     include_overnight: bool = False,
-    gap_threshold_ms: int = 200,
+    precise: bool = False,
+    gap_threshold_ms: int = DEFAULT_GAP_THRESHOLD_MS,
+    uptime_threshold_pct: float = DEFAULT_UPTIME_THRESHOLD_PCT,
 ) -> FeedUptimeResult:
     """Evaluate per-publisher uptime for a single feed/date/mode."""
 
@@ -350,27 +415,60 @@ def evaluate_feed_uptime(
         publisher_uptimes: list[PublisherSessionUptime] = []
         for publisher_id in publishers:
             for session_window in filtered_sessions:
-                uptime = compute_uptime_200ms_gap(
-                    client=client,
-                    publisher_id=publisher_id,
-                    feed_id=feed_id,
-                    start_utc=session_window.start_utc,
-                    end_utc=session_window.end_utc,
-                    gap_threshold_ms=gap_threshold_ms,
-                )
-                publisher_uptimes.append(
-                    PublisherSessionUptime(
+                if precise:
+                    uptime = compute_uptime_200ms_gap(
+                        client=client,
                         publisher_id=publisher_id,
-                        session=session_window.session,
-                        uptime_pct=uptime["uptime_pct"],
-                        downtime_ms=uptime["total_downtime_ms"],
-                        period_length_ms=uptime["period_length_ms"],
-                        updates_total=uptime["updates_total"],
-                        updates_per_second=uptime["updates_per_second"],
-                        max_gap_ms=uptime["max_gap_ms"],
-                        gaps_over_threshold=uptime["gaps_over_threshold"],
+                        feed_id=feed_id,
+                        start_utc=session_window.start_utc,
+                        end_utc=session_window.end_utc,
+                        gap_threshold_ms=gap_threshold_ms,
                     )
-                )
+                    uptime_pct = uptime["uptime_pct"]
+                    passes = uptime_pct >= uptime_threshold_pct
+                    total_seconds = int((session_window.end_utc - session_window.start_utc).total_seconds())
+                    publisher_uptimes.append(
+                        PublisherSessionUptime(
+                            publisher_id=publisher_id,
+                            session=session_window.session,
+                            uptime_pct=uptime_pct,
+                            passes=passes,
+                            seconds_with_data=0,
+                            total_seconds=total_seconds,
+                            updates_total=uptime["updates_total"],
+                            updates_per_second=uptime["updates_per_second"],
+                            downtime_ms=uptime["total_downtime_ms"],
+                            period_length_ms=uptime["period_length_ms"],
+                            max_gap_ms=uptime["max_gap_ms"],
+                            gaps_over_threshold=uptime["gaps_over_threshold"],
+                        )
+                    )
+                else:
+                    uptime = compute_uptime_1s_window(
+                        client=client,
+                        publisher_id=publisher_id,
+                        feed_id=feed_id,
+                        start_utc=session_window.start_utc,
+                        end_utc=session_window.end_utc,
+                    )
+                    uptime_pct = uptime["uptime_pct"]
+                    passes = uptime_pct >= uptime_threshold_pct
+                    publisher_uptimes.append(
+                        PublisherSessionUptime(
+                            publisher_id=publisher_id,
+                            session=session_window.session,
+                            uptime_pct=uptime_pct,
+                            passes=passes,
+                            seconds_with_data=uptime["seconds_with_data"],
+                            total_seconds=uptime["total_seconds"],
+                            updates_total=uptime["updates_total"],
+                            updates_per_second=uptime["updates_per_second"],
+                            downtime_ms=None,
+                            period_length_ms=None,
+                            max_gap_ms=None,
+                            gaps_over_threshold=None,
+                        )
+                    )
 
         return FeedUptimeResult(
             feed_id=feed_id,
@@ -403,7 +501,9 @@ def process_csv(
     include_extended_hours: bool = False,
     include_overnight: bool = False,
     feed_id_filter: Optional[set[int]] = None,
-    gap_threshold_ms: int = 200,
+    precise: bool = False,
+    gap_threshold_ms: int = DEFAULT_GAP_THRESHOLD_MS,
+    uptime_threshold_pct: float = DEFAULT_UPTIME_THRESHOLD_PCT,
 ) -> list[FeedUptimeResult]:
     """Process feed/date/mode tuples from CSV with parallel execution."""
 
@@ -470,7 +570,9 @@ def process_csv(
         max_workers=max_workers,
         include_extended_hours=include_extended_hours,
         include_overnight=include_overnight,
+        precise=precise,
         gap_threshold_ms=gap_threshold_ms,
+        uptime_threshold_pct=uptime_threshold_pct,
     )
 
 
@@ -479,7 +581,9 @@ def process_work_items(
     max_workers: int,
     include_extended_hours: bool = False,
     include_overnight: bool = False,
-    gap_threshold_ms: int = 200,
+    precise: bool = False,
+    gap_threshold_ms: int = DEFAULT_GAP_THRESHOLD_MS,
+    uptime_threshold_pct: float = DEFAULT_UPTIME_THRESHOLD_PCT,
 ) -> list[FeedUptimeResult]:
     """Evaluate a list of feed/date/mode tuples in parallel."""
 
@@ -503,7 +607,9 @@ def process_work_items(
                 mode=mode,
                 include_extended_hours=include_extended_hours,
                 include_overnight=include_overnight,
+                precise=precise,
                 gap_threshold_ms=gap_threshold_ms,
+                uptime_threshold_pct=uptime_threshold_pct,
             )
         except Exception as e:
             return FeedUptimeResult(
@@ -545,135 +651,207 @@ def process_work_items(
                 )
                 continue
 
-            session_rows = len(result.publisher_uptimes)
+            pass_count = sum(1 for u in result.publisher_uptimes if u.passes)
+            fail_count = len(result.publisher_uptimes) - pass_count
             print(
                 f"  [{result.execution_time_ms:>5}ms] Feed {result.feed_id} "
                 f"({result.date}, {result.mode}): {result.publisher_count} publishers, "
-                f"{session_rows} publisher-session rows"
+                f"{pass_count} pass rows, {fail_count} fail rows"
             )
 
     return sorted(results, key=lambda r: (r.date, r.feed_id, normalize_asset_class(r.mode)))
 
 
-def build_feed_summary_rows(
+def compute_publisher_summary(
     results: list[FeedUptimeResult],
-) -> list[tuple[int, str, str, Optional[str], int, str, float, float, float, float]]:
-    """Build per-feed, per-session summary rows."""
+) -> tuple[list[str], list[str], list[dict[str, object]]]:
+    """Compute publisher pass/fail consistency summary across dates."""
 
-    summary_rows: list[tuple[int, str, str, Optional[str], int, str, float, float, float, float]] = []
+    unique_dates = sorted({result.date for result in results})
+    if not unique_dates:
+        return [], [], []
 
-    for result in sorted(results, key=lambda r: (r.date, r.feed_id, normalize_asset_class(r.mode))):
-        by_session: dict[str, list[float]] = defaultdict(list)
-        for item in result.publisher_uptimes:
-            by_session[item.session].append(item.uptime_pct)
+    publisher_dates: dict[int, set[str]] = defaultdict(set)
+    publisher_session_date_statuses: dict[int, dict[str, dict[str, list[bool]]]] = defaultdict(
+        lambda: defaultdict(lambda: defaultdict(list))
+    )
 
-        for session, uptime_values in sorted(by_session.items()):
-            if not uptime_values:
-                continue
-            summary_rows.append(
-                (
-                    result.feed_id,
-                    result.date,
-                    result.mode,
-                    result.symbol,
-                    result.publisher_count,
-                    session,
-                    statistics.median(uptime_values),
-                    statistics.fmean(uptime_values),
-                    min(uptime_values),
-                    max(uptime_values),
-                )
+    for result in results:
+        for uptime in result.publisher_uptimes:
+            publisher_dates[uptime.publisher_id].add(result.date)
+            publisher_session_date_statuses[uptime.publisher_id][uptime.session][result.date].append(
+                uptime.passes
             )
 
-    return summary_rows
+    all_sessions = set()
+    for session_map in publisher_session_date_statuses.values():
+        all_sessions.update(session_map.keys())
+    session_names = [session for session in SESSION_ORDER if session in all_sessions]
+    session_names.extend(sorted(session for session in all_sessions if session not in SESSION_ORDER))
+
+    summary_rows: list[dict[str, object]] = []
+    for publisher_id in sorted(publisher_session_date_statuses):
+        session_summary: dict[str, dict[str, object]] = {}
+        for session_name in session_names:
+            date_map = publisher_session_date_statuses[publisher_id].get(session_name, {})
+            statuses_by_date: list[tuple[str, bool]] = []
+            for date_str in unique_dates:
+                statuses = date_map.get(date_str)
+                if not statuses:
+                    continue
+                statuses_by_date.append((date_str, all(statuses)))
+
+            pass_dates = sum(1 for _, status in statuses_by_date if status)
+            fail_dates = sum(1 for _, status in statuses_by_date if not status)
+            evaluated_dates = pass_dates + fail_dates
+            pass_rate = (pass_dates * 100.0 / evaluated_dates) if evaluated_dates > 0 else None
+            results_str = ";".join(
+                f"{date_str[5:]}:{'PASS' if status else 'FAIL'}"
+                for date_str, status in statuses_by_date
+            )
+            session_summary[session_name] = {
+                "pass_dates": pass_dates,
+                "fail_dates": fail_dates,
+                "evaluated_dates": evaluated_dates,
+                "pass_rate": pass_rate,
+                "results": results_str,
+            }
+
+        summary_rows.append(
+            {
+                "publisher_id": publisher_id,
+                "dates_seen": len(publisher_dates[publisher_id]),
+                "sessions": session_summary,
+            }
+        )
+
+    return unique_dates, session_names, summary_rows
 
 
-def write_results_csv(results: list[FeedUptimeResult], output_path: Path):
-    """Write long-format per-publisher rows and appended feed summary section."""
+def write_results_csv(
+    results: list[FeedUptimeResult],
+    output_path: Path,
+    precise: bool = False,
+):
+    """Write long-format per-publisher rows and optional publisher summary matrix."""
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    detail_header = [
-        "feed_id",
-        "date",
-        "mode",
-        "symbol",
-        "publisher_id",
-        "session",
-        "uptime_pct",
-        "downtime_ms",
-        "period_length_ms",
-        "updates_total",
-        "updates_per_second",
-        "max_gap_ms",
-        "gaps_over_threshold",
-    ]
-
-    summary_header = [
-        "feed_id",
-        "date",
-        "mode",
-        "symbol",
-        "publisher_count",
-        "session",
-        "median_uptime_pct",
-        "mean_uptime_pct",
-        "min_uptime_pct",
-        "max_uptime_pct",
-    ]
+    if precise:
+        detail_header = [
+            "feed_id",
+            "date",
+            "mode",
+            "symbol",
+            "publisher_id",
+            "session",
+            "uptime_pct",
+            "passes",
+            "downtime_ms",
+            "period_length_ms",
+            "updates_total",
+            "updates_per_second",
+            "max_gap_ms",
+            "gaps_over_threshold",
+        ]
+    else:
+        detail_header = [
+            "feed_id",
+            "date",
+            "mode",
+            "symbol",
+            "publisher_id",
+            "session",
+            "uptime_pct",
+            "passes",
+            "seconds_with_data",
+            "total_seconds",
+            "updates_total",
+            "updates_per_second",
+        ]
 
     with open(output_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(detail_header)
 
         for result in sorted(results, key=lambda r: (r.date, r.feed_id, normalize_asset_class(r.mode))):
-            sorted_uptimes = sorted(
-                result.publisher_uptimes,
-                key=lambda u: (u.publisher_id, u.session),
-            )
+            sorted_uptimes = sorted(result.publisher_uptimes, key=lambda u: (u.publisher_id, u.session))
             for uptime in sorted_uptimes:
-                writer.writerow(
+                if precise:
+                    writer.writerow(
+                        [
+                            result.feed_id,
+                            result.date,
+                            result.mode,
+                            result.symbol or "",
+                            uptime.publisher_id,
+                            uptime.session,
+                            f"{uptime.uptime_pct:.4f}",
+                            uptime.passes,
+                            uptime.downtime_ms if uptime.downtime_ms is not None else "",
+                            uptime.period_length_ms if uptime.period_length_ms is not None else "",
+                            uptime.updates_total,
+                            f"{uptime.updates_per_second:.6f}",
+                            uptime.max_gap_ms if uptime.max_gap_ms is not None else "",
+                            uptime.gaps_over_threshold if uptime.gaps_over_threshold is not None else "",
+                        ]
+                    )
+                else:
+                    writer.writerow(
+                        [
+                            result.feed_id,
+                            result.date,
+                            result.mode,
+                            result.symbol or "",
+                            uptime.publisher_id,
+                            uptime.session,
+                            f"{uptime.uptime_pct:.4f}",
+                            uptime.passes,
+                            uptime.seconds_with_data,
+                            uptime.total_seconds,
+                            uptime.updates_total,
+                            f"{uptime.updates_per_second:.6f}",
+                        ]
+                    )
+
+        unique_dates, session_names, summary_rows = compute_publisher_summary(results)
+        if len(unique_dates) > 1 and summary_rows:
+            header = ["publisher_id", "dates_seen"]
+            for session_name in session_names:
+                header.extend(
                     [
-                        result.feed_id,
-                        result.date,
-                        result.mode,
-                        result.symbol or "",
-                        uptime.publisher_id,
-                        uptime.session,
-                        f"{uptime.uptime_pct:.4f}",
-                        uptime.downtime_ms,
-                        uptime.period_length_ms,
-                        uptime.updates_total,
-                        f"{uptime.updates_per_second:.6f}",
-                        uptime.max_gap_ms if uptime.max_gap_ms is not None else "",
-                        uptime.gaps_over_threshold,
+                        f"{session_name}_pass_dates",
+                        f"{session_name}_fail_dates",
+                        f"{session_name}_pass_rate",
+                        f"{session_name}_results",
                     ]
                 )
 
-        writer.writerow([])
-        writer.writerow(["FEED SUMMARY"])
-        writer.writerow(summary_header)
+            writer.writerow([])
+            writer.writerow(["PUBLISHER SUMMARY"])
+            writer.writerow(header)
 
-        for row in build_feed_summary_rows(results):
-            writer.writerow(
-                [
-                    row[0],
-                    row[1],
-                    row[2],
-                    row[3] or "",
-                    row[4],
-                    row[5],
-                    f"{row[6]:.4f}",
-                    f"{row[7]:.4f}",
-                    f"{row[8]:.4f}",
-                    f"{row[9]:.4f}",
-                ]
-            )
+            for row in summary_rows:
+                output_row = [row["publisher_id"], row["dates_seen"]]
+                sessions = row["sessions"]
+                for session_name in session_names:
+                    stats = sessions.get(session_name, {})
+                    pass_dates = stats.get("pass_dates", 0)
+                    fail_dates = stats.get("fail_dates", 0)
+                    pass_rate = stats.get("pass_rate")
+                    results_str = stats.get("results", "")
+                    output_row.extend(
+                        [
+                            pass_dates,
+                            fail_dates,
+                            f"{pass_rate:.2f}%" if pass_rate is not None else "",
+                            results_str,
+                        ]
+                    )
+                writer.writerow(output_row)
 
 
-def _session_stats(values: list[float]) -> str:
-    if not values:
-        return "No data"
+def _format_uptime_stats(values: list[float]) -> str:
     return (
         f"Median uptime: {statistics.median(values):.2f}% | "
         f"Mean: {statistics.fmean(values):.2f}% | "
@@ -682,74 +860,120 @@ def _session_stats(values: list[float]) -> str:
     )
 
 
+def _format_id_list(values: list[int]) -> str:
+    if not values:
+        return "None"
+    return ", ".join(str(v) for v in values)
+
+
+def print_publisher_consistency(results: list[FeedUptimeResult]):
+    """Print cross-date publisher pass/fail consistency matrix."""
+
+    unique_dates, session_names, summary_rows = compute_publisher_summary(results)
+    if len(unique_dates) <= 1 or not summary_rows:
+        return
+
+    print()
+    print("=" * 70)
+    print(f"PUBLISHER CONSISTENCY (across {len(unique_dates)} dates)")
+    print("=" * 70)
+
+    for session_name in session_names:
+        print()
+        print(f"{session_name.upper()} SESSION:")
+        print("  Publisher  Pass  Fail  Rate    Results")
+
+        always_passing: list[int] = []
+        always_failing: list[int] = []
+        intermittent: list[int] = []
+
+        for row in summary_rows:
+            publisher_id = int(row["publisher_id"])
+            stats = row["sessions"].get(session_name, {})
+            evaluated_dates = int(stats.get("evaluated_dates", 0))
+            if evaluated_dates == 0:
+                continue
+
+            pass_dates = int(stats.get("pass_dates", 0))
+            fail_dates = int(stats.get("fail_dates", 0))
+            pass_rate = stats.get("pass_rate")
+            results_str = str(stats.get("results", "")).replace(";", " ")
+            rate_str = f"{pass_rate:.1f}%" if pass_rate is not None else "N/A"
+
+            print(
+                f"  {publisher_id:<9} {pass_dates:<5} {fail_dates:<5} {rate_str:<7}  {results_str}"
+            )
+
+            if pass_dates > 0 and fail_dates == 0:
+                always_passing.append(publisher_id)
+            elif fail_dates > 0 and pass_dates == 0:
+                always_failing.append(publisher_id)
+            else:
+                intermittent.append(publisher_id)
+
+        print()
+        print(f"  Always passing: {_format_id_list(always_passing)}")
+        print(f"  Always failing: {_format_id_list(always_failing)}")
+        print(f"  Intermittent: {_format_id_list(intermittent)}")
+
+
 def print_console_summary(
     results: list[FeedUptimeResult],
     total_time_seconds: float,
+    precise: bool,
     gap_threshold_ms: int,
+    uptime_threshold_pct: float,
 ):
     """Print aggregated console summary."""
 
-    all_uptimes = [
-        (result, uptime)
-        for result in results
-        for uptime in result.publisher_uptimes
-    ]
+    all_uptimes = [(result, uptime) for result in results for uptime in result.publisher_uptimes]
     errors = [result for result in results if result.error]
+    publisher_feed_combos = {(result.feed_id, result.date, uptime.publisher_id) for result, uptime in all_uptimes}
 
-    publisher_feed_combos = {
-        (result.feed_id, result.date, uptime.publisher_id)
-        for result, uptime in all_uptimes
-    }
+    session_values: dict[str, list[float]] = defaultdict(list)
+    session_passes: dict[str, int] = defaultdict(int)
+    session_totals: dict[str, int] = defaultdict(int)
+    for _, uptime in all_uptimes:
+        session_values[uptime.session].append(uptime.uptime_pct)
+        session_totals[uptime.session] += 1
+        if uptime.passes:
+            session_passes[uptime.session] += 1
 
-    session_uptime_values: dict[str, list[float]] = defaultdict(list)
-    session_feeds: dict[str, set[tuple[int, str]]] = defaultdict(set)
-    mode_regular_values: dict[str, list[float]] = defaultdict(list)
-    mode_regular_feeds: dict[str, set[tuple[int, str]]] = defaultdict(set)
-
-    for result, uptime in all_uptimes:
-        session_uptime_values[uptime.session].append(uptime.uptime_pct)
-        session_feeds[uptime.session].add((result.feed_id, result.date))
-        if uptime.session == "regular":
-            normalized_mode = normalize_asset_class(result.mode)
-            mode_regular_values[normalized_mode].append(uptime.uptime_pct)
-            mode_regular_feeds[normalized_mode].add((result.feed_id, result.date))
-
+    method_label = f"{gap_threshold_ms}ms gap-based" if precise else "1s window"
     print()
     print("=" * 70)
     print("FEED UPTIME REPORT")
     print("=" * 70)
     print(
         f"Feeds evaluated: {len(results)} | Publisher-feed combos: {len(publisher_feed_combos)} "
-        f"| Gap threshold: {gap_threshold_ms}ms"
+        f"| Method: {method_label} | Pass threshold: {uptime_threshold_pct:.1f}%"
     )
     if errors:
         print(f"Errors: {len(errors)}")
 
-    session_order = ["regular", "premarket", "afterhours", "overnight"]
-    extra_sessions = sorted(s for s in session_uptime_values if s not in session_order)
-    for session in [*session_order, *extra_sessions]:
-        values = session_uptime_values.get(session, [])
+    ordered_sessions = [s for s in SESSION_ORDER if s in session_values]
+    ordered_sessions.extend(sorted(s for s in session_values if s not in SESSION_ORDER))
+
+    for session_name in ordered_sessions:
+        values = session_values[session_name]
         if not values:
             continue
+        pass_count = session_passes[session_name]
+        fail_count = session_totals[session_name] - pass_count
         print()
-        print(f"{session.upper()} SESSION:")
-        print(f"  {_session_stats(values)}")
-        print(f"  Publishers below 99%: {sum(1 for value in values if value < 99.0)}")
-
-        if session == "regular" and mode_regular_values:
-            print()
-            print("  Per-asset-class:")
-            for mode, mode_values in sorted(mode_regular_values.items()):
-                feed_count = len(mode_regular_feeds[mode])
-                print(
-                    f"    {mode:<15} feeds={feed_count:<3} "
-                    f"median={statistics.median(mode_values):.2f}%"
-                )
+        print(f"{session_name.upper()} SESSION:")
+        print(f"  {_format_uptime_stats(values)}")
+        print(
+            f"  Publishers passing (>={uptime_threshold_pct:.1f}%): {pass_count} | "
+            f"Failing: {fail_count}"
+        )
 
     avg_feed_ms = statistics.fmean([r.execution_time_ms for r in results]) if results else 0.0
     print()
     print(f"Timing: {total_time_seconds:.1f}s total, {avg_feed_ms:.0f}ms avg/feed")
     print("=" * 70)
+
+    print_publisher_consistency(results)
 
 
 def main():
@@ -762,25 +986,22 @@ Examples:
   python feed_uptime.py --csv price_id_list.csv
 
   # Process a single feed
-  python feed_uptime.py --feed-id 327 --date 2025-10-06 --mode fx
+  python feed_uptime.py --feed-id 922 --date 2026-02-09 --mode us-equities
 
-  # Multiple feed IDs × multiple dates (cartesian product)
-  python feed_uptime.py --feed-id 327 328 --date 2025-10-06 2025-10-07 --mode fx
+  # Multi-date range
+  python feed_uptime.py --feed-id 922 --start-date 2026-02-09 --end-date 2026-02-12 --mode us-equities
 
-  # Date range
-  python feed_uptime.py --feed-id 327 --start-date 2025-10-01 --end-date 2025-10-06 --mode fx
+  # Session flags for US equities
+  python feed_uptime.py --feed-id 922 --date 2026-02-09 --mode us-equities --extended-hours --overnight
 
-  # Include pre-market + after-hours (US equities only)
-  python feed_uptime.py --csv price_id_list.csv --extended-hours
+  # CSV filtering
+  python feed_uptime.py --csv feeds.csv --include-asset-class us-equities fx
+  python feed_uptime.py --csv feeds.csv --exclude-asset-class crypto
+  python feed_uptime.py --csv feeds.csv --filter-feed-id 922 327
 
-  # Include overnight session (US equities only)
-  python feed_uptime.py --csv price_id_list.csv --extended-hours --overnight
-
-  # Filter by asset class and feed ID in CSV mode
-  python feed_uptime.py --csv feeds.csv --include-asset-class us-equities fx --filter-feed-id 327 1163
-
-  # Switch default gap threshold from 200ms to 1s
-  python feed_uptime.py --csv price_id_list.csv --one-second-gap
+  # Threshold controls
+  python feed_uptime.py --csv feeds.csv --uptime-threshold 95
+  python feed_uptime.py --csv feeds.csv --precise --gap-threshold 100
 """,
     )
 
@@ -850,36 +1071,34 @@ Examples:
         help="Include overnight session for US equities",
     )
     parser.add_argument(
-        "--one-second-gap",
+        "--precise",
         action="store_true",
-        help="Use 1000ms gap threshold instead of default 200ms",
+        help="Use 200ms gap-based method instead of default 1-second window",
     )
     parser.add_argument(
         "--gap-threshold",
         type=int,
-        default=None,
-        help=(
-            "Gap threshold in milliseconds "
-            "(default: 200, or 1000 when --one-second-gap is set)"
-        ),
+        default=DEFAULT_GAP_THRESHOLD_MS,
+        help="Gap threshold in milliseconds for --precise mode (default: 200)",
+    )
+    parser.add_argument(
+        "--uptime-threshold",
+        type=float,
+        default=DEFAULT_UPTIME_THRESHOLD_PCT,
+        help="Pass threshold percentage (default: 95.0)",
     )
 
     args = parser.parse_args()
     single_feed_dates: list[str] = []
 
-    if args.one_second_gap and args.gap_threshold is not None:
-        parser.error("Use either --one-second-gap or --gap-threshold, not both")
-    if args.gap_threshold is not None and args.gap_threshold <= 0:
-        parser.error("--gap-threshold must be a positive integer")
     if args.workers <= 0:
         parser.error("--workers must be a positive integer")
-
-    if args.gap_threshold is not None:
-        effective_gap_threshold_ms = args.gap_threshold
-    else:
-        effective_gap_threshold_ms = (
-            ONE_SECOND_GAP_THRESHOLD_MS if args.one_second_gap else DEFAULT_GAP_THRESHOLD_MS
-        )
+    if args.gap_threshold <= 0:
+        parser.error("--gap-threshold must be a positive integer")
+    if not args.precise and args.gap_threshold != DEFAULT_GAP_THRESHOLD_MS:
+        parser.error("--gap-threshold requires --precise")
+    if args.uptime_threshold < 0 or args.uptime_threshold > 100:
+        parser.error("--uptime-threshold must be between 0 and 100")
 
     if args.list_asset_classes:
         if not args.csv:
@@ -944,7 +1163,9 @@ Examples:
             include_extended_hours=args.extended_hours,
             include_overnight=args.overnight,
             feed_id_filter=feed_id_filter,
-            gap_threshold_ms=effective_gap_threshold_ms,
+            precise=args.precise,
+            gap_threshold_ms=args.gap_threshold,
+            uptime_threshold_pct=args.uptime_threshold,
         )
     else:
         work_items = [(feed_id, date, args.mode) for feed_id in args.feed_id for date in single_feed_dates]
@@ -953,12 +1174,20 @@ Examples:
             max_workers=args.workers,
             include_extended_hours=args.extended_hours,
             include_overnight=args.overnight,
-            gap_threshold_ms=effective_gap_threshold_ms,
+            precise=args.precise,
+            gap_threshold_ms=args.gap_threshold,
+            uptime_threshold_pct=args.uptime_threshold,
         )
 
-    write_results_csv(results, args.output)
+    write_results_csv(results, args.output, precise=args.precise)
     total_time = time.time() - total_start
-    print_console_summary(results, total_time, effective_gap_threshold_ms)
+    print_console_summary(
+        results=results,
+        total_time_seconds=total_time,
+        precise=args.precise,
+        gap_threshold_ms=args.gap_threshold,
+        uptime_threshold_pct=args.uptime_threshold,
+    )
     print(f"\nResults written to: {args.output}")
 
 
