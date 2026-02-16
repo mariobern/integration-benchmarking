@@ -260,6 +260,39 @@ def merge_results(
         for uptime in uptime_result.publisher_uptimes
         if uptime.session == SESSION_REGULAR
     }
+    premarket_uptime_by_pub = {
+        uptime.publisher_id: uptime
+        for uptime in uptime_result.publisher_uptimes
+        if uptime.session == SESSION_PREMARKET
+    }
+    afterhours_uptime_by_pub = {
+        uptime.publisher_id: uptime
+        for uptime in uptime_result.publisher_uptimes
+        if uptime.session == SESSION_AFTERHOURS
+    }
+    overnight_uptime_by_pub = {
+        uptime.publisher_id: uptime
+        for uptime in uptime_result.publisher_uptimes
+        if uptime.session == SESSION_OVERNIGHT
+    }
+
+    premarket_bench_passes: dict[int, bool] = {}
+    afterhours_bench_passes: dict[int, bool] = {}
+    overnight_bench_passes: dict[int, bool] = {}
+
+    for detail in benchmark_details:
+        if detail.premarket_metrics is not None:
+            premarket_bench_passes[detail.publisher_id] = (
+                detail.premarket_metrics.passes and not bool(detail.premarket_metrics.error)
+            )
+        if detail.afterhours_metrics is not None:
+            afterhours_bench_passes[detail.publisher_id] = (
+                detail.afterhours_metrics.passes and not bool(detail.afterhours_metrics.error)
+            )
+        if detail.overnight_metrics is not None:
+            overnight_bench_passes[detail.publisher_id] = (
+                detail.overnight_metrics.passes and not bool(detail.overnight_metrics.error)
+            )
 
     all_publisher_ids = sorted(set(benchmark_by_pub) | set(regular_uptime_by_pub))
 
@@ -328,6 +361,12 @@ def merge_results(
                 fully_passes=fully_passes,
                 benchmark_detail=benchmark_detail if include_detailed else None,
                 uptime_sessions=uptime_sessions_by_pub.get(publisher_id) if include_detailed else None,
+                premarket_uptime_passes=premarket_uptime_by_pub[publisher_id].passes if publisher_id in premarket_uptime_by_pub else None,
+                premarket_uptime_pct=premarket_uptime_by_pub[publisher_id].uptime_pct if publisher_id in premarket_uptime_by_pub else None,
+                afterhours_uptime_passes=afterhours_uptime_by_pub[publisher_id].passes if publisher_id in afterhours_uptime_by_pub else None,
+                afterhours_uptime_pct=afterhours_uptime_by_pub[publisher_id].uptime_pct if publisher_id in afterhours_uptime_by_pub else None,
+                overnight_uptime_passes=overnight_uptime_by_pub[publisher_id].passes if publisher_id in overnight_uptime_by_pub else None,
+                overnight_uptime_pct=overnight_uptime_by_pub[publisher_id].uptime_pct if publisher_id in overnight_uptime_by_pub else None,
             )
         )
 
@@ -352,6 +391,22 @@ def merge_results(
         error_parts.append(f"benchmark: {benchmark_result.error}")
     if uptime_result.error:
         error_parts.append(f"uptime: {uptime_result.error}")
+
+    premarket_stats = (
+        _compute_session_readiness(premarket_bench_passes, premarket_uptime_by_pub, target_pub_count)
+        if premarket_bench_passes or premarket_uptime_by_pub
+        else None
+    )
+    afterhours_stats = (
+        _compute_session_readiness(afterhours_bench_passes, afterhours_uptime_by_pub, target_pub_count)
+        if afterhours_bench_passes or afterhours_uptime_by_pub
+        else None
+    )
+    overnight_stats = (
+        _compute_session_readiness(overnight_bench_passes, overnight_uptime_by_pub, target_pub_count)
+        if overnight_bench_passes or overnight_uptime_by_pub
+        else None
+    )
 
     return FeedReadinessResult(
         feed_id=benchmark_result.feed_id,
@@ -381,6 +436,24 @@ def merge_results(
         premarket_benchmark_passing_count=benchmark_result.premarket_passing_count,
         afterhours_benchmark_passing_count=benchmark_result.afterhours_passing_count,
         overnight_benchmark_passing_count=benchmark_result.overnight_passing_count,
+        premarket_ready=premarket_stats["ready"] if premarket_stats else None,
+        premarket_fully_passing_count=premarket_stats["fully_passing_count"] if premarket_stats else None,
+        premarket_uptime_passing_count=premarket_stats["uptime_passing_count"] if premarket_stats else None,
+        premarket_uptime_failing_count=premarket_stats["uptime_failing_count"] if premarket_stats else None,
+        premarket_median_uptime_pct=premarket_stats["median_uptime_pct"] if premarket_stats else None,
+        premarket_fully_passing_publishers=premarket_stats["fully_passing_publishers"] if premarket_stats else None,
+        afterhours_ready=afterhours_stats["ready"] if afterhours_stats else None,
+        afterhours_fully_passing_count=afterhours_stats["fully_passing_count"] if afterhours_stats else None,
+        afterhours_uptime_passing_count=afterhours_stats["uptime_passing_count"] if afterhours_stats else None,
+        afterhours_uptime_failing_count=afterhours_stats["uptime_failing_count"] if afterhours_stats else None,
+        afterhours_median_uptime_pct=afterhours_stats["median_uptime_pct"] if afterhours_stats else None,
+        afterhours_fully_passing_publishers=afterhours_stats["fully_passing_publishers"] if afterhours_stats else None,
+        overnight_ready=overnight_stats["ready"] if overnight_stats else None,
+        overnight_fully_passing_count=overnight_stats["fully_passing_count"] if overnight_stats else None,
+        overnight_uptime_passing_count=overnight_stats["uptime_passing_count"] if overnight_stats else None,
+        overnight_uptime_failing_count=overnight_stats["uptime_failing_count"] if overnight_stats else None,
+        overnight_median_uptime_pct=overnight_stats["median_uptime_pct"] if overnight_stats else None,
+        overnight_fully_passing_publishers=overnight_stats["fully_passing_publishers"] if overnight_stats else None,
         benchmark_error=benchmark_result.error,
         uptime_error=uptime_result.error,
         error=" | ".join(error_parts) if error_parts else None,
