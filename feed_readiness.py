@@ -1077,6 +1077,27 @@ def compute_summary_stats(results: list[FeedReadinessResult], total_time_seconds
         else:
             per_date_stats[result.date]["not_ready"] += 1
 
+    # Extended session stats (only for results that have per-session data)
+    extended_session_stats = {}
+    for session_name in [SESSION_PREMARKET, SESSION_AFTERHOURS, SESSION_OVERNIGHT]:
+        ready_field = f"{session_name}_ready"
+        median_uptime_field = f"{session_name}_median_uptime_pct"
+
+        session_results = [r for r in results if getattr(r, ready_field) is not None]
+        if session_results:
+            session_ready = sum(1 for r in session_results if getattr(r, ready_field))
+            session_uptime_values = [
+                getattr(r, median_uptime_field)
+                for r in session_results
+                if getattr(r, median_uptime_field) is not None
+            ]
+            extended_session_stats[session_name] = {
+                "total": len(session_results),
+                "ready": session_ready,
+                "not_ready": len(session_results) - session_ready,
+                "uptime": _distribution_stats(session_uptime_values),
+            }
+
     return {
         "total_feeds": total_feeds,
         "ready_count": ready_count,
@@ -1089,6 +1110,7 @@ def compute_summary_stats(results: list[FeedReadinessResult], total_time_seconds
         "uptime": _distribution_stats([value for value in uptime_values if value is not None]),
         "mode_stats": mode_stats,
         "per_date_stats": per_date_stats,
+        "extended_session_stats": extended_session_stats,
         "total_time_sec": total_time_seconds,
         "avg_time_ms": (total_time_seconds / total_feeds * 1000) if total_feeds > 0 else 0,
     }
@@ -1197,6 +1219,29 @@ def print_console_summary(
                 f"  {date_value:<12} ready={stats['ready']:<4} "
                 f"not_ready={stats['not_ready']:<4} error={stats['error']:<4}"
             )
+
+    extended_stats = summary.get("extended_session_stats", {})
+    if extended_stats:
+        print("\nEXTENDED SESSION READINESS:")
+        for session_name, stats in extended_stats.items():
+            total = stats["total"]
+            print(f"\n  {session_name.upper()}:")
+            print(
+                f"    Ready: {stats['ready']} / {total} "
+                f"({_format_ratio(stats['ready'], total)})"
+            )
+            print(
+                f"    Not ready: {stats['not_ready']} / {total} "
+                f"({_format_ratio(stats['not_ready'], total)})"
+            )
+            uptime_s = stats["uptime"]
+            if uptime_s["median"] is not None:
+                print(
+                    f"    Uptime: median={uptime_s['median']:.4f}% "
+                    f"min={uptime_s['min']:.4f}% max={uptime_s['max']:.4f}%"
+                )
+            else:
+                print("    Uptime: no data")
 
     print(f"\nTiming: {summary['total_time_sec']:.1f}s total, {summary['avg_time_ms']:.0f}ms avg/feed")
 
