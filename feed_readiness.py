@@ -61,6 +61,13 @@ class PublisherReadinessDetail:
     fully_passes: bool
     benchmark_detail: Optional[PublisherFeedMetrics] = None
     uptime_sessions: Optional[list[PublisherSessionUptime]] = None
+    # Extended session uptime (populated when --extended-hours / --overnight)
+    premarket_uptime_passes: Optional[bool] = None
+    premarket_uptime_pct: Optional[float] = None
+    afterhours_uptime_passes: Optional[bool] = None
+    afterhours_uptime_pct: Optional[float] = None
+    overnight_uptime_passes: Optional[bool] = None
+    overnight_uptime_pct: Optional[float] = None
 
 
 @dataclass
@@ -89,9 +96,30 @@ class FeedReadinessResult:
     benchmark_only_publishers: list[int]
     uptime_only_publishers: list[int]
     both_failing_publishers: list[int]
-    premarket_passing_count: Optional[int] = None
-    afterhours_passing_count: Optional[int] = None
-    overnight_passing_count: Optional[int] = None
+    premarket_benchmark_passing_count: Optional[int] = None
+    afterhours_benchmark_passing_count: Optional[int] = None
+    overnight_benchmark_passing_count: Optional[int] = None
+    # Per-session readiness (populated when --extended-hours / --overnight)
+    premarket_ready: Optional[bool] = None
+    premarket_fully_passing_count: Optional[int] = None
+    premarket_uptime_passing_count: Optional[int] = None
+    premarket_uptime_failing_count: Optional[int] = None
+    premarket_median_uptime_pct: Optional[float] = None
+    premarket_fully_passing_publishers: Optional[list[int]] = None
+
+    afterhours_ready: Optional[bool] = None
+    afterhours_fully_passing_count: Optional[int] = None
+    afterhours_uptime_passing_count: Optional[int] = None
+    afterhours_uptime_failing_count: Optional[int] = None
+    afterhours_median_uptime_pct: Optional[float] = None
+    afterhours_fully_passing_publishers: Optional[list[int]] = None
+
+    overnight_ready: Optional[bool] = None
+    overnight_fully_passing_count: Optional[int] = None
+    overnight_uptime_passing_count: Optional[int] = None
+    overnight_uptime_failing_count: Optional[int] = None
+    overnight_median_uptime_pct: Optional[float] = None
+    overnight_fully_passing_publishers: Optional[list[int]] = None
     benchmark_error: Optional[str] = None
     uptime_error: Optional[str] = None
     error: Optional[str] = None
@@ -314,9 +342,9 @@ def merge_results(
         benchmark_only_publishers=benchmark_only_publishers,
         uptime_only_publishers=uptime_only_publishers,
         both_failing_publishers=both_failing_publishers,
-        premarket_passing_count=benchmark_result.premarket_passing_count,
-        afterhours_passing_count=benchmark_result.afterhours_passing_count,
-        overnight_passing_count=benchmark_result.overnight_passing_count,
+        premarket_benchmark_passing_count=benchmark_result.premarket_passing_count,
+        afterhours_benchmark_passing_count=benchmark_result.afterhours_passing_count,
+        overnight_benchmark_passing_count=benchmark_result.overnight_passing_count,
         benchmark_error=benchmark_result.error,
         uptime_error=uptime_result.error,
         error=" | ".join(error_parts) if error_parts else None,
@@ -751,9 +779,9 @@ def write_results_csv(
     ]
 
     if include_extended_hours:
-        header.extend(["premarket_passing_count", "afterhours_passing_count"])
+        header.extend(["premarket_benchmark_passing_count", "afterhours_benchmark_passing_count"])
     if include_overnight:
-        header.append("overnight_passing_count")
+        header.append("overnight_benchmark_passing_count")
 
     header.extend(["benchmark_error", "uptime_error", "error", "execution_time_ms"])
 
@@ -792,18 +820,18 @@ def write_results_csv(
             if include_extended_hours:
                 row.extend(
                     [
-                        result.premarket_passing_count
-                        if result.premarket_passing_count is not None
+                        result.premarket_benchmark_passing_count
+                        if result.premarket_benchmark_passing_count is not None
                         else "",
-                        result.afterhours_passing_count
-                        if result.afterhours_passing_count is not None
+                        result.afterhours_benchmark_passing_count
+                        if result.afterhours_benchmark_passing_count is not None
                         else "",
                     ]
                 )
             if include_overnight:
                 row.append(
-                    result.overnight_passing_count
-                    if result.overnight_passing_count is not None
+                    result.overnight_benchmark_passing_count
+                    if result.overnight_benchmark_passing_count is not None
                     else ""
                 )
 
