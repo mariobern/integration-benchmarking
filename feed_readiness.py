@@ -206,6 +206,42 @@ def _placeholder_uptime_result(
     )
 
 
+def _compute_session_readiness(
+    benchmark_passes_by_pub: dict[int, bool],
+    uptime_by_pub: dict[int, PublisherSessionUptime],
+    target_pub_count: int,
+) -> dict:
+    """Compute readiness stats for a single session.
+
+    Returns dict with: ready, fully_passing_count, fully_passing_publishers,
+    uptime_passing_count, uptime_failing_count, median_uptime_pct.
+    """
+    all_pub_ids = sorted(set(benchmark_passes_by_pub) | set(uptime_by_pub))
+    fully_passing: list[int] = []
+
+    for pub_id in all_pub_ids:
+        bench_passes = benchmark_passes_by_pub.get(pub_id, False)
+        uptime_entry = uptime_by_pub.get(pub_id)
+        uptime_passes = uptime_entry.passes if uptime_entry else False
+        if bench_passes and uptime_passes:
+            fully_passing.append(pub_id)
+
+    uptime_rows = list(uptime_by_pub.values())
+    uptime_passing_count = sum(1 for u in uptime_rows if u.passes)
+    uptime_failing_count = len(uptime_rows) - uptime_passing_count
+    uptime_values = [u.uptime_pct for u in uptime_rows]
+    median_uptime = statistics.median(uptime_values) if uptime_values else None
+
+    return {
+        "ready": len(fully_passing) >= target_pub_count,
+        "fully_passing_count": len(fully_passing),
+        "fully_passing_publishers": fully_passing,
+        "uptime_passing_count": uptime_passing_count,
+        "uptime_failing_count": uptime_failing_count,
+        "median_uptime_pct": median_uptime,
+    }
+
+
 def merge_results(
     benchmark_result: BenchmarkResult,
     uptime_result: FeedUptimeResult,
