@@ -40,6 +40,12 @@ from quick_benchmark_95 import (
     normalize_asset_class,
 )
 
+# Session name constants
+SESSION_REGULAR = "regular"
+SESSION_PREMARKET = "premarket"
+SESSION_AFTERHOURS = "afterhours"
+SESSION_OVERNIGHT = "overnight"
+
 
 @dataclass
 class PublisherReadinessDetail:
@@ -188,7 +194,7 @@ def merge_results(
     regular_uptime_by_pub = {
         uptime.publisher_id: uptime
         for uptime in uptime_result.publisher_uptimes
-        if uptime.session == "regular"
+        if uptime.session == SESSION_REGULAR
     }
 
     all_publisher_ids = sorted(set(benchmark_by_pub) | set(regular_uptime_by_pub))
@@ -261,7 +267,7 @@ def merge_results(
             )
         )
 
-    regular_uptime_rows = [u for u in uptime_result.publisher_uptimes if u.session == "regular"]
+    regular_uptime_rows = [u for u in uptime_result.publisher_uptimes if u.session == SESSION_REGULAR]
     uptime_passing_count = sum(1 for u in regular_uptime_rows if u.passes)
     uptime_failing_count = len(regular_uptime_rows) - uptime_passing_count
 
