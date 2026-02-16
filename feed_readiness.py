@@ -888,9 +888,20 @@ def write_results_csv(
     ]
 
     if include_extended_hours:
-        header.extend(["premarket_benchmark_passing_count", "afterhours_benchmark_passing_count"])
+        header.extend([
+            "premarket_ready", "premarket_benchmark_passing_count",
+            "premarket_uptime_passing_count", "premarket_uptime_failing_count",
+            "premarket_median_uptime_pct", "premarket_fully_passing_count",
+            "afterhours_ready", "afterhours_benchmark_passing_count",
+            "afterhours_uptime_passing_count", "afterhours_uptime_failing_count",
+            "afterhours_median_uptime_pct", "afterhours_fully_passing_count",
+        ])
     if include_overnight:
-        header.append("overnight_benchmark_passing_count")
+        header.extend([
+            "overnight_ready", "overnight_benchmark_passing_count",
+            "overnight_uptime_passing_count", "overnight_uptime_failing_count",
+            "overnight_median_uptime_pct", "overnight_fully_passing_count",
+        ])
 
     header.extend(["benchmark_error", "uptime_error", "error", "execution_time_ms"])
 
@@ -927,22 +938,29 @@ def write_results_csv(
             ]
 
             if include_extended_hours:
-                row.extend(
-                    [
-                        result.premarket_benchmark_passing_count
-                        if result.premarket_benchmark_passing_count is not None
-                        else "",
-                        result.afterhours_benchmark_passing_count
-                        if result.afterhours_benchmark_passing_count is not None
-                        else "",
-                    ]
-                )
+                row.extend([
+                    result.premarket_ready if result.premarket_ready is not None else "",
+                    result.premarket_benchmark_passing_count if result.premarket_benchmark_passing_count is not None else "",
+                    result.premarket_uptime_passing_count if result.premarket_uptime_passing_count is not None else "",
+                    result.premarket_uptime_failing_count if result.premarket_uptime_failing_count is not None else "",
+                    f"{result.premarket_median_uptime_pct:.4f}" if result.premarket_median_uptime_pct is not None else "",
+                    result.premarket_fully_passing_count if result.premarket_fully_passing_count is not None else "",
+                    result.afterhours_ready if result.afterhours_ready is not None else "",
+                    result.afterhours_benchmark_passing_count if result.afterhours_benchmark_passing_count is not None else "",
+                    result.afterhours_uptime_passing_count if result.afterhours_uptime_passing_count is not None else "",
+                    result.afterhours_uptime_failing_count if result.afterhours_uptime_failing_count is not None else "",
+                    f"{result.afterhours_median_uptime_pct:.4f}" if result.afterhours_median_uptime_pct is not None else "",
+                    result.afterhours_fully_passing_count if result.afterhours_fully_passing_count is not None else "",
+                ])
             if include_overnight:
-                row.append(
-                    result.overnight_benchmark_passing_count
-                    if result.overnight_benchmark_passing_count is not None
-                    else ""
-                )
+                row.extend([
+                    result.overnight_ready if result.overnight_ready is not None else "",
+                    result.overnight_benchmark_passing_count if result.overnight_benchmark_passing_count is not None else "",
+                    result.overnight_uptime_passing_count if result.overnight_uptime_passing_count is not None else "",
+                    result.overnight_uptime_failing_count if result.overnight_uptime_failing_count is not None else "",
+                    f"{result.overnight_median_uptime_pct:.4f}" if result.overnight_median_uptime_pct is not None else "",
+                    result.overnight_fully_passing_count if result.overnight_fully_passing_count is not None else "",
+                ])
 
             row.extend(
                 [
@@ -957,48 +975,55 @@ def write_results_csv(
         if include_detailed:
             writer.writerow([])
             writer.writerow(["PUBLISHER DETAIL"])
-            writer.writerow(
-                [
-                    "feed_id",
-                    "publisher_id",
-                    "date",
-                    "mode",
-                    "symbol",
-                    "fully_passes",
-                    "benchmark_passes",
-                    "uptime_passes",
-                    "benchmark_nrmse",
-                    "benchmark_hit_rate",
-                    "benchmark_n_observations",
-                    "uptime_pct",
-                    "benchmark_error",
-                    "uptime_error",
-                ]
-            )
+            detail_header = [
+                "feed_id", "publisher_id", "date", "mode", "symbol",
+                "fully_passes", "benchmark_passes", "uptime_passes",
+                "benchmark_nrmse", "benchmark_hit_rate", "benchmark_n_observations",
+                "uptime_pct", "benchmark_error", "uptime_error",
+            ]
+            if include_extended_hours:
+                detail_header.extend([
+                    "premarket_uptime_pct", "premarket_uptime_passes",
+                    "afterhours_uptime_pct", "afterhours_uptime_passes",
+                ])
+            if include_overnight:
+                detail_header.extend([
+                    "overnight_uptime_pct", "overnight_uptime_passes",
+                ])
+            writer.writerow(detail_header)
 
             for result in sorted(results, key=lambda r: (r.date, r.feed_id, normalize_asset_class(r.mode))):
                 details = sorted(result.publisher_details or [], key=lambda detail: detail.publisher_id)
                 for detail in details:
-                    writer.writerow(
-                        [
-                            result.feed_id,
-                            detail.publisher_id,
-                            result.date,
-                            result.mode,
-                            result.symbol or "",
-                            detail.fully_passes,
-                            detail.benchmark_passes,
-                            detail.uptime_passes,
-                            f"{detail.benchmark_nrmse:.6f}" if detail.benchmark_nrmse is not None else "",
-                            f"{detail.benchmark_hit_rate:.2f}"
-                            if detail.benchmark_hit_rate is not None
-                            else "",
-                            detail.benchmark_n_observations,
-                            f"{detail.uptime_pct:.4f}" if detail.uptime_pct is not None else "",
-                            detail.benchmark_error or "",
-                            detail.uptime_error or "",
-                        ]
-                    )
+                    detail_row = [
+                        result.feed_id,
+                        detail.publisher_id,
+                        result.date,
+                        result.mode,
+                        result.symbol or "",
+                        detail.fully_passes,
+                        detail.benchmark_passes,
+                        detail.uptime_passes,
+                        f"{detail.benchmark_nrmse:.6f}" if detail.benchmark_nrmse is not None else "",
+                        f"{detail.benchmark_hit_rate:.2f}" if detail.benchmark_hit_rate is not None else "",
+                        detail.benchmark_n_observations,
+                        f"{detail.uptime_pct:.4f}" if detail.uptime_pct is not None else "",
+                        detail.benchmark_error or "",
+                        detail.uptime_error or "",
+                    ]
+                    if include_extended_hours:
+                        detail_row.extend([
+                            f"{detail.premarket_uptime_pct:.4f}" if detail.premarket_uptime_pct is not None else "",
+                            detail.premarket_uptime_passes if detail.premarket_uptime_passes is not None else "",
+                            f"{detail.afterhours_uptime_pct:.4f}" if detail.afterhours_uptime_pct is not None else "",
+                            detail.afterhours_uptime_passes if detail.afterhours_uptime_passes is not None else "",
+                        ])
+                    if include_overnight:
+                        detail_row.extend([
+                            f"{detail.overnight_uptime_pct:.4f}" if detail.overnight_uptime_pct is not None else "",
+                            detail.overnight_uptime_passes if detail.overnight_uptime_passes is not None else "",
+                        ])
+                    writer.writerow(detail_row)
 
             consistency = compute_publisher_consistency(results)
             if len(consistency["dates"]) > 1 and consistency["rows"]:
