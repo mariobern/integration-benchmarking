@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TypedDict
 
 from date_utils import expand_date_args, validate_date_args
 from feed_uptime import (
@@ -45,6 +45,15 @@ SESSION_REGULAR = "regular"
 SESSION_PREMARKET = "premarket"
 SESSION_AFTERHOURS = "afterhours"
 SESSION_OVERNIGHT = "overnight"
+
+
+class SessionReadinessStats(TypedDict):
+    ready: bool
+    fully_passing_count: int
+    fully_passing_publishers: list[int]
+    uptime_passing_count: int
+    uptime_failing_count: int
+    median_uptime_pct: Optional[float]
 
 
 @dataclass
@@ -210,12 +219,8 @@ def _compute_session_readiness(
     benchmark_passes_by_pub: dict[int, bool],
     uptime_by_pub: dict[int, PublisherSessionUptime],
     target_pub_count: int,
-) -> dict:
-    """Compute readiness stats for a single session.
-
-    Returns dict with: ready, fully_passing_count, fully_passing_publishers,
-    uptime_passing_count, uptime_failing_count, median_uptime_pct.
-    """
+) -> SessionReadinessStats:
+    """Compute readiness stats for a single session."""
     all_pub_ids = sorted(set(benchmark_passes_by_pub) | set(uptime_by_pub))
     fully_passing: list[int] = []
 
@@ -1224,15 +1229,15 @@ def print_console_summary(
     if extended_stats:
         print("\nEXTENDED SESSION READINESS:")
         for session_name, stats in extended_stats.items():
-            total = stats["total"]
+            session_total = stats["total"]
             print(f"\n  {session_name.upper()}:")
             print(
-                f"    Ready: {stats['ready']} / {total} "
-                f"({_format_ratio(stats['ready'], total)})"
+                f"    Ready: {stats['ready']} / {session_total} "
+                f"({_format_ratio(stats['ready'], session_total)})"
             )
             print(
-                f"    Not ready: {stats['not_ready']} / {total} "
-                f"({_format_ratio(stats['not_ready'], total)})"
+                f"    Not ready: {stats['not_ready']} / {session_total} "
+                f"({_format_ratio(stats['not_ready'], session_total)})"
             )
             uptime_s = stats["uptime"]
             if uptime_s["median"] is not None:
