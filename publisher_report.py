@@ -147,7 +147,7 @@ def get_uptime_sessions(
 
     sessions: list[dict] = []
 
-    if mode in ("fx", "metals"):
+    if mode in ("fx", "metals", "commodity", "us-treasuries"):
         sessions.append({
             "name": "regular",
             "start": datetime.combine(dt.date(), datetime.min.time()),
@@ -209,8 +209,8 @@ def compute_feed_uptime(
             sum(update_count) AS updates_total,
             count() AS seconds_with_data,
             total_seconds,
-            updates_total / total_seconds AS updates_per_second,
-            (seconds_with_data * 100.0 / total_seconds) AS uptime_pct
+            if(total_seconds > 0, updates_total / total_seconds, 0) AS updates_per_second,
+            if(total_seconds > 0, seconds_with_data * 100.0 / total_seconds, 0) AS uptime_pct
         FROM per_second
     """
 
@@ -836,6 +836,9 @@ Examples:
     total_start = time.time()
     feed_id_filter = set(args.feed_ids) if args.feed_ids else None
 
+    # Load config once for both phases
+    config = load_config()
+
     # Phase 1: Run benchmark evaluation
     print(f"\n{'='*70}")
     print(f"PHASE 1: BENCHMARK EVALUATION - Publisher {publisher_id}")
@@ -853,7 +856,6 @@ Examples:
             skip_scipy_tests=args.skip_scipy_tests,
         )
     else:
-        config = load_config()
         benchmark_results = []
         feed_date_pairs = [
             (fid, dv, args.mode)
@@ -875,13 +877,18 @@ Examples:
         with ThreadPoolExecutor(max_workers=args.workers) as executor:
             futures = {executor.submit(eval_single, t): t for t in feed_date_pairs}
             for future in as_completed(futures):
-                r = future.result()
-                benchmark_results.append(r)
-                status = "PASS" if r.passes else "FAIL"
-                if r.error:
-                    status = f"ERROR: {r.error[:50]}"
-                nrmse_s = f"{r.nrmse:.4f}" if r.nrmse is not None else "N/A"
-                print(f"  Feed {r.feed_id} ({r.symbol or 'unknown'}): {status} nrmse={nrmse_s}")
+                t = futures[future]
+                try:
+                    r = future.result()
+                    benchmark_results.append(r)
+                    status = "PASS" if r.passes else "FAIL"
+                    if r.error:
+                        status = f"ERROR: {r.error[:50]}"
+                    nrmse_s = f"{r.nrmse:.4f}" if r.nrmse is not None else "N/A"
+                    print(f"  Feed {r.feed_id} ({r.symbol or 'unknown'}): {status} nrmse={nrmse_s}")
+                except Exception as e:
+                    fid, dv, mode_val = t
+                    print(f"  Feed {fid} ({dv}): ERROR - {e}")
 
     if not benchmark_results:
         print("No feeds to evaluate.")
@@ -892,7 +899,6 @@ Examples:
     print(f"PHASE 2: UPTIME COMPUTATION - Publisher {publisher_id}")
     print(f"{'='*70}")
 
-    config = load_config()
     health_results = run_report(
         benchmark_results, publisher_id, config,
         uptime_threshold=args.uptime_threshold,

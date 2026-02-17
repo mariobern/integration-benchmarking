@@ -98,6 +98,27 @@ def test_get_uptime_sessions_fx():
     assert sessions[0]["name"] == "regular"
 
 
+def test_get_uptime_sessions_commodity():
+    """Commodity sessions are 24-hour (not US equities hours)."""
+    from publisher_report import get_uptime_sessions
+    sessions = get_uptime_sessions("2026-02-17", "commodity", extended_hours=False, overnight=False)
+    assert len(sessions) == 1
+    assert sessions[0]["name"] == "regular"
+    # Should be 24-hour, not 9:30-4:00
+    total_seconds = (sessions[0]["end"] - sessions[0]["start"]).total_seconds()
+    assert total_seconds == 86400  # 24 hours
+
+
+def test_get_uptime_sessions_us_treasuries():
+    """US treasuries sessions are 24-hour (not US equities hours)."""
+    from publisher_report import get_uptime_sessions
+    sessions = get_uptime_sessions("2026-02-17", "us-treasuries", extended_hours=False, overnight=False)
+    assert len(sessions) == 1
+    assert sessions[0]["name"] == "regular"
+    total_seconds = (sessions[0]["end"] - sessions[0]["start"]).total_seconds()
+    assert total_seconds == 86400  # 24 hours
+
+
 def test_get_uptime_sessions_extended_hours():
     """Extended hours adds premarket and afterhours sessions."""
     from publisher_report import get_uptime_sessions
