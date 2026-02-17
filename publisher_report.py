@@ -16,6 +16,7 @@ Usage:
     python publisher_report.py --publisher-id 55 --feed-id 327 --date 2026-02-17 --mode fx
 """
 
+import statistics
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
@@ -300,3 +301,120 @@ def format_diagnostics(
         parts.append("Low uptime")
 
     return ", ".join(parts) if parts else ""
+
+
+def print_health_report(
+    results: list[FeedHealthResult],
+    publisher_id: int,
+    uptime_threshold: float = 95.0,
+) -> None:
+    """
+    Print unified health report to console.
+
+    Sections:
+    1. Executive Summary - overall counts and key metrics
+    2. Feeds Needing Attention - only non-HEALTHY feeds with diagnostics
+    3. All Feeds - full table
+    4. Action Items - what to fix
+    """
+    total = len(results)
+    healthy_count = sum(1 for r in results if r.health_status == "HEALTHY")
+    degraded_count = sum(1 for r in results if r.health_status == "DEGRADED")
+    failing_count = sum(1 for r in results if r.health_status == "FAILING")
+
+    pass_count = sum(1 for r in results if r.passes and not r.error)
+    fail_count = sum(1 for r in results if not r.passes and not r.error)
+    error_count = sum(1 for r in results if r.error)
+
+    valid_nrmse = [r.nrmse for r in results if r.nrmse is not None and not r.error]
+    median_nrmse = statistics.median(valid_nrmse) if valid_nrmse else None
+
+    valid_uptime = [r.uptime_pct for r in results if not r.error]
+    median_uptime = statistics.median(valid_uptime) if valid_uptime else None
+
+    uptime_above = sum(1 for r in results if r.uptime_pct >= uptime_threshold and not r.error)
+
+    # Collect unique dates for display
+    dates = sorted({r.date for r in results})
+    date_display = dates[0] if len(dates) == 1 else f"{dates[0]} to {dates[-1]}"
+
+    # Section 1: Executive Summary
+    print(f"\n{'='*70}")
+    print(f"PUBLISHER HEALTH REPORT - Publisher {publisher_id} - {date_display}")
+    print(f"{'='*70}")
+    print(f"Overall: {healthy_count}/{total} feeds HEALTHY, "
+          f"{degraded_count} DEGRADED, {failing_count} FAILING")
+    print()
+
+    benchmark_str = f"{pass_count}/{total} pass ({pass_count/total*100:.1f}%)" if total > 0 else "N/A"
+    nrmse_str = f"Median NRMSE: {median_nrmse:.6f}" if median_nrmse is not None else "Median NRMSE: N/A"
+    print(f"  Benchmark:  {benchmark_str:<25} |  {nrmse_str}")
+
+    uptime_str = f"{uptime_above}/{total} above {uptime_threshold:.0f}%" if total > 0 else "N/A"
+    uptime_med_str = f"Median uptime: {median_uptime:.2f}%" if median_uptime is not None else "Median uptime: N/A"
+    print(f"  Uptime:     {uptime_str:<25} |  {uptime_med_str}")
+
+    if error_count > 0:
+        print(f"  Errors:     {error_count} feeds had errors")
+
+    print(f"{'='*70}")
+
+    # Section 2: Feeds Needing Attention
+    attention_feeds = [r for r in results if r.health_status != "HEALTHY"]
+
+    if not attention_feeds:
+        print(f"\nAll feeds are HEALTHY - no action needed!")
+    else:
+        print(f"\nFEEDS NEEDING ATTENTION ({len(attention_feeds)} of {total}):")
+        print(f"{'-'*90}")
+        print(f"{'Feed':<8} {'Symbol':<25} {'Status':<10} {'Pass':<6} {'Uptime':<8} {'Diagnostics'}")
+        print(f"{'-'*90}")
+
+        for r in sorted(attention_feeds, key=lambda x: (
+            {"FAILING": 0, "DEGRADED": 1}.get(x.health_status, 2), x.feed_id
+        )):
+            symbol_str = (r.symbol or "unknown")[:25]
+            pass_str = "PASS" if r.passes else "FAIL"
+            uptime_str = f"{r.uptime_pct:.1f}%"
+            diag = format_diagnostics(
+                r.mean_diff, r.t_pvalue, r.normality_pvalue, r.mean_abs_z_score,
+                r.passes, r.uptime_pct, uptime_threshold,
+            )
+            print(f"{r.feed_id:<8} {symbol_str:<25} {r.health_status:<10} {pass_str:<6} {uptime_str:<8} {diag}")
+
+        print(f"{'-'*90}")
+
+    # Section 3: All Feeds
+    print(f"\nALL FEEDS:")
+    print(f"{'-'*110}")
+    print(f"{'Feed':<8} {'Symbol':<22} {'Date':<12} {'Mode':<14} {'Pass':<6} {'NRMSE':<10} {'Hit%':<8} {'Uptime%':<9} {'Status'}")
+    print(f"{'-'*110}")
+
+    for r in sorted(results, key=lambda x: (x.date, x.feed_id)):
+        symbol_str = (r.symbol or "unknown")[:22]
+        pass_str = "PASS" if r.passes else ("ERR" if r.error else "FAIL")
+        nrmse_str = f"{r.nrmse:.6f}" if r.nrmse is not None else "N/A"
+        hit_str = f"{r.hit_rate:.1f}%" if r.hit_rate is not None else "N/A"
+        uptime_str = f"{r.uptime_pct:.2f}%"
+        print(f"{r.feed_id:<8} {symbol_str:<22} {r.date:<12} {r.mode:<14} {pass_str:<6} {nrmse_str:<10} {hit_str:<8} {uptime_str:<9} {r.health_status}")
+
+    print(f"{'-'*110}")
+
+    # Section 4: Action Items
+    quality_fails = sum(1 for r in results if not r.passes and not r.error)
+    uptime_fails = sum(1 for r in results if r.uptime_pct < uptime_threshold and not r.error)
+
+    if quality_fails > 0 or uptime_fails > 0:
+        print(f"\n{'='*70}")
+        print("HOW TO IMPROVE:")
+        print(f"{'='*70}")
+        if quality_fails > 0:
+            print(f"  - {quality_fails} feed(s) failing data quality:")
+            print(f"    Check price source calibration, reduce latency")
+            print(f"    Target: nrmse < 0.01 or (nrmse < 0.05 + hit_rate >= 95%)")
+        if uptime_fails > 0:
+            print(f"  - {uptime_fails} feed(s) with low uptime (< {uptime_threshold:.0f}%):")
+            print(f"    Investigate connectivity gaps, increase update frequency")
+        print(f"  - See CSV output for detailed per-feed metrics")
+        print(f"{'='*70}")
+    print()

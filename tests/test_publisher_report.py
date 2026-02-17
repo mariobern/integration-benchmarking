@@ -4,6 +4,24 @@ from datetime import date, datetime
 from unittest.mock import MagicMock
 
 
+def _make_health_result(**overrides):
+    """Helper to create FeedHealthResult with defaults."""
+    from publisher_report import FeedHealthResult
+    defaults = dict(
+        publisher_id=55, feed_id=100, date="2026-02-17", mode="fx",
+        symbol="FX.EUR/USD", passes=True, n_observations=23400,
+        nrmse=0.002, hit_rate=99.5, benchmark_price_range=0.025,
+        rmse=0.00005, mean_spread=0.00012, rmse_over_spread=0.42,
+        mean_diff=0.00003, t_pvalue=0.45, normality_pvalue=0.23,
+        mean_abs_z_score=0.72, uptime_pct=99.87,
+        seconds_with_data=23370, total_seconds=23400,
+        updates_total=117000, updates_per_second=5.0,
+        health_status="HEALTHY",
+    )
+    defaults.update(overrides)
+    return FeedHealthResult(**defaults)
+
+
 def test_healthy_status():
     """Feed that passes benchmark and has good uptime is HEALTHY."""
     from publisher_report import classify_health
@@ -279,3 +297,60 @@ def test_diagnostics_all_none():
         passes=False, uptime_pct=99.0, threshold=95.0,
     )
     assert "Data quality" in diag
+
+
+# --- Task 6: print_health_report tests ---
+
+
+def test_print_health_report_shows_executive_summary(capsys):
+    """Console output includes executive summary with counts."""
+    from publisher_report import print_health_report
+
+    results = [
+        _make_health_result(feed_id=100, health_status="HEALTHY"),
+        _make_health_result(feed_id=101, health_status="HEALTHY"),
+        _make_health_result(feed_id=102, health_status="DEGRADED", passes=False),
+    ]
+
+    print_health_report(results, publisher_id=55, uptime_threshold=95.0)
+    captured = capsys.readouterr()
+
+    assert "PUBLISHER HEALTH REPORT" in captured.out
+    assert "Publisher 55" in captured.out
+    assert "HEALTHY" in captured.out
+    assert "DEGRADED" in captured.out
+
+
+def test_print_health_report_shows_attention_section(capsys):
+    """Console output shows feeds needing attention."""
+    from publisher_report import print_health_report
+
+    results = [
+        _make_health_result(feed_id=100, health_status="HEALTHY"),
+        _make_health_result(
+            feed_id=200, health_status="FAILING", passes=False,
+            uptime_pct=80.0, nrmse=0.08, symbol="Equity.US.AAPL/USD",
+        ),
+    ]
+
+    print_health_report(results, publisher_id=55, uptime_threshold=95.0)
+    captured = capsys.readouterr()
+
+    assert "FEEDS NEEDING ATTENTION" in captured.out
+    assert "200" in captured.out
+    assert "AAPL" in captured.out
+
+
+def test_print_health_report_no_attention_when_all_healthy(capsys):
+    """When all feeds are healthy, says so."""
+    from publisher_report import print_health_report
+
+    results = [
+        _make_health_result(feed_id=100),
+        _make_health_result(feed_id=101),
+    ]
+
+    print_health_report(results, publisher_id=55, uptime_threshold=95.0)
+    captured = capsys.readouterr()
+
+    assert "All feeds are HEALTHY" in captured.out or "NEEDING ATTENTION (0" in captured.out
