@@ -17,7 +17,9 @@ Usage:
 """
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 
 @dataclass
@@ -105,3 +107,109 @@ def classify_health(passes: bool, uptime_pct: float, threshold: float) -> str:
         return "DEGRADED"
     else:
         return "FAILING"
+
+
+def get_uptime_sessions(
+    date_str: str,
+    mode: str,
+    extended_hours: bool = False,
+    overnight: bool = False,
+) -> list[dict]:
+    """
+    Get trading session windows for uptime computation.
+
+    Returns list of dicts with 'name', 'start' (UTC datetime), 'end' (UTC datetime).
+    """
+    dt = datetime.strptime(date_str, "%Y-%m-%d")
+    est = ZoneInfo("America/New_York")
+    utc = ZoneInfo("UTC")
+
+    sessions: list[dict] = []
+
+    if mode in ("fx", "metals"):
+        sessions.append({
+            "name": "regular",
+            "start": datetime.combine(dt.date(), datetime.min.time()),
+            "end": datetime.combine(dt.date() + timedelta(days=1), datetime.min.time()),
+        })
+    else:
+        market_open = dt.replace(hour=9, minute=30, tzinfo=est).astimezone(utc).replace(tzinfo=None)
+        market_close = dt.replace(hour=16, minute=0, tzinfo=est).astimezone(utc).replace(tzinfo=None)
+        sessions.append({"name": "regular", "start": market_open, "end": market_close})
+
+        if extended_hours:
+            pm_start = dt.replace(hour=4, minute=0, tzinfo=est).astimezone(utc).replace(tzinfo=None)
+            sessions.append({"name": "premarket", "start": pm_start, "end": market_open})
+            ah_end = dt.replace(hour=20, minute=0, tzinfo=est).astimezone(utc).replace(tzinfo=None)
+            sessions.append({"name": "afterhours", "start": market_close, "end": ah_end})
+
+        if overnight:
+            on_start = dt.replace(hour=20, minute=0, tzinfo=est).astimezone(utc).replace(tzinfo=None)
+            next_day = dt + timedelta(days=1)
+            on_end = next_day.replace(hour=4, minute=0, tzinfo=est).astimezone(utc).replace(tzinfo=None)
+            sessions.append({"name": "overnight", "start": on_start, "end": on_end})
+
+    return sessions
+
+
+def compute_feed_uptime(
+    client,
+    publisher_id: int,
+    feed_id: int,
+    start_utc: datetime,
+    end_utc: datetime,
+) -> dict:
+    """
+    Compute uptime using 1-second window method.
+
+    Counts seconds that have at least one update. Matches dashboard calculation.
+    """
+    start_str = start_utc.strftime("%Y-%m-%d %H:%M:%S")
+    end_str = end_utc.strftime("%Y-%m-%d %H:%M:%S")
+
+    query = f"""
+        WITH
+            parseDateTimeBestEffort('{start_str}') AS start_time,
+            parseDateTimeBestEffort('{end_str}') AS end_time,
+            dateDiff('second', start_time, end_time) AS total_seconds,
+
+            per_second AS (
+                SELECT
+                    toStartOfSecond(publish_time) AS second_start,
+                    count() AS update_count
+                FROM publisher_updates
+                PREWHERE price_feed_id = {feed_id}
+                    AND publisher_id = {publisher_id}
+                WHERE publish_time >= start_time
+                    AND publish_time < end_time
+                GROUP BY second_start
+            )
+        SELECT
+            sum(update_count) AS updates_total,
+            count() AS seconds_with_data,
+            total_seconds,
+            updates_total / total_seconds AS updates_per_second,
+            (seconds_with_data * 100.0 / total_seconds) AS uptime_pct
+        FROM per_second
+    """
+
+    result = client.query(query)
+
+    if not result.result_rows or result.result_rows[0][0] is None:
+        total_seconds = int((end_utc - start_utc).total_seconds())
+        return {
+            "uptime_pct": 0.0,
+            "seconds_with_data": 0,
+            "total_seconds": total_seconds,
+            "updates_total": 0,
+            "updates_per_second": 0.0,
+        }
+
+    row = result.result_rows[0]
+    return {
+        "uptime_pct": float(row[4] or 0),
+        "seconds_with_data": int(row[1] or 0),
+        "total_seconds": int(row[2] or 0),
+        "updates_total": int(row[0] or 0),
+        "updates_per_second": float(row[3] or 0),
+    }
