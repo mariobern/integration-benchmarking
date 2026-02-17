@@ -16,9 +16,11 @@ Usage:
     python publisher_report.py --publisher-id 55 --feed-id 327 --date 2026-02-17 --mode fx
 """
 
+import csv
 import statistics
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -418,3 +420,135 @@ def print_health_report(
         print(f"  - See CSV output for detailed per-feed metrics")
         print(f"{'='*70}")
     print()
+
+
+def write_health_csv(
+    results: list[FeedHealthResult],
+    output_path: Path,
+    include_extended_hours: bool = False,
+    include_overnight: bool = False,
+) -> None:
+    """
+    Write combined health report to CSV with SUMMARY section.
+
+    Args:
+        results: List of FeedHealthResult
+        output_path: Path for output CSV file
+        include_extended_hours: Include premarket/afterhours columns
+        include_overnight: Include overnight columns
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Base header
+    header = [
+        "publisher_id", "feed_id", "date", "mode", "symbol",
+        "passes", "n_observations", "nrmse", "hit_rate",
+        "benchmark_price_range", "rmse", "mean_spread", "rmse_over_spread",
+        "mean_diff", "t_pvalue", "normality_pvalue", "mean_abs_z_score",
+        "uptime_pct", "seconds_with_data", "total_seconds",
+        "updates_total", "updates_per_second",
+        "health_status",
+    ]
+
+    if include_extended_hours:
+        header.extend([
+            "premarket_n_observations", "premarket_nrmse", "premarket_hit_rate",
+            "premarket_passes", "premarket_uptime_pct", "premarket_error",
+            "afterhours_n_observations", "afterhours_nrmse", "afterhours_hit_rate",
+            "afterhours_passes", "afterhours_uptime_pct", "afterhours_error",
+        ])
+
+    if include_overnight:
+        header.extend([
+            "overnight_n_observations", "overnight_n_reference_observations",
+            "overnight_nrmse", "overnight_hit_rate", "overnight_passes",
+            "overnight_uptime_pct", "overnight_reference_publisher_id", "overnight_error",
+        ])
+
+    header.extend(["error", "execution_time_ms"])
+
+    with open(output_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+
+        for r in sorted(results, key=lambda x: (x.date, x.feed_id)):
+            row = [
+                r.publisher_id, r.feed_id, r.date, r.mode, r.symbol or "",
+                r.passes, r.n_observations,
+                f"{r.nrmse:.6f}" if r.nrmse is not None else "",
+                f"{r.hit_rate:.2f}" if r.hit_rate is not None else "",
+                f"{r.benchmark_price_range:.6f}" if r.benchmark_price_range is not None else "",
+                f"{r.rmse:.6f}" if r.rmse is not None else "",
+                f"{r.mean_spread:.6f}" if r.mean_spread is not None else "",
+                f"{r.rmse_over_spread:.6f}" if r.rmse_over_spread is not None else "",
+                f"{r.mean_diff:.8f}" if r.mean_diff is not None else "",
+                f"{r.t_pvalue:.6f}" if r.t_pvalue is not None else "",
+                f"{r.normality_pvalue:.6f}" if r.normality_pvalue is not None else "",
+                f"{r.mean_abs_z_score:.4f}" if r.mean_abs_z_score is not None else "",
+                f"{r.uptime_pct:.2f}", r.seconds_with_data, r.total_seconds,
+                r.updates_total, f"{r.updates_per_second:.1f}",
+                r.health_status,
+            ]
+
+            if include_extended_hours:
+                row.extend([
+                    r.premarket_n_observations or "",
+                    f"{r.premarket_nrmse:.6f}" if r.premarket_nrmse is not None else "",
+                    f"{r.premarket_hit_rate:.2f}" if r.premarket_hit_rate is not None else "",
+                    r.premarket_passes if r.premarket_passes is not None else "",
+                    f"{r.premarket_uptime_pct:.2f}" if r.premarket_uptime_pct is not None else "",
+                    r.premarket_error or "",
+                    r.afterhours_n_observations or "",
+                    f"{r.afterhours_nrmse:.6f}" if r.afterhours_nrmse is not None else "",
+                    f"{r.afterhours_hit_rate:.2f}" if r.afterhours_hit_rate is not None else "",
+                    r.afterhours_passes if r.afterhours_passes is not None else "",
+                    f"{r.afterhours_uptime_pct:.2f}" if r.afterhours_uptime_pct is not None else "",
+                    r.afterhours_error or "",
+                ])
+
+            if include_overnight:
+                row.extend([
+                    r.overnight_n_observations or "",
+                    r.overnight_n_reference_observations or "",
+                    f"{r.overnight_nrmse:.6f}" if r.overnight_nrmse is not None else "",
+                    f"{r.overnight_hit_rate:.2f}" if r.overnight_hit_rate is not None else "",
+                    r.overnight_passes if r.overnight_passes is not None else "",
+                    f"{r.overnight_uptime_pct:.2f}" if r.overnight_uptime_pct is not None else "",
+                    r.overnight_reference_publisher_id or "",
+                    r.overnight_error or "",
+                ])
+
+            row.extend([r.error or "", r.execution_time_ms])
+            writer.writerow(row)
+
+        # SUMMARY section
+        writer.writerow([])
+        writer.writerow(["SUMMARY"])
+
+        total = len(results)
+        pass_count = sum(1 for r in results if r.passes and not r.error)
+        fail_count = sum(1 for r in results if not r.passes and not r.error)
+        error_count = sum(1 for r in results if r.error)
+        healthy_count = sum(1 for r in results if r.health_status == "HEALTHY")
+        degraded_count = sum(1 for r in results if r.health_status == "DEGRADED")
+        failing_count = sum(1 for r in results if r.health_status == "FAILING")
+
+        valid_nrmse = [r.nrmse for r in results if r.nrmse is not None and not r.error]
+        valid_uptime = [r.uptime_pct for r in results if not r.error]
+        valid_hit_rate = [r.hit_rate for r in results if r.hit_rate is not None and not r.error]
+
+        writer.writerow(["total_feeds", total])
+        writer.writerow(["pass_count", pass_count])
+        writer.writerow(["fail_count", fail_count])
+        writer.writerow(["error_count", error_count])
+        writer.writerow(["pass_rate_pct", f"{pass_count/total*100:.1f}" if total > 0 else "0"])
+        writer.writerow(["healthy_count", healthy_count])
+        writer.writerow(["degraded_count", degraded_count])
+        writer.writerow(["failing_count", failing_count])
+        writer.writerow(["median_nrmse", f"{statistics.median(valid_nrmse):.6f}" if valid_nrmse else ""])
+        writer.writerow(["mean_nrmse", f"{statistics.mean(valid_nrmse):.6f}" if valid_nrmse else ""])
+        writer.writerow(["median_hit_rate", f"{statistics.median(valid_hit_rate):.2f}" if valid_hit_rate else ""])
+        writer.writerow(["median_uptime_pct", f"{statistics.median(valid_uptime):.2f}" if valid_uptime else ""])
+        writer.writerow(["mean_uptime_pct", f"{statistics.mean(valid_uptime):.2f}" if valid_uptime else ""])
+
+    print(f"Results written to {output_path}")

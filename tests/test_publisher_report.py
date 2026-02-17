@@ -1,4 +1,8 @@
 """Tests for publisher_report.py health classification and output."""
+import csv
+import tempfile
+from pathlib import Path
+
 import pytest
 from datetime import date, datetime
 from unittest.mock import MagicMock
@@ -354,3 +358,54 @@ def test_print_health_report_no_attention_when_all_healthy(capsys):
     captured = capsys.readouterr()
 
     assert "All feeds are HEALTHY" in captured.out or "NEEDING ATTENTION (0" in captured.out
+
+
+# --- Task 7: write_health_csv tests ---
+
+
+def test_write_health_csv_creates_file():
+    """CSV output creates file with correct header."""
+    from publisher_report import write_health_csv
+
+    results = [_make_health_result(feed_id=100)]
+
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+        output_path = Path(f.name)
+
+    try:
+        write_health_csv(results, output_path)
+        assert output_path.exists()
+
+        with open(output_path) as f:
+            reader = csv.reader(f)
+            header = next(reader)
+            assert "publisher_id" in header
+            assert "health_status" in header
+            assert "uptime_pct" in header
+            assert "nrmse" in header
+
+            data_row = next(reader)
+            assert data_row[header.index("feed_id")] == "100"
+            assert data_row[header.index("health_status")] == "HEALTHY"
+    finally:
+        output_path.unlink(missing_ok=True)
+
+
+def test_write_health_csv_includes_summary():
+    """CSV output includes SUMMARY section at bottom."""
+    from publisher_report import write_health_csv
+
+    results = [
+        _make_health_result(feed_id=100, health_status="HEALTHY"),
+        _make_health_result(feed_id=101, health_status="FAILING", passes=False),
+    ]
+
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+        output_path = Path(f.name)
+
+    try:
+        write_health_csv(results, output_path)
+        content = output_path.read_text()
+        assert "SUMMARY" in content
+    finally:
+        output_path.unlink(missing_ok=True)
