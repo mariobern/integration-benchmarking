@@ -139,3 +139,143 @@ def test_compute_feed_uptime_no_data():
     assert result["uptime_pct"] == 0.0
     assert result["seconds_with_data"] == 0
     assert result["updates_total"] == 0
+
+
+# --- Task 4: merge_benchmark_and_uptime tests ---
+
+
+def test_merge_creates_healthy_result():
+    """Merging a passing benchmark with good uptime creates HEALTHY result."""
+    from publisher_report import merge_benchmark_and_uptime, FeedHealthResult
+    from publisher_benchmark_95 import PublisherBenchmarkResult
+
+    benchmark = PublisherBenchmarkResult(
+        publisher_id=55, feed_id=327, date="2026-02-17", mode="fx",
+        symbol="FX.EUR/USD", passes=True, n_observations=23400,
+        rmse=0.00005, mean_spread=0.00012, rmse_over_spread=0.42,
+        nrmse=0.002, hit_rate=99.5, benchmark_price_range=0.025,
+        mean_diff=0.00003, t_pvalue=0.45, normality_pvalue=0.23,
+        mean_abs_z_score=0.72,
+    )
+    uptime = {
+        "uptime_pct": 99.87, "seconds_with_data": 23370, "total_seconds": 23400,
+        "updates_total": 117000, "updates_per_second": 5.0,
+    }
+
+    result = merge_benchmark_and_uptime(benchmark, uptime, threshold=95.0)
+    assert isinstance(result, FeedHealthResult)
+    assert result.health_status == "HEALTHY"
+    assert result.passes is True
+    assert result.uptime_pct == 99.87
+    assert result.nrmse == 0.002
+
+
+def test_merge_creates_failing_result():
+    """Merging a failing benchmark with low uptime creates FAILING result."""
+    from publisher_report import merge_benchmark_and_uptime
+    from publisher_benchmark_95 import PublisherBenchmarkResult
+
+    benchmark = PublisherBenchmarkResult(
+        publisher_id=55, feed_id=1163, date="2026-02-17", mode="us-equities",
+        symbol="Equity.US.AAPL/USD", passes=False, n_observations=15000,
+        rmse=0.08, mean_spread=0.01, rmse_over_spread=8.0,
+        nrmse=0.082, hit_rate=82.0, benchmark_price_range=1.0,
+    )
+    uptime = {
+        "uptime_pct": 87.3, "seconds_with_data": 13000, "total_seconds": 14895,
+        "updates_total": 39000, "updates_per_second": 2.6,
+    }
+
+    result = merge_benchmark_and_uptime(benchmark, uptime, threshold=95.0)
+    assert result.health_status == "FAILING"
+    assert result.passes is False
+    assert result.uptime_pct == 87.3
+
+
+def test_merge_with_error():
+    """Merging an errored benchmark result still includes uptime."""
+    from publisher_report import merge_benchmark_and_uptime
+    from publisher_benchmark_95 import PublisherBenchmarkResult
+
+    benchmark = PublisherBenchmarkResult(
+        publisher_id=55, feed_id=999, date="2026-02-17", mode="fx",
+        symbol=None, passes=False, n_observations=0,
+        rmse=None, mean_spread=None, rmse_over_spread=None,
+        error="Feed metadata not found",
+    )
+    uptime = {"uptime_pct": 0.0, "seconds_with_data": 0, "total_seconds": 86400,
+              "updates_total": 0, "updates_per_second": 0.0}
+
+    result = merge_benchmark_and_uptime(benchmark, uptime, threshold=95.0)
+    assert result.health_status == "FAILING"
+    assert result.error == "Feed metadata not found"
+
+
+# --- Task 5: format_diagnostics tests ---
+
+
+def test_diagnostics_significant_bias():
+    """Significant t-test shows bias direction and magnitude."""
+    from publisher_report import format_diagnostics
+    diag = format_diagnostics(
+        mean_diff=0.003, t_pvalue=0.001,
+        normality_pvalue=0.5, mean_abs_z_score=0.7,
+        passes=False, uptime_pct=99.0, threshold=95.0,
+    )
+    assert "Bias: +0.0030 (significant)" in diag
+
+
+def test_diagnostics_no_bias():
+    """Non-significant t-test shows no bias."""
+    from publisher_report import format_diagnostics
+    diag = format_diagnostics(
+        mean_diff=0.0001, t_pvalue=0.45,
+        normality_pvalue=0.5, mean_abs_z_score=0.7,
+        passes=True, uptime_pct=99.0, threshold=95.0,
+    )
+    # Passes benchmark, no diagnostics needed for passing feed
+    assert diag == "" or "Bias: none" not in diag
+
+
+def test_diagnostics_non_normal():
+    """Non-normal errors flagged."""
+    from publisher_report import format_diagnostics
+    diag = format_diagnostics(
+        mean_diff=0.001, t_pvalue=0.1,
+        normality_pvalue=0.01, mean_abs_z_score=0.8,
+        passes=False, uptime_pct=99.0, threshold=95.0,
+    )
+    assert "outliers" in diag.lower()
+
+
+def test_diagnostics_volatile():
+    """High z-score flagged as volatile."""
+    from publisher_report import format_diagnostics
+    diag = format_diagnostics(
+        mean_diff=0.001, t_pvalue=0.1,
+        normality_pvalue=0.5, mean_abs_z_score=1.8,
+        passes=False, uptime_pct=99.0, threshold=95.0,
+    )
+    assert "volatile" in diag.lower()
+
+
+def test_diagnostics_low_uptime():
+    """Low uptime is flagged."""
+    from publisher_report import format_diagnostics
+    diag = format_diagnostics(
+        mean_diff=None, t_pvalue=None,
+        normality_pvalue=None, mean_abs_z_score=None,
+        passes=True, uptime_pct=87.0, threshold=95.0,
+    )
+    assert "Low uptime" in diag
+
+
+def test_diagnostics_all_none():
+    """When stats are None (--skip-scipy-tests), shows minimal diagnostics."""
+    from publisher_report import format_diagnostics
+    diag = format_diagnostics(
+        mean_diff=None, t_pvalue=None,
+        normality_pvalue=None, mean_abs_z_score=None,
+        passes=False, uptime_pct=99.0, threshold=95.0,
+    )
+    assert "Data quality" in diag

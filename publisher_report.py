@@ -21,6 +21,8 @@ from datetime import datetime, timedelta
 from typing import Optional
 from zoneinfo import ZoneInfo
 
+from publisher_benchmark_95 import PublisherBenchmarkResult
+
 
 @dataclass
 class FeedHealthResult:
@@ -213,3 +215,88 @@ def compute_feed_uptime(
         "updates_total": int(row[0] or 0),
         "updates_per_second": float(row[3] or 0),
     }
+
+
+def merge_benchmark_and_uptime(
+    benchmark: PublisherBenchmarkResult,
+    uptime: dict,
+    threshold: float = 95.0,
+) -> FeedHealthResult:
+    """
+    Merge a benchmark result with uptime data into a FeedHealthResult.
+
+    Args:
+        benchmark: Result from evaluate_publisher_feed()
+        uptime: Dict from compute_feed_uptime() for the regular session
+        threshold: Minimum uptime % for HEALTHY classification
+    """
+    health = classify_health(benchmark.passes, uptime["uptime_pct"], threshold)
+
+    return FeedHealthResult(
+        publisher_id=benchmark.publisher_id,
+        feed_id=benchmark.feed_id,
+        date=benchmark.date,
+        mode=benchmark.mode,
+        symbol=benchmark.symbol,
+        passes=benchmark.passes,
+        n_observations=benchmark.n_observations,
+        nrmse=benchmark.nrmse,
+        hit_rate=benchmark.hit_rate,
+        benchmark_price_range=getattr(benchmark, 'benchmark_price_range', None),
+        rmse=benchmark.rmse,
+        mean_spread=benchmark.mean_spread,
+        rmse_over_spread=benchmark.rmse_over_spread,
+        mean_diff=getattr(benchmark, 'mean_diff', None),
+        t_pvalue=getattr(benchmark, 't_pvalue', None),
+        normality_pvalue=getattr(benchmark, 'normality_pvalue', None),
+        mean_abs_z_score=getattr(benchmark, 'mean_abs_z_score', None),
+        uptime_pct=uptime["uptime_pct"],
+        seconds_with_data=uptime["seconds_with_data"],
+        total_seconds=uptime["total_seconds"],
+        updates_total=uptime["updates_total"],
+        updates_per_second=uptime["updates_per_second"],
+        health_status=health,
+        error=benchmark.error,
+        execution_time_ms=getattr(benchmark, 'execution_time_ms', 0),
+    )
+
+
+def format_diagnostics(
+    mean_diff: Optional[float],
+    t_pvalue: Optional[float],
+    normality_pvalue: Optional[float],
+    mean_abs_z_score: Optional[float],
+    passes: bool,
+    uptime_pct: float,
+    threshold: float,
+) -> str:
+    """
+    Generate a concise diagnostic string for console output.
+
+    Only produces diagnostics for non-HEALTHY feeds. Returns empty string for feeds
+    that pass benchmark and have good uptime.
+    """
+    parts = []
+
+    # Benchmark diagnostics (only for non-passing feeds)
+    if not passes:
+        if t_pvalue is not None and mean_diff is not None:
+            if t_pvalue < 0.05:
+                sign = "+" if mean_diff >= 0 else ""
+                parts.append(f"Bias: {sign}{mean_diff:.4f} (significant)")
+            else:
+                parts.append("Bias: none")
+        else:
+            parts.append("Data quality: benchmark fail")
+
+        if normality_pvalue is not None and normality_pvalue < 0.05:
+            parts.append("Errors: has outliers")
+
+        if mean_abs_z_score is not None and mean_abs_z_score > 1.5:
+            parts.append(f"Deviation: {mean_abs_z_score:.1f} (volatile)")
+
+    # Uptime diagnostic
+    if uptime_pct < threshold:
+        parts.append("Low uptime")
+
+    return ", ".join(parts) if parts else ""
