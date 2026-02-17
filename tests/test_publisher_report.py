@@ -409,3 +409,57 @@ def test_write_health_csv_includes_summary():
         assert "SUMMARY" in content
     finally:
         output_path.unlink(missing_ok=True)
+
+
+# --- Task 9: Integration test ---
+
+
+def test_full_pipeline_mock():
+    """Full pipeline: benchmark results + uptime -> health report."""
+    from publisher_report import merge_benchmark_and_uptime, FeedHealthResult
+    from publisher_benchmark_95 import PublisherBenchmarkResult
+
+    benchmarks = [
+        PublisherBenchmarkResult(
+            publisher_id=55, feed_id=100, date="2026-02-17", mode="fx",
+            symbol="FX.EUR/USD", passes=True, n_observations=23400,
+            rmse=0.00005, mean_spread=0.00012, rmse_over_spread=0.42,
+            nrmse=0.002, hit_rate=99.5,
+        ),
+        PublisherBenchmarkResult(
+            publisher_id=55, feed_id=200, date="2026-02-17", mode="us-equities",
+            symbol="Equity.US.MSFT/USD", passes=True, n_observations=20000,
+            rmse=0.001, mean_spread=0.01, rmse_over_spread=0.1,
+            nrmse=0.003, hit_rate=98.0,
+        ),
+        PublisherBenchmarkResult(
+            publisher_id=55, feed_id=300, date="2026-02-17", mode="us-equities",
+            symbol="Equity.US.AAPL/USD", passes=False, n_observations=15000,
+            rmse=0.08, mean_spread=0.01, rmse_over_spread=8.0,
+            nrmse=0.082, hit_rate=82.0,
+        ),
+    ]
+    uptimes = [
+        {"uptime_pct": 99.9, "seconds_with_data": 86300, "total_seconds": 86400,
+         "updates_total": 430000, "updates_per_second": 5.0},
+        {"uptime_pct": 87.0, "seconds_with_data": 12950, "total_seconds": 14895,
+         "updates_total": 39000, "updates_per_second": 2.6},
+        {"uptime_pct": 80.0, "seconds_with_data": 11900, "total_seconds": 14895,
+         "updates_total": 35000, "updates_per_second": 2.3},
+    ]
+
+    results = [
+        merge_benchmark_and_uptime(b, u, threshold=95.0)
+        for b, u in zip(benchmarks, uptimes)
+    ]
+
+    assert results[0].health_status == "HEALTHY"
+    assert results[1].health_status == "DEGRADED"  # pass + low uptime
+    assert results[2].health_status == "FAILING"   # fail + low uptime
+
+    healthy = sum(1 for r in results if r.health_status == "HEALTHY")
+    degraded = sum(1 for r in results if r.health_status == "DEGRADED")
+    failing = sum(1 for r in results if r.health_status == "FAILING")
+    assert healthy == 1
+    assert degraded == 1
+    assert failing == 1
