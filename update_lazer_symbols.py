@@ -134,11 +134,17 @@ def modify_config(
             r'"state": "COMING_SOON"', '"state": "STABLE"', block
         )
         pub_str = "[ " + ", ".join(str(p) for p in sorted(pubs)) + " ]"
-        new_block = re.sub(
-            r'"allowedPublisherIds": \[[^\]]*\]',
-            f'"allowedPublisherIds": {pub_str}',
-            new_block,
-        )
+        if re.search(r'"allowedPublisherIds":', new_block):
+            new_block = re.sub(
+                r'"allowedPublisherIds": \[[^\]]*\]',
+                f'"allowedPublisherIds": {pub_str}',
+                new_block,
+            )
+        else:
+            # Field doesn't exist yet — insert after opening {
+            newline_pos = new_block.index('\n')
+            insert_line = f'\n      "allowedPublisherIds": {pub_str},'
+            new_block = new_block[:newline_pos] + insert_line + new_block[newline_pos:]
         new_block = re.sub(
             r'"minPublishers": \d+', '"minPublishers": 2', new_block
         )

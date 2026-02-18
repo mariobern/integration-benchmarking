@@ -54364,6 +54364,7 @@
       "symbol": "Equity.US.GLXY/USD"
     },
     {
+      "allowedPublisherIds": [ 19, 21, 22, 65, 69, 71 ],
       "expiryTime": "5.000000000s",
       "exponent": -5,
       "feedId": 2289,
@@ -54788,6 +54789,7 @@
       "symbol": "Equity.US.WSM/USD"
     },
     {
+      "allowedPublisherIds": [ 19, 22, 42, 65, 69, 71 ],
       "expiryTime": "5.000000000s",
       "exponent": -5,
       "feedId": 2306,
@@ -57318,6 +57320,7 @@
       "symbol": "Equity.US.OKLO/USD"
     },
     {
+      "allowedPublisherIds": [ 19, 22, 42, 65, 71 ],
       "expiryTime": "5.000000000s",
       "exponent": -5,
       "feedId": 2419,
