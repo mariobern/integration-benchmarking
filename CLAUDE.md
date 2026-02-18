@@ -139,6 +139,97 @@ Results CSV contains:
 - `error` (if any)
 - `execution_time_ms`
 
+## Feed Readiness
+
+`feed_readiness.py` evaluates **combined feed readiness** by running both benchmark quality and publisher uptime checks. A feed is marked **READY** only if enough publishers pass **both** checks. This is the primary tool for assessing whether a feed is production-ready.
+
+See [docs/feed_readiness.md](docs/feed_readiness.md) for full output schema and per-session readiness details.
+
+### Running Feed Readiness
+
+```bash
+# Single feed, single date
+python feed_readiness.py --feed-id 327 --date 2026-02-10 --mode fx
+
+# Multi-date range
+python feed_readiness.py --feed-id 327 --start-date 2026-02-10 --end-date 2026-02-14 --mode fx
+
+# CSV batch
+python feed_readiness.py --csv price_id_list.csv --workers 8
+
+# With precise uptime + extended hours (US equities)
+python feed_readiness.py --feed-id 922 --date 2026-02-10 --mode us-equities --precise --extended-hours
+
+# Include overnight session (US equities)
+python feed_readiness.py --feed-id 922 --date 2026-02-10 --mode us-equities --extended-hours --overnight
+
+# Detailed output (publisher rows + cross-date consistency)
+python feed_readiness.py --feed-id 327 --start-date 2026-02-10 --end-date 2026-02-14 --mode fx --detailed
+
+# Fast execution (skip statistical tests)
+python feed_readiness.py --csv price_id_list.csv --workers 8 --skip-scipy-tests
+```
+
+### Feed Readiness Arguments
+
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `--csv` | CSV with `feed_id,date,mode` rows | - |
+| `--feed-id` | Feed ID(s) (single-feed mode) | - |
+| `--date` | Date(s) `YYYY-MM-DD` | - |
+| `--start-date` / `--end-date` | Inclusive date range | - |
+| `--mode` | Asset class (single-feed mode) | - |
+| `--output` | Output CSV path | `feed_readiness_results.csv` |
+| `--detailed` | Append publisher detail + consistency sections | Off |
+| `--target-pub-count` | Minimum fully-passing publishers for readiness | `4` |
+| `--skip-scipy-tests` | Skip benchmark statistical tests for faster runs | Off |
+| `--precise` | Use gap-based uptime method instead of 1-second window | Off |
+| `--gap-threshold` | Gap threshold in ms for `--precise` mode | `200` |
+| `--uptime-threshold` | Regular-session uptime pass threshold | `95.0` |
+| `--extended-hours` | Include premarket + afterhours for US equities | Off |
+| `--overnight` | Include overnight session for US equities | Off |
+| `--workers` | Parallel workers | `4` |
+| `--include-asset-class` | Only these classes (CSV mode) | All |
+| `--exclude-asset-class` | Exclude these classes (CSV mode) | None |
+| `--filter-feed-id` | Only these feed IDs (CSV mode) | All |
+| `--list-asset-classes` | List asset classes in CSV and exit | Off |
+
+### Readiness Logic
+
+Per publisher:
+- `benchmark_passes`: benchmark pass/fail from quality evaluation
+- `uptime_passes`: regular-session uptime above threshold
+- `fully_passes`: `benchmark_passes AND uptime_passes`
+
+Per feed:
+- `ready`: `fully_passing_count >= target_pub_count`
+- `benchmark_ready`: benchmark passing publishers >= target
+- `uptime_ready`: regular-session uptime passing publishers >= target
+
+Publisher buckets: `fully_passing`, `benchmark_only`, `uptime_only`, `both_failing`.
+
+### Per-Session Readiness (Extended Hours)
+
+When `--extended-hours` or `--overnight` is enabled, feed readiness is also computed per session (premarket, afterhours, overnight). Each session gets its own:
+- `{session}_ready` boolean
+- `{session}_fully_passing_count` and `{session}_fully_passing_publishers`
+- `{session}_uptime_passing_count`, `{session}_uptime_failing_count`
+- `{session}_median_uptime_pct`
+
+The console summary includes a per-session breakdown table showing readiness rates per session.
+
+### Feed Readiness Output
+
+Results CSV includes:
+- identity: `feed_id`, `date`, `mode`, `symbol`
+- readiness: `ready`, `benchmark_ready`, `uptime_ready`
+- counts: `fully_passing_count`, `benchmark_only_passing_count`, `uptime_only_passing_count`, `both_failing_count`
+- benchmark metrics: `benchmark_passing_count`, `median_nrmse`, `median_hit_rate`
+- uptime metrics: `uptime_passing_count`, `median_uptime_pct`
+- publisher lists: `fully_passing_publishers`, `benchmark_only_publishers`, `uptime_only_publishers`, `both_failing_publishers`
+
+With `--detailed`, CSV appends publisher-level detail rows and cross-date consistency analysis.
+
 ## Publisher Benchmark Summary
 
 `publisher_benchmark.py` outputs summary statistics after processing (console + CSV):
@@ -754,3 +845,24 @@ The script filters for `LUDP` only. Other common halt reason codes in the feed (
 - ~1,200 unique tickers
 - Most halts occur in small-cap/micro-cap stocks
 - Halts cluster around market open (9:30-10:30 AM ET)
+
+## Publisher Health Report
+
+`publisher_report.py` combines benchmark quality and uptime into a unified per-feed health classification (HEALTHY / DEGRADED / FAILING) for a single publisher. See [docs/publisher_report.md](docs/publisher_report.md) for full details.
+
+```bash
+python publisher_report.py --csv publisher_55_feeds.csv
+python publisher_report.py --publisher-id 55 --feed-id 327 --date 2026-02-17 --mode fx
+```
+
+## Feed Promotion (update_lazer_symbols.py)
+
+`update_lazer_symbols.py` promotes feeds from `COMING_SOON` to `STABLE` in `after.json` using a benchmark summary markdown as input. Sets per-ticker `allowedPublisherIds` and `minPublishers`. See [docs/update_lazer_symbols.md](docs/update_lazer_symbols.md) for full details.
+
+```bash
+python3 update_lazer_symbols.py --summary feeds_ready_170226_summary.md --config after.json --dry-run
+```
+
+## Benchmark Results Interpretation Guide
+
+`docs/benchmark_results_guide.md` is a standalone guide for publishers explaining how to read and interpret benchmark CSV output. Covers pass/fail criteria, core quality metrics, session breakdowns, and advanced statistical tests. See [docs/benchmark_results_guide.md](docs/benchmark_results_guide.md).
