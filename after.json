@@ -20996,7 +20996,7 @@
         "quote_currency": "USD"
       },
       "minChannel": { "rate": "0.200000000s" },
-      "minPublishers": 1,
+      "minPublishers": 2,
       "state": "STABLE",
       "symbol": "Equity.US.APP/USD"
     },
@@ -26730,7 +26730,7 @@
       "symbol": "Equity.US.HLT/USD"
     },
     {
-      "allowedPublisherIds": [ 1, 2, 3, 4, 5, 6, 7, 9, 11, 12, 13, 14, 15 ],
+      "allowedPublisherIds": [ 19, 21, 22, 28, 44, 65, 71 ],
       "expiryTime": "5.000000000s",
       "exponent": -5,
       "feedId": 1179,
@@ -26751,8 +26751,8 @@
         "quote_currency": "USD"
       },
       "minChannel": { "rate": "0.200000000s" },
-      "minPublishers": 3,
-      "state": "COMING_SOON",
+      "minPublishers": 2,
+      "state": "STABLE",
       "symbol": "Equity.US.HODL/USD"
     },
     {
@@ -37780,7 +37780,7 @@
       "symbol": "Crypto.YUTY/UTY.RR"
     },
     {
-      "allowedPublisherIds": [ 19, 21, 22, 28, 44, 65, 71 ],
+      "allowedPublisherIds": [ 1, 2, 3, 4, 5, 6, 7, 9, 11, 12, 13, 14, 15 ],
       "expiryTime": "5.000000000s",
       "exponent": -5,
       "feedId": 1603,
@@ -37800,8 +37800,8 @@
         "quote_currency": "CAD"
       },
       "minChannel": { "rate": "0.200000000s" },
-      "minPublishers": 2,
-      "state": "STABLE",
+      "minPublishers": 3,
+      "state": "COMING_SOON",
       "symbol": "Equity.CA.HODL/CAD"
     },
     {
@@ -69648,7 +69648,7 @@
         "quote_currency": "USD"
       },
       "minChannel": { "rate": "0.050000000s" },
-      "minPublishers": 3,
+      "minPublishers": 2,
       "state": "STABLE",
       "symbol": "Equity.US.SHLD/USD"
     },
