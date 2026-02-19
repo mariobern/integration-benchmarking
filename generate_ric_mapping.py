@@ -530,9 +530,12 @@ class RICResolver:
                 result.asset_class = "Equity Future"
                 result.confidence = "high"
             elif symbol.startswith("Equity.US."):
-                # Strip Equity.US. prefix, /USD quote, and .EXT suffix
-                equity_ticker = symbol.replace("Equity.US.", "").replace("/USD", "")
-                equity_ticker = equity_ticker.replace(".EXT", "")
+                # Use the name field as the canonical ticker (handles BRK.B vs BRK-B)
+                equity_ticker = entry.get("name", "")
+                if not equity_ticker:
+                    # Fallback: extract from symbol
+                    equity_ticker = symbol.replace("Equity.US.", "").replace("/USD", "")
+                    equity_ticker = equity_ticker.replace(".EXT", "")
                 result.ric = self._equity.resolve(equity_ticker) or ""
                 result.asset_class = _classify_equity(description)
                 result.display_ticker = equity_ticker
