@@ -117,10 +117,17 @@ Base output includes:
   `uptime_only_publishers`, `both_failing_publishers`
 - errors/timing: `benchmark_error`, `uptime_error`, `error`, `execution_time_ms`
 
-Optional columns:
+Optional per-session readiness columns (with `--extended-hours` / `--overnight`):
 
-- with `--extended-hours`: `premarket_passing_count`, `afterhours_passing_count`
-- with `--overnight`: `overnight_passing_count`
+For each session (`premarket`, `afterhours`, `overnight`):
+- `{session}_ready` — boolean, session-level readiness
+- `{session}_fully_passing_count` — publishers passing both benchmark and uptime for this session
+- `{session}_fully_passing_publishers` — semicolon-separated publisher IDs
+- `{session}_uptime_passing_count`, `{session}_uptime_failing_count`
+- `{session}_median_uptime_pct`
+
+Legacy columns (still present for backward compatibility):
+- `premarket_benchmark_passing_count`, `afterhours_benchmark_passing_count`, `overnight_benchmark_passing_count`
 
 ### Detailed section (`--detailed`)
 
@@ -133,6 +140,10 @@ CSV appends:
   - benchmark metrics (`benchmark_nrmse`, `benchmark_hit_rate`, `benchmark_n_observations`)
   - `uptime_pct`
   - `benchmark_error`, `uptime_error`
+  - extended session uptime (when `--extended-hours` / `--overnight`):
+    `premarket_uptime_passes`, `premarket_uptime_pct`,
+    `afterhours_uptime_passes`, `afterhours_uptime_pct`,
+    `overnight_uptime_passes`, `overnight_uptime_pct`
 
 ### Consistency section (multi-date + `--detailed`)
 
@@ -154,5 +165,15 @@ Console output includes:
 - per-asset-class breakdown
 - optional per-date breakdown (multi-date)
 - timing summary
+
+With `--extended-hours` or `--overnight`, an **EXTENDED SESSION READINESS** table is printed showing per-session readiness rates:
+
+```
+EXTENDED SESSION READINESS
+Session      Ready  Fully Pass  Uptime Pass  Median Uptime
+premarket    3/5    3           4            98.50%
+afterhours   2/5    2           3            96.20%
+overnight    1/5    1           2            91.40%
+```
 
 With multi-date and `--detailed`, a `PUBLISHER CONSISTENCY` report is also printed.
