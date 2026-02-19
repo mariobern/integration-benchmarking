@@ -391,3 +391,37 @@ class TestCLI:
         with open(output) as f:
             rows = list(csv.DictReader(f))
         assert len(rows) == 2
+
+
+@pytest.mark.skipif(
+    not Path("lazer_symbols.json").exists(),
+    reason="lazer_symbols.json not available"
+)
+class TestIntegration:
+    """Validate resolved RICs against known pyth_mappings_export values."""
+
+    KNOWN_MAPPINGS = {
+        # FX
+        "EURUSD": ("EUR=", "Forex"),
+        "AUDCAD": ("AUDCAD=R", "Forex"),
+        # Metals
+        "XAUUSD": ("XAU=", "Metal"),
+        "XAGUSD": ("XAG=", "Metal"),
+        # Rates
+        "US10Y": ("US10YT=RRPS", "Rates"),
+        "US3M": ("US3MT=RRPS", "Rates"),
+    }
+
+    def test_known_mappings(self):
+        from generate_ric_mapping import RICResolver
+        resolver = RICResolver()
+        for ticker, (expected_ric, expected_class) in self.KNOWN_MAPPINGS.items():
+            result = resolver.resolve(ticker)
+            assert result.ric == expected_ric, f"{ticker}: got {result.ric}, expected {expected_ric}"
+            assert result.asset_class == expected_class, f"{ticker}: got {result.asset_class}"
+
+    def test_crypto_skipped(self):
+        from generate_ric_mapping import RICResolver
+        resolver = RICResolver()
+        result = resolver.resolve("BTCUSD")
+        assert result.ric == ""
