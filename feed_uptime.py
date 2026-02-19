@@ -850,6 +850,32 @@ def write_results_csv(
                     )
                 writer.writerow(output_row)
 
+            writer.writerow([])
+            writer.writerow(["PUBLISHER CLASSIFICATIONS"])
+
+            for session_name in session_names:
+                always_passing = []
+                always_failing = []
+                intermittent = []
+                for row in summary_rows:
+                    stats = row["sessions"].get(session_name, {})
+                    pass_dates = stats.get("pass_dates", 0)
+                    fail_dates = stats.get("fail_dates", 0)
+                    if pass_dates + fail_dates == 0:
+                        continue
+                    pid = int(row["publisher_id"])
+                    if pass_dates > 0 and fail_dates == 0:
+                        always_passing.append(pid)
+                    elif fail_dates > 0 and pass_dates == 0:
+                        always_failing.append(pid)
+                    else:
+                        intermittent.append(pid)
+
+                _fmt = lambda ids: ";".join(str(x) for x in ids) if ids else ""
+                writer.writerow([f"{session_name}_always_passing", _fmt(always_passing)])
+                writer.writerow([f"{session_name}_always_failing", _fmt(always_failing)])
+                writer.writerow([f"{session_name}_intermittent", _fmt(intermittent)])
+
 
 def _format_uptime_stats(values: list[float]) -> str:
     return (

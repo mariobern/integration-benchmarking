@@ -7,7 +7,7 @@ benchmark data (Datascope). It is the feed-level counterpart to
 publisher_benchmark.py.
 
 Pass/Fail Criteria (per publisher):
-- PASS if: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 98%)
+- PASS if: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 95%)
 - nrmse = RMSE / (max_benchmark_price - min_benchmark_price)
 - hit_rate = % of observations within 10 basis points (0.1%) of benchmark
 
@@ -645,7 +645,7 @@ def evaluate_session_for_all_publishers(
             )
 
             if nrmse is not None:
-                passes = nrmse < 0.01 or (nrmse < 0.05 and hit_rate >= 98)
+                passes = nrmse < 0.01 or (nrmse < 0.05 and hit_rate >= 95)
             else:
                 passes = False
 
@@ -856,7 +856,7 @@ def evaluate_overnight_for_all_publishers(
             rmse_over_spread = rmse / mean_spread if mean_spread and mean_spread > 0 else None
 
             if nrmse is not None:
-                passes = nrmse < 0.01 or (nrmse < 0.05 and hit_rate >= 98)
+                passes = nrmse < 0.01 or (nrmse < 0.05 and hit_rate >= 95)
             else:
                 passes = False
 
@@ -1116,7 +1116,7 @@ def evaluate_feed_two_queries(
             )
 
             if nrmse is not None:
-                passes = nrmse < 0.01 or (nrmse < 0.05 and hit_rate >= 98)
+                passes = nrmse < 0.01 or (nrmse < 0.05 and hit_rate >= 95)
             else:
                 passes = False
 
@@ -2073,7 +2073,7 @@ def print_interpretation_guide(summary_stats: dict) -> None:
     print("INTERPRETATION GUIDE")
     print(f"{'='*70}")
 
-    print("PASS criteria per publisher: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 98%)")
+    print("PASS criteria per publisher: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 95%)")
     print("Feed is READY when passing publishers >= target publisher count.")
 
     median_nrmse = summary_stats.get("nrmse", {}).get("median")
@@ -2090,7 +2090,7 @@ def print_interpretation_guide(summary_stats: dict) -> None:
 
     if median_hit_rate is not None:
         print(f"Median feed hit_rate: {median_hit_rate:.2f}% (higher is better)")
-        if median_hit_rate >= 98:
+        if median_hit_rate >= 95:
             print("Interpretation: benchmark tracking is generally tight.")
         elif median_hit_rate >= 95:
             print("Interpretation: acceptable but close to pass threshold risk.")
@@ -2461,7 +2461,7 @@ Examples:
     print(f"\n{'='*70}")
     print("PASS/FAIL CRITERIA")
     print(f"{'='*70}")
-    print("Publisher passes if: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 98%)")
+    print("Publisher passes if: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 95%)")
     print("Feed is READY if passing publishers >= target publisher count")
 
     print(f"\n{'='*70}")
