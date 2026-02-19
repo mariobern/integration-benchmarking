@@ -342,11 +342,26 @@ class SymbolIndex:
 
         for entry in self._entries:
             name = entry.get("name", "").upper()
+            symbol = entry.get("symbol", "")
+            asset_type = entry.get("asset_type", "")
+
             if name:
-                self._by_name[name] = entry
+                existing = self._by_name.get(name)
+                if existing is None:
+                    self._by_name[name] = entry
+                else:
+                    # Prefer benchmarkable over non-benchmarkable
+                    existing_type = existing.get("asset_type", "")
+                    is_benchmarkable = asset_type in BENCHMARKABLE_ASSET_TYPES
+                    existing_benchmarkable = existing_type in BENCHMARKABLE_ASSET_TYPES
+                    # Prefer non-EXT over EXT symbols
+                    is_ext = ".EXT" in symbol
+                    existing_ext = ".EXT" in existing.get("symbol", "")
+                    if (is_benchmarkable and not existing_benchmarkable) or \
+                       (existing_ext and not is_ext and is_benchmarkable == existing_benchmarkable):
+                        self._by_name[name] = entry
 
             # Extract ticker from symbol (e.g., "AAPL" from "Equity.US.AAPL/USD")
-            symbol = entry.get("symbol", "")
             pyth_ticker = self._extract_ticker(symbol)
             if pyth_ticker and pyth_ticker not in self._by_pyth_ticker:
                 self._by_pyth_ticker[pyth_ticker] = entry
@@ -515,7 +530,9 @@ class RICResolver:
                 result.asset_class = "Equity Future"
                 result.confidence = "high"
             elif symbol.startswith("Equity.US."):
+                # Strip Equity.US. prefix, /USD quote, and .EXT suffix
                 equity_ticker = symbol.replace("Equity.US.", "").replace("/USD", "")
+                equity_ticker = equity_ticker.replace(".EXT", "")
                 result.ric = self._equity.resolve(equity_ticker) or ""
                 result.asset_class = _classify_equity(description)
                 result.display_ticker = equity_ticker
