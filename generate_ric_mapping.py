@@ -155,6 +155,154 @@ def resolve_commodity_futures_ric(symbol: str) -> Optional[str]:
     return f"{ric_root}{month}{year_2digit}"
 
 
+# --- Equity Index Futures RIC ---
+
+INDEX_FUTURES_PYTH_TO_RIC: dict[str, str] = {
+    "EM": "ES",   # E-Mini S&P 500
+    "NM": "NQ",   # Nasdaq Mini
+    "DM": "YM",   # Dow Jones Mini
+}
+
+_INDEX_FUTURES_PATTERN = re.compile(
+    r"^Equity\.US\.([A-Z]{2})([FGHJKMNQUVXZ])(\d)/USD$"
+)
+
+
+def resolve_equity_futures_ric(symbol: str) -> Optional[str]:
+    """Derive RIC for an equity index futures contract.
+    Returns None if the symbol is a regular equity (not a futures contract).
+    """
+    m = _INDEX_FUTURES_PATTERN.match(symbol)
+    if not m:
+        return None
+    pyth_code = m.group(1)
+    month = m.group(2)
+    year_digit = m.group(3)
+    ric_root = INDEX_FUTURES_PYTH_TO_RIC.get(pyth_code)
+    if not ric_root:
+        return None
+    year_2digit = f"2{year_digit}"
+    return f"{ric_root}{month}{year_2digit}"
+
+
+# --- Equity RIC Resolver (NASDAQ Trader) ---
+
+NASDAQ_TRADER_BASE_URL = "https://www.nasdaqtrader.com/dynamic/SymDir"
+NASDAQ_LISTED_URL = f"{NASDAQ_TRADER_BASE_URL}/nasdaqlisted.txt"
+OTHER_LISTED_URL = f"{NASDAQ_TRADER_BASE_URL}/otherlisted.txt"
+
+EQUITY_CACHE_DIR = Path(".nasdaq_cache")
+EQUITY_CACHE_TTL = 24 * 60 * 60  # 24 hours
+
+OTHER_EXCHANGE_SUFFIX_MAP = {
+    "N": ".N",   # NYSE
+    "P": ".P",   # NYSE Arca
+    "Z": ".Z",   # BATS
+    "A": ".A",   # NYSE American (AMEX)
+    "V": ".K",   # IEXG -> .K in RIC
+}
+
+
+def ticker_to_ric_base(ticker: str) -> str:
+    """Convert dotted ticker to RIC base (BRK.B -> BRKb)."""
+    upper = ticker.upper()
+    if "." in upper:
+        base, cls = upper.rsplit(".", 1)
+        if len(cls) == 1 and cls.isalpha():
+            return base + cls.lower()
+    return upper
+
+
+class EquityResolver:
+    """Resolve US equity/ETF tickers to RICs using NASDAQ Trader."""
+
+    def __init__(self, cache_dir: Path = EQUITY_CACHE_DIR, force_refresh: bool = False):
+        self.cache_dir = cache_dir
+        self.force_refresh = force_refresh
+        self._nasdaq: dict[str, str] = {}
+        self._other: dict[str, tuple[str, str]] = {}
+        self._loaded = False
+
+    def _load_from_files(self, nasdaq_path: Path, other_path: Path) -> None:
+        """Load from already-downloaded files."""
+        self._nasdaq = {}
+        self._other = {}
+
+        for line in nasdaq_path.read_text().strip().split("\n")[1:]:
+            if line.startswith("File Creation Time"):
+                continue
+            parts = line.split("|")
+            if len(parts) >= 2:
+                symbol = parts[0].strip().upper()
+                name = parts[1].strip()
+                test = parts[3].strip() if len(parts) > 3 else "N"
+                if test != "Y":
+                    self._nasdaq[symbol] = name
+
+        for line in other_path.read_text().strip().split("\n")[1:]:
+            if line.startswith("File Creation Time"):
+                continue
+            parts = line.split("|")
+            if len(parts) >= 3:
+                symbol = parts[0].strip().upper()
+                name = parts[1].strip()
+                exchange = parts[2].strip()
+                test = parts[5].strip() if len(parts) > 5 else "N"
+                if test != "Y":
+                    self._other[symbol] = (exchange, name)
+
+        self._loaded = True
+
+    def _ensure_loaded(self) -> None:
+        """Download NASDAQ Trader files if needed, then parse."""
+        if self._loaded:
+            return
+        import time
+        import urllib.request
+
+        self.cache_dir.mkdir(exist_ok=True)
+        nasdaq_path = self.cache_dir / "nasdaqlisted.txt"
+        other_path = self.cache_dir / "otherlisted.txt"
+
+        for url, path in [(NASDAQ_LISTED_URL, nasdaq_path), (OTHER_LISTED_URL, other_path)]:
+            need_download = self.force_refresh or not path.exists()
+            if not need_download:
+                age = time.time() - path.stat().st_mtime
+                need_download = age > EQUITY_CACHE_TTL
+            if need_download:
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    path.write_text(resp.read().decode("utf-8"))
+
+        self._load_from_files(nasdaq_path, other_path)
+
+    def resolve(self, ticker: str) -> Optional[str]:
+        """Resolve ticker to RIC (e.g., AAPL -> AAPL.O, BRK.B -> BRKb.N)."""
+        self._ensure_loaded()
+        upper = ticker.upper()
+        ric_base = ticker_to_ric_base(upper)
+
+        for form in [upper, ric_base]:
+            if form in self._nasdaq:
+                return f"{ric_base}.O"
+            if form in self._other:
+                exchange, _ = self._other[form]
+                suffix = OTHER_EXCHANGE_SUFFIX_MAP.get(exchange, ".N")
+                return f"{ric_base}{suffix}"
+        return None
+
+    def get_name(self, ticker: str) -> Optional[str]:
+        """Get company name for a ticker."""
+        self._ensure_loaded()
+        upper = ticker.upper()
+        for form in [upper, ticker_to_ric_base(upper)]:
+            if form in self._nasdaq:
+                return self._nasdaq[form]
+            if form in self._other:
+                return self._other[form][1]
+        return None
+
+
 # --- Data Classes ---
 
 @dataclass

@@ -221,3 +221,54 @@ class TestCommodityFuturesResolver:
         from generate_ric_mapping import resolve_commodity_futures_ric
         result = resolve_commodity_futures_ric("Commodities.ZZZZH6/USD")
         assert result is None
+
+
+class TestEquityIndexFuturesResolver:
+    def test_emini_sp500_march(self):
+        from generate_ric_mapping import resolve_equity_futures_ric
+        assert resolve_equity_futures_ric("Equity.US.EMH6/USD") == "ESH26"
+
+    def test_nasdaq_mini(self):
+        from generate_ric_mapping import resolve_equity_futures_ric
+        result = resolve_equity_futures_ric("Equity.US.NMH6/USD")
+        assert result is not None and result.startswith("NQ")
+
+    def test_dow_mini(self):
+        from generate_ric_mapping import resolve_equity_futures_ric
+        assert resolve_equity_futures_ric("Equity.US.DMH6/USD") == "YMH26"
+
+    def test_non_futures(self):
+        from generate_ric_mapping import resolve_equity_futures_ric
+        assert resolve_equity_futures_ric("Equity.US.AAPL/USD") is None
+
+
+class TestEquityResolver:
+    def test_nasdaq_ticker(self, tmp_path):
+        from generate_ric_mapping import EquityResolver
+        nasdaq_file = tmp_path / "nasdaqlisted.txt"
+        nasdaq_file.write_text("Symbol|Security Name|Market Category|Test Issue\nAAPL|Apple Inc|Q|N\n")
+        other_file = tmp_path / "otherlisted.txt"
+        other_file.write_text("ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue\n")
+        resolver = EquityResolver(cache_dir=tmp_path)
+        resolver._load_from_files(nasdaq_file, other_file)
+        assert resolver.resolve("AAPL") == "AAPL.O"
+
+    def test_nyse_ticker(self, tmp_path):
+        from generate_ric_mapping import EquityResolver
+        nasdaq_file = tmp_path / "nasdaqlisted.txt"
+        nasdaq_file.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other_file = tmp_path / "otherlisted.txt"
+        other_file.write_text("ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue\nJPM|JPMorgan Chase|N|||100|N\n")
+        resolver = EquityResolver(cache_dir=tmp_path)
+        resolver._load_from_files(nasdaq_file, other_file)
+        assert resolver.resolve("JPM") == "JPM.N"
+
+    def test_dotted_ticker(self, tmp_path):
+        from generate_ric_mapping import EquityResolver
+        nasdaq_file = tmp_path / "nasdaqlisted.txt"
+        nasdaq_file.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other_file = tmp_path / "otherlisted.txt"
+        other_file.write_text("ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue\nBRK.B|Berkshire Hathaway B|N|||100|N\n")
+        resolver = EquityResolver(cache_dir=tmp_path)
+        resolver._load_from_files(nasdaq_file, other_file)
+        assert resolver.resolve("BRK.B") == "BRKb.N"
