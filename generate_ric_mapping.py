@@ -81,6 +81,80 @@ def resolve_fx_ric(symbol: str) -> Optional[str]:
     return f"{base}{quote}="
 
 
+# --- Metal RIC Map ---
+
+METAL_RIC_MAP = {
+    "XAU": "XAU=",
+    "XAG": "XAG=",
+    "XPT": "XPT=",
+    "XPD": "XPD=",
+    "XDP": "XPD=",  # Pyth uses XDP for palladium (Metal.XDP/USD)
+}
+
+
+def resolve_metal_ric(symbol: str) -> Optional[str]:
+    """Derive RIC for a metal spot symbol. Returns None if unknown."""
+    if not symbol.startswith("Metal."):
+        return None
+    body = symbol[6:]  # Strip "Metal."
+    code = body.split("/")[0].upper()
+    code = code.replace("_DEPRECATED", "")
+    return METAL_RIC_MAP.get(code)
+
+
+# --- Rates RIC ---
+
+_US_TREASURY_PATTERN = re.compile(r"^Rates\.US(\d+[MY])$")
+
+
+def resolve_rates_ric(symbol: str) -> Optional[str]:
+    """Derive RIC for US Treasury rates. Pattern: US{TENOR}T=RRPS."""
+    m = _US_TREASURY_PATTERN.match(symbol)
+    if not m:
+        return None
+    tenor = m.group(1)
+    return f"US{tenor}T=RRPS"
+
+
+# --- Commodity Futures RIC ---
+
+FUTURES_PYTH_TO_RIC: dict[str, str] = {
+    "CC":    "HG",   # Copper (COMEX)
+    "WTI":   "CL",   # WTI Crude Oil (NYMEX)
+    "NGD":   "NG",   # Natural Gas (NYMEX)
+    "AL":    "ALI",  # Aluminum (LME/COMEX)
+    "PL":    "PA",   # Palladium (NYMEX)
+    "PT":    "PL",   # Platinum (NYMEX)
+    "UR":    "UX",   # Uranium (COMEX)
+    "CO":    "C",    # Corn (CBOT)
+    "BRENT": "LCO",  # Brent Crude (ICE)
+    "NID":   "NK",   # Nikkei 225 (CME)
+}
+
+MONTH_CODES = "FGHJKMNQUVXZ"
+_FUTURES_PATTERN = re.compile(
+    r"^Commodities\.([A-Z]+)([FGHJKMNQUVXZ])(\d)/USD$"
+)
+
+
+def resolve_commodity_futures_ric(symbol: str) -> Optional[str]:
+    """Derive RIC for a commodity futures contract."""
+    m = _FUTURES_PATTERN.match(symbol)
+    if not m:
+        return None
+
+    pyth_code = m.group(1)
+    month = m.group(2)
+    year_digit = m.group(3)
+
+    ric_root = FUTURES_PYTH_TO_RIC.get(pyth_code)
+    if not ric_root:
+        return None
+
+    year_2digit = f"2{year_digit}"
+    return f"{ric_root}{month}{year_2digit}"
+
+
 # --- Data Classes ---
 
 @dataclass
