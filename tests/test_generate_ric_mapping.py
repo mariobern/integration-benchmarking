@@ -66,3 +66,65 @@ class TestSymbolIndex:
         entry = idx.lookup_by_id(922)
         assert entry is not None
         assert entry["name"] == "AAPL"
+
+
+class TestFXResolver:
+    def test_usd_pair_base_eur(self):
+        from generate_ric_mapping import resolve_fx_ric
+        assert resolve_fx_ric("FX.EUR/USD") == "EUR="
+
+    def test_usd_pair_quote_jpy(self):
+        from generate_ric_mapping import resolve_fx_ric
+        assert resolve_fx_ric("FX.USD/JPY") == "JPY="
+
+    def test_usd_pair_quote_aud(self):
+        from generate_ric_mapping import resolve_fx_ric
+        assert resolve_fx_ric("FX.USD/AUD") == "AUD="
+
+    def test_usd_pair_nzd_usd(self):
+        from generate_ric_mapping import resolve_fx_ric
+        assert resolve_fx_ric("FX.NZD/USD") == "NZD="
+
+    def test_cross_eur_gbp(self):
+        from generate_ric_mapping import resolve_fx_ric
+        assert resolve_fx_ric("FX.EUR/GBP") == "EURGBP="
+
+    def test_cross_gbp_jpy(self):
+        from generate_ric_mapping import resolve_fx_ric
+        assert resolve_fx_ric("FX.GBP/JPY") == "GBPJPY="
+
+    def test_cross_eur_nok(self):
+        from generate_ric_mapping import resolve_fx_ric
+        assert resolve_fx_ric("FX.EUR/NOK") == "EURNOK="
+
+    def test_cross_aud_cad_uses_R(self):
+        from generate_ric_mapping import resolve_fx_ric
+        assert resolve_fx_ric("FX.AUD/CAD") == "AUDCAD=R"
+
+    def test_cross_nzd_chf_uses_R(self):
+        from generate_ric_mapping import resolve_fx_ric
+        assert resolve_fx_ric("FX.NZD/CHF") == "NZDCHF=R"
+
+    def test_cross_cad_chf_uses_R(self):
+        from generate_ric_mapping import resolve_fx_ric
+        assert resolve_fx_ric("FX.CAD/CHF") == "CADCHF=R"
+
+    def test_cross_aud_jpy_no_R(self):
+        from generate_ric_mapping import resolve_fx_ric
+        assert resolve_fx_ric("FX.AUD/JPY") == "AUDJPY="
+
+    def test_cross_chf_jpy_no_R(self):
+        from generate_ric_mapping import resolve_fx_ric
+        assert resolve_fx_ric("FX.CHF/JPY") == "CHFJPY="
+
+    def test_usd_index_dxy(self):
+        from generate_ric_mapping import resolve_fx_ric
+        assert resolve_fx_ric("FX.USDXY") == ".DXY"
+
+    def test_exotic_brl(self):
+        from generate_ric_mapping import resolve_fx_ric
+        assert resolve_fx_ric("FX.USD/BRL") == "BRL="
+
+    def test_exotic_inr(self):
+        from generate_ric_mapping import resolve_fx_ric
+        assert resolve_fx_ric("FX.USD/INR") == "INR="

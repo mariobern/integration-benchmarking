@@ -37,6 +37,50 @@ NON_BENCHMARKABLE_ASSET_TYPES = {
 }
 
 
+# Currencies that use =R suffix when crossed among themselves (no EUR, GBP, or JPY)
+_R_SUFFIX_CURRENCIES = {"AUD", "NZD", "CAD", "CHF"}
+
+
+# --- FX RIC Resolver ---
+
+def resolve_fx_ric(symbol: str) -> Optional[str]:
+    """Derive Datascope RIC for an FX symbol.
+
+    Rules (derived from 60 existing pyth_mappings):
+    - FX.USDXY -> .DXY (special case)
+    - USD pair (one side is USD): non-USD currency + "=" (e.g., EUR=, JPY=)
+    - Cross pair with EUR/GBP/JPY involved: BASECCY+QUOTECCY+"=" (e.g., EURGBP=)
+    - Cross pair both in {AUD,NZD,CAD,CHF}: BASECCY+QUOTECCY+"=R" (e.g., AUDCAD=R)
+    """
+    if not symbol.startswith("FX."):
+        return None
+
+    body = symbol[3:]  # Strip "FX."
+
+    # Special case: Dollar Index
+    if body == "USDXY":
+        return ".DXY"
+
+    # Parse base/quote
+    if "/" not in body:
+        return None
+    base, quote = body.split("/", 1)
+    base = base.upper()
+    quote = quote.upper()
+
+    # USD pair: return the non-USD currency + "="
+    if base == "USD" or quote == "USD":
+        non_usd = quote if base == "USD" else base
+        return f"{non_usd}="
+
+    # Cross pair: both in _R_SUFFIX_CURRENCIES -> use =R
+    if base in _R_SUFFIX_CURRENCIES and quote in _R_SUFFIX_CURRENCIES:
+        return f"{base}{quote}=R"
+
+    # Cross pair: anything else -> use =
+    return f"{base}{quote}="
+
+
 # --- Data Classes ---
 
 @dataclass
