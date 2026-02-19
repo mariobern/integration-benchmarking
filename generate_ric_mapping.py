@@ -16,9 +16,11 @@ Usage:
     python generate_ric_mapping.py --ticker AAPL --output my_mappings.csv
 """
 
+import argparse
 import csv
 import json
 import re
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -571,3 +573,144 @@ def write_csv(results: list[RICResult], output_path: Path) -> None:
     if len(valid) < len(results):
         skipped = len(results) - len(valid)
         print(f"Skipped {skipped} tickers (no RIC resolved)")
+
+
+# --- Summary ---
+
+def print_summary(results: list[RICResult]) -> None:
+    """Print resolution summary to console."""
+    total = len(results)
+    resolved = sum(1 for r in results if r.ric)
+    by_class: dict[str, int] = {}
+    by_confidence: dict[str, int] = {}
+    warnings_list: list[str] = []
+
+    for r in results:
+        if r.ric:
+            by_class[r.asset_class] = by_class.get(r.asset_class, 0) + 1
+        by_confidence[r.confidence] = by_confidence.get(r.confidence, 0) + 1
+        for w in r.warnings:
+            warnings_list.append(f"  {r.ticker}: {w}")
+
+    print(f"\n{'='*60}")
+    print("RIC MAPPING SUMMARY")
+    print(f"{'='*60}")
+    print(f"Total tickers:  {total}")
+    print(f"Resolved:       {resolved}")
+    print(f"Unresolved:     {total - resolved}")
+    print()
+    if by_class:
+        print("By asset class:")
+        for cls, cnt in sorted(by_class.items()):
+            print(f"  {cls}: {cnt}")
+    print()
+    print("Confidence:")
+    for level in ["high", "medium", "low"]:
+        cnt = by_confidence.get(level, 0)
+        if cnt:
+            print(f"  {level}: {cnt}")
+    if warnings_list:
+        print(f"\nWarnings ({len(warnings_list)}):")
+        for w in warnings_list:
+            print(w)
+
+
+# --- CLI ---
+
+def parse_tickers_from_file(path: Path) -> list[str]:
+    """Parse tickers from file (one per line, or CSV first column)."""
+    tickers: list[str] = []
+    seen: set[str] = set()
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            candidate = line.split(",")[0].strip()
+            if candidate.lower() in ("ticker", "symbol"):
+                continue
+            if candidate and candidate not in seen:
+                seen.add(candidate)
+                tickers.append(candidate)
+    return tickers
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Generate RIC mappings for Pyth Lazer tickers (all asset classes)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python generate_ric_mapping.py --ticker AAPL
+  python generate_ric_mapping.py --ticker AAPL AUDCAD CCH6 XAU US10Y
+  python generate_ric_mapping.py --ticker-file new_tickers.txt
+  python generate_ric_mapping.py --ticker AAPL --output my_mappings.csv
+  python generate_ric_mapping.py --ticker AAPL --symbols after.json
+""",
+    )
+
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument("--ticker", nargs="+", help="Ticker(s) to resolve")
+    input_group.add_argument("--ticker-file", type=Path, help="File with tickers")
+
+    parser.add_argument("--output", type=Path, default=Path("ric_mappings.csv"),
+                        help="Output CSV path (default: ric_mappings.csv)")
+    parser.add_argument("--symbols", type=Path, default=DEFAULT_SYMBOLS_PATH,
+                        help="Path to lazer_symbols.json")
+    parser.add_argument("--force-refresh", action="store_true",
+                        help="Re-download NASDAQ Trader data")
+    parser.add_argument("--append-to", type=Path, default=None,
+                        help="Append to existing CSV instead of creating new")
+
+    args = parser.parse_args()
+
+    if not args.symbols.exists():
+        print(f"Error: {args.symbols} not found", file=sys.stderr)
+        sys.exit(1)
+
+    if args.ticker:
+        tickers = args.ticker
+    else:
+        if not args.ticker_file.exists():
+            print(f"Error: {args.ticker_file} not found", file=sys.stderr)
+            sys.exit(1)
+        tickers = parse_tickers_from_file(args.ticker_file)
+
+    if not tickers:
+        print("Error: No tickers provided", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Resolving RICs for {len(tickers)} ticker(s)...")
+    resolver = RICResolver(
+        symbols_path=args.symbols,
+        force_refresh=args.force_refresh,
+    )
+
+    results = resolver.resolve_batch(tickers)
+    print_summary(results)
+
+    output_path = args.append_to or args.output
+    if args.append_to and args.append_to.exists():
+        valid = [r for r in results if r.ric]
+        with open(args.append_to, "a", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
+            for r in valid:
+                writer.writerow({
+                    "source_value": r.ric,
+                    "source_type": r.source_type,
+                    "pyth_id": r.pyth_id,
+                    "pythnet_id": r.pythnet_id,
+                    "pyth_lazer_id": r.pyth_lazer_id or "",
+                    "valid_from": r.valid_from,
+                    "valid_to": r.valid_to,
+                    "ticker": r.display_ticker,
+                    "asset_full_name": r.asset_full_name,
+                    "asset_class": r.asset_class,
+                })
+        print(f"Appended {len(valid)} rows to {args.append_to}")
+    else:
+        write_csv(results, output_path)
+
+
+if __name__ == "__main__":
+    main()

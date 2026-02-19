@@ -355,3 +355,39 @@ class TestCSVOutput:
         assert len(rows) == 2
         assert rows[0]["source_value"] == "EUR="
         assert rows[0]["source_type"] == "RIC"
+
+
+class TestCLI:
+    def test_single_ticker(self, symbols_path, tmp_path):
+        """Test CLI with a single ticker."""
+        import subprocess
+        output = tmp_path / "out.csv"
+        result = subprocess.run(
+            ["python3", "generate_ric_mapping.py",
+             "--ticker", "EURUSD",
+             "--symbols", str(symbols_path),
+             "--output", str(output)],
+            capture_output=True, text=True
+        )
+        assert result.returncode == 0
+        assert output.exists()
+
+    def test_ticker_file(self, symbols_path, tmp_path):
+        """Test CLI with ticker file input."""
+        import subprocess
+        ticker_file = tmp_path / "tickers.txt"
+        ticker_file.write_text("EURUSD\nUS10Y\n")
+        output = tmp_path / "out.csv"
+        result = subprocess.run(
+            ["python3", "generate_ric_mapping.py",
+             "--ticker-file", str(ticker_file),
+             "--symbols", str(symbols_path),
+             "--output", str(output)],
+            capture_output=True, text=True
+        )
+        assert result.returncode == 0
+        assert output.exists()
+        import csv
+        with open(output) as f:
+            rows = list(csv.DictReader(f))
+        assert len(rows) == 2
