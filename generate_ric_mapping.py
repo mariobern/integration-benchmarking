@@ -134,7 +134,6 @@ FUTURES_PYTH_TO_RIC: dict[str, str] = {
     "NID":   "NK",   # Nikkei 225 (CME)
 }
 
-MONTH_CODES = "FGHJKMNQUVXZ"
 _FUTURES_PATTERN = re.compile(
     r"^Commodities\.([A-Z]+)([FGHJKMNQUVXZ])(\d)/USD$"
 )
@@ -261,6 +260,7 @@ class EquityResolver:
         if self._loaded:
             return
         import time
+        import urllib.error
         import urllib.request
 
         self.cache_dir.mkdir(exist_ok=True)
@@ -273,9 +273,18 @@ class EquityResolver:
                 age = time.time() - path.stat().st_mtime
                 need_download = age > EQUITY_CACHE_TTL
             if need_download:
-                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib.request.urlopen(req, timeout=30) as resp:
-                    path.write_text(resp.read().decode("utf-8"))
+                try:
+                    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                    with urllib.request.urlopen(req, timeout=30) as resp:
+                        path.write_text(resp.read().decode("utf-8"))
+                except (urllib.error.URLError, OSError) as e:
+                    if path.exists():
+                        print(f"Warning: Failed to refresh {path.name}, using cached: {e}",
+                              file=sys.stderr)
+                    else:
+                        raise RuntimeError(
+                            f"Cannot download {url} and no cached version exists: {e}"
+                        ) from e
 
         self._load_from_files(nasdaq_path, other_path)
 
@@ -352,12 +361,17 @@ class SymbolIndex:
                 else:
                     # Prefer benchmarkable over non-benchmarkable
                     existing_type = existing.get("asset_type", "")
+                    existing_symbol = existing.get("symbol", "")
                     is_benchmarkable = asset_type in BENCHMARKABLE_ASSET_TYPES
                     existing_benchmarkable = existing_type in BENCHMARKABLE_ASSET_TYPES
                     # Prefer non-EXT over EXT symbols
                     is_ext = ".EXT" in symbol
-                    existing_ext = ".EXT" in existing.get("symbol", "")
+                    existing_ext = ".EXT" in existing_symbol
+                    # Prefer US equities over non-US (most users want US)
+                    is_us = "Equity.US." in symbol
+                    existing_us = "Equity.US." in existing_symbol
                     if (is_benchmarkable and not existing_benchmarkable) or \
+                       (is_us and not existing_us) or \
                        (existing_ext and not is_ext and is_benchmarkable == existing_benchmarkable):
                         self._by_name[name] = entry
 
@@ -569,27 +583,35 @@ CSV_COLUMNS = [
 ]
 
 
-def write_csv(results: list[RICResult], output_path: Path) -> None:
+def _result_to_row(r: RICResult) -> dict:
+    """Convert a RICResult to a CSV row dict."""
+    return {
+        "source_value": r.ric,
+        "source_type": r.source_type,
+        "pyth_id": r.pyth_id,
+        "pythnet_id": r.pythnet_id,
+        "pyth_lazer_id": r.pyth_lazer_id or "",
+        "valid_from": r.valid_from,
+        "valid_to": r.valid_to,
+        "ticker": r.display_ticker,
+        "asset_full_name": r.asset_full_name,
+        "asset_class": r.asset_class,
+    }
+
+
+def write_csv(results: list[RICResult], output_path: Path, append: bool = False) -> None:
     """Write results in pyth_mappings_export CSV format."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     valid = [r for r in results if r.ric]
-    with open(output_path, "w", newline="") as f:
+    mode = "a" if append else "w"
+    with open(output_path, mode, newline="") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
-        writer.writeheader()
+        if not append:
+            writer.writeheader()
         for r in valid:
-            writer.writerow({
-                "source_value": r.ric,
-                "source_type": r.source_type,
-                "pyth_id": r.pyth_id,
-                "pythnet_id": r.pythnet_id,
-                "pyth_lazer_id": r.pyth_lazer_id or "",
-                "valid_from": r.valid_from,
-                "valid_to": r.valid_to,
-                "ticker": r.display_ticker,
-                "asset_full_name": r.asset_full_name,
-                "asset_class": r.asset_class,
-            })
-    print(f"Wrote {len(valid)} rows to {output_path}")
+            writer.writerow(_result_to_row(r))
+    action = "Appended" if append else "Wrote"
+    print(f"{action} {len(valid)} rows to {output_path}")
     if len(valid) < len(results):
         skipped = len(results) - len(valid)
         print(f"Skipped {skipped} tickers (no RIC resolved)")
@@ -710,26 +732,8 @@ Examples:
     print_summary(results)
 
     output_path = args.append_to or args.output
-    if args.append_to and args.append_to.exists():
-        valid = [r for r in results if r.ric]
-        with open(args.append_to, "a", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
-            for r in valid:
-                writer.writerow({
-                    "source_value": r.ric,
-                    "source_type": r.source_type,
-                    "pyth_id": r.pyth_id,
-                    "pythnet_id": r.pythnet_id,
-                    "pyth_lazer_id": r.pyth_lazer_id or "",
-                    "valid_from": r.valid_from,
-                    "valid_to": r.valid_to,
-                    "ticker": r.display_ticker,
-                    "asset_full_name": r.asset_full_name,
-                    "asset_class": r.asset_class,
-                })
-        print(f"Appended {len(valid)} rows to {args.append_to}")
-    else:
-        write_csv(results, output_path)
+    append = args.append_to is not None and args.append_to.exists()
+    write_csv(results, output_path, append=append)
 
 
 if __name__ == "__main__":

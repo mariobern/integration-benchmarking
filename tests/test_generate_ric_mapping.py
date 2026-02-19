@@ -211,7 +211,7 @@ class TestCommodityFuturesResolver:
 
     def test_brent_march_2026(self):
         from generate_ric_mapping import resolve_commodity_futures_ric
-        assert resolve_commodity_futures_ric("Commodities.BRENTH6/USD") is not None
+        assert resolve_commodity_futures_ric("Commodities.BRENTH6/USD") == "LCOH26"
 
     def test_nikkei_march_2026(self):
         from generate_ric_mapping import resolve_commodity_futures_ric
