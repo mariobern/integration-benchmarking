@@ -272,3 +272,86 @@ class TestEquityResolver:
         resolver = EquityResolver(cache_dir=tmp_path)
         resolver._load_from_files(nasdaq_file, other_file)
         assert resolver.resolve("BRK.B") == "BRKb.N"
+
+
+class TestRICResolver:
+    """Integration tests for the main resolve() dispatcher."""
+
+    def test_resolve_equity(self, symbols_path, tmp_path):
+        from generate_ric_mapping import RICResolver
+        nasdaq = tmp_path / "nasdaqlisted.txt"
+        nasdaq.write_text("Symbol|Security Name|Market Category|Test Issue\nAAPL|Apple Inc|Q|N\n")
+        other = tmp_path / "otherlisted.txt"
+        other.write_text("ACT Symbol|Security Name|Exchange|CQS|ETF|Lot|Test\n")
+        resolver = RICResolver(symbols_path, equity_cache_dir=tmp_path)
+        resolver._equity._load_from_files(nasdaq, other)
+        result = resolver.resolve("AAPL")
+        assert result.ric == "AAPL.O"
+        assert result.asset_class == "Common Stock"
+        assert result.pyth_lazer_id == 922
+
+    def test_resolve_fx(self, symbols_path):
+        from generate_ric_mapping import RICResolver
+        resolver = RICResolver(symbols_path)
+        result = resolver.resolve("EURUSD")
+        assert result.ric == "EUR="
+        assert result.asset_class == "Forex"
+
+    def test_resolve_fx_cross(self, symbols_path):
+        from generate_ric_mapping import RICResolver
+        resolver = RICResolver(symbols_path)
+        result = resolver.resolve("AUDCAD")
+        assert result.ric == "AUDCAD=R"
+        assert result.asset_class == "Forex"
+
+    def test_resolve_metal(self, symbols_path):
+        from generate_ric_mapping import RICResolver
+        resolver = RICResolver(symbols_path)
+        result = resolver.resolve("XAUUSD")
+        assert result.ric == "XAU="
+        assert result.asset_class == "Metal"
+
+    def test_resolve_commodity_futures(self, symbols_path):
+        from generate_ric_mapping import RICResolver
+        resolver = RICResolver(symbols_path)
+        result = resolver.resolve("CCH6")
+        assert result.ric == "HGH26"
+        assert result.asset_class == "Commodity Future"
+
+    def test_resolve_rates(self, symbols_path):
+        from generate_ric_mapping import RICResolver
+        resolver = RICResolver(symbols_path)
+        result = resolver.resolve("US10Y")
+        assert result.ric == "US10YT=RRPS"
+        assert result.asset_class == "Rates"
+
+    def test_resolve_crypto_skipped(self, symbols_path):
+        from generate_ric_mapping import RICResolver
+        resolver = RICResolver(symbols_path)
+        result = resolver.resolve("BTCUSD")
+        assert result.ric == ""
+        assert len(result.warnings) > 0
+
+    def test_resolve_not_found(self, symbols_path):
+        from generate_ric_mapping import RICResolver
+        resolver = RICResolver(symbols_path)
+        result = resolver.resolve("ZZZZZ")
+        assert result.ric == ""
+        assert len(result.warnings) > 0
+
+
+class TestCSVOutput:
+    def test_csv_format(self, symbols_path, tmp_path):
+        from generate_ric_mapping import RICResolver, write_csv
+        resolver = RICResolver(symbols_path)
+        results = [resolver.resolve("EURUSD"), resolver.resolve("US10Y")]
+        output = tmp_path / "output.csv"
+        write_csv(results, output)
+        assert output.exists()
+        import csv
+        with open(output) as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        assert len(rows) == 2
+        assert rows[0]["source_value"] == "EUR="
+        assert rows[0]["source_type"] == "RIC"

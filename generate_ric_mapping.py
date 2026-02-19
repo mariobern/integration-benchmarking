@@ -16,6 +16,7 @@ Usage:
     python generate_ric_mapping.py --ticker AAPL --output my_mappings.csv
 """
 
+import csv
 import json
 import re
 from dataclasses import dataclass, field
@@ -389,3 +390,184 @@ class SymbolIndex:
     def lookup_by_id(self, lazer_id: int) -> Optional[dict]:
         """Look up by pyth_lazer_id."""
         return self._by_id.get(lazer_id)
+
+
+# --- Asset Class Classification ---
+
+ADR_KEYWORDS = ["american depositary", "depositary shares", "depositary receipts", " adr", " ads"]
+
+
+def _classify_equity(description: str) -> str:
+    """Classify equity as Common Stock, ADR, Equity (ETF), etc."""
+    lower = description.lower()
+    for kw in ADR_KEYWORDS:
+        if kw in lower:
+            return "American Depositary Shares"
+    if "etf" in lower or "fund" in lower or "trust" in lower:
+        return "Equity"
+    if "class a " in lower:
+        return "Class A Common Stock"
+    if "class b " in lower:
+        return "Class B Common Stock"
+    if "class c " in lower:
+        return "Class C Common Stock"
+    if "preferred" in lower:
+        return "Preferred Share"
+    if "ordinary" in lower:
+        return "Ordinary Shares"
+    return "Common Stock"
+
+
+def _derive_pyth_id(entry: dict) -> str:
+    """Derive pyth_id from lazer_symbols entry."""
+    asset_type = entry.get("asset_type", "")
+    symbol = entry.get("symbol", "")
+    name = entry.get("name", "").lower()
+
+    if asset_type == "fx":
+        return f"fx.{name}"
+    elif asset_type == "metal":
+        return f"metal.{name}"
+    elif asset_type == "rates":
+        return f"rates.{name}"
+    elif asset_type == "commodity":
+        return f"future.{name}"
+    elif asset_type == "equity":
+        if _INDEX_FUTURES_PATTERN.match(symbol):
+            return f"future.{name}"
+        return f"equity.{name}"
+    return f"{asset_type}.{name}"
+
+
+# --- Main Resolver ---
+
+class RICResolver:
+    """Orchestrates RIC resolution across all asset classes."""
+
+    def __init__(
+        self,
+        symbols_path: Path = DEFAULT_SYMBOLS_PATH,
+        equity_cache_dir: Path = EQUITY_CACHE_DIR,
+        force_refresh: bool = False,
+    ):
+        self._index = SymbolIndex(symbols_path)
+        self._equity = EquityResolver(cache_dir=equity_cache_dir, force_refresh=force_refresh)
+
+    def resolve(self, ticker: str) -> RICResult:
+        """Resolve a ticker to its Datascope RIC."""
+        entry = self._index.lookup(ticker)
+        if not entry:
+            return RICResult(
+                ticker=ticker,
+                warnings=[f"Ticker '{ticker}' not found in lazer_symbols.json"],
+            )
+
+        asset_type = entry.get("asset_type", "")
+        symbol = entry.get("symbol", "")
+        description = entry.get("description", "")
+
+        # Skip non-benchmarkable assets
+        if asset_type in NON_BENCHMARKABLE_ASSET_TYPES:
+            return RICResult(
+                ticker=ticker,
+                pyth_lazer_id=entry.get("pyth_lazer_id"),
+                pythnet_id=symbol,
+                warnings=[f"Asset type '{asset_type}' has no Datascope benchmark"],
+            )
+
+        result = RICResult(
+            ticker=ticker,
+            pyth_lazer_id=entry.get("pyth_lazer_id"),
+            pythnet_id=symbol,
+            pyth_id=_derive_pyth_id(entry),
+            display_ticker=entry.get("name", ticker),
+            asset_full_name=description,
+            valid_from="1970-01-01 00:00:00",
+        )
+
+        # Dispatch to asset-class resolver
+        if asset_type == "fx":
+            result.ric = resolve_fx_ric(symbol) or ""
+            result.asset_class = "Forex"
+            result.confidence = "high" if result.ric else "low"
+
+        elif asset_type == "metal":
+            result.ric = resolve_metal_ric(symbol) or ""
+            result.asset_class = "Metal"
+            result.confidence = "high" if result.ric else "low"
+
+        elif asset_type == "rates":
+            result.ric = resolve_rates_ric(symbol) or ""
+            result.asset_class = "Rates"
+            result.confidence = "high" if result.ric else "low"
+
+        elif asset_type == "commodity":
+            result.ric = resolve_commodity_futures_ric(symbol) or ""
+            result.asset_class = "Commodity Future"
+            result.confidence = "high" if result.ric else "low"
+
+        elif asset_type == "equity":
+            futures_ric = resolve_equity_futures_ric(symbol)
+            if futures_ric:
+                result.ric = futures_ric
+                result.asset_class = "Equity Future"
+                result.confidence = "high"
+            elif symbol.startswith("Equity.US."):
+                equity_ticker = symbol.replace("Equity.US.", "").replace("/USD", "")
+                result.ric = self._equity.resolve(equity_ticker) or ""
+                result.asset_class = _classify_equity(description)
+                result.display_ticker = equity_ticker
+                if result.ric:
+                    result.confidence = "medium"
+                else:
+                    ric_base = ticker_to_ric_base(equity_ticker)
+                    result.ric = f"{ric_base}.N"
+                    result.confidence = "low"
+                    result.warnings.append(f"Defaulting to {result.ric} — verify exchange suffix")
+            else:
+                result.warnings.append(f"Non-US equity '{symbol}' — RIC resolution not supported")
+                result.confidence = "low"
+
+        if not result.ric and not result.warnings:
+            result.warnings.append(f"Could not derive RIC for {symbol}")
+
+        return result
+
+    def resolve_batch(self, tickers: list[str]) -> list[RICResult]:
+        """Resolve multiple tickers."""
+        return [self.resolve(t) for t in tickers]
+
+
+# --- CSV Output ---
+
+CSV_COLUMNS = [
+    "source_value", "source_type", "pyth_id", "pythnet_id",
+    "pyth_lazer_id", "valid_from", "valid_to", "ticker",
+    "asset_full_name", "asset_class",
+]
+
+
+def write_csv(results: list[RICResult], output_path: Path) -> None:
+    """Write results in pyth_mappings_export CSV format."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    valid = [r for r in results if r.ric]
+    with open(output_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
+        writer.writeheader()
+        for r in valid:
+            writer.writerow({
+                "source_value": r.ric,
+                "source_type": r.source_type,
+                "pyth_id": r.pyth_id,
+                "pythnet_id": r.pythnet_id,
+                "pyth_lazer_id": r.pyth_lazer_id or "",
+                "valid_from": r.valid_from,
+                "valid_to": r.valid_to,
+                "ticker": r.display_ticker,
+                "asset_full_name": r.asset_full_name,
+                "asset_class": r.asset_class,
+            })
+    print(f"Wrote {len(valid)} rows to {output_path}")
+    if len(valid) < len(results):
+        skipped = len(results) - len(valid)
+        print(f"Skipped {skipped} tickers (no RIC resolved)")
