@@ -70,6 +70,19 @@ class PublisherReadinessDetail:
     fully_passes: bool
     benchmark_detail: Optional[PublisherFeedMetrics] = None
     uptime_sessions: Optional[list[PublisherSessionUptime]] = None
+    # Extended session benchmark (populated when --extended-hours / --overnight)
+    premarket_benchmark_passes: Optional[bool] = None
+    premarket_benchmark_nrmse: Optional[float] = None
+    premarket_benchmark_hit_rate: Optional[float] = None
+    premarket_benchmark_n_observations: Optional[int] = None
+    afterhours_benchmark_passes: Optional[bool] = None
+    afterhours_benchmark_nrmse: Optional[float] = None
+    afterhours_benchmark_hit_rate: Optional[float] = None
+    afterhours_benchmark_n_observations: Optional[int] = None
+    overnight_benchmark_passes: Optional[bool] = None
+    overnight_benchmark_nrmse: Optional[float] = None
+    overnight_benchmark_hit_rate: Optional[float] = None
+    overnight_benchmark_n_observations: Optional[int] = None
     # Extended session uptime (populated when --extended-hours / --overnight)
     premarket_uptime_passes: Optional[bool] = None
     premarket_uptime_pct: Optional[float] = None
@@ -366,6 +379,18 @@ def merge_results(
                 fully_passes=fully_passes,
                 benchmark_detail=benchmark_detail if include_detailed else None,
                 uptime_sessions=uptime_sessions_by_pub.get(publisher_id) if include_detailed else None,
+                premarket_benchmark_passes=(benchmark_detail.premarket_metrics.passes and not bool(benchmark_detail.premarket_metrics.error)) if benchmark_detail is not None and benchmark_detail.premarket_metrics is not None else None,
+                premarket_benchmark_nrmse=benchmark_detail.premarket_metrics.nrmse if benchmark_detail is not None and benchmark_detail.premarket_metrics is not None else None,
+                premarket_benchmark_hit_rate=benchmark_detail.premarket_metrics.hit_rate if benchmark_detail is not None and benchmark_detail.premarket_metrics is not None else None,
+                premarket_benchmark_n_observations=benchmark_detail.premarket_metrics.n_observations if benchmark_detail is not None and benchmark_detail.premarket_metrics is not None else None,
+                afterhours_benchmark_passes=(benchmark_detail.afterhours_metrics.passes and not bool(benchmark_detail.afterhours_metrics.error)) if benchmark_detail is not None and benchmark_detail.afterhours_metrics is not None else None,
+                afterhours_benchmark_nrmse=benchmark_detail.afterhours_metrics.nrmse if benchmark_detail is not None and benchmark_detail.afterhours_metrics is not None else None,
+                afterhours_benchmark_hit_rate=benchmark_detail.afterhours_metrics.hit_rate if benchmark_detail is not None and benchmark_detail.afterhours_metrics is not None else None,
+                afterhours_benchmark_n_observations=benchmark_detail.afterhours_metrics.n_observations if benchmark_detail is not None and benchmark_detail.afterhours_metrics is not None else None,
+                overnight_benchmark_passes=(benchmark_detail.overnight_metrics.passes and not bool(benchmark_detail.overnight_metrics.error)) if benchmark_detail is not None and benchmark_detail.overnight_metrics is not None else None,
+                overnight_benchmark_nrmse=benchmark_detail.overnight_metrics.nrmse if benchmark_detail is not None and benchmark_detail.overnight_metrics is not None else None,
+                overnight_benchmark_hit_rate=benchmark_detail.overnight_metrics.hit_rate if benchmark_detail is not None and benchmark_detail.overnight_metrics is not None else None,
+                overnight_benchmark_n_observations=benchmark_detail.overnight_metrics.n_observations if benchmark_detail is not None and benchmark_detail.overnight_metrics is not None else None,
                 premarket_uptime_passes=premarket_uptime_by_pub[publisher_id].passes if publisher_id in premarket_uptime_by_pub else None,
                 premarket_uptime_pct=premarket_uptime_by_pub[publisher_id].uptime_pct if publisher_id in premarket_uptime_by_pub else None,
                 afterhours_uptime_passes=afterhours_uptime_by_pub[publisher_id].passes if publisher_id in afterhours_uptime_by_pub else None,
@@ -988,11 +1013,17 @@ def write_results_csv(
             ]
             if include_extended_hours:
                 detail_header.extend([
+                    "premarket_benchmark_passes", "premarket_benchmark_nrmse",
+                    "premarket_benchmark_hit_rate", "premarket_benchmark_n_observations",
                     "premarket_uptime_pct", "premarket_uptime_passes",
+                    "afterhours_benchmark_passes", "afterhours_benchmark_nrmse",
+                    "afterhours_benchmark_hit_rate", "afterhours_benchmark_n_observations",
                     "afterhours_uptime_pct", "afterhours_uptime_passes",
                 ])
             if include_overnight:
                 detail_header.extend([
+                    "overnight_benchmark_passes", "overnight_benchmark_nrmse",
+                    "overnight_benchmark_hit_rate", "overnight_benchmark_n_observations",
                     "overnight_uptime_pct", "overnight_uptime_passes",
                 ])
             writer.writerow(detail_header)
@@ -1018,13 +1049,25 @@ def write_results_csv(
                     ]
                     if include_extended_hours:
                         detail_row.extend([
+                            detail.premarket_benchmark_passes if detail.premarket_benchmark_passes is not None else "",
+                            f"{detail.premarket_benchmark_nrmse:.6f}" if detail.premarket_benchmark_nrmse is not None else "",
+                            f"{detail.premarket_benchmark_hit_rate:.2f}" if detail.premarket_benchmark_hit_rate is not None else "",
+                            detail.premarket_benchmark_n_observations if detail.premarket_benchmark_n_observations is not None else "",
                             f"{detail.premarket_uptime_pct:.4f}" if detail.premarket_uptime_pct is not None else "",
                             detail.premarket_uptime_passes if detail.premarket_uptime_passes is not None else "",
+                            detail.afterhours_benchmark_passes if detail.afterhours_benchmark_passes is not None else "",
+                            f"{detail.afterhours_benchmark_nrmse:.6f}" if detail.afterhours_benchmark_nrmse is not None else "",
+                            f"{detail.afterhours_benchmark_hit_rate:.2f}" if detail.afterhours_benchmark_hit_rate is not None else "",
+                            detail.afterhours_benchmark_n_observations if detail.afterhours_benchmark_n_observations is not None else "",
                             f"{detail.afterhours_uptime_pct:.4f}" if detail.afterhours_uptime_pct is not None else "",
                             detail.afterhours_uptime_passes if detail.afterhours_uptime_passes is not None else "",
                         ])
                     if include_overnight:
                         detail_row.extend([
+                            detail.overnight_benchmark_passes if detail.overnight_benchmark_passes is not None else "",
+                            f"{detail.overnight_benchmark_nrmse:.6f}" if detail.overnight_benchmark_nrmse is not None else "",
+                            f"{detail.overnight_benchmark_hit_rate:.2f}" if detail.overnight_benchmark_hit_rate is not None else "",
+                            detail.overnight_benchmark_n_observations if detail.overnight_benchmark_n_observations is not None else "",
                             f"{detail.overnight_uptime_pct:.4f}" if detail.overnight_uptime_pct is not None else "",
                             detail.overnight_uptime_passes if detail.overnight_uptime_passes is not None else "",
                         ])
