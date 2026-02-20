@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, TypedDict
+from typing import Callable, Optional, TypedDict
 
 from date_utils import expand_date_args, validate_date_args
 from feed_uptime import (
@@ -784,6 +784,56 @@ def process_csv(
         gap_threshold_ms=gap_threshold_ms,
         uptime_threshold_pct=uptime_threshold_pct,
         include_detailed=include_detailed,
+    )
+
+
+def _regular_status(detail: PublisherReadinessDetail) -> str:
+    """Status extractor for regular-hours consistency."""
+    if detail.benchmark_error or detail.uptime_error:
+        return "ERROR"
+    return "PASS" if detail.fully_passes else "FAIL"
+
+
+def _session_status(
+    benchmark_passes: bool | None,
+    uptime_passes: bool | None,
+    uptime_pct: float | None,
+) -> str | None:
+    """Generic session status extractor. Returns None if no data for this session.
+
+    Note: uptime_passes is expected to always be populated when uptime_pct > 0
+    (the uptime module sets both fields together). If uptime_passes is None with
+    non-zero uptime_pct, it is treated as a FAIL (not ERROR) since the uptime
+    calculation ran but the pass flag was not set.
+    """
+    if uptime_pct is None or uptime_pct == 0.0:
+        return None
+    if benchmark_passes is None:
+        return "ERROR"
+    return "PASS" if (benchmark_passes and uptime_passes) else "FAIL"
+
+
+def _premarket_status(detail: PublisherReadinessDetail) -> str | None:
+    return _session_status(
+        detail.premarket_benchmark_passes,
+        detail.premarket_uptime_passes,
+        detail.premarket_uptime_pct,
+    )
+
+
+def _afterhours_status(detail: PublisherReadinessDetail) -> str | None:
+    return _session_status(
+        detail.afterhours_benchmark_passes,
+        detail.afterhours_uptime_passes,
+        detail.afterhours_uptime_pct,
+    )
+
+
+def _overnight_status(detail: PublisherReadinessDetail) -> str | None:
+    return _session_status(
+        detail.overnight_benchmark_passes,
+        detail.overnight_uptime_passes,
+        detail.overnight_uptime_pct,
     )
 
 
