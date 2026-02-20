@@ -208,3 +208,185 @@ class TestOvernightStatus:
             overnight_uptime_pct=99.0,
         )
         assert _overnight_status(detail) == "ERROR"
+
+
+# ---------------------------------------------------------------------------
+# compute_publisher_consistency tests
+# ---------------------------------------------------------------------------
+
+
+class TestComputePublisherConsistency:
+    """Tests for compute_publisher_consistency with status_extractor."""
+
+    def _make_two_date_results(self):
+        """Two dates, publisher 19 passes regular+premarket, publisher 20 fails both."""
+        details_d1 = [
+            make_detail(
+                publisher_id=19, fully_passes=True, benchmark_passes=True, uptime_passes=True,
+                premarket_benchmark_passes=True, premarket_uptime_passes=True, premarket_uptime_pct=99.0,
+            ),
+            make_detail(
+                publisher_id=20, fully_passes=False,
+                premarket_benchmark_passes=False, premarket_uptime_passes=True, premarket_uptime_pct=80.0,
+            ),
+        ]
+        details_d2 = [
+            make_detail(
+                publisher_id=19, fully_passes=True, benchmark_passes=True, uptime_passes=True,
+                premarket_benchmark_passes=True, premarket_uptime_passes=True, premarket_uptime_pct=99.0,
+            ),
+            make_detail(
+                publisher_id=20, fully_passes=False,
+                premarket_benchmark_passes=True, premarket_uptime_passes=True, premarket_uptime_pct=95.0,
+            ),
+        ]
+        return [
+            make_result(feed_id=100, date="2026-02-17", details=details_d1),
+            make_result(feed_id=100, date="2026-02-18", details=details_d2),
+        ]
+
+    def test_regular_default_extractor(self):
+        results = self._make_two_date_results()
+        consistency = compute_publisher_consistency(results)
+        row_19 = next(r for r in consistency["rows"] if r["publisher_id"] == 19)
+        assert row_19["pass_count"] == 2
+        assert 19 in consistency["classifications"]["always_passing"]
+        row_20 = next(r for r in consistency["rows"] if r["publisher_id"] == 20)
+        assert row_20["fail_count"] == 2
+        assert 20 in consistency["classifications"]["always_failing"]
+
+    def test_premarket_extractor(self):
+        results = self._make_two_date_results()
+        consistency = compute_publisher_consistency(results, status_extractor=_premarket_status)
+        row_19 = next(r for r in consistency["rows"] if r["publisher_id"] == 19)
+        assert row_19["pass_count"] == 2
+        row_20 = next(r for r in consistency["rows"] if r["publisher_id"] == 20)
+        assert row_20["pass_count"] == 1
+        assert row_20["fail_count"] == 1
+        assert 20 in consistency["classifications"]["intermittent"]
+
+    def test_extractor_none_excludes_publisher(self):
+        details = [
+            make_detail(
+                publisher_id=19, fully_passes=True,
+                premarket_uptime_pct=99.0, premarket_benchmark_passes=True, premarket_uptime_passes=True,
+            ),
+            make_detail(
+                publisher_id=20, fully_passes=False,
+                premarket_uptime_pct=None,
+            ),
+        ]
+        results = [
+            make_result(feed_id=100, date="2026-02-17", details=details),
+            make_result(feed_id=100, date="2026-02-18", details=details),
+        ]
+        consistency = compute_publisher_consistency(results, status_extractor=_premarket_status)
+        publisher_ids = {r["publisher_id"] for r in consistency["rows"]}
+        assert 19 in publisher_ids
+        assert 20 not in publisher_ids
+
+    def test_backward_compatible_no_extractor(self):
+        details = [make_detail(publisher_id=19, fully_passes=True, benchmark_passes=True, uptime_passes=True)]
+        results = [
+            make_result(feed_id=100, date="2026-02-17", details=details),
+            make_result(feed_id=100, date="2026-02-18", details=details),
+        ]
+        consistency = compute_publisher_consistency(results)
+        assert consistency["classifications"]["always_passing"] == [19]
+
+
+# ---------------------------------------------------------------------------
+# write_publisher_consistency_csv tests
+# ---------------------------------------------------------------------------
+
+
+class TestWritePublisherConsistencyCsv:
+    def _write_and_read(self, consistency, session_prefix=""):
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        write_publisher_consistency_csv(writer, consistency, session_prefix=session_prefix)
+        buf.seek(0)
+        return buf.getvalue()
+
+    def _make_consistency(self):
+        return {
+            "dates": ["2026-02-17", "2026-02-18"],
+            "rows": [
+                {
+                    "publisher_id": 19,
+                    "dates_seen": 2,
+                    "pass_count": 2,
+                    "fail_count": 0,
+                    "error_count": 0,
+                    "pass_rate": 100.0,
+                    "results": {"2026-02-17": "PASS", "2026-02-18": "PASS"},
+                },
+            ],
+            "classifications": {
+                "always_passing": [19],
+                "always_failing": [],
+                "intermittent": [],
+            },
+        }
+
+    def test_regular_default_prefix(self):
+        output = self._write_and_read(self._make_consistency())
+        assert "PUBLISHER CONSISTENCY" in output
+        assert "PUBLISHER CLASSIFICATIONS" in output
+        assert "regular_always_passing" in output
+
+    def test_premarket_prefix(self):
+        output = self._write_and_read(self._make_consistency(), session_prefix="PREMARKET ")
+        assert "PREMARKET PUBLISHER CONSISTENCY" in output
+        assert "PREMARKET PUBLISHER CLASSIFICATIONS" in output
+        assert "premarket_always_passing" in output
+        assert "regular_always_passing" not in output
+
+    def test_overnight_prefix(self):
+        output = self._write_and_read(self._make_consistency(), session_prefix="OVERNIGHT ")
+        assert "OVERNIGHT PUBLISHER CONSISTENCY" in output
+        assert "overnight_always_passing" in output
+
+
+# ---------------------------------------------------------------------------
+# print_publisher_consistency tests
+# ---------------------------------------------------------------------------
+
+
+class TestPrintPublisherConsistency:
+    def _make_consistency(self):
+        return {
+            "dates": ["2026-02-17", "2026-02-18"],
+            "rows": [
+                {
+                    "publisher_id": 19,
+                    "dates_seen": 2,
+                    "pass_count": 2,
+                    "fail_count": 0,
+                    "error_count": 0,
+                    "pass_rate": 100.0,
+                    "results": {"2026-02-17": "PASS", "2026-02-18": "PASS"},
+                },
+            ],
+            "classifications": {
+                "always_passing": [19],
+                "always_failing": [],
+                "intermittent": [],
+            },
+        }
+
+    def test_regular_default(self, capsys):
+        print_publisher_consistency(self._make_consistency())
+        out = capsys.readouterr().out
+        assert "REGULAR SESSION:" in out
+        assert "Always passing:" in out
+
+    def test_premarket_session(self, capsys):
+        print_publisher_consistency(self._make_consistency(), session_prefix="PREMARKET ")
+        out = capsys.readouterr().out
+        assert "PREMARKET SESSION:" in out
+
+    def test_overnight_session(self, capsys):
+        print_publisher_consistency(self._make_consistency(), session_prefix="OVERNIGHT ")
+        out = capsys.readouterr().out
+        assert "OVERNIGHT SESSION:" in out

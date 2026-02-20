@@ -837,16 +837,21 @@ def _overnight_status(detail: PublisherReadinessDetail) -> str | None:
     )
 
 
-def compute_publisher_consistency(results: list[FeedReadinessResult]) -> dict:
+def compute_publisher_consistency(
+    results: list[FeedReadinessResult],
+    status_extractor: Callable[[PublisherReadinessDetail], str | None] | None = None,
+) -> dict:
+    if status_extractor is None:
+        status_extractor = _regular_status
+
     dates = sorted({result.date for result in results})
 
     publisher_statuses: dict[int, dict[str, str]] = {}
     for result in sorted(results, key=lambda r: (r.date, r.feed_id)):
         for detail in result.publisher_details or []:
-            if detail.benchmark_error or detail.uptime_error:
-                status = "ERROR"
-            else:
-                status = "PASS" if detail.fully_passes else "FAIL"
+            status = status_extractor(detail)
+            if status is None:
+                continue  # no data for this session → skip
             publisher_statuses.setdefault(detail.publisher_id, {})[result.date] = status
 
     rows = []
@@ -896,9 +901,15 @@ def compute_publisher_consistency(results: list[FeedReadinessResult]) -> dict:
     }
 
 
-def write_publisher_consistency_csv(writer: csv.writer, consistency: dict) -> None:
+def write_publisher_consistency_csv(
+    writer: csv.writer,
+    consistency: dict,
+    session_prefix: str = "",
+) -> None:
+    label_prefix = session_prefix.lower().replace(" ", "") + "_" if session_prefix else "regular_"
+
     writer.writerow([])
-    writer.writerow(["PUBLISHER CONSISTENCY"])
+    writer.writerow([f"{session_prefix}PUBLISHER CONSISTENCY"])
     writer.writerow(
         [
             "publisher_id",
@@ -924,11 +935,11 @@ def write_publisher_consistency_csv(writer: csv.writer, consistency: dict) -> No
         )
 
     writer.writerow([])
-    writer.writerow(["PUBLISHER CLASSIFICATIONS"])
+    writer.writerow([f"{session_prefix}PUBLISHER CLASSIFICATIONS"])
     _fmt = lambda ids: ";".join(str(x) for x in ids) if ids else ""
-    writer.writerow(["regular_always_passing", _fmt(consistency["classifications"]["always_passing"])])
-    writer.writerow(["regular_always_failing", _fmt(consistency["classifications"]["always_failing"])])
-    writer.writerow(["regular_intermittent", _fmt(consistency["classifications"]["intermittent"])])
+    writer.writerow([f"{label_prefix}always_passing", _fmt(consistency["classifications"]["always_passing"])])
+    writer.writerow([f"{label_prefix}always_failing", _fmt(consistency["classifications"]["always_failing"])])
+    writer.writerow([f"{label_prefix}intermittent", _fmt(consistency["classifications"]["intermittent"])])
 
 
 def write_results_csv(
@@ -1344,13 +1355,14 @@ def print_console_summary(
     print(f"\nTiming: {summary['total_time_sec']:.1f}s total, {summary['avg_time_ms']:.0f}ms avg/feed")
 
 
-def print_publisher_consistency(consistency: dict) -> None:
+def print_publisher_consistency(consistency: dict, session_prefix: str = "") -> None:
     print()
     print("=" * 70)
     print(f"PUBLISHER CONSISTENCY (across {len(consistency['dates'])} dates)")
     print("=" * 70)
 
-    print("\nREGULAR SESSION:")
+    session_label = session_prefix.strip() if session_prefix else "REGULAR"
+    print(f"\n{session_label} SESSION:")
     print("  Publisher  Pass  Fail  Rate    Results")
     for row in consistency["rows"]:
         if row["dates_seen"] == 0:
