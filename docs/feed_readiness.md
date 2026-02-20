@@ -149,11 +149,25 @@ CSV appends:
 
 When multiple dates are evaluated, CSV appends:
 
-- `PUBLISHER CONSISTENCY` (cross-date pass/fail matrix)
+- `PUBLISHER CONSISTENCY` (cross-date pass/fail matrix for regular hours)
 - `PUBLISHER CLASSIFICATIONS`
   - `regular_always_passing`
   - `regular_always_failing`
   - `regular_intermittent`
+
+With `--extended-hours`, additional sections are appended for each extended session:
+
+- `PREMARKET PUBLISHER CONSISTENCY` + `PREMARKET PUBLISHER CLASSIFICATIONS`
+  - `premarket_always_passing`, `premarket_always_failing`, `premarket_intermittent`
+- `AFTERHOURS PUBLISHER CONSISTENCY` + `AFTERHOURS PUBLISHER CLASSIFICATIONS`
+  - `afterhours_always_passing`, `afterhours_always_failing`, `afterhours_intermittent`
+
+With `--overnight`, an additional section is appended:
+
+- `OVERNIGHT PUBLISHER CONSISTENCY` + `OVERNIGHT PUBLISHER CLASSIFICATIONS`
+  - `overnight_always_passing`, `overnight_always_failing`, `overnight_intermittent`
+
+Session consistency uses the same pass logic as regular hours: a publisher PASSES a session if both session-specific benchmark AND session-specific uptime pass. Publishers with no data for a session (0% uptime or null) are excluded from that session's table.
 
 ## Console Summary
 
