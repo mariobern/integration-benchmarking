@@ -1138,6 +1138,18 @@ def write_results_csv(
             if len(consistency["dates"]) > 1 and consistency["rows"]:
                 write_publisher_consistency_csv(writer, consistency)
 
+            # Per-session consistency (only for multi-date with session flags)
+            if include_extended_hours:
+                for session_name, extractor in [("PREMARKET", _premarket_status), ("AFTERHOURS", _afterhours_status)]:
+                    session_consistency = compute_publisher_consistency(results, status_extractor=extractor)
+                    if len(session_consistency["dates"]) > 1 and session_consistency["rows"]:
+                        write_publisher_consistency_csv(writer, session_consistency, session_prefix=f"{session_name} ")
+
+            if include_overnight:
+                session_consistency = compute_publisher_consistency(results, status_extractor=_overnight_status)
+                if len(session_consistency["dates"]) > 1 and session_consistency["rows"]:
+                    write_publisher_consistency_csv(writer, session_consistency, session_prefix="OVERNIGHT ")
+
 
 def compute_summary_stats(results: list[FeedReadinessResult], total_time_seconds: float) -> dict:
     total_feeds = len(results)
@@ -1627,6 +1639,18 @@ Examples:
         consistency = compute_publisher_consistency(results)
         if consistency["rows"]:
             print_publisher_consistency(consistency)
+
+        # Per-session consistency console output
+        if args.extended_hours:
+            for session_name, extractor in [("PREMARKET", _premarket_status), ("AFTERHOURS", _afterhours_status)]:
+                session_consistency = compute_publisher_consistency(results, status_extractor=extractor)
+                if session_consistency["rows"]:
+                    print_publisher_consistency(session_consistency, session_prefix=f"{session_name} ")
+
+        if args.overnight:
+            session_consistency = compute_publisher_consistency(results, status_extractor=_overnight_status)
+            if session_consistency["rows"]:
+                print_publisher_consistency(session_consistency, session_prefix="OVERNIGHT ")
 
     print(f"\nResults written to: {args.output}")
 

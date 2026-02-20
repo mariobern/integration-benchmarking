@@ -1,6 +1,8 @@
 """Tests for feed_readiness.py -- publisher consistency & classifications."""
 import csv
 import io
+import tempfile
+from pathlib import Path
 from typing import Optional
 
 import pytest
@@ -10,6 +12,7 @@ from feed_readiness import (
     PublisherReadinessDetail,
     compute_publisher_consistency,
     write_publisher_consistency_csv,
+    write_results_csv,
     print_publisher_consistency,
     _regular_status,
     _premarket_status,
@@ -390,3 +393,109 @@ class TestPrintPublisherConsistency:
         print_publisher_consistency(self._make_consistency(), session_prefix="OVERNIGHT ")
         out = capsys.readouterr().out
         assert "OVERNIGHT SESSION:" in out
+
+
+# ---------------------------------------------------------------------------
+# write_results_csv session consistency integration tests
+# ---------------------------------------------------------------------------
+
+
+class TestWriteResultsCsvSessionConsistency:
+    def _make_multi_date_results(self):
+        """Two dates with session data for premarket and overnight."""
+        details_d1 = [
+            make_detail(
+                publisher_id=19, fully_passes=True, benchmark_passes=True, uptime_passes=True,
+                premarket_benchmark_passes=True, premarket_uptime_passes=True, premarket_uptime_pct=99.0,
+                afterhours_benchmark_passes=True, afterhours_uptime_passes=True, afterhours_uptime_pct=98.0,
+                overnight_benchmark_passes=True, overnight_uptime_passes=True, overnight_uptime_pct=98.0,
+            ),
+            make_detail(
+                publisher_id=20, fully_passes=False,
+                premarket_benchmark_passes=False, premarket_uptime_passes=True, premarket_uptime_pct=80.0,
+                afterhours_benchmark_passes=False, afterhours_uptime_passes=True, afterhours_uptime_pct=70.0,
+                overnight_uptime_pct=None,
+            ),
+        ]
+        details_d2 = [
+            make_detail(
+                publisher_id=19, fully_passes=True, benchmark_passes=True, uptime_passes=True,
+                premarket_benchmark_passes=True, premarket_uptime_passes=True, premarket_uptime_pct=99.0,
+                afterhours_benchmark_passes=True, afterhours_uptime_passes=True, afterhours_uptime_pct=97.0,
+                overnight_benchmark_passes=False, overnight_uptime_passes=True, overnight_uptime_pct=95.0,
+            ),
+            make_detail(
+                publisher_id=20, fully_passes=False,
+                premarket_benchmark_passes=True, premarket_uptime_passes=True, premarket_uptime_pct=95.0,
+                afterhours_benchmark_passes=True, afterhours_uptime_passes=True, afterhours_uptime_pct=90.0,
+                overnight_uptime_pct=None,
+            ),
+        ]
+        return [
+            make_result(feed_id=100, date="2026-02-17", details=details_d1),
+            make_result(feed_id=100, date="2026-02-18", details=details_d2),
+        ]
+
+    def test_no_session_sections_without_flags(self):
+        results = self._make_multi_date_results()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+            path = Path(f.name)
+        write_results_csv(results, path, include_extended_hours=False, include_overnight=False, include_detailed=True)
+        content = path.read_text()
+        assert "PUBLISHER CONSISTENCY" in content
+        assert "PREMARKET PUBLISHER CONSISTENCY" not in content
+        assert "OVERNIGHT PUBLISHER CONSISTENCY" not in content
+        path.unlink()
+
+    def test_extended_hours_adds_premarket_afterhours(self):
+        results = self._make_multi_date_results()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+            path = Path(f.name)
+        write_results_csv(results, path, include_extended_hours=True, include_overnight=False, include_detailed=True)
+        content = path.read_text()
+        assert "PUBLISHER CONSISTENCY" in content
+        assert "PREMARKET PUBLISHER CONSISTENCY" in content
+        assert "PREMARKET PUBLISHER CLASSIFICATIONS" in content
+        assert "premarket_always_passing" in content
+        assert "AFTERHOURS PUBLISHER CONSISTENCY" in content
+        assert "afterhours_always_passing" in content
+        assert "OVERNIGHT PUBLISHER CONSISTENCY" not in content
+        path.unlink()
+
+    def test_overnight_adds_overnight_section(self):
+        results = self._make_multi_date_results()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+            path = Path(f.name)
+        write_results_csv(results, path, include_extended_hours=False, include_overnight=True, include_detailed=True)
+        content = path.read_text()
+        assert "OVERNIGHT PUBLISHER CONSISTENCY" in content
+        assert "overnight_always_passing" in content
+        assert "PREMARKET PUBLISHER CONSISTENCY" not in content
+        path.unlink()
+
+    def test_both_flags_all_sections(self):
+        results = self._make_multi_date_results()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+            path = Path(f.name)
+        write_results_csv(results, path, include_extended_hours=True, include_overnight=True, include_detailed=True)
+        content = path.read_text()
+        assert "PUBLISHER CONSISTENCY" in content
+        assert "PREMARKET PUBLISHER CONSISTENCY" in content
+        assert "AFTERHOURS PUBLISHER CONSISTENCY" in content
+        assert "OVERNIGHT PUBLISHER CONSISTENCY" in content
+        path.unlink()
+
+    def test_single_date_no_session_sections(self):
+        details = [
+            make_detail(
+                publisher_id=19, fully_passes=True, benchmark_passes=True, uptime_passes=True,
+                premarket_benchmark_passes=True, premarket_uptime_passes=True, premarket_uptime_pct=99.0,
+            ),
+        ]
+        results = [make_result(feed_id=100, date="2026-02-17", details=details)]
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+            path = Path(f.name)
+        write_results_csv(results, path, include_extended_hours=True, include_overnight=True, include_detailed=True)
+        content = path.read_text()
+        assert "PREMARKET PUBLISHER CONSISTENCY" not in content
+        path.unlink()
