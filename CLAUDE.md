@@ -228,7 +228,7 @@ Results CSV includes:
 - uptime metrics: `uptime_passing_count`, `median_uptime_pct`
 - publisher lists: `fully_passing_publishers`, `benchmark_only_publishers`, `uptime_only_publishers`, `both_failing_publishers`
 
-With `--detailed`, CSV appends publisher-level detail rows and cross-date consistency analysis.
+With `--detailed`, CSV appends publisher-level detail rows (per publisher per feed/date) and cross-date consistency analysis. Detail rows include regular-session benchmark metrics (`benchmark_nrmse`, `benchmark_hit_rate`, `benchmark_n_observations`) and `uptime_pct`. When `--extended-hours` or `--overnight` is enabled, each session block adds `{session}_benchmark_passes`, `{session}_benchmark_nrmse`, `{session}_benchmark_hit_rate`, `{session}_benchmark_n_observations`, `{session}_uptime_pct`, `{session}_uptime_passes`.
 
 ## Publisher Benchmark Summary
 

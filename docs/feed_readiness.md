@@ -140,10 +140,10 @@ CSV appends:
   - benchmark metrics (`benchmark_nrmse`, `benchmark_hit_rate`, `benchmark_n_observations`)
   - `uptime_pct`
   - `benchmark_error`, `uptime_error`
-  - extended session uptime (when `--extended-hours` / `--overnight`):
-    `premarket_uptime_passes`, `premarket_uptime_pct`,
-    `afterhours_uptime_passes`, `afterhours_uptime_pct`,
-    `overnight_uptime_passes`, `overnight_uptime_pct`
+  - extended session metrics (when `--extended-hours` / `--overnight`), per session:
+    `{session}_benchmark_passes`, `{session}_benchmark_nrmse`,
+    `{session}_benchmark_hit_rate`, `{session}_benchmark_n_observations`,
+    `{session}_uptime_pct`, `{session}_uptime_passes`
 
 ### Consistency section (multi-date + `--detailed`)
 
