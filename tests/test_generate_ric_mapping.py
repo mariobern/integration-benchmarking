@@ -21,6 +21,15 @@ SAMPLE_SYMBOLS = [
     {"pyth_lazer_id": 2279, "name": "DMH6", "symbol": "Equity.US.DMH6/USD",
      "description": "PYTH US30 20 MARCH 2026", "asset_type": "equity",
      "quote_currency": "USD"},
+    {"pyth_lazer_id": 9001, "name": "NLH6", "symbol": "Commodities.NLH6/USD",
+     "description": "NICKEL 18 MARCH 2026", "asset_type": "commodity",
+     "quote_currency": "USD"},
+    {"pyth_lazer_id": 9002, "name": "RSK6", "symbol": "Commodities.RSK6/USD",
+     "description": "RAW SUGAR 30 APRIL 2026", "asset_type": "commodity",
+     "quote_currency": "USD"},
+    {"pyth_lazer_id": 9003, "name": "US500H6", "symbol": "Equity.US.US500H6/USD",
+     "description": "PYTH US500 20 MARCH 2026", "asset_type": "equity",
+     "quote_currency": "USD"},
     {"pyth_lazer_id": 1, "name": "BTCUSD", "symbol": "Crypto.BTC/USD",
      "description": "BITCOIN / US DOLLAR", "asset_type": "crypto", "quote_currency": "USD"},
 ]
@@ -394,6 +403,29 @@ class TestRICResolver:
         result = resolver.resolve("ZZZZZ")
         assert result.ric == ""
         assert len(result.warnings) > 0
+
+    def test_resolve_nickel_futures(self, symbols_path):
+        from generate_ric_mapping import RICResolver
+        resolver = RICResolver(symbols_path)
+        result = resolver.resolve("NLH6")
+        assert result.ric == "MNIH26"
+        assert result.asset_class == "Commodity Future"
+        assert result.confidence == "high"
+
+    def test_resolve_sugar_futures(self, symbols_path):
+        from generate_ric_mapping import RICResolver
+        resolver = RICResolver(symbols_path)
+        result = resolver.resolve("RSK6")
+        assert result.ric == "SBK26"
+        assert result.asset_class == "Commodity Future"
+
+    def test_resolve_us500_futures(self, symbols_path):
+        from generate_ric_mapping import RICResolver
+        resolver = RICResolver(symbols_path)
+        result = resolver.resolve("US500H6")
+        assert result.ric == "ESH26"
+        assert result.asset_class == "Equity Future"
+        assert result.confidence == "high"
 
 
 class TestCSVOutput:
