@@ -277,6 +277,26 @@ class TestEquityIndexFuturesResolver:
         from generate_ric_mapping import resolve_equity_futures_ric
         assert resolve_equity_futures_ric("Equity.US.AAPL/USD") is None
 
+    def test_us500_march_2026(self):
+        from generate_ric_mapping import resolve_equity_futures_ric
+        assert resolve_equity_futures_ric("Equity.US.US500H6/USD") == "ESH26"
+
+    def test_us100_march_2026(self):
+        from generate_ric_mapping import resolve_equity_futures_ric
+        assert resolve_equity_futures_ric("Equity.US.US100H6/USD") == "NQH26"
+
+    def test_us30_march_2026(self):
+        from generate_ric_mapping import resolve_equity_futures_ric
+        assert resolve_equity_futures_ric("Equity.US.US30H6/USD") == "YMH26"
+
+    def test_us500_june_2026(self):
+        from generate_ric_mapping import resolve_equity_futures_ric
+        assert resolve_equity_futures_ric("Equity.US.US500M6/USD") == "ESM26"
+
+    def test_us30_september_2025(self):
+        from generate_ric_mapping import resolve_equity_futures_ric
+        assert resolve_equity_futures_ric("Equity.US.US30U5/USD") == "YMU25"
+
 
 class TestEquityResolver:
     def test_nasdaq_ticker(self, tmp_path):

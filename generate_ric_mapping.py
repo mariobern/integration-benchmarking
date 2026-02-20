@@ -168,10 +168,13 @@ INDEX_FUTURES_PYTH_TO_RIC: dict[str, str] = {
     "EM": "ES",   # E-Mini S&P 500
     "NM": "NQ",   # Nasdaq Mini
     "DM": "YM",   # Dow Jones Mini
+    "US500": "ES",  # S&P 500 E-mini (alias for EM)
+    "US100": "NQ",  # Nasdaq 100 E-mini (alias for NM)
+    "US30":  "YM",  # Dow Jones E-mini (alias for DM)
 }
 
 _INDEX_FUTURES_PATTERN = re.compile(
-    r"^Equity\.US\.([A-Z]{2})([FGHJKMNQUVXZ])(\d)/USD$"
+    r"^Equity\.US\.([A-Z][A-Z0-9]*)([FGHJKMNQUVXZ])(\d)/USD$"
 )
 
 
