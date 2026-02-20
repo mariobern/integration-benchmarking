@@ -132,6 +132,11 @@ FUTURES_PYTH_TO_RIC: dict[str, str] = {
     "CO":    "C",    # Corn (CBOT)
     "BRENT": "LCO",  # Brent Crude (ICE)
     "NID":   "NK",   # Nikkei 225 (CME)
+    "NL":    "MNI",  # Nickel (LME)
+    "LE":    "MPB",  # Lead (LME)
+    "TI":    "MSN",  # Tin (LME)
+    "RS":    "SB",   # Raw Sugar No. 11 (ICE US)
+    "GO":    "LGO",  # Low Sulphur Gasoil (ICE Europe)
 }
 
 _FUTURES_PATTERN = re.compile(

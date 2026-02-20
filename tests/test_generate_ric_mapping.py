@@ -217,6 +217,42 @@ class TestCommodityFuturesResolver:
         from generate_ric_mapping import resolve_commodity_futures_ric
         assert resolve_commodity_futures_ric("Commodities.NIDH6/USD") == "NKH26"
 
+    def test_nickel_february_2026(self):
+        from generate_ric_mapping import resolve_commodity_futures_ric
+        assert resolve_commodity_futures_ric("Commodities.NLG6/USD") == "MNIG26"
+
+    def test_nickel_march_2026(self):
+        from generate_ric_mapping import resolve_commodity_futures_ric
+        assert resolve_commodity_futures_ric("Commodities.NLH6/USD") == "MNIH26"
+
+    def test_lead_june_2026(self):
+        from generate_ric_mapping import resolve_commodity_futures_ric
+        assert resolve_commodity_futures_ric("Commodities.LEM6/USD") == "MPBM26"
+
+    def test_lead_september_2026(self):
+        from generate_ric_mapping import resolve_commodity_futures_ric
+        assert resolve_commodity_futures_ric("Commodities.LEU6/USD") == "MPBU26"
+
+    def test_tin_march_2026(self):
+        from generate_ric_mapping import resolve_commodity_futures_ric
+        assert resolve_commodity_futures_ric("Commodities.TIH6/USD") == "MSNH26"
+
+    def test_raw_sugar_february_2026(self):
+        from generate_ric_mapping import resolve_commodity_futures_ric
+        assert resolve_commodity_futures_ric("Commodities.RSH6/USD") == "SBH26"
+
+    def test_raw_sugar_may_2026(self):
+        from generate_ric_mapping import resolve_commodity_futures_ric
+        assert resolve_commodity_futures_ric("Commodities.RSK6/USD") == "SBK26"
+
+    def test_gasoil_march_2026(self):
+        from generate_ric_mapping import resolve_commodity_futures_ric
+        assert resolve_commodity_futures_ric("Commodities.GOH6/USD") == "LGOH26"
+
+    def test_gasoil_april_2026(self):
+        from generate_ric_mapping import resolve_commodity_futures_ric
+        assert resolve_commodity_futures_ric("Commodities.GOJ6/USD") == "LGOJ26"
+
     def test_unknown_commodity(self):
         from generate_ric_mapping import resolve_commodity_futures_ric
         result = resolve_commodity_futures_ric("Commodities.ZZZZH6/USD")
