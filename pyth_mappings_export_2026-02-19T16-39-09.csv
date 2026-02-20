@@ -1,0 +1,757 @@
+source_value,source_type,pyth_id,pythnet_id,pyth_lazer_id,valid_from,valid_to,ticker,asset_full_name,asset_class
+.DXY,RIC,fx.usdxy,FX.USDXY,2307,1970-01-01 00:00:00,,usdxy,US DOLLAR INDEX,Forex
+A.N,RIC,equity.a,Equity.US.A/USD,921,1970-01-01 00:00:00,,A,Agilent Technologies Inc,Common Stock
+A.N,RIC,equity.a,Equity.US.A/USD,921,1970-01-01 00:00:28,,A,Agilent Technologies Inc,Common Stock
+AAAU.K,RIC,equity.gld,Equity.US.AAAU/USD,2702,1970-01-01 00:00:00,,AAAU,GOLDMAN SACHS PHYSICAL GOLD ETF,Equity
+AAL.O,RIC,equity.aal,Equity.US.AAL/USD,2269,1970-01-01 00:00:00,,AAL,American Airlines Group Inc,Common Stock
+AAPL.O,RIC,equity.aapl,Equity.US.AAPL/USD,922,1970-01-01 00:00:00,,AAPL,Apple Inc,Common Stock
+ABBV.N,RIC,equity.abbv,Equity.US.ABBV/USD,923,1970-01-01 00:00:00,,ABBV,AbbVie Inc,Common Stock
+ABNB.O,RIC,equity.abnb,Equity.US.ABNB/USD,924,1970-01-01 00:00:00,,ABNB,Airbnb Inc,Class A Common Stock
+ABT.N,RIC,equity.abt,Equity.US.ABT/USD,925,1970-01-01 00:00:00,,ABT,Abbott Laboratories,Common Stock
+ACGL.O,RIC,equity.acgl,Equity.US.ACGL/USD,926,1970-01-01 00:00:00,,ACGL,Arch Capital Group Ltd.,Common Stock
+ACN.N,RIC,equity.acn,Equity.US.ACN/USD,927,1970-01-01 00:00:00,,ACN,Accenture plc,Class A Common Stock
+ADBE.O,RIC,equity.adbe,Equity.US.ADBE/USD,928,1970-01-01 00:00:00,,ADBE,Adobe Inc,Common Stock
+ADI.O,RIC,equity.adi,Equity.US.ADI/USD,929,1970-01-01 00:00:00,,ADI,Analog Devices Inc,Common Stock
+ADM.N,RIC,equity.adm,Equity.US.ADM/USD,930,1970-01-01 00:00:00,,ADM,Archer-Daniels-Midland Co.,Common Stock
+ADP.O,RIC,equity.adp,Equity.US.ADP/USD,931,1970-01-01 00:00:00,,ADP,Automatic Data Processing Inc,Common Stock
+ADSK.O,RIC,equity.adsk,Equity.US.ADSK/USD,932,1970-01-01 00:00:00,,ADSK,Autodesk Inc,Common Stock
+AEE.N,RIC,equity.aee,Equity.US.AEE/USD,933,1970-01-01 00:00:00,,AEE,Ameren Corp.,Common Stock
+AEP.O,RIC,equity.aep,Equity.US.AEP/USD,934,1970-01-01 00:00:00,,AEP,American Electric Power Co. Inc,Common Stock
+AES.N,RIC,equity.aes,Equity.US.AES/USD,935,1970-01-01 00:00:00,,AES,AES Corp.,Common Stock
+AFL.N,RIC,equity.afl,Equity.US.AFL/USD,936,1970-01-01 00:00:00,,AFL,Aflac Inc,Common Stock
+AI.N,RIC,equity.ai,Equity.US.AI/USD,937,1970-01-01 00:00:00,,AI,C3.ai Inc,Class A Common Stock
+AIG.N,RIC,equity.aig,Equity.US.AIG/USD,938,1970-01-01 00:00:00,,AIG,American International Group Inc,Common Stock
+AIQ.O,RIC,equity.aiq,Equity.US.AIQ/USD,2929,1970-01-01 00:00:00,,AIQ,GLOBAL X AI & TECHNOLOGY ETF,Equity
+AIZ.N,RIC,equity.aiz,Equity.US.AIZ/USD,939,1970-01-01 00:00:00,,AIZ,Assurant Inc,Common Stock
+AJG.N,RIC,equity.ajg,Equity.US.AJG/USD,940,1970-01-01 00:00:00,,AJG,Arthur J. Gallagher & Co.,Common Stock
+AKAM.O,RIC,equity.akam,Equity.US.AKAM/USD,941,1970-01-01 00:00:00,,AKAM,Akamai Technologies Inc,Common Stock
+ALB.N,RIC,equity.alb,Equity.US.ALB/USD,942,1970-01-01 00:00:00,,ALB,Albemarle Corp.,Common Stock
+ALGN.O,RIC,equity.algn,Equity.US.ALGN/USD,943,1970-01-01 00:00:00,,ALGN,Align Technology Inc,Common Stock
+ALIH26,RIC,future.alh6,Commodities.ALH6/USD,2973,1970-01-01 00:00:00,2026-03-27 17:00:00,ALH6,ALUMINIUM 27 MARCH 2026 / US DOLLAR,Commodity Future
+ALIJ26,RIC,future.alj6,Commodities.ALJ6/USD,2974,1970-01-01 00:00:00,2026-04-28 17:00:00,ALJ6,ALUMINIUM 28 APRIL 2026 / US DOLLAR,Commodity Future
+ALIK26,RIC,future.alk6,Commodities.ALK6/USD,2975,1970-01-01 00:00:00,2026-05-27 17:00:00,ALK6,ALUMINIUM 27 MAY 2026 / US DOLLAR,Commodity Future
+ALL.N,RIC,equity.all,Equity.US.ALL/USD,944,1970-01-01 00:00:00,,ALL,The Allstate Corp.,Common Stock
+ALLE.N,RIC,equity.alle,Equity.US.ALLE/USD,945,1970-01-01 00:00:00,,ALLE,Allegion plc,Ordinary Shares
+AMAT.O,RIC,equity.amat,Equity.US.AMAT/USD,946,1970-01-01 00:00:00,,AMAT,Applied Materials Inc,Common Stock
+AMC.N,RIC,equity.amc,Equity.US.AMC/USD,947,1970-01-01 00:00:00,,AMC,AMC Entertainment Holdings Inc,Class A Common Stock
+AMCR.N,RIC,equity.amcr,Equity.US.AMCR/USD,948,1970-01-01 00:00:00,,AMCR,Amcor PLC,Ordinary Shares
+AMD.O,RIC,equity.amd,Equity.US.AMD/USD,949,1970-01-01 00:00:00,,AMD,Advanced Micro Devices Inc,Common Stock
+AME.N,RIC,equity.ame,Equity.US.AME/USD,950,1970-01-01 00:00:00,,AME,AMETEK Inc,Common Stock
+AMGN.O,RIC,equity.amgn,Equity.US.AMGN/USD,951,1970-01-01 00:00:00,,AMGN,Amgen Inc,Common Stock
+AMP.N,RIC,equity.amp,Equity.US.AMP/USD,952,1970-01-01 00:00:00,,AMP,Ameriprise Financial Inc,Common Stock
+AMT.N,RIC,equity.amt,Equity.US.AMT/USD,953,1970-01-01 00:00:00,,AMT,American Tower Corp.,Common Stock
+AMZN.O,RIC,equity.amzn,Equity.US.AMZN/USD,954,1970-01-01 00:00:00,,AMZN,Amazon.com Inc,Common Stock
+ANET.N,RIC,equity.anet,Equity.US.ANET/USD,955,1970-01-01 00:00:00,,ANET,Arista Networks Inc,Common Stock
+ANSS.O,RIC,equity.anss,Equity.US.ANSS/USD,956,1970-01-01 00:00:00,,ANSS,Ansys Inc,Common Stock
+AON.N,RIC,equity.aon,Equity.US.AON/USD,957,1970-01-01 00:00:00,,AON,Aon plc,Class A Common Stock
+AOS.N,RIC,equity.aos,Equity.US.AOS/USD,958,1970-01-01 00:00:00,,AOS,A. O. Smith Corp.,Common Stock
+APA.N,RIC,equity.apa,Equity.US.APA/USD,959,1970-01-01 00:00:00,,APA,APA Corp.,Common Stock
+APD.N,RIC,equity.apd,Equity.US.APD/USD,960,1970-01-01 00:00:00,,APD,Air Products & Chemicals Inc,Common Stock
+APH.N,RIC,equity.aph,Equity.US.APH/USD,961,1970-01-01 00:00:00,,APH,Amphenol Corp.,Class A Common Stock
+APO.N,RIC,equity.apo,Equity.US.APO/USD,962,1970-01-01 00:00:00,,APO,Apollo Global Management Inc,Common Stock
+APP.O,RIC,equity.app,Equity.US.APP/USD,963,1970-01-01 00:00:00,,APP,Appian Corp.,Class A Common Stock
+APTV.N,RIC,equity.aptv,Equity.US.APTV/USD,964,1970-01-01 00:00:00,,APTV,Aptiv PLC,Common Stock
+ARE.N,RIC,equity.are,Equity.US.ARE/USD,965,1970-01-01 00:00:00,,ARE,Alexandria Real Estate Equities Inc,Common Stock
+ARKB.Z,RIC,equity.arkb,Equity.US.ARKB/USD,966,1970-01-01 00:00:00,,ARKB,ARK 21SHARES BITCOIN ETF / US DOLLAR,Equity
+ARKK.K,RIC,equity.arkk,Equity.US.ARKK/USD,967,1970-01-01 00:00:00,,ARKK,ARK INNOVATION ETF,Equity
+ARM.O,RIC,equity.arm,Equity.US.ARM/USD,968,1970-01-01 00:00:00,,ARM,Arm Holdings plc,American Depositary Shares
+ASML.O,RIC,equity.asml,Equity.US.ASML/USD,969,1970-01-01 00:00:00,,ASML,ASML Holding N.V.,New York Registry Shares
+ATO.N,RIC,equity.ato,Equity.US.ATO/USD,970,1970-01-01 00:00:00,,ATO,Atmos Energy Corp.,Common Stock
+AUD=,RIC,fx.usdaud,FX.USD/AUD,2591,1970-01-01 00:00:00,,usdaud,US DOLLAR / AUSTRALIAN DOLLAR,Forex
+AUDCAD=R,RIC,fx.audcad,FX.AUD/CAD,311,1970-01-01 00:00:00,,AUDCAD,AUSTRALIAN DOLLAR / CANADIAN DOLLAR,Forex
+AUDCHF=R,RIC,fx.audchf,FX.AUD/CHF,312,1970-01-01 00:00:00,,AUDCHF,AUSTRALIAN DOLLAR / SWISS FRANC,Forex
+AUDJPY=,RIC,fx.audjpy,FX.AUD/JPY,313,1970-01-01 00:00:00,,AUDJPY,AUSTRALIAN DOLLAR / JAPANESE YEN,Forex
+AUDNZD=,RIC,fx.audnzd,FX.AUD/NZD,314,1970-01-01 00:00:00,,AUDNZD,AUSTRALIAN DOLLAR / NEW ZEALAND DOLLAR,Forex
+AVB.N,RIC,equity.avb,Equity.US.AVB/USD,971,1970-01-01 00:00:00,,AVB,AvalonBay Communities Inc,Common Stock
+AVGO.O,RIC,equity.avgo,Equity.US.AVGO/USD,972,1970-01-01 00:00:00,,AVGO,Broadcom Inc,Common Stock
+AVY.N,RIC,equity.avy,Equity.US.AVY/USD,973,1970-01-01 00:00:00,,AVY,Avery Dennison Corp.,Common Stock
+AWK.N,RIC,equity.awk,Equity.US.AWK/USD,974,1970-01-01 00:00:00,,AWK,American Water Works Co. Inc,Common Stock
+AXON.O,RIC,equity.axon,Equity.US.AXON/USD,975,1970-01-01 00:00:00,,AXON,Axon Enterprise Inc,Common Stock
+AXP.N,RIC,equity.axp,Equity.US.AXP/USD,976,1970-01-01 00:00:00,,AXP,American Express Co.,Common Stock
+AZN.O,RIC,equity.azn,Equity.US.AZN/USD,977,1970-01-01 00:00:00,,AZN,AstraZeneca plc,American Depositary Shares
+AZO.N,RIC,equity.azo,Equity.US.AZO/USD,978,1970-01-01 00:00:00,,AZO,AutoZone Inc,Common Stock
+BA.N,RIC,equity.ba,Equity.US.BA/USD,979,1970-01-01 00:00:00,,BA,The Boeing Co.,Common Stock
+BABA.Z,RIC,equity.baba,Equity.US.BABA/USD,2271,1970-01-01 00:00:00,,BABA,Alibaba Group Holding Ltd.,American Depositary Shares
+BAC.N,RIC,equity.bac,Equity.US.BAC/USD,980,1970-01-01 00:00:00,,BAC,Bank of America Corp.,Common Stock
+BALL.N,RIC,equity.ball,Equity.US.BALL/USD,981,1970-01-01 00:00:00,,BALL,Ball Corp.,Common Stock
+BAX.N,RIC,equity.bax,Equity.US.BAX/USD,982,1970-01-01 00:00:00,,BAX,Baxter International Inc,Common Stock
+BBY.N,RIC,equity.bby,Equity.US.BBY/USD,983,1970-01-01 00:00:00,,BBY,Best Buy Co. Inc,Common Stock
+BDX.N,RIC,equity.bdx,Equity.US.BDX/USD,984,1970-01-01 00:00:00,,BDX,Becton Dickinson and Co.,Common Stock
+BEN.N,RIC,equity.ben,Equity.US.BEN/USD,985,1970-01-01 00:00:00,,BEN,Franklin Resources Inc,Common Stock
+BFb.N,RIC,equity.bfb,Equity.US.BF-B/USD,986,1970-01-01 00:00:00,,BF.B,Brown-Forman Corp.,Class B Common Stock
+BG.N,RIC,equity.bg,Equity.US.BG/USD,987,1970-01-01 00:00:00,,BG,Bunge Global SA,Common Stock
+BIIB.O,RIC,equity.biib,Equity.US.BIIB/USD,988,1970-01-01 00:00:00,,BIIB,Biogen Inc,Common Stock
+BITB.P,RIC,equity.bitb,Equity.US.BITB/USD,989,1970-01-01 00:00:00,,BITB,BITWISE BITCOIN ETF TRUST / US DOLLAR,Equity
+BK.N,RIC,equity.bk,Equity.US.BK/USD,991,1970-01-01 00:00:00,,BK,The Bank of New York Mellon Corp.,Common Stock
+BKNG.O,RIC,equity.bkng,Equity.US.BKNG/USD,992,1970-01-01 00:00:00,,BKNG,Booking Holdings Inc,Common Stock
+BKR.N,RIC,equity.bkr,Equity.US.BKR/USD,993,1970-01-01 00:00:00,,BKR,Baker Hughes Co.,Class A Common Stock
+BLDR.N,RIC,equity.bldr,Equity.US.BLDR/USD,994,1970-01-01 00:00:00,,BLDR,Builders FirstSource Inc,Common Stock
+BLK.N,RIC,equity.blk,Equity.US.BLK/USD,995,1970-01-01 00:00:00,,BLK,BlackRock Inc,Common Stock
+BLSH.N,RIC,equity.blsh,Equity.US.BLSH/USD,2352,1970-01-01 00:00:00,,BLSH,Bullish,Common Stock
+BMNR.A,RIC,equity.bmnr,Equity.US.BMNR/USD,2353,1970-01-01 00:00:00,,BMNR,BitMine Immersion Technologies Inc.,Common Stock
+BMY.N,RIC,equity.bmy,Equity.US.BMY/USD,996,1970-01-01 00:00:00,,BMY,Bristol-Myers Squibb Co.,Common Stock
+BOTZ.O,RIC,equity.botz,Equity.US.BOTZ/USD,2274,1970-01-01 00:00:00,,BOTZ,GLOBAL X ROBOTICS & ARTIFICIAL INTELLIGENCE ETF,Equity
+BRKa.N,RIC,equity.brka,Equity.US.BRK-A/USD,998,1970-01-01 00:00:00,,BRK.A,Berkshire Hathaway Inc A Share,Class A Common Stock
+BRKb.N,RIC,equity.brkb,Equity.US.BRK-B/USD,999,1970-01-01 00:00:00,,BRK.B,Berkshire Hathaway Inc B Share,Class B Common Stock
+BRL=,RIC,fx.usdbrl,FX.USD/BRL,1506,1970-01-01 00:00:00,,USDBRL,US DOLLAR / BRAZILIAN REAL,Forex
+BRO.N,RIC,equity.bro,Equity.US.BRO/USD,1000,1970-01-01 00:00:00,,BRO,Brown & Brown Inc,Common Stock
+BRRR.O,RIC,equity.brrr,Equity.US.BRRR/USD,1001,1970-01-01 00:00:00,,BRRR,COINSHARES BITCOIN ETF,Equity
+BSX.N,RIC,equity.bsx,Equity.US.BSX/USD,1002,1970-01-01 00:00:00,,BSX,Boston Scientific Corp.,Common Stock
+BTBT.O,RIC,equity.btbt,Equity.US.BTBT/USD,2275,1970-01-01 00:00:00,,BTBT,Bit Digital Inc,Common Stock
+BTCW.Z,RIC,equity.btcw,Equity.US.BTCW/USD,1004,1970-01-01 00:00:00,,BTCW,WISDOMTREE BITCOIN TRUST / US DOLLAR,Equity
+BTDR.O,RIC,equity.btdr,Equity.US.BTDR/USD,2276,1970-01-01 00:00:00,,BTDR,Bitdeer Technologies Group,Class A Ordinary Shares
+BTGO.K,RIC,equity.btgo,Equity.US.BTGO/USD,2942,1970-01-01 00:00:00,,BTGO,BITGO HOLDINGS INC,Common Stock
+BWA.N,RIC,equity.bwa,Equity.US.BWA/USD,1006,1970-01-01 00:00:00,,BWA,BorgWarner Inc,Common Stock
+BX.N,RIC,equity.bx,Equity.US.BX/USD,1007,1970-01-01 00:00:00,,BX,The Blackstone Group Inc,Common Stock
+BXP.N,RIC,equity.bxp,Equity.US.BXP/USD,1008,1970-01-01 00:00:00,,BXP,Boston Properties Inc,Common Stock
+C.N,RIC,equity.c,Equity.US.C/USD,1009,1970-01-01 00:00:00,,C,Citigroup Inc,Common Stock
+CAD=,RIC,fx.usdcad,FX.USD/CAD,338,1970-01-01 00:00:00,,usdCAD,US DOLLAR / CANADIAN DOLLAR,Forex
+CADCHF=R,RIC,fx.cadchf,FX.CAD/CHF,316,1970-01-01 00:00:00,,CADCHF,CANADIAN DOLLAR / SWISS FRANC,Forex
+CADJPY=,RIC,fx.cadjpy,FX.CAD/JPY,317,1970-01-01 00:00:00,,CADJPY,CANADIAN DOLLAR / JAPANESE YEN,Forex
+CAG.N,RIC,equity.cag,Equity.US.CAG/USD,1010,1970-01-01 00:00:00,,CAG,Conagra Brands Inc,Common Stock
+CAH.N,RIC,equity.cah,Equity.US.CAH/USD,1011,1970-01-01 00:00:00,,CAH,Cardinal Health Inc,Common Stock
+CARR.N,RIC,equity.carr,Equity.US.CARR/USD,1013,1970-01-01 00:00:00,,CARR,Carrier Global Corp.,Common Stock
+CAT.N,RIC,equity.cat,Equity.US.CAT/USD,1014,1970-01-01 00:00:00,,CAT,Caterpillar Inc,Common Stock
+CB.N,RIC,equity.cb,Equity.US.CB/USD,1015,1970-01-01 00:00:00,,CB,Chubb Ltd.,Common Stock
+CBOE.N,RIC,equity.cboe,Equity.US.CBOE/USD,1016,1970-01-01 00:00:00,,CBOE,Cboe Global Markets Inc,Common Stock
+CBRE.N,RIC,equity.cbre,Equity.US.CBRE/USD,1017,1970-01-01 00:00:00,,CBRE,CBRE Group Inc,Class A Common Stock
+CCEP.O,RIC,equity.ccep,Equity.US.CCEP/USD,1018,1970-01-01 00:00:00,,CCEP,Coca-Cola Europacific Partners PLC,Ordinary Shares
+CCI.N,RIC,equity.cci,Equity.US.CCI/USD,1019,1970-01-01 00:00:00,,CCI,Crown Castle Inc,Common Stock
+CCL.N,RIC,equity.ccl,Equity.US.CCL/USD,1020,1970-01-01 00:00:00,,CCL,Carnival Corp.,Common Stock
+CDNS.O,RIC,equity.cdns,Equity.US.CDNS/USD,1021,1970-01-01 00:00:00,,CDNS,Cadence Design Systems Inc,Common Stock
+CDW.O,RIC,equity.cdw,Equity.US.CDW/USD,1022,1970-01-01 00:00:00,,CDW,CDW Corp.,Common Stock
+CE.N,RIC,equity.ce,Equity.US.CE/USD,1023,1970-01-01 00:00:00,,CE,Celanese Corp.,Common Stock
+CEG.N,RIC,equity.ceg,Equity.US.CEG/USD,1024,1970-01-01 00:00:00,,CEG,Constellation Energy Corp.,Common Stock
+CF.N,RIC,equity.cf,Equity.US.CF/USD,1025,1970-01-01 00:00:00,,CF,CF Industries Holdings Inc,Common Stock
+CFG.N,RIC,equity.cfg,Equity.US.CFG/USD,1026,1970-01-01 00:00:00,,CFG,Citizens Financial Group Inc,Common Stock
+CH26,RIC,future.coh6,Commodities.COH6/USD,3017,1970-01-01 00:00:00,2026-03-13 13:00:00,COH6,CORN 13 MARCH 2026 / US DOLLAR,Commodity Future
+CHD.N,RIC,equity.chd,Equity.US.CHD/USD,1027,1970-01-01 00:00:00,,CHD,Church & Dwight Co. Inc,Common Stock
+CHF=,RIC,fx.usdchf,FX.USD/CHF,2592,1970-01-01 00:00:00,,usdchf,US DOLLAR / SWISS FRANC,Forex
+CHFJPY=,RIC,fx.chfjpy,FX.CHF/JPY,318,1970-01-01 00:00:00,,CHFJPY,SWISS FRANC / JAPANESE YEN,Forex
+CHRW.O,RIC,equity.chrw,Equity.US.CHRW/USD,1028,1970-01-01 00:00:00,,CHRW,C.H. Robinson Worldwide Inc,Common Stock
+CHTR.O,RIC,equity.chtr,Equity.US.CHTR/USD,1029,1970-01-01 00:00:00,,CHTR,Charter Communications Inc,Class A Common Stock
+CI.N,RIC,equity.ci,Equity.US.CI/USD,1030,1970-01-01 00:00:00,,CI,The Cigna Group,Common Stock
+CINF.O,RIC,equity.cinf,Equity.US.CINF/USD,1031,1970-01-01 00:00:00,,CINF,Cincinnati Financial Corp.,Common Stock
+CK26,RIC,future.cok6,Commodities.COK6/USD,3018,1970-01-01 00:00:00,2026-05-14 13:00:00,COK6,CORN 14 MAY 2026 / US DOLLAR,Commodity Future
+CL.N,RIC,equity.cl,Equity.US.CL/USD,1032,1970-01-01 00:00:00,,CL,Colgate-Palmolive Co.,Common Stock
+CLH26,RIC,future.wtih6,Commodities.WTIH6/USD,2692,2026-01-20 17:00:00,2026-02-20 17:00:00,CLH6,PYTH WTI 20 FEBRUARY 2026 / US DOLLAR,Commodity Future
+CLJ26,RIC,future.wtij6,Commodities.WTIJ6/USD,2693,2026-02-20 17:00:00,2026-03-20 17:00:00,CLJ6,PYTH WTI 20 MARCH 2026 / US DOLLAR,Commodity Future
+CLK26,RIC,future.wtik6,Commodities.WTIK6/USD,2694,2026-03-20 17:00:00,2026-04-20 17:00:00,CLK6,PYTH WTI 21 APRIL 2026 / US DOLLAR,Commodity Future
+CLP=,RIC,fx.usdclp,FX.USD/CLP,1507,1970-01-01 00:00:00,,USDCLP,US DOLLAR / CHILEAN PESO SPOT OFFSHORE,Forex
+CLX.N,RIC,equity.clx,Equity.US.CLX/USD,1033,1970-01-01 00:00:00,,CLX,The Clorox Co.,Common Stock
+CLc1,RIC,future.wtiz5,Equity.US.WTIZ5/USD,1790,2025-09-19 19:30:00,2025-11-19 20:30:00,CLZ5,PYTH WTI 20 NOVEMBER 2025 / US DOLLAR,Commodity Future
+CLc1,RIC,future.wtif6,Equity.US.WTIF6/USD,2315,2025-11-19 20:30:00,2025-12-18 20:30:00,CLF6,PYTH WTI 19 DECEMBER 2025 / US DOLLAR,Commodity Future
+CLc1,RIC,future.wtih6,Commodities.WTIH6/USD,2692,2026-01-20 17:00:00,2026-02-20 17:00:00,CLH6,PYTH WTI 20 FEBRUARY 2026 / US DOLLAR,Commodity Future
+CLc1,RIC,future.wtij6,Commodities.WTIJ6/USD,2693,2026-02-20 17:00:00,2026-03-20 17:00:00,CLJ6,PYTH WTI 20 MARCH 2026 / US DOLLAR,Commodity Future
+CLc2,RIC,future.wtif6,Equity.US.WTIF6/USD,2315,2025-09-19 19:30:00,2025-11-19 20:30:00,CLF6,PYTH WTI 19 DECEMBER 2025 / US DOLLAR,Commodity Future
+CLc2,RIC,future.wtig6,Equity.US.WTIG6/USD,2691,2025-12-18 20:30:00,2026-01-16 20:30:00,CLG6,PYTH WTI 20 JANUARY 2026 / US DOLLAR,Commodity Future
+CLc2,RIC,future.wtih6,Commodities.WTIH6/USD,2692,2025-12-19 17:00:00,2026-01-20 17:00:00,CLH6,PYTH WTI 20 FEBRUARY 2026 / US DOLLAR,Commodity Future
+CLc2,RIC,future.wtij6,Commodities.WTIJ6/USD,2693,2026-01-20 17:00:00,2026-02-20 17:00:00,CLJ6,PYTH WTI 20 MARCH 2026 / US DOLLAR,Commodity Future
+CLc3,RIC,future.wtig6,Equity.US.WTIG6/USD,2691,2025-09-19 19:30:00,2025-12-18 20:30:00,CLG6,PYTH WTI 20 JANUARY 2026 / US DOLLAR,Commodity Future
+CLc3,RIC,future.wtij6,Commodities.WTIJ6/USD,2693,2025-12-19 17:00:00,2026-01-20 17:00:00,CLJ6,PYTH WTI 20 MARCH 2026 / US DOLLAR,Commodity Future
+CMCSA.O,RIC,equity.cmcsa,Equity.US.CMCSA/USD,1034,1970-01-01 00:00:00,,CMCSA,Comcast Corp.,Class A Common Stock
+CME.O,RIC,equity.cme,Equity.US.CME/USD,1035,1970-01-01 00:00:00,,CME,CME Group Inc,Class A Common Stock
+CMG.N,RIC,equity.cmg,Equity.US.CMG/USD,1036,1970-01-01 00:00:00,,CMG,Chipotle Mexican Grill Inc,Common Stock
+CMI.N,RIC,equity.cmi,Equity.US.CMI/USD,1037,1970-01-01 00:00:00,,CMI,Cummins Inc,Common Stock
+CMS.N,RIC,equity.cms,Equity.US.CMS/USD,1038,1970-01-01 00:00:00,,CMS,CMS Energy Corp.,Common Stock
+CN26,RIC,future.con6,Commodities.CON6/USD,3019,1970-01-01 00:00:00,2026-07-14 13:00:00,CON6,CORN 14 JULY 2026 / US DOLLAR,Commodity Future
+CNC.N,RIC,equity.cnc,Equity.US.CNC/USD,1039,1970-01-01 00:00:00,,CNC,Centene Corp.,Common Stock
+CNH=,RIC,fx.usdcnh,FX.USD/CNH,1508,1970-01-01 00:00:00,,USDCNH,US DOLLAR / CHINESE YUAN OFFSHORE,Forex
+CNP.N,RIC,equity.cnp,Equity.US.CNP/USD,1040,1970-01-01 00:00:00,,CNP,CenterPoint Energy Inc,Common Stock
+CNY=,RIC,fx.usdcny,FX.USD/CNY,2593,1970-01-01 00:00:00,,usdcny,US DOLLAR / CHINESE YUAN,Forex
+COF.N,RIC,equity.cof,Equity.US.COF/USD,1041,1970-01-01 00:00:00,,COF,Capital One Financial Corp.,Common Stock
+COIN.O,RIC,equity.coin,Equity.US.COIN/USD,1042,1970-01-01 00:00:00,,COIN,Coinbase Global Inc,Class A Common Stock
+COO.N,RIC,equity.coo,Equity.US.COO/USD,1043,1970-01-01 00:00:00,,COO,The Cooper Companies Inc,Common Stock
+COP.N,RIC,equity.cop,Equity.US.COP/USD,1044,1970-01-01 00:00:00,,COP,ConocoPhillips,Common Stock
+COP=,RIC,fx.usdcop,FX.USD/COP,1509,1970-01-01 00:00:00,,USDCOP,US DOLLAR / COLOMBIAN PESO SPOT OFFSHORE,Forex
+COR.N,RIC,equity.cor,Equity.US.COR/USD,1045,1970-01-01 00:00:00,,COR,Core & Main Inc,Class A Common Stock
+COST.O,RIC,equity.cost,Equity.US.COST/USD,1046,1970-01-01 00:00:00,,COST,Costco Wholesale Corp.,Common Stock
+CPAY.O,RIC,equity.cpay,Equity.US.CPAY/USD,1047,1970-01-01 00:00:00,,CPAY,Corpay Inc,Common Stock
+CPB.N,RIC,equity.cpb,Equity.US.CPB/USD,1048,1970-01-01 00:00:00,,CPB,Campbell Soup Co.,Common Stock
+CPER.K,RIC,equity.cper,Equity.US.CPER/USD,2943,1970-01-01 00:00:00,,CPER,UNITED STATES COPPER INDEX FUND,Equity
+CPNG.N,RIC,equity.cpng,Equity.US.CPNG/USD,1049,1970-01-01 00:00:00,,CPNG,Coupang Inc,Class A Common Stock
+CPRT.O,RIC,equity.cprt,Equity.US.CPRT/USD,1050,1970-01-01 00:00:00,,CPRT,Copart Inc,Common Stock
+CPT.N,RIC,equity.cpt,Equity.US.CPT/USD,1051,1970-01-01 00:00:00,,CPT,Camden Property Trust,Common Stock
+CRL.N,RIC,equity.crl,Equity.US.CRL/USD,1052,1970-01-01 00:00:00,,CRL,Charles River Laboratories International Inc,Common Stock
+CRM.N,RIC,equity.crm,Equity.US.CRM/USD,1053,1970-01-01 00:00:00,,CRM,Salesforce Inc,Common Stock
+CRWD.O,RIC,equity.crwd,Equity.US.CRWD/USD,1054,1970-01-01 00:00:00,,CRWD,CrowdStrike Holdings Inc,Class A Common Stock
+CRWV.O,RIC,equity.crwv,Equity.US.CRWV/USD,2737,1970-01-01 00:00:00,,CRWV,CoreWeave Inc,Common Stock
+CSCO.O,RIC,equity.csco,Equity.US.CSCO/USD,1055,1970-01-01 00:00:00,,CSCO,Cisco Systems Inc,Common Stock
+CSGP.O,RIC,equity.csgp,Equity.US.CSGP/USD,1056,1970-01-01 00:00:00,,CSGP,CoStar Group Inc,Common Stock
+CSX.O,RIC,equity.csx,Equity.US.CSX/USD,1057,1970-01-01 00:00:00,,CSX,CSX Corp.,Common Stock
+CTAS.O,RIC,equity.ctas,Equity.US.CTAS/USD,1058,1970-01-01 00:00:00,,CTAS,Cintas Corp.,Common Stock
+CTRA.N,RIC,equity.ctra,Equity.US.CTRA/USD,1059,1970-01-01 00:00:00,,CTRA,Coterra Energy Inc,Common Stock
+CTSH.O,RIC,equity.ctsh,Equity.US.CTSH/USD,1060,1970-01-01 00:00:00,,CTSH,Cognizant Technology Solutions Corp.,Class A Common Stock
+CTVA.N,RIC,equity.ctva,Equity.US.CTVA/USD,1061,1970-01-01 00:00:00,,CTVA,Corteva Inc,Common Stock
+CVS.N,RIC,equity.cvs,Equity.US.CVS/USD,1062,1970-01-01 00:00:00,,CVS,CVS Health Corp.,Common Stock
+CVX.N,RIC,equity.cvx,Equity.US.CVX/USD,1063,1970-01-01 00:00:00,,CVX,Chevron Corp.,Common Stock
+CZK=,RIC,fx.usdczk,FX.USD/CZK,2597,1970-01-01 00:00:00,,usdczk,US DOLLAR / CZECH KORUNA,Forex
+CZR.O,RIC,equity.czr,Equity.US.CZR/USD,1064,1970-01-01 00:00:00,,CZR,Caesars Entertainment Inc,Common Stock
+D.N,RIC,equity.d,Equity.US.D/USD,1065,1970-01-01 00:00:00,,D,Dominion Energy Inc,Common Stock
+DAL.N,RIC,equity.dal,Equity.US.DAL/USD,1066,1970-01-01 00:00:00,,DAL,Delta Air Lines Inc,Common Stock
+DASH.N,RIC,equity.dash,Equity.US.DASH/USD,1067,1970-01-01 00:00:00,,DASH,DoorDash Inc,Class A Common Stock
+DAY.N,RIC,equity.day,Equity.US.DAY/USD,1068,1970-01-01 00:00:00,,DAY,Dayforce Inc,Common Stock
+DD.N,RIC,equity.dd,Equity.US.DD/USD,1069,1970-01-01 00:00:00,,DD,DuPont de Nemours Inc,Common Stock
+DDOG.O,RIC,equity.ddog,Equity.US.DDOG/USD,1070,1970-01-01 00:00:00,,DDOG,Datadog Inc,Class A Common Stock
+DE.N,RIC,equity.de,Equity.US.DE/USD,1071,1970-01-01 00:00:00,,DE,Deere & Co.,Common Stock
+DECK.N,RIC,equity.deck,Equity.US.DECK/USD,1072,1970-01-01 00:00:00,,DECK,Deckers Outdoor Corp.,Common Stock
+DELL.N,RIC,equity.dell,Equity.US.DELL/USD,1074,1970-01-01 00:00:00,,DELL,Dell Technologies Inc,Class C Common Stock
+DFS.N,RIC,equity.dfs,Equity.US.DFS/USD,1075,1970-01-01 00:00:00,,DFS,Discover Financial Services,Common Stock
+DG.N,RIC,equity.dg,Equity.US.DG/USD,1076,1970-01-01 00:00:00,,DG,Dollar General Corp.,Common Stock
+DGX.N,RIC,equity.dgx,Equity.US.DGX/USD,1077,1970-01-01 00:00:00,,DGX,Quest Diagnostics Inc,Common Stock
+DHI.N,RIC,equity.dhi,Equity.US.DHI/USD,1078,1970-01-01 00:00:00,,DHI,D.R. Horton Inc,Common Stock
+DHR.N,RIC,equity.dhr,Equity.US.DHR/USD,1079,1970-01-01 00:00:00,,DHR,Danaher Corp.,Common Stock
+DIA.N,RIC,equity.dia,Equity.US.DIA/USD,1080,1970-01-01 00:00:00,,DIA,SPDR DOW JONES INDUSTRIAL AVRG ETF / US DOLLAR,Equity
+DIS.N,RIC,equity.dis,Equity.US.DIS/USD,1081,1970-01-01 00:00:00,,DIS,The Walt Disney Co.,Common Stock
+DKK=,RIC,fx.usddkk,FX.USD/DKK,2599,1970-01-01 00:00:00,,usddkk,US DOLLAR / DANISH KRONE,Forex
+DLR.N,RIC,equity.dlr,Equity.US.DLR/USD,1082,1970-01-01 00:00:00,,DLR,Digital Realty Trust Inc,Common Stock
+DLTR.O,RIC,equity.dltr,Equity.US.DLTR/USD,1083,1970-01-01 00:00:00,,DLTR,Dollar Tree Inc,Common Stock
+DOC.N,RIC,equity.doc,Equity.US.DOC/USD,1084,1970-01-01 00:00:00,,DOC,Healthpeak Properties Inc,Common Stock
+DOV.N,RIC,equity.dov,Equity.US.DOV/USD,1085,1970-01-01 00:00:00,,DOV,Dover Corp.,Common Stock
+DOW.N,RIC,equity.dow,Equity.US.DOW/USD,1086,1970-01-01 00:00:00,,DOW,Dow Inc,Common Stock
+DPZ.N,RIC,equity.dpz,Equity.US.DPZ/USD,1087,1970-01-01 00:00:00,,DPZ,Domino's Pizza Inc,Common Stock
+DRI.N,RIC,equity.dri,Equity.US.DRI/USD,1088,1970-01-01 00:00:00,,DRI,Darden Restaurants Inc,Common Stock
+DTE.N,RIC,equity.dte,Equity.US.DTE/USD,1089,1970-01-01 00:00:00,,DTE,DTE Energy Co.,Common Stock
+DUK.N,RIC,equity.duk,Equity.US.DUK/USD,1090,1970-01-01 00:00:00,,DUK,Duke Energy Corp.,Common Stock
+DVA.N,RIC,equity.dva,Equity.US.DVA/USD,1091,1970-01-01 00:00:00,,DVA,DaVita Inc,Common Stock
+DVN.N,RIC,equity.dvn,Equity.US.DVN/USD,1092,1970-01-01 00:00:00,,DVN,Devon Energy Corp.,Common Stock
+DXCM.O,RIC,equity.dxcm,Equity.US.DXCM/USD,1093,1970-01-01 00:00:00,,DXCM,DexCom Inc,Common Stock
+EA.O,RIC,equity.ea,Equity.US.EA/USD,1094,1970-01-01 00:00:00,,EA,Electronic Arts Inc,Common Stock
+EBAY.O,RIC,equity.ebay,Equity.US.EBAY/USD,1095,1970-01-01 00:00:00,,EBAY,eBay Inc,Common Stock
+ECL.N,RIC,equity.ecl,Equity.US.ECL/USD,1096,1970-01-01 00:00:00,,ECL,Ecolab Inc,Common Stock
+ED.N,RIC,equity.ed,Equity.US.ED/USD,1097,1970-01-01 00:00:00,,ED,Consolidated Edison Inc,Common Stock
+EFX.N,RIC,equity.efx,Equity.US.EFX/USD,1100,1970-01-01 00:00:00,,EFX,Equifax Inc,Common Stock
+EG.N,RIC,equity.eg,Equity.US.EG/USD,1101,1970-01-01 00:00:00,,EG,Everest Group Ltd.,Common Stock
+EIX.N,RIC,equity.eix,Equity.US.EIX/USD,1102,1970-01-01 00:00:00,,EIX,Edison International,Common Stock
+EL.N,RIC,equity.el,Equity.US.EL/USD,1103,1970-01-01 00:00:00,,EL,The Estee Lauder Companies Inc,Class A Common Stock
+ELV.N,RIC,equity.elv,Equity.US.ELV/USD,1104,1970-01-01 00:00:00,,ELV,Elevance Health Inc,Common Stock
+EMN.N,RIC,equity.emn,Equity.US.EMN/USD,1105,1970-01-01 00:00:00,,EMN,Eastman Chemical Co.,Common Stock
+EMR.N,RIC,equity.emr,Equity.US.EMR/USD,1106,1970-01-01 00:00:00,,EMR,Emerson Electric Co.,Common Stock
+ENPH.O,RIC,equity.enph,Equity.US.ENPH/USD,1107,1970-01-01 00:00:00,,ENPH,Enphase Energy Inc,Common Stock
+EOG.N,RIC,equity.eog,Equity.US.EOG/USD,1108,1970-01-01 00:00:00,,EOG,EOG Resources Inc,Common Stock
+EPAM.N,RIC,equity.epam,Equity.US.EPAM/USD,1109,1970-01-01 00:00:00,,EPAM,EPAM Systems Inc,Common Stock
+EQIX.O,RIC,equity.eqix,Equity.US.EQIX/USD,1110,1970-01-01 00:00:00,,EQIX,Equinix Inc,Common Stock
+EQR.N,RIC,equity.eqr,Equity.US.EQR/USD,1111,1970-01-01 00:00:00,,EQR,Equity Residential,Common Stock
+EQT.N,RIC,equity.eqt,Equity.US.EQT/USD,1112,1970-01-01 00:00:00,,EQT,EQT Corp.,Common Stock
+ERIE.O,RIC,equity.erie,Equity.US.ERIE/USD,1113,1970-01-01 00:00:00,,ERIE,Erie Indemnity Co.,Common Stock
+ES.N,RIC,equity.es,Equity.US.ES/USD,1114,1970-01-01 00:00:00,,ES,Eversource Energy,Common Stock
+ESLT.O,RIC,equity.eslt,Equity.US.ESLT/USD,2285,1970-01-01 00:00:00,,ESLT,Elbit Systems Ltd.,Common Stock
+ESS.N,RIC,equity.ess,Equity.US.ESS/USD,1115,1970-01-01 00:00:00,,ESS,Essex Property Trust Inc,Common Stock
+ESc1,RIC,future.emz5,Equity.US.EMZ5/USD,2284,2025-09-19 13:30:00,2025-12-19 14:30:00,ESZ5,PYTH US500 19 DECEMBER 2025 / US DOLLAR,Equity Future
+ESc2,RIC,future.emh6,Equity.US.EMH6/USD,2282,2025-09-19 13:30:00,2026-03-20 13:30:00,ESH6,PYTH US500 20 MARCH 2026 / US DOLLAR,Equity Future
+ETN.N,RIC,equity.etn,Equity.US.ETN/USD,1116,1970-01-01 00:00:00,,ETN,Eaton Corp. plc,Ordinary Shares
+ETR.N,RIC,equity.etr,Equity.US.ETR/USD,1117,1970-01-01 00:00:00,,ETR,Entergy Corp.,Common Stock
+EUR=,RIC,fx.eurusd,FX.EUR/USD,327,1970-01-01 00:00:00,,eurusd,EURO / US DOLLAR,Forex
+EURAUD=,RIC,fx.euraud,FX.EUR/AUD,319,1970-01-01 00:00:00,,EURAUD,EURO / AUSTRALIAN DOLLAR,Forex
+EURCAD=,RIC,fx.eurcad,FX.EUR/CAD,320,1970-01-01 00:00:00,,EURCAD,EURO / CANADIAN DOLLAR,Forex
+EURCHF=,RIC,fx.eurchf,FX.EUR/CHF,321,1970-01-01 00:00:00,,EURCHF,EURO / SWISS FRANC,Forex
+EURDKK=,RIC,fx.eurdkk,FX.EUR/DKK,2379,1970-01-01 00:00:00,,eurdkk,EURO / DANISH KRONE,Forex
+EURGBP=,RIC,fx.eurgbp,FX.EUR/GBP,322,1970-01-01 00:00:00,,EURGBP,EURO / BRITISH POUND,Forex
+EURJPY=,RIC,fx.eurjpy,FX.EUR/JPY,323,1970-01-01 00:00:00,,EURJPY,EURO / JAPANESE YEN,Forex
+EURNOK=,RIC,fx.eurnok,FX.EUR/NOK,324,1970-01-01 00:00:00,,EURNOK,EURO / NORWEGIAN KRONE,Forex
+EURNZD=,RIC,fx.eurnzd,FX.EUR/NZD,325,1970-01-01 00:00:00,,EURNZD,EURO / NEW ZEALAND DOLLAR,Forex
+EURSEK=,RIC,fx.eursek,FX.EUR/SEK,326,1970-01-01 00:00:00,,EURSEK,EURO / SWEDISH KRONA,Forex
+EVRG.N,RIC,equity.evrg,Equity.US.EVRG/USD,1118,1970-01-01 00:00:00,,EVRG,Evergy Inc,Common Stock
+EW.N,RIC,equity.ew,Equity.US.EW/USD,1119,1970-01-01 00:00:00,,EW,Edwards Lifesciences Corp.,Common Stock
+EWJ,RIC,equity.ewj,Equity.US.EWJ/USD,2971,1970-01-01 00:00:00,,EWJ,ISHARES MSCI JAPAN ETF,Equity
+EWY,RIC,equity.ewy,Equity.US.EWY/USD,2944,1970-01-01 00:00:00,,EWY,ISHARES MSCI SOUTH KOREA ETF,Equity
+EXE.O,RIC,equity.exe,Equity.US.EXE/USD,2286,1970-01-01 00:00:00,,EXE,Expand Energy Inc.,Common Stock
+EXOD.K,RIC,equity.exod,Equity.US.EXOD/USD,2946,1970-01-01 00:00:00,,EXOD,EXODUS MOVEMENT INC.,Common Stock
+EXPD.N,RIC,equity.expd,Equity.US.EXPD/USD,1122,1970-01-01 00:00:00,,EXPD,Expeditors International of Washington Inc,Common Stock
+EXPE.O,RIC,equity.expe,Equity.US.EXPE/USD,1123,1970-01-01 00:00:00,,EXPE,Expedia Group Inc,Common Stock
+EXR.N,RIC,equity.exr,Equity.US.EXR/USD,1124,1970-01-01 00:00:00,,EXR,Extra Space Storage Inc,Common Stock
+EZBC.Z,RIC,equity.ezbc,Equity.US.EZBC/USD,1125,1970-01-01 00:00:00,,EZBC,FRANKLIN BITCOIN ETF / US DOLLAR,Equity
+F.N,RIC,equity.btf,Equity.US.BTF/USD,1126,1970-01-01 00:00:00,,F,Ford Motor Co.,Common Stock
+FANG.O,RIC,equity.fang,Equity.US.FANG/USD,1127,1970-01-01 00:00:00,,FANG,Diamondback Energy Inc,Common Stock
+FAST.O,RIC,equity.fast,Equity.US.FAST/USD,1128,1970-01-01 00:00:00,,FAST,Fastenal Co.,Common Stock
+FBTC.Z,RIC,equity.fbtc,Equity.US.FBTC/USD,1129,1970-01-01 00:00:00,,FBTC,FIDELITY WISE ORIGIN BITCOIN TRUST / US DOLLAR,Equity
+FCX.N,RIC,equity.fcx,Equity.US.FCX/USD,1130,1970-01-01 00:00:00,,FCX,Freeport-McMoRan Inc,Common Stock
+FDS.N,RIC,equity.fds,Equity.US.FDS/USD,1131,1970-01-01 00:00:00,,FDS,FactSet Research Systems Inc,Common Stock
+FDX.N,RIC,equity.fdx,Equity.US.FDX/USD,1132,1970-01-01 00:00:00,,FDX,FedEx Corp.,Common Stock
+FE.N,RIC,equity.fe,Equity.US.FE/USD,1133,1970-01-01 00:00:00,,FE,FirstEnergy Corp.,Common Stock
+FFIV.O,RIC,equity.ffiv,Equity.US.FFIV/USD,1134,1970-01-01 00:00:00,,FFIV,F5 Inc,Common Stock
+FICO.N,RIC,equity.fico,Equity.US.FICO/USD,1136,1970-01-01 00:00:00,,FICO,Fair Isaac Corp.,Common Stock
+FIS.N,RIC,equity.fis,Equity.US.FIS/USD,1137,1970-01-01 00:00:00,,FIS,Fidelity National Information Services Inc,Common Stock
+FISV.O,RIC,equity.fi,Equity.US.FI/USD,1135,1970-01-01 00:00:00,,FI,Fiserv Inc,Common Stock
+FITB.O,RIC,equity.fitb,Equity.US.FITB/USD,1138,1970-01-01 00:00:00,,FITB,Fifth Third Bancorp,Common Stock
+FMC.N,RIC,equity.fmc,Equity.US.FMC/USD,1139,1970-01-01 00:00:00,,FMC,FMC Corp.,Common Stock
+FOX.O,RIC,equity.fox,Equity.US.FOX/USD,1140,1970-01-01 00:00:00,,FOX,Fox Corp.,Class B Common Stock
+FRT.N,RIC,equity.frt,Equity.US.FRT/USD,1142,1970-01-01 00:00:00,,FRT,Federal Realty Investment Trust,Common Stock
+FSLR.O,RIC,equity.fslr,Equity.US.FSLR/USD,1143,1970-01-01 00:00:00,,FSLR,First Solar Inc,Common Stock
+FTNT.O,RIC,equity.ftnt,Equity.US.FTNT/USD,1144,1970-01-01 00:00:00,,FTNT,Fortinet Inc,Common Stock
+FTV.N,RIC,equity.ftv,Equity.US.FTV/USD,1145,1970-01-01 00:00:00,,FTV,Fortive Corp.,Common Stock
+FUTU.O,RIC,equity.futu,Equity.US.FUTU/USD,2771,1970-01-01 00:00:00,,FUTU,FUTU HOLDINGS LTD,American Depositary Shares
+FWDI.O,RIC,equity.fwdi,Equity.US.FWDI/USD,2948,1970-01-01 00:00:00,,FWDI,FORWARD INDUSTRIES INC,Common Stock
+GBP=,RIC,fx.usdgbp,FX.USD/GBP,2595,1970-01-01 00:00:00,,usdgbp,US DOLLAR / BRITISH POUND,Forex
+GBPAUD=,RIC,fx.gbpaud,FX.GBP/AUD,328,1970-01-01 00:00:00,,GBPAUD,BRITISH POUND / AUSTRALIAN DOLLAR,Forex
+GBPCAD=,RIC,fx.gbpcad,FX.GBP/CAD,329,1970-01-01 00:00:00,,GBPCAD,BRITISH POUND / CANADIAN DOLLAR,Forex
+GBPCHF=,RIC,fx.gbpchf,FX.GBP/CHF,330,1970-01-01 00:00:00,,GBPCHF,BRITISH POUND / SWISS FRANC,Forex
+GBPJPY=,RIC,fx.gbpjpy,FX.GBP/JPY,331,1970-01-01 00:00:00,,GBPJPY,BRITISH POUND / JAPANESE YEN,Forex
+GBPNZD=,RIC,fx.gbpnzd,FX.GBP/NZD,332,1970-01-01 00:00:00,,GBPNZD,BRITISH POUND / NEW ZEALAND DOLLAR,Forex
+GBTC.P,RIC,equity.gbtc,Equity.US.GBTC/USD,1146,1970-01-01 00:00:00,,GBTC,GRAYSCALE BITCOIN TRUST / US DOLLAR,Equity
+GD.N,RIC,equity.gd,Equity.US.GD/USD,1147,1970-01-01 00:00:00,,GD,General Dynamics Corp.,Common Stock
+GDDY.N,RIC,equity.gddy,Equity.US.GDDY/USD,1148,1970-01-01 00:00:00,,GDDY,GoDaddy Inc,Class A Common Stock
+GDXJ.K,RIC,equity.gdxj,Equity.US.GDXJ/USD,2774,1970-01-01 00:00:00,,GDXJ,VANECK JUNIOR GOLD MINERS ETF,Equity
+GE.N,RIC,equity.ge,Equity.US.GE/USD,1149,1970-01-01 00:00:00,,GE,GE Aerospace,Common Stock
+GEHC.O,RIC,equity.gehc,Equity.US.GEHC/USD,1150,1970-01-01 00:00:00,,GEHC,GE HealthCare Technologies Inc,Common Stock
+GEN.O,RIC,equity.gen,Equity.US.GEN/USD,1151,1970-01-01 00:00:00,,GEN,Gen Digital Inc,Common Stock
+GEV.N,RIC,equity.gev,Equity.US.GEV/USD,1152,1970-01-01 00:00:00,,GEV,GE Vernova,Common Stock
+GILD.O,RIC,equity.gild,Equity.US.GILD/USD,1154,1970-01-01 00:00:00,,GILD,Gilead Sciences Inc,Common Stock
+GIS.N,RIC,equity.gis,Equity.US.GIS/USD,1155,1970-01-01 00:00:00,,GIS,General Mills Inc,Common Stock
+GL.N,RIC,equity.gld,Equity.US.GLD/USD,1157,1970-01-01 00:00:00,,GL,Globe Life Inc,Common Stock
+GLD,RIC,equity.gld,Equity.US.GLD/USD,1157,1970-01-01 00:00:00,,GLD,SPDR GOLD SHARES ETF,Equity
+GLW.N,RIC,equity.glw,Equity.US.GLW/USD,1158,1970-01-01 00:00:00,,GLW,Corning Inc,Common Stock
+GLXY.O,RIC,equity.glxy,Equity.US.GLXY/USD,2288,1970-01-01 00:00:00,,GLXY,Galaxy Digital Holdings Ltd.,Common Stock
+GM.N,RIC,equity.gm,Equity.US.GM/USD,1159,1970-01-01 00:00:00,,GM,General Motors Co.,Common Stock
+GME.N,RIC,equity.gme,Equity.US.GME/USD,1160,1970-01-01 00:00:00,,GME,GameStop Corp.,Class A Common Stock
+GNRC.N,RIC,equity.gnrc,Equity.US.GNRC/USD,1161,1970-01-01 00:00:00,,GNRC,Generac Holdings Inc,Common Stock
+GOOG.O,RIC,equity.goog,Equity.US.GOOG/USD,1162,1970-01-01 00:00:00,,GOOG,Alphabet Inc C Share,Class C Common Stock
+GOOGL.O,RIC,equity.googl,Equity.US.GOOGL/USD,1163,1970-01-01 00:00:00,,GOOGL,Alphabet Inc A Share,Class A Common Stock
+GPC.N,RIC,equity.gpc,Equity.US.GPC/USD,1165,1970-01-01 00:00:00,,GPC,Genuine Parts Co.,Common Stock
+GPN.N,RIC,equity.gpn,Equity.US.GPN/USD,1166,1970-01-01 00:00:00,,GPN,Global Payments Inc,Common Stock
+GRMN.N,RIC,equity.grmn,Equity.US.GRMN/USD,1167,1970-01-01 00:00:00,,GRMN,Garmin Ltd.,Common Stock
+GS.N,RIC,equity.gs,Equity.US.GS/USD,1168,1970-01-01 00:00:00,,GS,The Goldman Sachs Group Inc,Common Stock
+GWW.N,RIC,equity.gww,Equity.US.GWW/USD,1169,1970-01-01 00:00:00,,GWW,W.W. Grainger Inc,Common Stock
+HAL.N,RIC,equity.hal,Equity.US.HAL/USD,1170,1970-01-01 00:00:00,,HAL,Halliburton Co.,Common Stock
+HAS.O,RIC,equity.has,Equity.US.HAS/USD,1171,1970-01-01 00:00:00,,HAS,Hasbro Inc,Common Stock
+HBAN.O,RIC,equity.hban,Equity.US.HBAN/USD,1172,1970-01-01 00:00:00,,HBAN,Huntington Bancshares Inc,Common Stock
+HCA.N,RIC,equity.hca,Equity.US.HCA/USD,1173,1970-01-01 00:00:00,,HCA,HCA Healthcare Inc,Common Stock
+HD.N,RIC,equity.hd,Equity.US.HD/USD,1174,1970-01-01 00:00:00,,HD,The Home Depot Inc,Common Stock
+HES.N,RIC,equity.hes,Equity.US.HES/USD,1175,1970-01-01 00:00:00,,HES,Hess Corp.,Common Stock
+HGH26,RIC,future.cch6,Commodities.CCH6/USD,2931,1970-01-01 00:00:00,2026-03-27 13:00:00,HGH6,Comex High Grade Copper Futures March 2026,Commodity Future
+HGJ26,RIC,future.ccj6,Commodities.CCJ6/USD,2932,1970-01-01 00:00:00,2026-04-28 13:00:00,HGJ6,Comex High Grade Copper Futures April 2026,Commodity Future
+HGK26,RIC,future.cck6,Commodities.CCK6/USD,2933,1970-01-01 00:00:00,2026-05-27 13:00:00,HGK6,Comex High Grade Copper Futures May 2026,Commodity Future
+HGM26,RIC,future.ccm6,Commodities.CCM6/USD,2934,1970-01-01 00:00:00,2026-06-26 13:00:00,HGM6,Comex High Grade Copper Futures June 2026,Commodity Future
+HGN26,RIC,future.ccn6,Commodities.CCN6/USD,2935,1970-01-01 00:00:00,2026-07-29 13:00:00,HGN6,Comex High Grade Copper Futures July 2026,Commodity Future
+HGQ26,RIC,future.ccq6,Commodities.CCQ6/USD,2936,1970-01-01 00:00:00,2026-08-27 13:00:00,HGQ6,Comex High Grade Copper Futures August 2026,Commodity Future
+HGU26,RIC,future.ccu6,Commodities.CCU6/USD,2937,1970-01-01 00:00:00,2026-09-28 13:00:00,HGU6,Comex High Grade Copper Futures September 2026,Commodity Future
+HGV26,RIC,future.ccv6,Commodities.CCV6/USD,2938,1970-01-01 00:00:00,2026-10-28 13:00:00,HGU6,Comex High Grade Copper Futures October 2026,Commodity Future
+HGX26,RIC,future.ccx6,Commodities.CCX6/USD,2939,1970-01-01 00:00:00,2026-11-25 13:00:00,HGX6,Comex High Grade Copper Futures November 2026,Commodity Future
+HGZ26,RIC,future.ccz6,Commodities.CCZ6/USD,2940,1970-01-01 00:00:00,2026-12-29 13:00:00,HGZ6,Comex High Grade Copper Futures December 2026,Commodity Future
+HIG.N,RIC,equity.hig,Equity.US.HIG/USD,1176,1970-01-01 00:00:00,,HIG,The Hartford Financial Services Group Inc,Common Stock
+HII.N,RIC,equity.hii,Equity.US.HII/USD,1177,1970-01-01 00:00:00,,HII,Huntington Ingalls Industries Inc,Common Stock
+HIMS.N,RIC,equity.hims,Equity.US.HIMS/USD,2289,1970-01-01 00:00:00,,HIMS,Hims & Hers Health Inc,Common Stock
+HKD=,RIC,fx.usdhkd,FX.USD/HKD,1510,1970-01-01 00:00:00,,usdhkd,US DOLLAR / HONG KONG DOLLAR,Forex
+HLT.N,RIC,equity.hlt,Equity.US.HLT/USD,1178,1970-01-01 00:00:00,,HLT,Hilton Worldwide Holdings Inc,Common Stock
+HODL.K,RIC,equity.hodl,Equity.US.HODL/USD,1179,1970-01-01 00:00:00,,HODL,VANECK BITCOIN TRUST / US DOLLAR,Equity
+HOLX.O,RIC,equity.holx,Equity.US.HOLX/USD,1180,1970-01-01 00:00:00,,HOLX,Hologic Inc,Common Stock
+HON.O,RIC,equity.hon,Equity.US.HON/USD,1181,1970-01-01 00:00:00,,HON,Honeywell International Inc,Common Stock
+HOOD.O,RIC,equity.hood,Equity.US.HOOD/USD,1182,1970-01-01 00:00:00,,HOOD,Robinhood Markets Inc,Class A Common Stock
+HPE.N,RIC,equity.hpe,Equity.US.HPE/USD,1183,1970-01-01 00:00:00,,HPE,Hewlett Packard Enterprise Co.,Common Stock
+HPQ.N,RIC,equity.hpq,Equity.US.HPQ/USD,1184,1970-01-01 00:00:00,,HPQ,HP Inc,Common Stock
+HRL.N,RIC,equity.hrl,Equity.US.HRL/USD,1185,1970-01-01 00:00:00,,HRL,Hormel Foods Corp.,Common Stock
+HSDT.O,RIC,equity.hsdt,Equity.US.HSDT/USD,2945,1970-01-01 00:00:00,,HSDT,SOLANA CO,Common Stock
+HSIC.O,RIC,equity.hsic,Equity.US.HSIC/USD,1186,1970-01-01 00:00:00,,HSIC,Henry Schein Inc,Common Stock
+HST.O,RIC,equity.hst,Equity.US.HST/USD,1187,1970-01-01 00:00:00,,HST,Host Hotels & Resorts Inc,Common Stock
+HSY.N,RIC,equity.hsy,Equity.US.HSY/USD,1188,1970-01-01 00:00:00,,HSY,The Hershey Co.,Common Stock
+HUBB.N,RIC,equity.hubb,Equity.US.HUBB/USD,1189,1970-01-01 00:00:00,,HUBB,Hubbell Inc,Common Stock
+HUF=,RIC,fx.usdhuf,FX.USD/HUF,2611,1970-01-01 00:00:00,,usdhuf,US DOLLAR / HUNGARIAN FORINT,Forex
+HUM.N,RIC,equity.hum,Equity.US.HUM/USD,1190,1970-01-01 00:00:00,,HUM,Humana Inc,Common Stock
+HWM.N,RIC,equity.hwm,Equity.US.HWM/USD,1191,1970-01-01 00:00:00,,HWM,Howmet Aerospace Inc,Common Stock
+IAU,RIC,equity.slv,Equity.US.IAU/USD,1193,1970-01-01 00:00:00,,IAU,ISHARES GOLD ETF,Equity
+IAUI.K,RIC,equity.gld,Equity.US.IAUI/USD,2789,1970-01-01 00:00:00,,IAUI,NEOS GOLD HIGH INCOME ETF,Equity
+IBIT.N,RIC,equity.ibit,Equity.US.IBIT/USD,1194,1970-01-01 00:00:00,,IBIT,ISHARES BITCOIN TRUST / US DOLLAR,Equity
+IBM.N,RIC,equity.ibm,Equity.US.IBM/USD,1195,1970-01-01 00:00:00,,IBM,International Business Machines Corp.,Common Stock
+ICE.N,RIC,equity.ice,Equity.US.ICE/USD,1196,1970-01-01 00:00:00,,ICE,Intercontinental Exchange Inc,Common Stock
+IDR=,RIC,fx.usdidr,FX.USD/IDR,1511,1970-01-01 00:00:00,,USDIDR,US DOLLAR / INDONESIAN RUPIAH SPOT OFFSHORE,Forex
+IDXX.O,RIC,equity.idxx,Equity.US.IDXX/USD,1197,1970-01-01 00:00:00,,IDXX,IDEXX Laboratories Inc,Common Stock
+IEX.N,RIC,equity.iex,Equity.US.IEX/USD,1198,1970-01-01 00:00:00,,IEX,IDEX Corp.,Common Stock
+IFF.N,RIC,equity.iff,Equity.US.IFF/USD,1199,1970-01-01 00:00:00,,IFF,International Flavors & Fragrances Inc,Common Stock
+ILS=,RIC,fx.usdils,FX.USD/ILS,2612,1970-01-01 00:00:00,,usdils,US DOLLAR / ISRAELI NEW SHEKEL,Forex
+INCY.O,RIC,equity.incy,Equity.US.INCY/USD,1200,1970-01-01 00:00:00,,INCY,Incyte Corp.,Common Stock
+INR=,RIC,fx.usdinr,FX.USD/INR,1512,1970-01-01 00:00:00,,USDINR,US DOLLAR / INDIAN RUPEE SPOT OFFSHORE,Forex
+INTC.O,RIC,equity.intc,Equity.US.INTC/USD,1201,1970-01-01 00:00:00,,INTC,Intel Corp.,Common Stock
+INTU.O,RIC,equity.intu,Equity.US.INTU/USD,1202,1970-01-01 00:00:00,,INTU,Intuit Inc,Common Stock
+INVH.N,RIC,equity.invh,Equity.US.INVH/USD,1203,1970-01-01 00:00:00,,INVH,Invitation Homes Inc,Common Stock
+IP.N,RIC,equity.ip,Equity.US.IP/USD,1204,1970-01-01 00:00:00,,IP,International Paper Co.,Common Stock
+IPG.N,RIC,equity.ipg,Equity.US.IPG/USD,1205,1970-01-01 00:00:00,,IPG,The Interpublic Group of Companies Inc,Common Stock
+IQV.N,RIC,equity.iqv,Equity.US.IQV/USD,1206,1970-01-01 00:00:00,,IQV,IQVIA Holdings Inc,Common Stock
+IR.N,RIC,equity.ir,Equity.US.IR/USD,1207,1970-01-01 00:00:00,,IR,Ingersoll Rand Inc,Common Stock
+IREN.O,RIC,equity.iren,Equity.US.IREN/USD,2363,1970-01-01 00:00:00,,IREN,Iren Ltd.,Common Stock
+IRL=,RIC,fx.usdirl,FX.USD/IRL,2603,1970-01-01 00:00:00,,usdirl,US DOLLAR / IRISH POUND,Forex
+IRM.N,RIC,equity.irm,Equity.US.IRM/USD,1208,1970-01-01 00:00:00,,IRM,Iron Mountain Inc,Common Stock
+ISRG.O,RIC,equity.isrg,Equity.US.ISRG/USD,1209,1970-01-01 00:00:00,,ISRG,Intuitive Surgical Inc,Common Stock
+IT.N,RIC,equity.it,Equity.US.IT/USD,1210,1970-01-01 00:00:00,,IT,Gartner Inc,Common Stock
+ITA.Z,RIC,equity.ita,Equity.US.ITA/USD,1211,1970-01-01 00:00:00,,ITA,ISHARES US AEROSPACE & DEFENSE ETF,Equity
+ITW.N,RIC,equity.itw,Equity.US.ITW/USD,1212,1970-01-01 00:00:00,,ITW,Illinois Tool Works Inc,Common Stock
+IVV.N,RIC,equity.ivv,Equity.US.IVV/USD,1213,1970-01-01 00:00:00,,IVV,ISHARES CORE S&P 500 ETF / US DOLLAR,Equity
+IVZ.N,RIC,equity.ivz,Equity.US.IVZ/USD,1214,1970-01-01 00:00:00,,IVZ,Invesco Ltd.,Common Stock
+J.N,RIC,equity.j,Equity.US.J/USD,1216,1970-01-01 00:00:00,,J,Jacobs Solutions Inc,Common Stock
+JBHT.O,RIC,equity.jbht,Equity.US.JBHT/USD,1217,1970-01-01 00:00:00,,JBHT,J.B. Hunt Transport Services Inc,Common Stock
+JBL.N,RIC,equity.jbl,Equity.US.JBL/USD,1218,1970-01-01 00:00:00,,JBL,Jabil Inc,Common Stock
+JCI.N,RIC,equity.jci,Equity.US.JCI/USD,1219,1970-01-01 00:00:00,,JCI,Johnson Controls International plc,Ordinary Shares
+JD.O,RIC,equity.jd,Equity.US.JD/USD,2364,1970-01-01 00:00:00,,JD,JD.COM,Common Stock
+JKHY.O,RIC,equity.jkhy,Equity.US.JKHY/USD,1220,1970-01-01 00:00:00,,JKHY,Jack Henry & Associates Inc,Common Stock
+JNJ.N,RIC,equity.jnj,Equity.US.JNJ/USD,1221,1970-01-01 00:00:00,,JNJ,Johnson & Johnson,Common Stock
+JNPR.N,RIC,equity.jnpr,Equity.US.JNPR/USD,1222,1970-01-01 00:00:00,,JNPR,Juniper Networks Inc,Common Stock
+JPM.N,RIC,equity.jpm,Equity.US.JPM/USD,1223,1970-01-01 00:00:00,,JPM,JPMorgan Chase & Co.,Common Stock
+JPY=,RIC,fx.usdjpy,FX.USD/JPY,2596,1970-01-01 00:00:00,,usdjpy,US DOLLAR / JAPANESE YEN,Forex
+K.N,RIC,equity.arkb,Equity.US.ARKB/USD,1224,1970-01-01 00:00:00,,K,Kellogg Co.,Common Stock
+KDP.O,RIC,equity.kdp,Equity.US.KDP/USD,1225,1970-01-01 00:00:00,,KDP,Keurig Dr Pepper Inc,Common Stock
+KEY.N,RIC,equity.key,Equity.US.KEY/USD,1226,1970-01-01 00:00:00,,KEY,KeyCorp,Common Stock
+KEYS.N,RIC,equity.keys,Equity.US.KEYS/USD,1227,1970-01-01 00:00:00,,KEYS,Keysight Technologies Inc,Common Stock
+KHC.O,RIC,equity.khc,Equity.US.KHC/USD,1228,1970-01-01 00:00:00,,KHC,The Kraft Heinz Co.,Common Stock
+KIM.N,RIC,equity.kim,Equity.US.KIM/USD,1229,1970-01-01 00:00:00,,KIM,Kimco Realty Corp.,Common Stock
+KKR.N,RIC,equity.kkr,Equity.US.KKR/USD,1230,1970-01-01 00:00:00,,KKR,KKR & Co. Inc,Common Stock
+KLAC.O,RIC,equity.klac,Equity.US.KLAC/USD,1231,1970-01-01 00:00:00,,KLAC,KLA Corp.,Common Stock
+KMB.N,RIC,equity.kmb,Equity.US.KMB/USD,1232,1970-01-01 00:00:00,,KMB,Kimberly-Clark Corp.,Common Stock
+KMI.N,RIC,equity.kmi,Equity.US.KMI/USD,1233,1970-01-01 00:00:00,,KMI,Kinder Morgan Inc,Common Stock
+KMX.N,RIC,equity.kmx,Equity.US.KMX/USD,1234,1970-01-01 00:00:00,,KMX,CarMax Inc,Common Stock
+KO.N,RIC,equity.ko,Equity.US.KO/USD,1235,1970-01-01 00:00:00,,KO,The Coca-Cola Co.,Common Stock
+KR.N,RIC,equity.kr,Equity.US.KR/USD,1236,1970-01-01 00:00:00,,KR,The Kroger Co.,Common Stock
+KRW=,RIC,fx.usdkrw,FX.USD/KRW,1513,1970-01-01 00:00:00,,USDKRW,US DOLLAR / SOUTH KOREAN WON SPOT OFFSHORE,Forex
+KVUE.N,RIC,equity.kvue,Equity.US.KVUE/USD,1237,1970-01-01 00:00:00,,KVUE,Kenvue Inc,Common Stock
+L.N,RIC,equity.l,Equity.US.L/USD,1238,1970-01-01 00:00:00,,L,Loews Corp.,Common Stock
+LCOc1,RIC,future.brentf6,Equity.US.BRENTF6/USD,2314,2025-09-19 19:30:00,2025-11-28 19:30:00,LCOF6,PYTH BRENT 28 NOVEMBER 2025 / US DOLLAR,Commodity Future
+LCOc1,RIC,future.brentg6,Equity.US.BRENTG6/USD,2695,2025-11-28 19:30:00,2025-12-30 19:30:00,LCOG6,PYTH BRENT 30 DECEMBER 2025 / US DOLLAR,Commodity Future
+LCOc1,RIC,future.brenth6,Equity.US.BRENTH6/USD,2696,2025-12-30 19:30:00,2026-01-30 19:30:00,LCOH6,PYTH BRENT 30 JANUARY 2026 / US DOLLAR,Commodity Future
+LCOc3,RIC,future.brenth6,Equity.US.BRENTH6/USD,2696,2025-09-19 19:30:00,2025-12-30 19:30:00,LCOH6,PYTH BRENT 30 JANUARY 2026 / US DOLLAR,Commodity Future
+LDOS.N,RIC,equity.ldos,Equity.US.LDOS/USD,1239,1970-01-01 00:00:00,,LDOS,Leidos Holdings Inc,Common Stock
+LEN.N,RIC,equity.len,Equity.US.LEN/USD,1240,1970-01-01 00:00:00,,LEN,Lennar Corp.,Class B Common Stock
+LH.N,RIC,equity.lh,Equity.US.LH/USD,1241,1970-01-01 00:00:00,,LH,LabCorp,Common Stock
+LHX.N,RIC,equity.lhx,Equity.US.LHX/USD,1242,1970-01-01 00:00:00,,LHX,L3Harris Technologies Inc,Common Stock
+LII.N,RIC,equity.lii,Equity.US.LII/USD,1243,1970-01-01 00:00:00,,LII,Lennox International Inc,Common Stock
+LIN.N,RIC,equity.lin,Equity.US.LIN/USD,1244,1970-01-01 00:00:00,,LIN,Linde plc,Ordinary Shares
+LKQ.O,RIC,equity.lkq,Equity.US.LKQ/USD,1245,1970-01-01 00:00:00,,LKQ,LKQ Corp.,Common Stock
+LLY.N,RIC,equity.lly,Equity.US.LLY/USD,1246,1970-01-01 00:00:00,,LLY,Eli Lilly and Co.,Common Stock
+LMT.N,RIC,equity.lmt,Equity.US.LMT/USD,1247,1970-01-01 00:00:00,,LMT,Lockheed Martin Corp.,Common Stock
+LNT.O,RIC,equity.lnt,Equity.US.LNT/USD,1248,1970-01-01 00:00:00,,LNT,Alliant Energy Corp.,Common Stock
+LOW.N,RIC,equity.low,Equity.US.LOW/USD,1249,1970-01-01 00:00:00,,LOW,Lowe's Companies Inc,Common Stock
+LRCX.O,RIC,equity.lrcx,Equity.US.LRCX/USD,1250,1970-01-01 00:00:00,,LRCX,Lam Research Corp.,Common Stock
+LULU.O,RIC,equity.lulu,Equity.US.LULU/USD,1251,1970-01-01 00:00:00,,LULU,Lululemon Athletica Inc,Common Stock
+LUV.N,RIC,equity.luv,Equity.US.LUV/USD,1252,1970-01-01 00:00:00,,LUV,Southwest Airlines Co.,Common Stock
+LVS.N,RIC,equity.lvs,Equity.US.LVS/USD,1253,1970-01-01 00:00:00,,LVS,Las Vegas Sands Corp.,Common Stock
+LW.N,RIC,equity.lw,Equity.US.LW/USD,1254,1970-01-01 00:00:00,,LW,Lamb Weston Holdings Inc,Common Stock
+LYB.N,RIC,equity.lyb,Equity.US.LYB/USD,1255,1970-01-01 00:00:00,,LYB,LyondellBasell Industries N.V.,Ordinary Shares
+LYV.N,RIC,equity.lyv,Equity.US.LYV/USD,1256,1970-01-01 00:00:00,,LYV,Live Nation Entertainment Inc,Common Stock
+MA.N,RIC,equity.ma,Equity.US.MA/USD,1257,1970-01-01 00:00:00,,MA,Mastercard Inc,Class A Common Stock
+MAA.N,RIC,equity.maa,Equity.US.MAA/USD,1258,1970-01-01 00:00:00,,MAA,Mid-America Apartment Communities Inc,Common Stock
+MAGS.Z,RIC,equity.mags,Equity.US.MAGS/USD,1713,1970-01-01 00:00:00,,MAGS,ROUNDHILL MAGNIFICENT SEVEN ETF / US DOLLAR,Equity
+MAR.O,RIC,equity.mar,Equity.US.MAR/USD,1259,1970-01-01 00:00:00,,MAR,Marriott International Inc,Class A Common Stock
+MARA.N,RIC,equity.mara,Equity.US.MARA/USD,1260,1970-01-01 00:00:00,,MARA,Marathon Digital Holdings Inc,Common Stock
+MAS.N,RIC,equity.mas,Equity.US.MAS/USD,1261,1970-01-01 00:00:00,,MAS,Masco Corp.,Common Stock
+MCD.N,RIC,equity.mcd,Equity.US.MCD/USD,1262,1970-01-01 00:00:00,,MCD,McDonald's Corp.,Common Stock
+MCHP.O,RIC,equity.mchp,Equity.US.MCHP/USD,1264,1970-01-01 00:00:00,,MCHP,Microchip Technology Inc,Common Stock
+MCK.N,RIC,equity.mck,Equity.US.MCK/USD,1265,1970-01-01 00:00:00,,MCK,McKesson Corp.,Common Stock
+MCO.N,RIC,equity.mco,Equity.US.MCO/USD,1266,1970-01-01 00:00:00,,MCO,Moody's Corp.,Common Stock
+MDLZ.O,RIC,equity.mdlz,Equity.US.MDLZ/USD,1268,1970-01-01 00:00:00,,MDLZ,Mondelez International Inc,Class A Common Stock
+MDT.N,RIC,equity.mdt,Equity.US.MDT/USD,1269,1970-01-01 00:00:00,,MDT,Medtronic plc,Ordinary Shares
+MELI.O,RIC,equity.meli,Equity.US.MELI/USD,1270,1970-01-01 00:00:00,,MELI,Mercadolibre Inc,Common Stock
+MET.N,RIC,equity.met,Equity.US.MET/USD,1271,1970-01-01 00:00:00,,MET,MetLife Inc,Common Stock
+META.O,RIC,equity.meta,Equity.US.META/USD,1272,1970-01-01 00:00:00,,META,Meta Platforms Inc,Class A Common Stock
+MGM.N,RIC,equity.mgm,Equity.US.MGM/USD,1273,1970-01-01 00:00:00,,MGM,MGM Resorts International,Common Stock
+MHK.N,RIC,equity.mhk,Equity.US.MHK/USD,1274,1970-01-01 00:00:00,,MHK,Mohawk Industries Inc,Common Stock
+MKC.N,RIC,equity.mkc,Equity.US.MKC/USD,1276,1970-01-01 00:00:00,,MKC,McCormick & Co. Inc,Class B Common Stock
+MKTX.O,RIC,equity.mktx,Equity.US.MKTX/USD,1277,1970-01-01 00:00:00,,MKTX,MarketAxess Holdings Inc,Common Stock
+MLM.N,RIC,equity.mlm,Equity.US.MLM/USD,1278,1970-01-01 00:00:00,,MLM,Martin Marietta Materials Inc,Common Stock
+MMC.N,RIC,equity.mmc,Equity.US.MMC/USD,1279,1970-01-01 00:00:00,,MMC,Marsh & McLennan Companies Inc,Common Stock
+MMM.N,RIC,equity.mmm,Equity.US.MMM/USD,1280,1970-01-01 00:00:00,,MMM,3M Co.,Common Stock
+MNST.O,RIC,equity.mnst,Equity.US.MNST/USD,1281,1970-01-01 00:00:00,,MNST,Monster Beverage Corp.,Common Stock
+MO.N,RIC,equity.mo,Equity.US.MO/USD,1282,1970-01-01 00:00:00,,MO,Altria Group Inc,Common Stock
+MOH.N,RIC,equity.moh,Equity.US.MOH/USD,1283,1970-01-01 00:00:00,,MOH,Molina Healthcare Inc,Common Stock
+MOS.N,RIC,equity.mos,Equity.US.MOS/USD,1284,1970-01-01 00:00:00,,MOS,The Mosaic Co.,Common Stock
+MPC.N,RIC,equity.mpc,Equity.US.MPC/USD,1285,1970-01-01 00:00:00,,MPC,Marathon Petroleum Corp.,Common Stock
+MPWR.O,RIC,equity.mpwr,Equity.US.MPWR/USD,1286,1970-01-01 00:00:00,,MPWR,Monolithic Power Systems Inc,Common Stock
+MRK.N,RIC,equity.mrk,Equity.US.MRK/USD,1287,1970-01-01 00:00:00,,MRK,Merck & Co. Inc,Common Stock
+MRNA.O,RIC,equity.mrna,Equity.US.MRNA/USD,1288,1970-01-01 00:00:00,,MRNA,Moderna Inc,Common Stock
+MRVL.O,RIC,equity.mrvl,Equity.US.MRVL/USD,1289,1970-01-01 00:00:00,,MRVL,MARVELL TECHNOLOGY INC,Common Stock
+MSCI.N,RIC,equity.msci,Equity.US.MSCI/USD,1291,1970-01-01 00:00:00,,MSCI,MSCI Inc,Common Stock
+MSFT.O,RIC,equity.msft,Equity.US.MSFT/USD,1292,1970-01-01 00:00:00,,MSFT,Microsoft Corp.,Common Stock
+MSI.N,RIC,equity.msi,Equity.US.MSI/USD,1293,1970-01-01 00:00:00,,MSI,Motorola Solutions Inc,Common Stock
+MSTR.O,RIC,equity.mstr,Equity.US.MSTR/USD,1294,1970-01-01 00:00:00,,MSTR,MicroStrategy Inc,Class A Common Stock
+MSTY.N,RIC,equity.msty,Equity.US.MSTY/USD,2292,1970-01-01 00:00:00,,MSTY,Monogram Technologies Inc,Class A Common Stock
+MTB.N,RIC,equity.mtb,Equity.US.MTB/USD,1295,1970-01-01 00:00:00,,MTB,M&T Bank Corp.,Common Stock
+MTCH.O,RIC,equity.mtch,Equity.US.MTCH/USD,1296,1970-01-01 00:00:00,,MTCH,Match Group Inc,Common Stock
+MTD.N,RIC,equity.mtd,Equity.US.MTD/USD,1297,1970-01-01 00:00:00,,MTD,Mettler-Toledo International Inc,Common Stock
+MU.O,RIC,equity.mu,Equity.US.MU/USD,1298,1970-01-01 00:00:00,,MU,Micron Technology Inc,Common Stock
+MXN=,RIC,fx.usdmxn,FX.USD/MXN,2604,1970-01-01 00:00:00,,usdmxn,US DOLLAR / MEXICAN PESO,Forex
+MYR=,RIC,fx.usdmyr,FX.USD/MYR,2629,1970-01-01 00:00:00,,usdmyr,US DOLLAR / MALAYSIAN RINGGIT,Forex
+NCLH.N,RIC,equity.nclh,Equity.US.NCLH/USD,1299,1970-01-01 00:00:00,,NCLH,Norwegian Cruise Line Holdings Ltd.,Ordinary Shares
+NDAQ.O,RIC,equity.ndaq,Equity.US.NDAQ/USD,1300,1970-01-01 00:00:00,,NDAQ,Nasdaq Inc,Common Stock
+NDSN.O,RIC,equity.ndsn,Equity.US.NDSN/USD,1301,1970-01-01 00:00:00,,NDSN,Nordson Corp.,Common Stock
+NEE.N,RIC,equity.nee,Equity.US.NEE/USD,1302,1970-01-01 00:00:00,,NEE,NextEra Energy Inc,Common Stock
+NEM.N,RIC,equity.nem,Equity.US.NEM/USD,1303,1970-01-01 00:00:00,,NEM,Newmont Corp.,Common Stock
+NFLX.O,RIC,equity.nflx,Equity.US.NFLX/USD,1304,1970-01-01 00:00:00,,NFLX,Netflix Inc,Common Stock
+NGH26,RIC,future.ngdh6,Commodities.NGDH6/USD,3024,1970-01-01 00:00:00,2026-02-25 18:00:00,NGDH6,HH NATURAL GAS 25 FEBRUARY 2026 / US DOLLAR,Commodity Future
+NGJ26,RIC,future.ngdj6,Commodities.NGDJ6/USD,3005,1970-01-01 00:00:00,2026-03-27 18:00:00,NGDJ6,HH NATURAL GAS 27 MARCH 2026 / US DOLLAR,Commodity Future
+NGK26,RIC,future.ngdk6,Commodities.NGDK6/USD,3006,1970-01-01 00:00:00,2026-04-28 18:00:00,NGDK6,HH NATURAL GAS 28 APRIL 2026 / US DOLLAR,Commodity Future
+NGM26,RIC,future.ngdm6,Commodities.NGDM6/USD,3008,1970-01-01 00:00:00,2026-05-27 18:00:00,NGDM6,HH NATURAL GAS 27 MAY 2026 / US DOLLAR,Commodity Future
+NGN26,RIC,future.ngdn6,Commodities.NGDN6/USD,3029,1970-01-01 00:00:00,2026-06-26 18:00:00,NGDN6,HH NATURAL GAS 26 JUNE 2026 / US DOLLAR,Commodity Future
+NGQ26,RIC,future.ngq6,Commodities.NGDQ6/USD,3026,1970-01-01 00:00:00,2026-07-29 18:00:00,NGDQ6,HH NATURAL GAS 29 JULY 2026 / US DOLLAR,Commodity Future
+NGU26,RIC,future.ngdu6,Commodities.NGDU6/USD,3027,1970-01-01 00:00:00,2026-08-27 18:00:00,NGDU6,HH NATURAL GAS 27 AUGUST 2026 / US DOLLAR,Commodity Future
+NI.N,RIC,equity.ni,Equity.US.NI/USD,1305,1970-01-01 00:00:00,,NI,NiSource Inc,Common Stock
+NKE.N,RIC,equity.nke,Equity.US.NKE/USD,1306,1970-01-01 00:00:00,,NKE,NIKE Inc,Class B Common Stock
+NKH26,RIC,future.nidh6,Commodities.NIDH6/USD,2912,1970-01-01 00:00:00,2026-03-12 17:00:00,NIDH6,NID H6 12 MARCH 2026 / US DOLLAR,Commodity Future
+NKM26,RIC,future.nidm6,Commodities.NIDM6/USD,2913,1970-01-01 00:00:00,2026-06-11 17:00:00,NIDM6,NID M6 11 JUNE 2026 / US DOLLAR,Commodity Future
+NKU26,RIC,future.nidu6,Commodities.NIDU6/USD,2914,1970-01-01 00:00:00,2026-09-10 17:00:00,NIDU6,NID U6 10 SEPTEMBER 2026 / US DOLLAR,Commodity Future
+NLR.P,RIC,equity.nlr,Equity.US.NLR/USD,2928,1970-01-01 00:00:00,,NLR,VANECK URANIUM & NUCLEAR ETF,Equity
+NOC.N,RIC,equity.noc,Equity.US.NOC/USD,1307,1970-01-01 00:00:00,,NOC,Northrop Grumman Corp.,Common Stock
+NOK=,RIC,fx.usdnok,FX.USD/NOK,2600,1970-01-01 00:00:00,,usdnok,US DOLLAR / NORWEGIAN KRONE,Forex
+NOW.N,RIC,equity.now,Equity.US.NOW/USD,1308,1970-01-01 00:00:00,,NOW,ServiceNow Inc,Common Stock
+NQc1,RIC,future.emz5,Equity.US.NMZ5/USD,2296,2025-09-19 13:30:00,2025-12-19 14:30:00,NQZ5,PYTH US100 19 DECEMBER 2025 / US DOLLAR,Equity Future
+NQc2,RIC,future.emh6,Equity.US.NMH6/USD,2294,2025-09-19 13:30:00,2026-03-20 13:30:00,NQH6,PYTH US100 20 MARCH 2026 / US DOLLAR,Equity Future
+NRG.N,RIC,equity.nrg,Equity.US.NRG/USD,1309,1970-01-01 00:00:00,,NRG,NRG Energy Inc,Common Stock
+NSC.N,RIC,equity.nsc,Equity.US.NSC/USD,1310,1970-01-01 00:00:00,,NSC,Norfolk Southern Corp.,Common Stock
+NTAP.O,RIC,equity.ntap,Equity.US.NTAP/USD,1311,1970-01-01 00:00:00,,NTAP,NetApp Inc,Common Stock
+NTRS.O,RIC,equity.ntrs,Equity.US.NTRS/USD,1312,1970-01-01 00:00:00,,NTRS,Northern Trust Corp.,Common Stock
+NUE.N,RIC,equity.nue,Equity.US.NUE/USD,1313,1970-01-01 00:00:00,,NUE,Nucor Corp.,Common Stock
+NVDA.O,RIC,equity.nvda,Equity.US.NVDA/USD,1314,1970-01-01 00:00:00,,NVDA,NVIDIA Corp.,Common Stock
+NVR.N,RIC,equity.nvr,Equity.US.NVR/USD,1315,1970-01-01 00:00:00,,NVR,NVR Inc,Common Stock
+NWS.O,RIC,equity.nws,Equity.US.NWS/USD,1316,1970-01-01 00:00:00,,NWS,News Corp.,Class B Common Stock
+NWSA.O,RIC,equity.nwsa,Equity.US.NWSA/USD,1317,1970-01-01 00:00:00,,NWSA,News Corp.,Class A Common Stock
+NXPI.O,RIC,equity.nxpi,Equity.US.NXPI/USD,1318,1970-01-01 00:00:00,,NXPI,NXP Semiconductors N.V.,Common Stock
+NZD=,RIC,fx.nzdusd,FX.NZD/USD,337,1970-01-01 00:00:00,,NZDUSD,NEW ZEALAND DOLLAR / US DOLLAR,Forex
+NZDCAD=R,RIC,fx.nzdcad,FX.NZD/CAD,334,1970-01-01 00:00:00,,NZDCAD,NEW ZEALAND DOLLAR / CANADIAN DOLLAR,Forex
+NZDCHF=R,RIC,fx.nzdchf,FX.NZD/CHF,335,1970-01-01 00:00:00,,NZDCHF,NEW ZEALAND DOLLAR / SWISS FRANC,Forex
+NZDJPY=,RIC,fx.nzdjpy,FX.NZD/JPY,336,1970-01-01 00:00:00,,NZDJPY,NEW ZEALAND DOLLAR / JAPANESE YEN,Forex
+O.N,RIC,equity.btco,Equity.US.BTCO/USD,1003,1970-01-01 00:00:00,,O,Realty Income Corp.,Common Stock
+ODFL.O,RIC,equity.odfl,Equity.US.ODFL/USD,1320,1970-01-01 00:00:00,,ODFL,Old Dominion Freight Line Inc,Common Stock
+OKE.N,RIC,equity.oke,Equity.US.OKE/USD,1321,1970-01-01 00:00:00,,OKE,ONEOK Inc,Common Stock
+OMC.N,RIC,equity.omc,Equity.US.OMC/USD,1322,1970-01-01 00:00:00,,OMC,Omnicom Group Inc,Common Stock
+ON.O,RIC,equity.on,Equity.US.ON/USD,1323,1970-01-01 00:00:00,,ON,ON Semiconductor Corp.,Common Stock
+OPEN.O,RIC,equity.open,Equity.US.OPEN/USD,2689,1970-01-01 00:00:00,,OPEN,Opendoor Technologies Inc.,Common Stock
+ORCL.N,RIC,equity.orcl,Equity.US.ORCL/USD,1324,1970-01-01 00:00:00,,ORCL,Oracle Corp.,Common Stock
+ORLY.O,RIC,equity.orly,Equity.US.ORLY/USD,1325,1970-01-01 00:00:00,,ORLY,O'Reilly Automotive Inc,Common Stock
+OTIS.N,RIC,equity.otis,Equity.US.OTIS/USD,1326,1970-01-01 00:00:00,,OTIS,Otis Worldwide Corp.,Common Stock
+OXY.N,RIC,equity.oxy,Equity.US.OXY/USD,1327,1970-01-01 00:00:00,,OXY,Occidental Petroleum Corp.,Common Stock
+PAH26,RIC,future.plh6,Commodities.PLH6/USD,2976,1970-01-01 00:00:00,2026-03-27 17:00:00,PLH6,PALLADIUM 27 MARCH 2026 / US DOLLAR,Commodity Future
+PAM26,RIC,future.plm6,Commodities.PLM6/USD,2977,1970-01-01 00:00:00,2026-06-26 17:00:00,PLM6,PALLADIUM 26 JUNE 2026 / US DOLLAR,Commodity Future
+PANW.O,RIC,equity.panw,Equity.US.PANW/USD,1329,1970-01-01 00:00:00,,PANW,Palo Alto Networks Inc,Common Stock
+PARA.O,RIC,equity.para,Equity.US.PARA/USD,1330,1970-01-01 00:00:00,,PARA,Paramount Global,Class B Common Stock
+PAU26,RIC,future.plu6,Commodities.PLU6/USD,2978,1970-01-01 00:00:00,2026-09-28 17:00:00,PLU6,PALLADIUM 28 SEPTEMBER 2026 / US DOLLAR,Commodity Future
+PAYC.N,RIC,equity.payc,Equity.US.PAYC/USD,1331,1970-01-01 00:00:00,,PAYC,Paycom Software Inc,Common Stock
+PAYX.O,RIC,equity.payx,Equity.US.PAYX/USD,1332,1970-01-01 00:00:00,,PAYX,Paychex Inc,Common Stock
+PCAR.O,RIC,equity.pcar,Equity.US.PCAR/USD,1333,1970-01-01 00:00:00,,PCAR,PACCAR Inc,Common Stock
+PCG.N,RIC,equity.pcg,Equity.US.PCG/USD,1334,1970-01-01 00:00:00,,PCG,PG&E Corp.,Common Stock
+PEG.N,RIC,equity.peg,Equity.US.PEG/USD,1336,1970-01-01 00:00:00,,PEG,Public Service Enterprise Group Inc,Common Stock
+PEN=,RIC,fx.usdpen,FX.USD/PEN,1515,1970-01-01 00:00:00,,USDPEN,US DOLLAR / PERUVIAN SOL SPOT OFFSHORE,Forex
+PEP.O,RIC,equity.pep,Equity.US.PEP/USD,1337,1970-01-01 00:00:00,,PEP,PepsiCo Inc,Common Stock
+PFE.N,RIC,equity.pfe,Equity.US.PFE/USD,1338,1970-01-01 00:00:00,,PFE,Pfizer Inc,Common Stock
+PFG.N,RIC,equity.pfg,Equity.US.PFG/USD,1339,1970-01-01 00:00:00,,PFG,Principal Financial Group Inc,Common Stock
+PG.N,RIC,equity.pg,Equity.US.PG/USD,1340,1970-01-01 00:00:00,,PG,The Procter & Gamble Co.,Common Stock
+PGR.N,RIC,equity.pgr,Equity.US.PGR/USD,1341,1970-01-01 00:00:00,,PGR,The Progressive Corp.,Common Stock
+PH.N,RIC,equity.ph,Equity.US.PH/USD,1342,1970-01-01 00:00:00,,PH,Parker-Hannifin Corp.,Common Stock
+PHM.N,RIC,equity.phm,Equity.US.PHM/USD,1343,1970-01-01 00:00:00,,PHM,PulteGroup Inc,Common Stock
+PHP=,RIC,fx.usdphp,FX.USD/PHP,1516,1970-01-01 00:00:00,,USDPHP,US DOLLAR / PHILIPPINES PESO SPOT OFFSHORE,Forex
+PKG.N,RIC,equity.pkg,Equity.US.PKG/USD,1344,1970-01-01 00:00:00,,PKG,Packaging Corp. of America,Common Stock
+PLD.N,RIC,equity.pld,Equity.US.PLD/USD,1345,1970-01-01 00:00:00,,PLD,Prologis Inc,Common Stock
+PLJ26,RIC,future.ptj6,Commodities.PTJ6/USD,2979,1970-01-01 00:00:00,2026-04-28 17:00:00,PTJ6,PLATINUM 28 APRIL 2026 / US DOLLAR,Commodity Future
+PLN26,RIC,future.ptn6,Commodities.PTN6/USD,2980,1970-01-01 00:00:00,2026-07-29 17:00:00,PTN6,PLATINUM 29 JULY 2026 / US DOLLAR,Commodity Future
+PLN=,RIC,fx.usdpln,FX.USD/PLN,2638,1970-01-01 00:00:00,,usdpln,US DOLLAR / POLISH ZLOTY,Forex
+PLTR.O,RIC,equity.pltr,Equity.US.PLTR/USD,1346,1970-01-01 00:00:00,,PLTR,Palantir Technologies Inc,"""""""Common Stock"""""""
+PLV26,RIC,future.ptv6,Commodities.PTV6/USD,2981,1970-01-01 00:00:00,2026-10-28 17:00:00,PTV6,PLATINUM 28 OCTOBER 2026 / US DOLLAR,Commodity Future
+PM.N,RIC,equity.pm,Equity.US.PM/USD,1347,1970-01-01 00:00:00,,PM,Philip Morris International Inc,Common Stock
+PNC.N,RIC,equity.pnc,Equity.US.PNC/USD,1348,1970-01-01 00:00:00,,PNC,The PNC Financial Services Group Inc,Common Stock
+PNR.N,RIC,equity.pnr,Equity.US.PNR/USD,1349,1970-01-01 00:00:00,,PNR,Pentair PLC,Ordinary Shares
+PNW.N,RIC,equity.pnw,Equity.US.PNW/USD,1350,1970-01-01 00:00:00,,PNW,Pinnacle West Capital Corp.,Common Stock
+PODD.O,RIC,equity.podd,Equity.US.PODD/USD,1351,1970-01-01 00:00:00,,PODD,Insulet Corp.,Common Stock
+POOL.O,RIC,equity.pool,Equity.US.POOL/USD,1352,1970-01-01 00:00:00,,POOL,Pool Corp.,Common Stock
+PPG.N,RIC,equity.ppg,Equity.US.PPG/USD,1353,1970-01-01 00:00:00,,PPG,PPG Industries Inc,Common Stock
+PPL.N,RIC,equity.pplt,Equity.US.PPLT/USD,1355,1970-01-01 00:00:00,,PPL,PPL Corp.,Common Stock
+PRU.N,RIC,equity.pru,Equity.US.PRU/USD,1356,1970-01-01 00:00:00,,PRU,Prudential Financial Inc,Common Stock
+PSA.N,RIC,equity.psa,Equity.US.PSA/USD,1357,1970-01-01 00:00:00,,PSA,Public Storage,Common Stock
+PSKY.N,RIC,equity.psky,Equity.US.PSKY/USD,0,1970-01-01 00:00:00,,PSKY,PeakSky Corp.,Common Stock
+PSX.N,RIC,equity.psx,Equity.US.PSX/USD,1358,1970-01-01 00:00:00,,PSX,Phillips 66,Common Stock
+PTC.O,RIC,equity.ptc,Equity.US.PTC/USD,1359,1970-01-01 00:00:00,,PTC,PTC Inc,Common Stock
+PURR.O,RIC,equity.purr,Equity.US.PURR/USD,2911,1970-01-01 00:00:00,,PURR,Hyperliquid Strategies Inc,Common Stock
+PWR.N,RIC,equity.pwr,Equity.US.\PWR/USD,1360,1970-01-01 00:00:00,,PWR,Quanta Services Inc,Common Stock
+PYPL.O,RIC,equity.pypl,Equity.US.PYPL/USD,1361,1970-01-01 00:00:00,,PYPL,PayPal Holdings Inc,Common Stock
+QBTS.N,RIC,equity.qbts,Equity.US.QBTS/USD,2690,1970-01-01 00:00:00,,QBTS,D-Wave Quantum Inc.,Common Stock
+QCOM.O,RIC,equity.qcom,Equity.US.QCOM/USD,1362,1970-01-01 00:00:00,,QCOM,Qualcomm Inc,Common Stock
+QQQ.O,RIC,equity.qqq,Equity.US.QQQ/USD,1363,1970-01-01 00:00:00,,QQQ,INVSC QQQ TRUST SRS 1 ETF / US DOLLAR,Equity
+QQQM.O,RIC,equity.qqqm,Equity.US.QQQM/USD,1723,1970-01-01 00:00:00,,QQQM,INVESCO NASDAQ 100 ETF / US DOLLAR,Equity
+QS.N,RIC,equity.qs,Equity.US.QS/USD,2297,1970-01-01 00:00:00,,QS,QuantumScape Corp.,Class A Common Stock
+RCL.N,RIC,equity.crcl,Equity.US.CRCL/USD,1683,1970-01-01 00:00:00,,RCL,Royal Caribbean Group,Common Stock
+RDDT.N,RIC,equity.rddt,Equity.US.RDDT/USD,1366,1970-01-01 00:00:00,,RDDT,REDDIT INC,Common Stock
+REG.N,RIC,equity.reg,Equity.US.REG/USD,1367,1970-01-01 00:00:00,,REG,Regency Centers Corp.,Common Stock
+REGN.O,RIC,equity.regn,Equity.US.REGN/USD,1368,1970-01-01 00:00:00,,REGN,Regeneron Pharmaceuticals Inc,Common Stock
+RF.N,RIC,equity.rf,Equity.US.RF/USD,1369,1970-01-01 00:00:00,,RF,Regions Financial Corp.,Common Stock
+RGTI.O,RIC,equity.rgti,Equity.US.RGTI/USD,2370,1970-01-01 00:00:00,,RGTI,Rigetti Computing Inc.,Common Stock
+RIOT.O,RIC,equity.riot,Equity.US.RIOT/USD,1371,1970-01-01 00:00:00,,RIOT,Riot Platforms Inc,Common Stock
+RIVN.O,RIC,equity.rivn,Equity.US.RIVN/USD,2371,1970-01-01 00:00:00,,RIVN,Rivian Automotive Inc,Common Stock
+RJF.N,RIC,equity.rjf,Equity.US.RJF/USD,1372,1970-01-01 00:00:00,,RJF,Raymond James Financial Inc,Common Stock
+RMD.N,RIC,equity.rmd,Equity.US.RMD/USD,1375,1970-01-01 00:00:00,,RMD,ResMed Inc,Common Stock
+ROK.N,RIC,equity.rok,Equity.US.ROK/USD,1376,1970-01-01 00:00:00,,ROK,Rockwell Automation Inc,Common Stock
+ROL.N,RIC,equity.rol,Equity.US.ROL/USD,1377,1970-01-01 00:00:00,,ROL,Rollins Inc,Common Stock
+RON=,RIC,fx.usdron,FX.USD/RON,2640,1970-01-01 00:00:00,,usdron,US DOLLAR / ROMANIAN LEU,Forex
+ROP.N,RIC,equity.rop,Equity.US.ROP/USD,1378,1970-01-01 00:00:00,,ROP,Roper Technologies Inc,Common Stock
+ROST.O,RIC,equity.rost,Equity.US.ROST/USD,1379,1970-01-01 00:00:00,,ROST,Ross Stores Inc,Common Stock
+RSG.N,RIC,equity.rsg,Equity.US.RSG/USD,1380,1970-01-01 00:00:00,,RSG,Republic Services Inc,Common Stock
+RSP.N,RIC,equity.rsp,Equity.US.RSP/USD,1725,1970-01-01 00:00:00,,RSP,INVSC S P 500 EQUAL WEIGHT ETF / US DOLLAR,Equity
+RTX.N,RIC,equity.rtx,Equity.US.RTX/USD,1381,1970-01-01 00:00:00,,RTX,RTX Corporation,Common Stock
+RUB=,RIC,fx.usdrub,FX.USD/RUB,2642,1970-01-01 00:00:00,,usdrub,US DOLLAR / RUSSIAN RUBLE,Forex
+RVTY.N,RIC,equity.rvty,Equity.US.RVTY/USD,1382,1970-01-01 00:00:00,,RVTY,Revvity Inc,Common Stock
+SBAC.O,RIC,equity.sbac,Equity.US.SBAC/USD,1383,1970-01-01 00:00:00,,SBAC,SBA Communications Corp.,Class A Common Stock
+SBET.O,RIC,equity.sbet,Equity.US.SBET/USD,1726,1970-01-01 00:00:00,,SBET,Sharps Compliance Inc,Common Stock
+SBUX.O,RIC,equity.sbux,Equity.US.SBUX/USD,1384,1970-01-01 00:00:00,,SBUX,Starbucks Corp.,Common Stock
+SCCO.N,RIC,equity.scco,Equity.US.SCCO/USD,1727,1970-01-01 00:00:00,,SCCO,Southern Copper Corp.,Common Stock
+SCHW.N,RIC,equity.schw,Equity.US.SCHW/USD,1385,1970-01-01 00:00:00,,SCHW,The Charles Schwab Corp.,Common Stock
+SEK=,RIC,fx.usdsek,FX.USD/SEK,2601,1970-01-01 00:00:00,,usdsek,US DOLLAR / SWEDISH KRONA,Forex
+SGD=,RIC,fx.usdsgd,FX.USD/SGD,342,1970-01-01 00:00:00,,USDSGD,US DOLLAR / SINGAPORE DOLLAR,Forex
+SGML.N,RIC,equity.sgml,Equity.US.SGML/USD,1733,1970-01-01 00:00:00,,SGML,Sigma Lithium Corp.,Common Stock
+SHLD.P,RIC,equity.shld,Equity.US.SHLD/USD,2930,1970-01-01 00:00:00,,SHLD,GLOBAL X DEFENSE TECH ETF,Equity
+SHOP.N,RIC,equity.shop,Equity.US.SHOP/USD,2298,1970-01-01 00:00:00,,SHOP,Shopify Inc,Class A Common Stock
+SHW.N,RIC,equity.shw,Equity.US.SHW/USD,1387,1970-01-01 00:00:00,,SHW,The Sherwin-Williams Co.,Common Stock
+SILJ.K,RIC,equity.silj,Equity.US.SILJ/USD,3025,1970-01-01 00:00:00,,SILJ,AMPLIFY JUNIOR SILVER MINERS ETF,Equity
+SIVR.K,RIC,equity.slv,Equity.US.SIVR/USD,1388,1970-01-01 00:00:00,,SIVR,ABRDN PHYSICAL SILVER SHARES ETF,Equity
+SJM.N,RIC,equity.sjm,Equity.US.SJM/USD,1389,1970-01-01 00:00:00,,SJM,The J. M. Smucker Co.,Common Stock
+SLB.N,RIC,equity.slb,Equity.US.SLB/USD,1390,1970-01-01 00:00:00,,SLB,Schlumberger NV,Common Stock
+SLS.O,RIC,equity.sls,Equity.US.SLS/USD,2299,1970-01-01 00:00:00,,SLS,Sesen Bio Inc,Common Stock
+SLV,RIC,equity.slv,Equity.US.SLV/USD,2853,1970-01-01 00:00:00,,SLV,ISHARES SILVER TRUST ETF,Equity
+SMCI.O,RIC,equity.smci,Equity.US.SMCI/USD,1391,1970-01-01 00:00:00,,SMCI,Super Micro Computer Inc,Common Stock
+SMH.O,RIC,equity.smh,Equity.US.SMH/USD,2372,1970-01-01 00:00:00,,SMH,VANECK SEMICONDUCTOR UCITS ETF / US DOLLAR,Equity
+SNA.N,RIC,equity.sna,Equity.US.SNA/USD,1392,1970-01-01 00:00:00,,SNA,Snap-on Inc,Common Stock
+SNDK.O,RIC,equity.sndk,Equity.US.SNDK/USD,2858,1970-01-01 00:00:00,,SNDK,Sandisk Corp,Common Stock
+SNPS.O,RIC,equity.snps,Equity.US.SNPS/USD,1393,1970-01-01 00:00:00,,SNPS,Synopsys Inc,Common Stock
+SO.N,RIC,equity.uso,Equity.US.USO/USD,1466,1970-01-01 00:00:00,,SO,The Southern Co.,Common Stock
+SOLV.N,RIC,equity.solv,Equity.US.SOLV/USD,1395,1970-01-01 00:00:00,,SOLV,Solventum Corp.,Ordinary Shares
+SPG.N,RIC,equity.spg,Equity.US.SPG/USD,1396,1970-01-01 00:00:00,,SPG,Simon Property Group Inc,Common Stock
+SPGI.N,RIC,equity.spgi,Equity.US.SPGI/USD,1397,1970-01-01 00:00:00,,SPGI,S&P Global Inc,Common Stock
+SPY.N,RIC,equity.spy,Equity.US.SPY/USD,1398,1970-01-01 00:00:00,,SPY,SPDR S&P 500 ETF / US DOLLAR,Equity
+SRE.N,RIC,equity.sre,Equity.US.SRE/USD,1399,1970-01-01 00:00:00,,SRE,Sempra Energy,Common Stock
+SSK.N,RIC,equity.ssk,Equity.US.SSK/USD,2300,1970-01-01 00:00:00,,SSK,Shenandoah National Corp.,Common Stock
+STE.N,RIC,equity.ste,Equity.US.STE/USD,1400,1970-01-01 00:00:00,,STE,STERIS plc,Ordinary Shares
+STLD.N,RIC,equity.stld,Equity.US.STLD/USD,1401,1970-01-01 00:00:00,,STLD,Steel Dynamics Inc,Common Stock
+STRC.O,RIC,equity.strc,Equity.US.STRC/USD,2419,1970-01-01 00:00:00,,STRC,Strategy Inc Var Perp Pfd,Preferred Share
+STRD.O,RIC,equity.strd,Equity.US.STRD/USD,2420,1970-01-01 00:00:00,,STRD,Strategy Inc 10% Perp Pfd,Preferred Share
+STRF.O,RIC,equity.strf,Equity.US.STRF/USD,2421,1970-01-01 00:00:00,,STRF,Strategy Inc 10% Pfd,Preferred Share
+STT.N,RIC,equity.stt,Equity.US.STT/USD,1403,1970-01-01 00:00:00,,STT,State Street Corp.,Common Stock
+STX.O,RIC,equity.stx,Equity.US.STX/USD,1404,1970-01-01 00:00:00,,STX,Seagate Technology Holdings PLC,Ordinary Shares
+STZ.N,RIC,equity.stz,Equity.US.STZ/USD,1405,1970-01-01 00:00:00,,STZ,Constellation Brands Inc,Class A Common Stock
+SWK.N,RIC,equity.swk,Equity.US.SWK/USD,1408,1970-01-01 00:00:00,,SWK,Stanley Black & Decker Inc,Common Stock
+SWKS.O,RIC,equity.swks,Equity.US.SWKS/USD,1409,1970-01-01 00:00:00,,SWKS,Skyworks Solutions Inc,Common Stock
+SYF.N,RIC,equity.syf,Equity.US.SYF/USD,1410,1970-01-01 00:00:00,,SYF,Synchrony Financial,Common Stock
+SYK.N,RIC,equity.syk,Equity.US.SYK/USD,1411,1970-01-01 00:00:00,,SYK,Stryker Corp.,Common Stock
+SYY.N,RIC,equity.syy,Equity.US.SYY/USD,1412,1970-01-01 00:00:00,,SYY,Sysco Corp.,Common Stock
+T.N,RIC,equity.t,Equity.US.T/USD,1413,1970-01-01 00:00:00,,T,AT&T Inc,Common Stock
+TAP.N,RIC,equity.tap,Equity.US.TAP/USD,1414,1970-01-01 00:00:00,,TAP,Molson Coors Beverage Co.,Class B Common Stock
+TDG.N,RIC,equity.tdg,Equity.US.TDG/USD,1415,1970-01-01 00:00:00,,TDG,TransDigm Group Inc,Common Stock
+TDY.N,RIC,equity.tdy,Equity.US.TDY/USD,1416,1970-01-01 00:00:00,,TDY,Teledyne Technologies Inc,Common Stock
+TECH.O,RIC,equity.tech,Equity.US.TECH/USD,1418,1970-01-01 00:00:00,,TECH,Bio-Techne Corp.,Common Stock
+TEJAS.TEST,RIC,equity.tejas.edit,Equity.US.TEJAS.TEST.EDIT/USD,9991,2025-01-01 00:00:00,2026-02-12 00:00:00,TEJAS.TEST.EDIT,TEJAS TEST EDIT,Equity
+TEJAS2.TEST,RIC,equity.tejas,Equity.US.TEJAS.TEST/USD,9999,2025-01-01 00:00:00,,TEJAS.TEST,TEJAS TEST,Equity
+TEL.N,RIC,equity.tel,Equity.US.TEL/USD,1419,1970-01-01 00:00:00,,TEL,TE Connectivity Ltd.,Common Stock
+TER.N,RIC,equity.ter,Equity.US.TER/USD,1420,1970-01-01 00:00:00,,TER,Teradyne Inc,Common Stock
+TFC.N,RIC,equity.tfc,Equity.US.TFC/USD,1421,1970-01-01 00:00:00,,TFC,Truist Financial Corp.,Common Stock
+TFX.N,RIC,equity.tfx,Equity.US.TFX/USD,1422,1970-01-01 00:00:00,,TFX,Teleflex Inc,Common Stock
+TGT.N,RIC,equity.tgt,Equity.US.TGT/USD,1423,1970-01-01 00:00:00,,TGT,Target Corp.,Common Stock
+THB=,RIC,fx.usdthb,FX.USD/THB,2650,1970-01-01 00:00:00,,usdthb,US DOLLAR / THAI BAHT,Forex
+TJX.N,RIC,equity.tjx,Equity.US.TJX/USD,1424,1970-01-01 00:00:00,,TJX,The TJX Companies Inc,Common Stock
+TKO.N,RIC,equity.tko,Equity.US.TKO/USD,2301,1970-01-01 00:00:00,,TKO,TKO Group Holdings Inc,Common Stock
+TMO.N,RIC,equity.tmo,Equity.US.TMO/USD,1426,1970-01-01 00:00:00,,TMO,Thermo Fisher Scientific Inc,Common Stock
+TMUS.O,RIC,equity.tmus,Equity.US.TMUS/USD,1427,1970-01-01 00:00:00,,TMUS,T-Mobile US Inc,Common Stock
+TPL.N,RIC,equity.tpl,Equity.US.TPL/USD,1428,1970-01-01 00:00:00,,TPL,Texas Pacific Land Corp.,Common Stock
+TPR.N,RIC,equity.tpr,Equity.US.TPR/USD,1429,1970-01-01 00:00:00,,TPR,Tapestry Inc,Common Stock
+TRGP.N,RIC,equity.trgp,Equity.US.TRGP/USD,1430,1970-01-01 00:00:00,,TRGP,Targa Resources Corp.,Common Stock
+TRMB.O,RIC,equity.trmb,Equity.US.TRMB/USD,1431,1970-01-01 00:00:00,,TRMB,Trimble Inc,Common Stock
+TROW.O,RIC,equity.trow,Equity.US.TROW/USD,1432,1970-01-01 00:00:00,,TROW,T. Rowe Price Group Inc,Common Stock
+TRV.N,RIC,equity.trv,Equity.US.TRV/USD,1433,1970-01-01 00:00:00,,TRV,The Travelers Companies Inc,Common Stock
+TRY=,RIC,fx.usdtry,FX.USD/TRY,1518,1970-01-01 00:00:00,,USDTRY,US DOLLAR / TURKISH LYRA,Forex
+TSCO.O,RIC,equity.tsco,Equity.US.TSCO/USD,1434,1970-01-01 00:00:00,,TSCO,Tractor Supply Co.,Common Stock
+TSLA.O,RIC,equity.tsla,Equity.US.TSLA/USD,1435,1970-01-01 00:00:00,,TSLA,Tesla Inc,Common Stock
+TSM.N,RIC,equity.tsm,Equity.US.TSM/USD,1436,1970-01-01 00:00:00,,TSM,Taiwan Semiconductor Manufacturing Company Ltd.,American Depositary Shares
+TSM.Z,RIC,equity.tsm,Equity.US.TSM/USD,1436,1970-01-01 00:00:00,,TSM,Taiwan Semiconductor Manufacturing Company Ltd.,American Depositary Shares
+TSN.N,RIC,equity.tsn,Equity.US.TSN/USD,1437,1970-01-01 00:00:00,,TSN,Tyson Foods Inc,Class A Common Stock
+TT.N,RIC,equity.tt,Equity.US.TT/USD,1438,1970-01-01 00:00:00,,TT,Trane Technologies plc,Ordinary Shares
+TTD.O,RIC,equity.ttd,Equity.US.TTD/USD,1439,1970-01-01 00:00:00,,TTD,The Trade Desk Inc,Class A Common Stock
+TTWO.O,RIC,equity.ttwo,Equity.US.TTWO/USD,1440,1970-01-01 00:00:00,,TTWO,Take-Two Interactive Software Inc,Common Stock
+TWD=,RIC,fx.usdtwd,FX.USD/TWD,1519,1970-01-01 00:00:00,,USDTWD,US DOLLAR / TAIWAN DOLLAR SPOT OFFSHORE,Forex
+TXN.O,RIC,equity.txn,Equity.US.TXN/USD,1441,1970-01-01 00:00:00,,TXN,Texas Instruments Inc,Common Stock
+TXT.N,RIC,equity.txt,Equity.US.TXT/USD,1442,1970-01-01 00:00:00,,TXT,Textron Inc,Common Stock
+TYL.N,RIC,equity.tyl,Equity.US.TYL/USD,1443,1970-01-01 00:00:00,,TYL,Tyler Technologies Inc,Common Stock
+UAL.O,RIC,equity.ual,Equity.US.UAL/USD,1444,1970-01-01 00:00:00,,UAL,United Airlines Holdings Inc,Common Stock
+UBER.N,RIC,equity.uber,Equity.US.UBER/USD,1445,1970-01-01 00:00:00,,UBER,Uber Technologies Inc,Common Stock
+UDR.N,RIC,equity.udr,Equity.US.UDR/USD,1446,1970-01-01 00:00:00,,UDR,UDR Inc,Common Stock
+UFO.O,RIC,equity.ufo,Equity.US.UFO/USD,2302,1970-01-01 00:00:00,,UFO,UFO Gaming,Common Stock
+UHS.N,RIC,equity.uhs,Equity.US.UHS/USD,1447,1970-01-01 00:00:00,,UHS,Universal Health Services Inc,Class B Common Stock
+ULTA.O,RIC,equity.ulta,Equity.US.ULTA/USD,1448,1970-01-01 00:00:00,,ULTA,Ulta Beauty Inc,Common Stock
+UNH.N,RIC,equity.unh,Equity.US.UNH/USD,1449,1970-01-01 00:00:00,,UNH,UnitedHealth Group Inc,Common Stock
+UNP.N,RIC,equity.unp,Equity.US.UNP/USD,1450,1970-01-01 00:00:00,,UNP,Union Pacific Corp.,Common Stock
+UPS.N,RIC,equity.upst,Equity.US.UPST/USD,1452,1970-01-01 00:00:00,,UPS,United Parcel Service Inc,Class B Common Stock
+UPXI.O,RIC,equity.upxi,Equity.US.UPXI/USD,2303,1970-01-01 00:00:00,,UPXI,UPEXI Holding Corp.,Common Stock
+URI.N,RIC,equity.uri,Equity.US.URI/USD,1453,1970-01-01 00:00:00,,URI,United Rentals Inc,Common Stock
+US10YT=RRPS,RIC,rates.us10yt,RATES.US10YT,1527,1970-01-01 00:00:00,,us10yt,US Treasury 10 year,Rates
+US1MT=RRPS,RIC,rates.us1mt,RATES.US1MT,1528,1970-01-01 00:00:00,,us1mt,US Treasury 1 month,Rates
+US1YT=RRPS,RIC,rates.us1yt,RATES.US1YT,1529,1970-01-01 00:00:00,,us1yt,US Treasury 1 year,Rates
+US20YT=RRPS,RIC,rates.us20yt,RATES.US20YT,0,1970-01-01 00:00:00,,us20yt,US Treasury 20 year,Rates
+US2MT=RRPS,RIC,rates.us2mt,RATES.US2MT,0,1970-01-01 00:00:00,,us2mt,US Treasury 2 month,Rates
+US2YT=RRPS,RIC,rates.us2yt,RATES.US2YT,1530,1970-01-01 00:00:00,,us2yt,US Treasury 2 year,Rates
+US30YT=RRPS,RIC,rates.us30yt,RATES.US30YT,1531,1970-01-01 00:00:00,,us30yt,US Treasury 30 year,Rates
+US3MT=RRPS,RIC,rates.us3mt,RATES.US3MT,1532,1970-01-01 00:00:00,,us3mt,US Treasury 3 month,Rates
+US3YT=RRPS,RIC,rates.us3yt,RATES.US3YT,1533,1970-01-01 00:00:00,,us3yt,US Treasury 3 year,Rates
+US4MT=RRPS,RIC,rates.us4mt,RATES.US4MT,0,1970-01-01 00:00:00,,us4mt,US Treasury 4 month,Rates
+US5YT=RRPS,RIC,rates.us5yt,RATES.US5YT,1534,1970-01-01 00:00:00,,us5yt,US Treasury 5 year,Rates
+US6MT=RRPS,RIC,rates.us6mt,RATES.US6MT,1535,1970-01-01 00:00:00,,us6mt,US Treasury 6 month,Rates
+US7YT=RRPS,RIC,rates.us7yt,RATES.US7YT,1536,1970-01-01 00:00:00,,us7yt,US Treasury 7 year,Rates
+USB.N,RIC,equity.usb,Equity.US.USB/USD,1464,1970-01-01 00:00:00,,USB,U.S. Bancorp,Common Stock
+UXG26,RIC,future.urg6,Commodities.URG6/USD,2982,1970-01-01 00:00:00,2026-02-23 17:00:00,URG6,URANIUM 23 FEBRUARY 2026 / US DOLLAR,Commodity Future
+UXH26,RIC,future.urh6,Commodities.URH6/USD,2983,1970-01-01 00:00:00,2026-03-30 17:00:00,URH6,URANIUM 30 MARCH 2026 / US DOLLAR,Commodity Future
+UXJ26,RIC,future.urj6,Commodities.URJ6/USD,2984,1970-01-01 00:00:00,2026-04-27 17:00:00,URJ6,URANIUM 27 APRIL 2026 / US DOLLAR,Commodity Future
+VERB.O,RIC,equity.verb,Equity.US.VERB/USD,2304,1970-01-01 00:00:00,,VERB,Verb Technology Co. Inc,Common Stock
+VICI.N,RIC,equity.vici,Equity.US.VICI/USD,1468,1970-01-01 00:00:00,,VICI,VICI Properties Inc,Common Stock
+VLO.N,RIC,equity.vlo,Equity.US.VLO/USD,1469,1970-01-01 00:00:00,,VLO,Valero Energy Corp.,Common Stock
+VLTO.N,RIC,equity.vlto,Equity.US.VLTO/USD,1470,1970-01-01 00:00:00,,VLTO,Veralto Corp.,Common Stock
+VMC.N,RIC,equity.vmc,Equity.US.VMC/USD,1471,1970-01-01 00:00:00,,VMC,Vulcan Materials Co.,Common Stock
+VOO.N,RIC,equity.voo,Equity.US.VOO/USD,1472,1970-01-01 00:00:00,,VOO,VANGUARD S&P 500 ETF / US DOLLAR,Equity
+VRSK.O,RIC,equity.vrsk,Equity.US.VRSK/USD,1473,1970-01-01 00:00:00,,VRSK,Verisk Analytics Inc,Common Stock
+VRSN.O,RIC,equity.vrsn,Equity.US.VRSN/USD,1474,1970-01-01 00:00:00,,VRSN,VeriSign Inc,Common Stock
+VRTX.O,RIC,equity.vrtx,Equity.US.VRTX/USD,1475,1970-01-01 00:00:00,,VRTX,Vertex Pharmaceuticals Inc,Common Stock
+VST.N,RIC,equity.vst,Equity.US.VST/USD,1476,1970-01-01 00:00:00,,VST,Vistra Corp.,Common Stock
+VTR.N,RIC,equity.vtr,Equity.US.VTR/USD,1477,1970-01-01 00:00:00,,VTR,Ventas Inc,Common Stock
+VTRS.O,RIC,equity.vtrs,Equity.US.VTRS/USD,1478,1970-01-01 00:00:00,,VTRS,Viatris Inc,Common Stock
+VXX.N,RIC,equity.vxx,Equity.US.VXX/USD,1772,1970-01-01 00:00:00,,VXX,BARCLAYS IPTH SRS B S&P SHRT TRM ETN / US DOLLAR,Equity
+VZ.N,RIC,equity.vz,Equity.US.VZ/USD,1479,1970-01-01 00:00:00,,VZ,Verizon Communications Inc,Common Stock
+WAB.N,RIC,equity.wab,Equity.US.WAB/USD,1480,1970-01-01 00:00:00,,WAB,Wabtec Corp.,Common Stock
+WAT.N,RIC,equity.wat,Equity.US.WAT/USD,1481,1970-01-01 00:00:00,,WAT,Waters Corp.,Common Stock
+WBA.O,RIC,equity.wba,Equity.US.WBA/USD,1482,1970-01-01 00:00:00,,WBA,Walgreens Boots Alliance Inc,Common Stock
+WBD.O,RIC,equity.wbd,Equity.US.WBD/USD,1483,1970-01-01 00:00:00,,WBD,Warner Bros. Discovery Inc,Series A Common Stock
+WDAY.O,RIC,equity.wday,Equity.US.WDAY/USD,1484,1970-01-01 00:00:00,,WDAY,Workday Inc,Class A Common Stock
+WDC.O,RIC,equity.wdc,Equity.US.WDC/USD,1485,1970-01-01 00:00:00,,WDC,Western Digital Corp.,Common Stock
+WEC.N,RIC,equity.wec,Equity.US.WEC/USD,1486,1970-01-01 00:00:00,,WEC,WEC Energy Group Inc,Common Stock
+WELL.N,RIC,equity.well,Equity.US.WELL/USD,1487,1970-01-01 00:00:00,,WELL,Welltower Inc,Common Stock
+WFC.N,RIC,equity.wfc,Equity.US.WFC/USD,1488,1970-01-01 00:00:00,,WFC,Wells Fargo & Co.,Common Stock
+WM.N,RIC,equity.iwm,Equity.US.IWM/USD,1215,1970-01-01 00:00:00,,WM,Waste Management Inc,Common Stock
+WMB.N,RIC,equity.wmb,Equity.US.WMB/USD,1490,1970-01-01 00:00:00,,WMB,The Williams Companies Inc,Common Stock
+WMT.N,RIC,equity.wmt,Equity.US.WMT/USD,1491,1970-01-01 00:00:00,,WMT,Walmart Inc,Common Stock
+WRB.N,RIC,equity.wrb,Equity.US.WRB/USD,1492,1970-01-01 00:00:00,,WRB,W.R. Berkley Corp.,Common Stock
+WSM.N,RIC,equity.wsm,Equity.US.WSM/USD,2305,1970-01-01 00:00:00,,WSM,Williams-Sonoma Inc,Common Stock
+WST.N,RIC,equity.wst,Equity.US.WST/USD,1493,1970-01-01 00:00:00,,WST,West Pharmaceutical Services Inc,Common Stock
+WTW.O,RIC,equity.wtw,Equity.US.WTW/USD,1494,1970-01-01 00:00:00,,WTW,Willis Towers Watson plc,Ordinary Shares
+WY.N,RIC,equity.wy,Equity.US.WY/USD,1495,1970-01-01 00:00:00,,WY,Weyerhaeuser Co.,Common Stock
+WYNN.O,RIC,equity.wynn,Equity.US.WYNN/USD,1496,1970-01-01 00:00:00,,WYNN,Wynn Resorts Ltd.,Common Stock
+XAG=,RIC,metal.xagusd,Metal.XAG/USD,345,1970-01-01 00:00:00,,XAG,SILVER SPOT / US DOLLAR,Metal
+XAU=,RIC,metal.xauusd,Metal.XAU/USD,346,1970-01-01 00:00:00,,XAU,GOLD SPOT / US DOLLAR,Metal
+XBI.P,RIC,equity.xbi,Equity.US.XBI/USD,2892,1970-01-01 00:00:00,,XBI,SPDR S&P BIOTECH ETF,Equity
+XEL.O,RIC,equity.xel,Equity.US.XEL/USD,1497,1970-01-01 00:00:00,,XEL,Xcel Energy Inc,Common Stock
+XLE,RIC,equity.xle,Equity.US.XLE/USD,1498,1970-01-01 00:00:00,,XLE,SPDR SELECT SECTOR FUND - ENERGY,Equity
+XLK,RIC,equity.xlk,Equity.US.XLK/USD,1775,1970-01-01 00:00:00,,XLK,SPDR SELECT SECTOR FUND - TECHNOLOGY,Equity
+XOM.N,RIC,equity.xom,Equity.US.XOM/USD,1499,1970-01-01 00:00:00,,XOM,Exxon Mobil Corp.,Common Stock
+XPD=,RIC,metal.xdpusd,Metal.XDP/USD,1780,1970-01-01 00:00:00,,XPD,PALLADIUM SPOT / US DOLLAR,Metal
+XPT=,RIC,metal.xptusd,Metal.XPT/USD,1781,1970-01-01 00:00:00,,XPT,PLATINUM SPOT / US DOLLAR,Metal
+XYL.N,RIC,equity.xyl,Equity.US.XYL/USD,1500,1970-01-01 00:00:00,,XYL,Xylem Inc,Common Stock
+XYZ.N,RIC,equity.xyz,Equity.US.XYZ/USD,2306,1970-01-01 00:00:00,,XYZ,Xometry Inc,Class A Common Stock
+YMH26,RIC,future.dmh6,Equity.US.DMH6/USD,2279,2025-03-21 13:30:00,2026-03-20 13:30:00,YMH26,PYTH US30 20 MARCH 2026 / US DOLLAR,Equity Future
+YMZ25,RIC,future.dmz5,Equity.US.DMZ5/USD,2281,2025-03-21 13:30:00,2025-12-19 14:30:00,YMZ25,PYTH US30 19 DECEMBER 2025 / US DOLLAR,Equity Future
+YUM.N,RIC,equity.yum,Equity.US.YUM/USD,1501,1970-01-01 00:00:00,,YUM,Yum! Brands Inc,Common Stock
+ZAR=,RIC,fx.usdzar,FX.USD/ZAR,343,1970-01-01 00:00:00,,USDZAR,US DOLLAR / SOUTH AFRICAN RAND,Forex
+ZBH.N,RIC,equity.zbh,Equity.US.ZBH/USD,1502,1970-01-01 00:00:00,,ZBH,Zimmer Biomet Holdings Inc,Common Stock
+ZBRA.O,RIC,equity.zbra,Equity.US.ZBRA/USD,1503,1970-01-01 00:00:00,,ZBRA,Zebra Technologies Corp.,Common Stock
+ZTS.N,RIC,equity.zts,Equity.US.ZTS/USD,1505,1970-01-01 00:00:00,,ZTS,Zoetis Inc,Common StockMNIG26,RIC,future.nlg6,Commodities.NLG6/USD,2999,1970-01-01 00:00:00,,NLG6,NICKEL 18 FEBRUARY 2026 / US DOLLAR,Commodity Future
+MNIH26,RIC,future.nlh6,Commodities.NLH6/USD,3000,1970-01-01 00:00:00,,NLH6,NICKEL 18 MARCH 2026 / US DOLLAR,Commodity Future
+MNIJ26,RIC,future.nlj6,Commodities.NLJ6/USD,3001,1970-01-01 00:00:00,,NLJ6,NICKEL 15 APRIL 2026 / US DOLLAR,Commodity Future
+NGM26,RIC,future.ngdm6,Commodities.NGDM6/USD,3007,1970-01-01 00:00:00,,NGDM6,HH NATURAL GAS 27 MAY 2026 / US DOLLAR,Commodity Future
+MPBM26,RIC,future.lem6,Commodities.LEM6/USD,3009,1970-01-01 00:00:00,,LEM6,LEAD 16 JUNE 2026 / US DOLLAR,Commodity Future
+MPBU26,RIC,future.leu6,Commodities.LEU6/USD,3010,1970-01-01 00:00:00,,LEU6,LEAD 16 SEPTEMBER 2026 / US DOLLAR,Commodity Future
+MSNH26,RIC,future.tih6,Commodities.TIH6/USD,3011,1970-01-01 00:00:00,,TIH6,TIN 17 MARCH 2026 / US DOLLAR,Commodity Future
+MSNM26,RIC,future.tim6,Commodities.TIM6/USD,3012,1970-01-01 00:00:00,,TIM6,TIN 16 JUNE 2026 / US DOLLAR,Commodity Future
+MSNU26,RIC,future.tiu6,Commodities.TIU6/USD,3013,1970-01-01 00:00:00,,TIU6,TIN 15 SEPTEMBER 2026 / US DOLLAR,Commodity Future
+SBH26,RIC,future.rsh6,Commodities.RSH6/USD,3014,1970-01-01 00:00:00,,RSH6,RAW SUGAR 27 FEBRUARY 2026 / US DOLLAR,Commodity Future
+SBK26,RIC,future.rsk6,Commodities.RSK6/USD,3015,1970-01-01 00:00:00,,RSK6,RAW SUGAR 30 APRIL 2O26 / US DOLLAR,Commodity Future
+SBN26,RIC,future.rsn6,Commodities.RSN6/USD,3016,1970-01-01 00:00:00,,RSN6,RAW SUGAR 30 JUNE 2O26 / US DOLLAR,Commodity Future
+LGOH26,RIC,future.goh6,Commodities.GOH6/USD,3020,1970-01-01 00:00:00,,GOH6,LS GASOIL 12 MARCH 2026 / US DOLLAR,Commodity Future
+LGOJ26,RIC,future.goj6,Commodities.GOJ6/USD,3021,1970-01-01 00:00:00,,GOJ6,LS GASOIL 10 APRIL 2026 / US DOLLAR,Commodity Future
+LGOK26,RIC,future.gok6,Commodities.GOK6/USD,3022,1970-01-01 00:00:00,,GOK6,LS GASOIL 12 MAY 2026 / US DOLLAR,Commodity Future
+CLM26,RIC,future.wtim6,Commodities.WTIM6/USD,3032,1970-01-01 00:00:00,,WTIM6,PYTH WTI 19 MAY 2026 / US DOLLAR,Commodity Future
+YMM26,RIC,future.dmm6,Equity.US.DMM6/USD,3033,1970-01-01 00:00:00,,DMM6,DM M6 18 JUNE 2026 / US DOLLAR,Equity Future
+ESM26,RIC,future.emm6,Equity.US.EMM6/USD,3034,1970-01-01 00:00:00,,EMM6,EM M6 18 JUNE 2026 / US DOLLAR,Equity Future
+NQM26,RIC,future.nmm6,Equity.US.NMM6/USD,3035,1970-01-01 00:00:00,,NMM6,NM M6 18 JUNE 2026 / US DOLLAR,Equity Future
