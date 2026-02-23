@@ -64,29 +64,29 @@ Uses `datascope_futures_benchmark_data` table instead of the standard benchmark 
 
 ## Trading Sessions (US Equities)
 
-| Session | Time (ET) | Benchmark Source | Flag |
-|---------|-----------|------------------|------|
-| Regular | 9:30 AM - 4:00 PM | Datascope | (always) |
-| Pre-market | 4:00 AM - 9:30 AM | Datascope | `--extended-hours` |
-| After-hours | 4:00 PM - 8:00 PM | Datascope | `--extended-hours` |
-| Overnight | 8:00 PM - 4:00 AM | Publisher 32 | `--overnight` |
+| Session     | Time (ET)         | Benchmark Source | Flag               |
+| ----------- | ----------------- | ---------------- | ------------------ |
+| Regular     | 9:30 AM - 4:00 PM | Datascope        | (always)           |
+| Pre-market  | 4:00 AM - 9:30 AM | Datascope        | `--extended-hours` |
+| After-hours | 4:00 PM - 8:00 PM | Datascope        | `--extended-hours` |
+| Overnight   | 8:00 PM - 4:00 AM | Publisher 32     | `--overnight`      |
 
 FX and Metals use 24-hour regular session (with maintenance windows). See individual script docs for session-specific output columns.
 
 ## Scripts
 
-| Script | Purpose | Quick Example | Docs |
-|--------|---------|---------------|------|
-| `quick_benchmark.py` | Evaluate feed quality vs Datascope | `python quick_benchmark.py --csv feeds.csv` | [docs/quick_benchmark.md](docs/quick_benchmark.md) |
-| `feed_readiness.py` | Combined benchmark + uptime readiness check | `python feed_readiness.py --csv feeds.csv` | [docs/feed_readiness.md](docs/feed_readiness.md) |
-| `publisher_benchmark.py` | Per-publisher benchmark with statistical metrics | `python publisher_benchmark.py --csv feeds.csv` | [docs/publisher_benchmark.md](docs/publisher_benchmark.md) |
-| `publisher_report.py` | Per-feed health classification (HEALTHY/DEGRADED/FAILING) | `python publisher_report.py --csv feeds.csv` | [docs/publisher_report.md](docs/publisher_report.md) |
-| `generate_source_upload.py` | Datascope onboarding CSV for US equities | `python generate_source_upload.py --tickers AAPL,NVDA` | [docs/generate_source_upload.md](docs/generate_source_upload.md) |
-| `generate_ric_mapping.py` | Universal RIC mapping (all asset classes) | `python generate_ric_mapping.py --ticker AAPL EURUSD` | [docs/generate_ric_mapping.md](docs/generate_ric_mapping.md) |
-| `isin_resolver.py` | Ticker to ISIN resolution (multi-tier) | `python isin_resolver.py --tickers AAPL,MSFT` | [docs/isin_resolver_v2.md](docs/isin_resolver_v2.md) |
-| `update_lazer_symbols.py` | Promote feeds COMING_SOON to STABLE in after.json | `python3 update_lazer_symbols.py --summary X --config after.json --dry-run` | [docs/update_lazer_symbols.md](docs/update_lazer_symbols.md) |
-| `trading_halt_history.py` | Download NASDAQ LUDP halt data | `python trading_halt_history.py` | [docs/trading_halt_history.md](docs/trading_halt_history.md) |
-| `verify_uptime.py` | Compare uptime calculation methods (1s window vs 200ms gap) | `python verify_uptime.py --publisher-id 55 --date 2026-01-28` | - |
+| Script                      | Purpose                                                     | Quick Example                                                               | Docs                                                             |
+| --------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `quick_benchmark.py`        | Evaluate feed quality vs Datascope                          | `python quick_benchmark.py --csv feeds.csv`                                 | [docs/quick_benchmark.md](docs/quick_benchmark.md)               |
+| `feed_readiness.py`         | Combined benchmark + uptime readiness check                 | `python feed_readiness.py --csv feeds.csv`                                  | [docs/feed_readiness.md](docs/feed_readiness.md)                 |
+| `publisher_benchmark.py`    | Per-publisher benchmark with statistical metrics            | `python publisher_benchmark.py --csv feeds.csv`                             | [docs/publisher_benchmark.md](docs/publisher_benchmark.md)       |
+| `publisher_report.py`       | Per-feed health classification (HEALTHY/DEGRADED/FAILING)   | `python publisher_report.py --csv feeds.csv`                                | [docs/publisher_report.md](docs/publisher_report.md)             |
+| `generate_source_upload.py` | Datascope onboarding CSV for US equities                    | `python generate_source_upload.py --tickers AAPL,NVDA`                      | [docs/generate_source_upload.md](docs/generate_source_upload.md) |
+| `generate_ric_mapping.py`   | Universal RIC mapping (all asset classes)                   | `python generate_ric_mapping.py --ticker AAPL EURUSD`                       | [docs/generate_ric_mapping.md](docs/generate_ric_mapping.md)     |
+| `isin_resolver.py`          | Ticker to ISIN resolution (multi-tier)                      | `python isin_resolver.py --tickers AAPL,MSFT`                               | [docs/isin_resolver_v2.md](docs/isin_resolver_v2.md)             |
+| `update_lazer_symbols.py`   | Promote feeds COMING_SOON to STABLE in after.json           | `python3 update_lazer_symbols.py --summary X --config after.json --dry-run` | [docs/update_lazer_symbols.md](docs/update_lazer_symbols.md)     |
+| `trading_halt_history.py`   | Download NASDAQ LUDP halt data                              | `python trading_halt_history.py`                                            | [docs/trading_halt_history.md](docs/trading_halt_history.md)     |
+| `verify_uptime.py`          | Compare uptime calculation methods (1s window vs 200ms gap) | `python verify_uptime.py --publisher-id 55 --date 2026-01-28`               | -                                                                |
 
 ### Publisher Performance Portal
 

@@ -13,6 +13,7 @@
 ### Task 1: Verify docs/ coverage before removing content
 
 **Files:**
+
 - Read: `docs/quick_benchmark.md`, `docs/feed_readiness.md`, `docs/publisher_benchmark.md`, `docs/generate_source_upload.md`, `docs/trading_halt_history.md`, `docs/portal_usage.md`, `docs/isin_resolver_v2.md`, `docs/publisher_report.md`, `docs/update_lazer_symbols.md`
 
 **Step 1: Confirm each docs/ file exists and covers the content being removed**
@@ -28,6 +29,7 @@ It may not have one. If missing, create `docs/generate_ric_mapping.md` by extrac
 ### Task 2: Backfill any missing docs/ content
 
 **Files:**
+
 - Create (if needed): `docs/generate_ric_mapping.md`
 - Modify (if needed): any docs/ file missing content from CLAUDE.md
 
@@ -47,6 +49,7 @@ git commit -m "docs: backfill docs/ files before CLAUDE.md restructure"
 ### Task 3: Rewrite CLAUDE.md
 
 **Files:**
+
 - Modify: `CLAUDE.md`
 
 **Step 1: Write the new CLAUDE.md with these sections (in order):**
@@ -60,18 +63,18 @@ git commit -m "docs: backfill docs/ files before CLAUDE.md restructure"
 7. **Futures Naming Convention** (~8 lines) — month codes, year digits, symbol pattern (no enumerated futures list)
 8. **Trading Sessions** (~12 lines) — single consolidated table:
 
-| Session | Time (ET) | Benchmark Source | Flag | Asset Classes |
-|---------|-----------|------------------|------|---------------|
-| Regular | 9:30 AM - 4:00 PM | Datascope | (always) | US Equities |
-| Pre-market | 4:00 AM - 9:30 AM | Datascope | `--extended-hours` | US Equities |
-| After-hours | 4:00 PM - 8:00 PM | Datascope | `--extended-hours` | US Equities |
-| Overnight | 8:00 PM - 4:00 AM | Publisher 32 | `--overnight` | US Equities |
-| Regular | 24h (with maint.) | Datascope | (always) | FX, Metals |
+| Session     | Time (ET)         | Benchmark Source | Flag               | Asset Classes |
+| ----------- | ----------------- | ---------------- | ------------------ | ------------- |
+| Regular     | 9:30 AM - 4:00 PM | Datascope        | (always)           | US Equities   |
+| Pre-market  | 4:00 AM - 9:30 AM | Datascope        | `--extended-hours` | US Equities   |
+| After-hours | 4:00 PM - 8:00 PM | Datascope        | `--extended-hours` | US Equities   |
+| Overnight   | 8:00 PM - 4:00 AM | Publisher 32     | `--overnight`      | US Equities   |
+| Regular     | 24h (with maint.) | Datascope        | (always)           | FX, Metals    |
 
 9. **Scripts** (~50 lines) — index table:
 
-| Script | Purpose | Quick Example | Docs |
-|--------|---------|---------------|------|
+| Script                                                                     | Purpose | Quick Example | Docs |
+| -------------------------------------------------------------------------- | ------- | ------------- | ---- |
 | One row per script with 1-line purpose, one example command, link to docs/ |
 
 Include all 12 scripts/tools: quick_benchmark, feed_readiness, publisher_benchmark, publisher_report, generate_source_upload, generate_ric_mapping, isin_resolver, update_lazer_symbols, trading_halt_history, verify_uptime, portal (test_api + uvicorn), daily batch runner.

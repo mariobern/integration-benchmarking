@@ -54,7 +54,7 @@ Rule-based resolution engine -- no ClickHouse or API dependencies (except NASDAQ
 | Metals                      | Fixed lookup                          | `XAU=`, `XAG=`, `XPT=`, `XPD=`  |
 | Rates                       | `US{TENOR}T=RRPS`                     | `US10YT=RRPS`, `US3MT=RRPS`     |
 | Commodity Futures           | Pyth->RIC root mapping                | `HGH26` (copper), `CLJ26` (WTI) |
-| Equity Index Futures        | EM->ES, NM->NQ, DM->YM               | `ESH26`, `NQH26`, `YMH26`       |
+| Equity Index Futures        | EM->ES, NM->NQ, DM->YM                | `ESH26`, `NQH26`, `YMH26`       |
 
 ## Output Format
 
@@ -77,8 +77,8 @@ HGH26,RIC,future.cch6,Commodities.CCH6/USD,2931,1970-01-01 00:00:00,,CCH6,COPPER
 
 ## Confidence Levels
 
-| Level    | Meaning                                                            |
-| -------- | ------------------------------------------------------------------ |
+| Level    | Meaning                                                             |
+| -------- | ------------------------------------------------------------------- |
 | `high`   | Rule-based derivation (FX, metals, rates, futures) -- deterministic |
 | `medium` | NASDAQ Trader lookup (US equities) -- correct ~84% of the time      |
 | `low`    | Fallback to `.N` suffix -- needs manual verification                |
