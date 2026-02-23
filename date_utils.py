@@ -16,7 +16,9 @@ def _parse_date(value: str, arg_name: str):
         raise ValueError(f"{arg_name} must be in YYYY-MM-DD format: {value}") from exc
 
 
-def _normalize_date_list(date_list: list[str] | tuple[str, ...] | str | None) -> list[str] | None:
+def _normalize_date_list(
+    date_list: list[str] | tuple[str, ...] | str | None
+) -> list[str] | None:
     if date_list is None:
         return None
     if isinstance(date_list, str):
@@ -36,7 +38,9 @@ def expand_date_args(
         raise ValueError("Use either --date OR --start-date/--end-date, not both")
 
     if normalized_date_list:
-        parsed_dates = {_parse_date(date_str, "--date") for date_str in normalized_date_list}
+        parsed_dates = {
+            _parse_date(date_str, "--date") for date_str in normalized_date_list
+        }
         return [date_obj.strftime(DATE_FORMAT) for date_obj in sorted(parsed_dates)]
 
     if start_date or end_date:
@@ -49,7 +53,10 @@ def expand_date_args(
             raise ValueError("--start-date must be less than or equal to --end-date")
 
         day_count = (end - start).days + 1
-        return [(start + timedelta(days=offset)).strftime(DATE_FORMAT) for offset in range(day_count)]
+        return [
+            (start + timedelta(days=offset)).strftime(DATE_FORMAT)
+            for offset in range(day_count)
+        ]
 
     return []
 

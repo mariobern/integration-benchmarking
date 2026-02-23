@@ -44,11 +44,11 @@ CACHE_TTL_SECONDS = 24 * 60 * 60  # 24 hours
 
 # otherlisted.txt Exchange column -> RIC suffix
 OTHER_EXCHANGE_SUFFIX_MAP = {
-    "N": ".N",   # NYSE
-    "P": ".P",   # NYSE Arca
-    "Z": ".Z",   # BATS
-    "A": ".A",   # NYSE American (AMEX)
-    "V": ".V",   # IEXG
+    "N": ".N",  # NYSE
+    "P": ".P",  # NYSE Arca
+    "Z": ".Z",  # BATS
+    "A": ".A",  # NYSE American (AMEX)
+    "V": ".V",  # IEXG
 }
 
 # ADR detection keywords (case-insensitive match against security name)
@@ -77,12 +77,12 @@ PRIMARY_EXCHANGE_SUFFIXES = {".N", ".O", ".OQ"}
 
 # Map NASDAQ Trader exchange codes to RIC suffixes for disambiguation
 _EXCHANGE_CODE_TO_RIC_SUFFIX: dict[str, str] = {
-    "Q": ".O",   # NASDAQ
-    "N": ".N",   # NYSE
-    "P": ".P",   # NYSE Arca
-    "Z": ".Z",   # BATS
-    "A": ".A",   # NYSE American (AMEX)
-    "V": ".V",   # IEXG
+    "Q": ".O",  # NASDAQ
+    "N": ".N",  # NYSE
+    "P": ".P",  # NYSE Arca
+    "Z": ".Z",  # BATS
+    "A": ".A",  # NYSE American (AMEX)
+    "V": ".V",  # IEXG
 }
 
 
@@ -242,9 +242,7 @@ class ClickHouseLookup:
             dot_idx = ric.rfind(".")
             if dot_idx > 0:
                 ric_base = ric[:dot_idx]
-                original = ric_base_to_original.get(
-                    ric_base.upper(), ric_base.upper()
-                )
+                original = ric_base_to_original.get(ric_base.upper(), ric_base.upper())
                 ric_map.setdefault(original, []).append(ric)
 
         return ric_map
@@ -297,7 +295,9 @@ class NasdaqTraderSource:
     def __init__(self, force_refresh: bool = False):
         self.force_refresh = force_refresh
         self._nasdaq_tickers: dict[str, str] = {}  # ticker -> name
-        self._other_tickers: dict[str, tuple[str, str]] = {}  # ticker -> (exchange, name)
+        self._other_tickers: dict[
+            str, tuple[str, str]
+        ] = {}  # ticker -> (exchange, name)
         self._loaded = False
 
     def _ensure_cache_dir(self) -> None:
@@ -321,9 +321,14 @@ class NasdaqTraderSource:
                 data = resp.read().decode("utf-8")
         except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as e:
             if cache_path.exists():
-                print(f"  Warning: Download failed ({e}), using stale cache", file=sys.stderr)
+                print(
+                    f"  Warning: Download failed ({e}), using stale cache",
+                    file=sys.stderr,
+                )
                 return cache_path.read_text()
-            raise RuntimeError(f"Cannot fetch {url} and no cached version available") from e
+            raise RuntimeError(
+                f"Cannot fetch {url} and no cached version available"
+            ) from e
         cache_path.write_text(data)
         return data
 
@@ -333,9 +338,7 @@ class NasdaqTraderSource:
 
         # Parse nasdaqlisted.txt (pipe-delimited, all NASDAQ stocks)
         # Format: Symbol|Security Name|...|Test Issue|...
-        nasdaq_data = self._download(
-            NASDAQ_LISTED_URL, CACHE_DIR / "nasdaqlisted.txt"
-        )
+        nasdaq_data = self._download(NASDAQ_LISTED_URL, CACHE_DIR / "nasdaqlisted.txt")
         for line in nasdaq_data.strip().split("\n")[1:]:  # skip header
             if line.startswith("File Creation Time"):
                 continue
@@ -349,9 +352,7 @@ class NasdaqTraderSource:
 
         # Parse otherlisted.txt (pipe-delimited, NYSE/ARCA/BATS/AMEX)
         # Format: ACT Symbol|Security Name|Exchange|...
-        other_data = self._download(
-            OTHER_LISTED_URL, CACHE_DIR / "otherlisted.txt"
-        )
+        other_data = self._download(OTHER_LISTED_URL, CACHE_DIR / "otherlisted.txt")
         for line in other_data.strip().split("\n")[1:]:  # skip header
             if line.startswith("File Creation Time"):
                 continue
@@ -666,19 +667,21 @@ def write_csv(rows: list[SourceUploadRow], output_path: Path) -> None:
         # Write data rows with standard csv.writer (no space after commas)
         writer = csv.writer(f)
         for row in rows:
-            writer.writerow([
-                row.source_value,
-                row.source_type,
-                row.pyth_id,
-                row.pythnet_id,
-                row.pyth_lazer_id,
-                row.valid_from,
-                row.valid_to,
-                row.ticker,
-                row.asset_full_name,
-                row.asset_class,
-                row.confidence,
-            ])
+            writer.writerow(
+                [
+                    row.source_value,
+                    row.source_type,
+                    row.pyth_id,
+                    row.pythnet_id,
+                    row.pyth_lazer_id,
+                    row.valid_from,
+                    row.valid_to,
+                    row.ticker,
+                    row.asset_full_name,
+                    row.asset_class,
+                    row.confidence,
+                ]
+            )
 
     print(f"\nWrote {len(rows)} rows to {output_path}")
 
@@ -779,7 +782,10 @@ def parse_tickers_from_file(file_path: Path) -> list[str]:
                 continue
 
             if not validate_ticker(candidate):
-                print(f"Warning: Skipping invalid ticker format: {candidate}", file=sys.stderr)
+                print(
+                    f"Warning: Skipping invalid ticker format: {candidate}",
+                    file=sys.stderr,
+                )
                 continue
 
             if candidate not in seen:

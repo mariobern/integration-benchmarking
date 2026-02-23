@@ -4,12 +4,12 @@ Last updated: 2026-01-26
 
 ## Summary
 
-| Asset Class | Instruments | Earliest | Latest |
-|-------------|-------------|----------|--------|
-| Us Equities | 620 | 2025-08-22 | 2026-02-04 |
-| Fx | 74 | 2025-09-08 | 2026-02-04 |
-| Futures | 22 | 2025-11-06 | 2026-02-04 |
-| Us Treasuries | 10 | 2025-12-01 | 2026-02-04 |
+| Asset Class   | Instruments | Earliest   | Latest     |
+| ------------- | ----------- | ---------- | ---------- |
+| Us Equities   | 620         | 2025-08-22 | 2026-02-04 |
+| Fx            | 74          | 2025-09-08 | 2026-02-04 |
+| Futures       | 22          | 2025-11-06 | 2026-02-04 |
+| Us Treasuries | 10          | 2025-12-01 | 2026-02-04 |
 
 **Total: 726 instruments**
 

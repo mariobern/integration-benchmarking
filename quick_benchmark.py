@@ -263,7 +263,9 @@ def get_clients(config: dict) -> tuple:
     return client_lazer, client_analytics
 
 
-def get_feed_metadata(client_lazer, feed_id: int) -> tuple[Optional[str], Optional[int]]:
+def get_feed_metadata(
+    client_lazer, feed_id: int
+) -> tuple[Optional[str], Optional[int]]:
     """Get symbol and exponent for a feed from metadata table."""
 
     query = f"""
@@ -303,7 +305,9 @@ def is_futures_symbol(symbol: str) -> bool:
 
 
 @lru_cache(maxsize=128)
-def get_market_hours_filter_sql(mode: str, date: str, column_name: str = "publish_time") -> str:
+def get_market_hours_filter_sql(
+    mode: str, date: str, column_name: str = "publish_time"
+) -> str:
     """Generate SQL WHERE clause for regular market hours filtering."""
 
     if mode not in ("us-equities", "equity-us"):
@@ -628,9 +632,7 @@ def evaluate_session_for_all_publishers(
 
             rmse = (sum(metrics["squared_errors"]) / n_observations) ** 0.5
             n_spreads = len(metrics["spreads"])
-            mean_spread = (
-                sum(metrics["spreads"]) / n_spreads if n_spreads > 0 else None
-            )
+            mean_spread = sum(metrics["spreads"]) / n_spreads if n_spreads > 0 else None
 
             benchmark_range = max(metrics["benchmark_prices"]) - min(
                 metrics["benchmark_prices"]
@@ -665,21 +667,25 @@ def evaluate_session_for_all_publishers(
         return results
 
     except Exception as e:
-        return {
-            pub_id: ExtendedHoursMetrics(
-                session=session,
-                n_observations=0,
-                rmse=None,
-                mean_spread=None,
-                rmse_over_spread=None,
-                nrmse=None,
-                hit_rate=None,
-                benchmark_price_range=None,
-                passes=False,
-                error=str(e),
-            )
-            for pub_id in all_publishers
-        } if "all_publishers" in locals() else {}
+        return (
+            {
+                pub_id: ExtendedHoursMetrics(
+                    session=session,
+                    n_observations=0,
+                    rmse=None,
+                    mean_spread=None,
+                    rmse_over_spread=None,
+                    nrmse=None,
+                    hit_rate=None,
+                    benchmark_price_range=None,
+                    passes=False,
+                    error=str(e),
+                )
+                for pub_id in all_publishers
+            }
+            if "all_publishers" in locals()
+            else {}
+        )
 
 
 def evaluate_overnight_for_all_publishers(
@@ -760,7 +766,9 @@ def evaluate_overnight_for_all_publishers(
         reference_by_ts: dict = {}
         for ts, ref_price, ref_spread, _ in ref_result.result_rows:
             if ref_price is not None:
-                spread = ref_spread if ref_spread is not None and ref_spread > 0 else None
+                spread = (
+                    ref_spread if ref_spread is not None and ref_spread > 0 else None
+                )
                 reference_by_ts[ts] = (ref_price, spread)
 
         n_reference_observations = len(reference_by_ts)
@@ -853,7 +861,9 @@ def evaluate_overnight_for_all_publishers(
             hits_within_10bps = sum(1 for pct in metrics["pct_diffs"] if pct <= 0.1)
             hit_rate = (hits_within_10bps / n_observations) * 100
 
-            rmse_over_spread = rmse / mean_spread if mean_spread and mean_spread > 0 else None
+            rmse_over_spread = (
+                rmse / mean_spread if mean_spread and mean_spread > 0 else None
+            )
 
             if nrmse is not None:
                 passes = nrmse < 0.01 or (nrmse < 0.05 and hit_rate >= 98)
@@ -877,22 +887,26 @@ def evaluate_overnight_for_all_publishers(
         return results
 
     except Exception as e:
-        return {
-            pub_id: OvernightMetrics(
-                n_observations=0,
-                n_reference_observations=0,
-                rmse=None,
-                mean_spread=None,
-                rmse_over_spread=None,
-                nrmse=None,
-                hit_rate=None,
-                reference_price_range=None,
-                passes=False,
-                reference_publisher_id=reference_publisher_id,
-                error=str(e),
-            )
-            for pub_id in all_publishers
-        } if "all_publishers" in locals() else {}
+        return (
+            {
+                pub_id: OvernightMetrics(
+                    n_observations=0,
+                    n_reference_observations=0,
+                    rmse=None,
+                    mean_spread=None,
+                    rmse_over_spread=None,
+                    nrmse=None,
+                    hit_rate=None,
+                    reference_price_range=None,
+                    passes=False,
+                    reference_publisher_id=reference_publisher_id,
+                    error=str(e),
+                )
+                for pub_id in all_publishers
+            }
+            if "all_publishers" in locals()
+            else {}
+        )
 
 
 def evaluate_feed_fast(
@@ -1099,9 +1113,7 @@ def evaluate_feed_two_queries(
 
             rmse = (sum(metrics["squared_errors"]) / n_observations) ** 0.5
             n_spreads = len(metrics["spreads"])
-            mean_spread = (
-                sum(metrics["spreads"]) / n_spreads if n_spreads > 0 else None
-            )
+            mean_spread = sum(metrics["spreads"]) / n_spreads if n_spreads > 0 else None
 
             benchmark_range = max(metrics["benchmark_prices"]) - min(
                 metrics["benchmark_prices"]
@@ -1169,7 +1181,9 @@ def evaluate_feed_two_queries(
                 )
             )
 
-        details_by_pub = {detail.publisher_id: detail for detail in publisher_details_internal}
+        details_by_pub = {
+            detail.publisher_id: detail for detail in publisher_details_internal
+        }
 
         premarket_passing_count: Optional[int] = None
         premarket_failing_count: Optional[int] = None
@@ -1250,7 +1264,9 @@ def evaluate_feed_two_queries(
                     detail.overnight_metrics = metrics
 
         nrmse_values = [
-            d.nrmse for d in publisher_details_internal if d.nrmse is not None and not d.error
+            d.nrmse
+            for d in publisher_details_internal
+            if d.nrmse is not None and not d.error
         ]
         hit_rate_values = [
             d.hit_rate
@@ -1259,7 +1275,9 @@ def evaluate_feed_two_queries(
         ]
 
         median_nrmse = statistics.median(nrmse_values) if nrmse_values else None
-        median_hit_rate = statistics.median(hit_rate_values) if hit_rate_values else None
+        median_hit_rate = (
+            statistics.median(hit_rate_values) if hit_rate_values else None
+        )
 
         ready = len(passing_publishers) >= target_pub_count
 
@@ -1406,7 +1424,9 @@ def process_csv(
                 status = f"ERROR: {result.error[:50]}"
 
             nrmse_str = (
-                f"{result.median_nrmse:.4f}" if result.median_nrmse is not None else "N/A"
+                f"{result.median_nrmse:.4f}"
+                if result.median_nrmse is not None
+                else "N/A"
             )
             hit_rate_str = (
                 f"{result.median_hit_rate:.1f}%"
@@ -1443,7 +1463,9 @@ def compute_publisher_summary(
             return "ERROR"
         return "PASS" if detail.passes else "FAIL"
 
-    def _status_from_session(metrics: Optional[ExtendedHoursMetrics | OvernightMetrics]) -> Optional[str]:
+    def _status_from_session(
+        metrics: Optional[ExtendedHoursMetrics | OvernightMetrics],
+    ) -> Optional[str]:
         if metrics is None:
             return None
         if metrics.error:
@@ -1468,7 +1490,7 @@ def compute_publisher_summary(
 
     publisher_sessions: dict[int, dict[str, dict[str, str]]] = {}
     for result in sorted(results, key=lambda r: (r.date, r.feed_id)):
-        for detail in (result.publisher_details or []):
+        for detail in result.publisher_details or []:
             pub_sessions = publisher_sessions.setdefault(
                 detail.publisher_id,
                 {
@@ -1479,21 +1501,29 @@ def compute_publisher_summary(
                 },
             )
 
-            pub_sessions[TradingSession.REGULAR.value][result.date] = _status_from_regular(detail)
+            pub_sessions[TradingSession.REGULAR.value][
+                result.date
+            ] = _status_from_regular(detail)
 
             if include_extended_hours:
                 pm_status = _status_from_session(detail.premarket_metrics)
                 if pm_status is not None:
-                    pub_sessions[TradingSession.PREMARKET.value][result.date] = pm_status
+                    pub_sessions[TradingSession.PREMARKET.value][
+                        result.date
+                    ] = pm_status
 
                 ah_status = _status_from_session(detail.afterhours_metrics)
                 if ah_status is not None:
-                    pub_sessions[TradingSession.AFTERHOURS.value][result.date] = ah_status
+                    pub_sessions[TradingSession.AFTERHOURS.value][
+                        result.date
+                    ] = ah_status
 
             if include_overnight:
                 on_status = _status_from_session(detail.overnight_metrics)
                 if on_status is not None:
-                    pub_sessions[TradingSession.OVERNIGHT.value][result.date] = on_status
+                    pub_sessions[TradingSession.OVERNIGHT.value][
+                        result.date
+                    ] = on_status
 
     rows = []
     for publisher_id, session_results in publisher_sessions.items():
@@ -1510,21 +1540,33 @@ def compute_publisher_summary(
                     },
                     TradingSession.PREMARKET.value: {
                         "results": dict(
-                            sorted(session_results[TradingSession.PREMARKET.value].items())
+                            sorted(
+                                session_results[TradingSession.PREMARKET.value].items()
+                            )
                         ),
-                        **_session_stats(session_results[TradingSession.PREMARKET.value]),
+                        **_session_stats(
+                            session_results[TradingSession.PREMARKET.value]
+                        ),
                     },
                     TradingSession.AFTERHOURS.value: {
                         "results": dict(
-                            sorted(session_results[TradingSession.AFTERHOURS.value].items())
+                            sorted(
+                                session_results[TradingSession.AFTERHOURS.value].items()
+                            )
                         ),
-                        **_session_stats(session_results[TradingSession.AFTERHOURS.value]),
+                        **_session_stats(
+                            session_results[TradingSession.AFTERHOURS.value]
+                        ),
                     },
                     TradingSession.OVERNIGHT.value: {
                         "results": dict(
-                            sorted(session_results[TradingSession.OVERNIGHT.value].items())
+                            sorted(
+                                session_results[TradingSession.OVERNIGHT.value].items()
+                            )
                         ),
-                        **_session_stats(session_results[TradingSession.OVERNIGHT.value]),
+                        **_session_stats(
+                            session_results[TradingSession.OVERNIGHT.value]
+                        ),
                     },
                 },
             }
@@ -1561,7 +1603,9 @@ def compute_publisher_summary(
         "dates": dates,
         "rows": rows,
         "classifications": {
-            TradingSession.REGULAR.value: _compute_classifications(TradingSession.REGULAR.value),
+            TradingSession.REGULAR.value: _compute_classifications(
+                TradingSession.REGULAR.value
+            ),
             TradingSession.PREMARKET.value: _compute_classifications(
                 TradingSession.PREMARKET.value
             ),
@@ -1588,7 +1632,8 @@ def write_publisher_summary_csv(
 
     def _format_results(session_data: dict) -> str:
         return ";".join(
-            f"{date_value}:{status}" for date_value, status in session_data["results"].items()
+            f"{date_value}:{status}"
+            for date_value, status in session_data["results"].items()
         )
 
     writer.writerow([])
@@ -1674,16 +1719,24 @@ def write_publisher_summary_csv(
 
     sessions_to_classify = [TradingSession.REGULAR.value]
     if include_extended_hours:
-        sessions_to_classify.extend([TradingSession.PREMARKET.value, TradingSession.AFTERHOURS.value])
+        sessions_to_classify.extend(
+            [TradingSession.PREMARKET.value, TradingSession.AFTERHOURS.value]
+        )
     if include_overnight:
         sessions_to_classify.append(TradingSession.OVERNIGHT.value)
 
     for session_name in sessions_to_classify:
         classifications = publisher_summary["classifications"][session_name]
         _fmt = lambda ids: ";".join(str(x) for x in ids) if ids else ""
-        writer.writerow([f"{session_name}_always_passing", _fmt(classifications["always_passing"])])
-        writer.writerow([f"{session_name}_always_failing", _fmt(classifications["always_failing"])])
-        writer.writerow([f"{session_name}_intermittent", _fmt(classifications["intermittent"])])
+        writer.writerow(
+            [f"{session_name}_always_passing", _fmt(classifications["always_passing"])]
+        )
+        writer.writerow(
+            [f"{session_name}_always_failing", _fmt(classifications["always_failing"])]
+        )
+        writer.writerow(
+            [f"{session_name}_intermittent", _fmt(classifications["intermittent"])]
+        )
 
 
 def write_results_csv(
@@ -1756,18 +1809,30 @@ def write_results_csv(
             if include_extended_hours:
                 row.extend(
                     [
-                        r.premarket_passing_count if r.premarket_passing_count is not None else "",
-                        r.premarket_failing_count if r.premarket_failing_count is not None else "",
-                        r.afterhours_passing_count if r.afterhours_passing_count is not None else "",
-                        r.afterhours_failing_count if r.afterhours_failing_count is not None else "",
+                        r.premarket_passing_count
+                        if r.premarket_passing_count is not None
+                        else "",
+                        r.premarket_failing_count
+                        if r.premarket_failing_count is not None
+                        else "",
+                        r.afterhours_passing_count
+                        if r.afterhours_passing_count is not None
+                        else "",
+                        r.afterhours_failing_count
+                        if r.afterhours_failing_count is not None
+                        else "",
                     ]
                 )
 
             if include_overnight:
                 row.extend(
                     [
-                        r.overnight_passing_count if r.overnight_passing_count is not None else "",
-                        r.overnight_failing_count if r.overnight_failing_count is not None else "",
+                        r.overnight_passing_count
+                        if r.overnight_passing_count is not None
+                        else "",
+                        r.overnight_failing_count
+                        if r.overnight_failing_count is not None
+                        else "",
                         r.overnight_reference_publisher_id
                         if r.overnight_reference_publisher_id is not None
                         else "",
@@ -1855,7 +1920,9 @@ def write_results_csv(
                         f"{d.hit_rate:.2f}" if d.hit_rate is not None else "",
                         f"{d.rmse:.6f}" if d.rmse is not None else "",
                         f"{d.mean_spread:.6f}" if d.mean_spread is not None else "",
-                        f"{d.rmse_over_spread:.6f}" if d.rmse_over_spread is not None else "",
+                        f"{d.rmse_over_spread:.6f}"
+                        if d.rmse_over_spread is not None
+                        else "",
                         f"{d.benchmark_price_range:.6f}"
                         if d.benchmark_price_range is not None
                         else "",
@@ -1866,10 +1933,18 @@ def write_results_csv(
                         f"{d.mae:.8f}" if d.mae is not None else "",
                         f"{d.t_statistic:.4f}" if d.t_statistic is not None else "",
                         f"{d.t_pvalue:.6f}" if d.t_pvalue is not None else "",
-                        f"{d.wilcoxon_statistic:.4f}" if d.wilcoxon_statistic is not None else "",
-                        f"{d.wilcoxon_pvalue:.6f}" if d.wilcoxon_pvalue is not None else "",
-                        f"{d.normality_pvalue:.6f}" if d.normality_pvalue is not None else "",
-                        f"{d.mean_abs_z_score:.4f}" if d.mean_abs_z_score is not None else "",
+                        f"{d.wilcoxon_statistic:.4f}"
+                        if d.wilcoxon_statistic is not None
+                        else "",
+                        f"{d.wilcoxon_pvalue:.6f}"
+                        if d.wilcoxon_pvalue is not None
+                        else "",
+                        f"{d.normality_pvalue:.6f}"
+                        if d.normality_pvalue is not None
+                        else "",
+                        f"{d.mean_abs_z_score:.4f}"
+                        if d.mean_abs_z_score is not None
+                        else "",
                     ]
 
                     if include_extended_hours:
@@ -1878,13 +1953,21 @@ def write_results_csv(
                         row.extend(
                             [
                                 pm.n_observations if pm else "",
-                                f"{pm.nrmse:.6f}" if pm and pm.nrmse is not None else "",
-                                f"{pm.hit_rate:.2f}" if pm and pm.hit_rate is not None else "",
+                                f"{pm.nrmse:.6f}"
+                                if pm and pm.nrmse is not None
+                                else "",
+                                f"{pm.hit_rate:.2f}"
+                                if pm and pm.hit_rate is not None
+                                else "",
                                 pm.passes if pm else "",
                                 pm.error if pm else "",
                                 ah.n_observations if ah else "",
-                                f"{ah.nrmse:.6f}" if ah and ah.nrmse is not None else "",
-                                f"{ah.hit_rate:.2f}" if ah and ah.hit_rate is not None else "",
+                                f"{ah.nrmse:.6f}"
+                                if ah and ah.nrmse is not None
+                                else "",
+                                f"{ah.hit_rate:.2f}"
+                                if ah and ah.hit_rate is not None
+                                else "",
                                 ah.passes if ah else "",
                                 ah.error if ah else "",
                             ]
@@ -1896,8 +1979,12 @@ def write_results_csv(
                             [
                                 on.n_observations if on else "",
                                 on.n_reference_observations if on else "",
-                                f"{on.nrmse:.6f}" if on and on.nrmse is not None else "",
-                                f"{on.hit_rate:.2f}" if on and on.hit_rate is not None else "",
+                                f"{on.nrmse:.6f}"
+                                if on and on.nrmse is not None
+                                else "",
+                                f"{on.hit_rate:.2f}"
+                                if on and on.hit_rate is not None
+                                else "",
                                 on.passes if on else "",
                                 on.reference_publisher_id if on else "",
                                 on.error if on else "",
@@ -1974,9 +2061,13 @@ def compute_summary_stats(
     ready_count = sum(1 for r in results if r.ready and not r.error)
     not_ready_count = sum(1 for r in results if not r.ready and not r.error)
 
-    nrmse_values = [r.median_nrmse for r in results if r.median_nrmse is not None and not r.error]
+    nrmse_values = [
+        r.median_nrmse for r in results if r.median_nrmse is not None and not r.error
+    ]
     hit_rate_values = [
-        r.median_hit_rate for r in results if r.median_hit_rate is not None and not r.error
+        r.median_hit_rate
+        for r in results
+        if r.median_hit_rate is not None and not r.error
     ]
 
     nrmse_stats = _distribution_stats(nrmse_values)
@@ -2024,7 +2115,9 @@ def compute_summary_stats(
             "afterhours_pass": ah_pass,
             "afterhours_fail": ah_fail,
             "afterhours_total": ah_total,
-            "afterhours_pass_rate": (ah_pass / ah_total * 100) if ah_total > 0 else None,
+            "afterhours_pass_rate": (ah_pass / ah_total * 100)
+            if ah_total > 0
+            else None,
         }
 
     overnight_stats = {}
@@ -2073,7 +2166,9 @@ def print_interpretation_guide(summary_stats: dict) -> None:
     print("INTERPRETATION GUIDE")
     print(f"{'='*70}")
 
-    print("PASS criteria per publisher: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 98%)")
+    print(
+        "PASS criteria per publisher: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 98%)"
+    )
     print("Feed is READY when passing publishers >= target publisher count.")
 
     median_nrmse = summary_stats.get("nrmse", {}).get("median")
@@ -2086,7 +2181,9 @@ def print_interpretation_guide(summary_stats: dict) -> None:
         elif median_nrmse < 0.05:
             print("Interpretation: moderate alignment; hit rate becomes decisive.")
         else:
-            print("Interpretation: broad quality gaps; investigate sources with high deviation.")
+            print(
+                "Interpretation: broad quality gaps; investigate sources with high deviation."
+            )
 
     if median_hit_rate is not None:
         print(f"Median feed hit_rate: {median_hit_rate:.2f}% (higher is better)")
@@ -2095,9 +2192,13 @@ def print_interpretation_guide(summary_stats: dict) -> None:
         elif median_hit_rate >= 95:
             print("Interpretation: acceptable but close to pass threshold risk.")
         else:
-            print("Interpretation: frequent misses vs benchmark; review latency and pricing logic.")
+            print(
+                "Interpretation: frequent misses vs benchmark; review latency and pricing logic."
+            )
 
-    print("Suggested focus: investigate feeds with low median_hit_rate and high median_nrmse first.")
+    print(
+        "Suggested focus: investigate feeds with low median_hit_rate and high median_nrmse first."
+    )
 
 
 def print_publisher_summary(
@@ -2207,9 +2308,12 @@ Examples:
 """,
     )
 
-    parser.add_argument("--csv", type=Path, help="CSV file containing feed_id,date,mode columns")
-    parser.add_argument("--feed-id", type=int, nargs="+", metavar="ID",
-                        help="Feed ID(s) to evaluate")
+    parser.add_argument(
+        "--csv", type=Path, help="CSV file containing feed_id,date,mode columns"
+    )
+    parser.add_argument(
+        "--feed-id", type=int, nargs="+", metavar="ID", help="Feed ID(s) to evaluate"
+    )
     parser.add_argument(
         "--date",
         nargs="+",
@@ -2309,7 +2413,9 @@ Examples:
     if args.list_asset_classes:
         if not args.csv:
             parser.error("--list-asset-classes requires --csv")
-    elif args.csv and (args.feed_id or args.date or args.start_date or args.end_date or args.mode):
+    elif args.csv and (
+        args.feed_id or args.date or args.start_date or args.end_date or args.mode
+    ):
         parser.error(
             "Use either --csv OR (--feed-id, --date/--start-date+--end-date, --mode), not both"
         )
@@ -2321,14 +2427,18 @@ Examples:
     if not args.csv:
         try:
             validate_date_args(args)
-            single_feed_dates = expand_date_args(args.date, args.start_date, args.end_date)
+            single_feed_dates = expand_date_args(
+                args.date, args.start_date, args.end_date
+            )
         except ValueError as e:
             parser.error(str(e))
         if not single_feed_dates:
             parser.error("Single-feed mode requires --date or --start-date/--end-date")
 
     if not args.csv and (args.include_asset_class or args.exclude_asset_class):
-        parser.error("--include-asset-class and --exclude-asset-class only apply to --csv mode")
+        parser.error(
+            "--include-asset-class and --exclude-asset-class only apply to --csv mode"
+        )
 
     if not args.csv and args.filter_feed_id:
         parser.error("--filter-feed-id only applies to --csv mode")
@@ -2338,7 +2448,9 @@ Examples:
         exclude_set = {normalize_asset_class(ac) for ac in args.exclude_asset_class}
         overlap = include_set & exclude_set
         if overlap:
-            parser.error(f"Asset classes cannot be both included and excluded: {overlap}")
+            parser.error(
+                f"Asset classes cannot be both included and excluded: {overlap}"
+            )
 
     if args.csv and not args.csv.exists():
         print(f"Error: CSV file '{args.csv}' not found")
@@ -2356,7 +2468,9 @@ Examples:
             print(f"  {ac:<25} {count:>5} feeds  [benchmarkable: {benchmarkable}]")
         print(f"{'='*50}")
         print(f"  {'TOTAL':<25} {total_feeds:>5} feeds")
-        print(f"\nBenchmarkable asset classes: {', '.join(sorted(BENCHMARKABLE_ASSET_CLASSES))}")
+        print(
+            f"\nBenchmarkable asset classes: {', '.join(sorted(BENCHMARKABLE_ASSET_CLASSES))}"
+        )
         sys.exit(0)
 
     if args.extended_hours or args.overnight:
@@ -2394,9 +2508,7 @@ Examples:
         results = []
 
         # Build cartesian product of feed_ids × dates
-        feed_date_pairs = [
-            (fid, d) for fid in args.feed_id for d in single_feed_dates
-        ]
+        feed_date_pairs = [(fid, d) for fid in args.feed_id for d in single_feed_dates]
 
         if args.workers > 1 and len(feed_date_pairs) > 1:
 
@@ -2548,7 +2660,9 @@ Examples:
                 "  no evaluable overnight data"
             )
 
-    print(f"\nTiming: total={summary['total_time_sec']:.2f}s, avg_per_feed={summary['avg_time_ms']:.0f}ms")
+    print(
+        f"\nTiming: total={summary['total_time_sec']:.2f}s, avg_per_feed={summary['avg_time_ms']:.0f}ms"
+    )
 
     print_interpretation_guide(summary)
 

@@ -50,6 +50,7 @@ from date_utils import expand_date_args, validate_date_args
 
 class TradingSession(Enum):
     """Trading session types for US equities."""
+
     REGULAR = "regular"
     PREMARKET = "premarket"
     AFTERHOURS = "afterhours"
@@ -74,7 +75,13 @@ ASSET_CLASS_ALIASES = {
 }
 
 # Asset classes that have benchmark data available
-BENCHMARKABLE_ASSET_CLASSES = {"fx", "metals", "us-equities", "commodity", "us-treasuries"}
+BENCHMARKABLE_ASSET_CLASSES = {
+    "fx",
+    "metals",
+    "us-equities",
+    "commodity",
+    "us-treasuries",
+}
 
 # Futures contract month codes
 # F=Jan, G=Feb, H=Mar, J=Apr, K=May, M=Jun, N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec
@@ -151,7 +158,9 @@ def is_futures_symbol(symbol: str) -> bool:
 
 
 @lru_cache(maxsize=128)
-def get_market_hours_filter_sql(mode: str, date: str, column_name: str = "publish_time") -> str:
+def get_market_hours_filter_sql(
+    mode: str, date: str, column_name: str = "publish_time"
+) -> str:
     """
     Generate SQL WHERE clause for market hours filtering.
 
@@ -179,9 +188,7 @@ def get_market_hours_filter_sql(mode: str, date: str, column_name: str = "publis
 
     # Market open: 9:30 AM EST
     market_open_est = dt.replace(
-        hour=US_EQUITY_MARKET_OPEN_HOUR,
-        minute=US_EQUITY_MARKET_OPEN_MINUTE,
-        tzinfo=est
+        hour=US_EQUITY_MARKET_OPEN_HOUR, minute=US_EQUITY_MARKET_OPEN_MINUTE, tzinfo=est
     )
     market_open_utc = market_open_est.astimezone(utc)
 
@@ -189,7 +196,7 @@ def get_market_hours_filter_sql(mode: str, date: str, column_name: str = "publis
     market_close_est = dt.replace(
         hour=US_EQUITY_MARKET_CLOSE_HOUR,
         minute=US_EQUITY_MARKET_CLOSE_MINUTE,
-        tzinfo=est
+        tzinfo=est,
     )
     market_close_utc = market_close_est.astimezone(utc)
 
@@ -201,9 +208,7 @@ def get_market_hours_filter_sql(mode: str, date: str, column_name: str = "publis
 
 @lru_cache(maxsize=128)
 def get_extended_hours_filter_sql(
-    session: TradingSession,
-    date: str,
-    column_name: str = "publish_time"
+    session: TradingSession, date: str, column_name: str = "publish_time"
 ) -> str:
     """
     Generate SQL WHERE clause for extended hours filtering.
@@ -232,24 +237,24 @@ def get_extended_hours_filter_sql(
         start_est = dt.replace(
             hour=US_EQUITY_PREMARKET_OPEN_HOUR,
             minute=US_EQUITY_PREMARKET_OPEN_MINUTE,
-            tzinfo=est
+            tzinfo=est,
         )
         end_est = dt.replace(
             hour=US_EQUITY_MARKET_OPEN_HOUR,
             minute=US_EQUITY_MARKET_OPEN_MINUTE,
-            tzinfo=est
+            tzinfo=est,
         )
     elif session == TradingSession.AFTERHOURS:
         # After-hours: 4:00 PM - 8:00 PM EST
         start_est = dt.replace(
             hour=US_EQUITY_MARKET_CLOSE_HOUR,
             minute=US_EQUITY_MARKET_CLOSE_MINUTE,
-            tzinfo=est
+            tzinfo=est,
         )
         end_est = dt.replace(
             hour=US_EQUITY_AFTERHOURS_CLOSE_HOUR,
             minute=US_EQUITY_AFTERHOURS_CLOSE_MINUTE,
-            tzinfo=est
+            tzinfo=est,
         )
     else:
         return ""
@@ -264,10 +269,7 @@ def get_extended_hours_filter_sql(
 
 
 @lru_cache(maxsize=128)
-def get_overnight_hours_filter_sql(
-    date: str,
-    column_name: str = "publish_time"
-) -> str:
+def get_overnight_hours_filter_sql(date: str, column_name: str = "publish_time") -> str:
     """
     Generate SQL WHERE clause for overnight hours filtering.
 
@@ -298,7 +300,7 @@ def get_overnight_hours_filter_sql(
     overnight_start_est = dt.replace(
         hour=US_EQUITY_OVERNIGHT_START_HOUR,
         minute=US_EQUITY_OVERNIGHT_START_MINUTE,
-        tzinfo=est
+        tzinfo=est,
     )
 
     # Overnight end: 4:00 AM EST the next day
@@ -306,7 +308,7 @@ def get_overnight_hours_filter_sql(
     overnight_end_est = next_day.replace(
         hour=US_EQUITY_OVERNIGHT_END_HOUR,
         minute=US_EQUITY_OVERNIGHT_END_MINUTE,
-        tzinfo=est
+        tzinfo=est,
     )
 
     overnight_start_utc = overnight_start_est.astimezone(utc)
@@ -441,6 +443,7 @@ def compute_statistical_metrics(
 @dataclass
 class ExtendedHoursMetrics:
     """Metrics for a single extended hours session (pre-market or after-hours)."""
+
     session: TradingSession
     n_observations: int
     rmse: Optional[float]
@@ -462,6 +465,7 @@ class OvernightMetrics:
     use publisher 32 (Blue Ocean ATS) as the reference. This is a publisher-vs-publisher
     comparison, not an official benchmark comparison.
     """
+
     n_observations: int
     n_reference_observations: int  # How many observations from publisher 32
     rmse: Optional[float]
@@ -494,18 +498,20 @@ class PublisherBenchmarkResult:
     hit_rate: Optional[float] = None
     benchmark_price_range: Optional[float] = None
     # New statistical metrics
-    mean_diff: Optional[float] = None           # Mean of price differences
-    std_diff: Optional[float] = None            # Std dev of price differences
-    mean_pct_diff: Optional[float] = None       # Mean of percentage differences
-    std_pct_diff: Optional[float] = None        # Std dev of percentage differences
-    mae: Optional[float] = None                 # Mean Absolute Error
+    mean_diff: Optional[float] = None  # Mean of price differences
+    std_diff: Optional[float] = None  # Std dev of price differences
+    mean_pct_diff: Optional[float] = None  # Mean of percentage differences
+    std_pct_diff: Optional[float] = None  # Std dev of percentage differences
+    mae: Optional[float] = None  # Mean Absolute Error
     # Statistical tests
-    t_statistic: Optional[float] = None         # t-test statistic
-    t_pvalue: Optional[float] = None            # t-test p-value
+    t_statistic: Optional[float] = None  # t-test statistic
+    t_pvalue: Optional[float] = None  # t-test p-value
     wilcoxon_statistic: Optional[float] = None  # Wilcoxon signed-rank statistic
-    wilcoxon_pvalue: Optional[float] = None     # Wilcoxon p-value
-    normality_pvalue: Optional[float] = None    # D'Agostino-Pearson normality test p-value
-    mean_abs_z_score: Optional[float] = None    # Mean absolute z-score
+    wilcoxon_pvalue: Optional[float] = None  # Wilcoxon p-value
+    normality_pvalue: Optional[
+        float
+    ] = None  # D'Agostino-Pearson normality test p-value
+    mean_abs_z_score: Optional[float] = None  # Mean absolute z-score
     # Extended hours results (only populated when --extended-hours is used)
     premarket_metrics: Optional[ExtendedHoursMetrics] = None
     afterhours_metrics: Optional[ExtendedHoursMetrics] = None
@@ -532,17 +538,26 @@ def compute_summary_stats(
 
     # Count passes by criterion type (for detailed breakdown)
     pass_by_nrmse_alone = sum(
-        1 for r in results
+        1
+        for r in results
         if r.passes and not r.error and r.nrmse is not None and r.nrmse < 0.01
     )
     pass_by_nrmse_and_hit_rate = sum(
-        1 for r in results
-        if r.passes and not r.error and r.nrmse is not None
-        and r.nrmse >= 0.01 and r.nrmse < 0.05 and r.hit_rate is not None and r.hit_rate >= 95
+        1
+        for r in results
+        if r.passes
+        and not r.error
+        and r.nrmse is not None
+        and r.nrmse >= 0.01
+        and r.nrmse < 0.05
+        and r.hit_rate is not None
+        and r.hit_rate >= 95
     )
 
     # Filter results with valid rmse_over_spread for statistical calculations
-    valid_results = [r for r in results if r.rmse_over_spread is not None and r.error is None]
+    valid_results = [
+        r for r in results if r.rmse_over_spread is not None and r.error is None
+    ]
     valid_rmse_ratios = [r.rmse_over_spread for r in valid_results]
 
     # Calculate percentiles if we have data
@@ -573,7 +588,9 @@ def compute_summary_stats(
         median_rmse = mean_rmse = min_rmse = max_rmse = p90_rmse = p95_rmse = None
 
     # NRMSE statistics
-    valid_nrmse_results = [r for r in results if r.nrmse is not None and r.error is None]
+    valid_nrmse_results = [
+        r for r in results if r.nrmse is not None and r.error is None
+    ]
     valid_nrmse_values = [r.nrmse for r in valid_nrmse_results]
 
     if valid_nrmse_values:
@@ -598,7 +615,9 @@ def compute_summary_stats(
         median_nrmse = mean_nrmse = min_nrmse = max_nrmse = p90_nrmse = p95_nrmse = None
 
     # Hit rate statistics
-    valid_hit_rate_results = [r for r in results if r.hit_rate is not None and r.error is None]
+    valid_hit_rate_results = [
+        r for r in results if r.hit_rate is not None and r.error is None
+    ]
     valid_hit_rates = [r.hit_rate for r in valid_hit_rate_results]
 
     if valid_hit_rates:
@@ -610,7 +629,9 @@ def compute_summary_stats(
         median_hit_rate = mean_hit_rate = min_hit_rate = max_hit_rate = None
 
     # Observation statistics - only from non-error results with actual data
-    observations = [r.n_observations for r in results if r.error is None and r.n_observations > 0]
+    observations = [
+        r.n_observations for r in results if r.error is None and r.n_observations > 0
+    ]
     total_observations = sum(observations) if observations else 0
     mean_observations = statistics.mean(observations) if observations else 0
     median_observations = statistics.median(observations) if observations else 0
@@ -651,7 +672,9 @@ def compute_summary_stats(
         median_mae = mean_mae = p90_mae = p95_mae = None
 
     # Mean difference statistics
-    valid_mean_diff = [r.mean_diff for r in results if r.mean_diff is not None and r.error is None]
+    valid_mean_diff = [
+        r.mean_diff for r in results if r.mean_diff is not None and r.error is None
+    ]
     if valid_mean_diff:
         median_mean_diff = statistics.median(valid_mean_diff)
         mean_mean_diff = statistics.mean(valid_mean_diff)
@@ -660,26 +683,32 @@ def compute_summary_stats(
 
     # T-test summary (count of significant results)
     significant_t_tests = sum(
-        1 for r in results
+        1
+        for r in results
         if r.t_pvalue is not None and r.t_pvalue < 0.05 and r.error is None
     )
     total_t_tests = sum(
-        1 for r in results
-        if r.t_pvalue is not None and r.error is None
+        1 for r in results if r.t_pvalue is not None and r.error is None
     )
 
     # Normality test summary
     normal_distributions = sum(
-        1 for r in results
-        if r.normality_pvalue is not None and r.normality_pvalue >= 0.05 and r.error is None
+        1
+        for r in results
+        if r.normality_pvalue is not None
+        and r.normality_pvalue >= 0.05
+        and r.error is None
     )
     total_normality_tests = sum(
-        1 for r in results
-        if r.normality_pvalue is not None and r.error is None
+        1 for r in results if r.normality_pvalue is not None and r.error is None
     )
 
     # Mean absolute z-score statistics
-    valid_z_scores = [r.mean_abs_z_score for r in results if r.mean_abs_z_score is not None and r.error is None]
+    valid_z_scores = [
+        r.mean_abs_z_score
+        for r in results
+        if r.mean_abs_z_score is not None and r.error is None
+    ]
     if valid_z_scores:
         median_z_score = statistics.median(valid_z_scores)
         mean_z_score = statistics.mean(valid_z_scores)
@@ -691,72 +720,124 @@ def compute_summary_stats(
     if include_extended_hours:
         # Filter US equity results with extended hours data
         us_equity_results = [
-            r for r in results
+            r
+            for r in results
             if normalize_asset_class(r.mode) == "us-equities" and r.error is None
         ]
 
         # Pre-market statistics
-        premarket_results = [r.premarket_metrics for r in us_equity_results if r.premarket_metrics]
+        premarket_results = [
+            r.premarket_metrics for r in us_equity_results if r.premarket_metrics
+        ]
         pm_pass = sum(1 for pm in premarket_results if pm.passes and not pm.error)
         pm_fail = sum(1 for pm in premarket_results if not pm.passes and not pm.error)
         pm_error = sum(1 for pm in premarket_results if pm.error)
         pm_total = len(premarket_results)
 
-        pm_nrmse_values = [pm.nrmse for pm in premarket_results if pm.nrmse is not None and not pm.error]
-        pm_hit_rate_values = [pm.hit_rate for pm in premarket_results if pm.hit_rate is not None and not pm.error]
+        pm_nrmse_values = [
+            pm.nrmse
+            for pm in premarket_results
+            if pm.nrmse is not None and not pm.error
+        ]
+        pm_hit_rate_values = [
+            pm.hit_rate
+            for pm in premarket_results
+            if pm.hit_rate is not None and not pm.error
+        ]
 
         extended_hours_stats["premarket_total_feeds"] = pm_total
         extended_hours_stats["premarket_pass_count"] = pm_pass
         extended_hours_stats["premarket_fail_count"] = pm_fail
         extended_hours_stats["premarket_error_count"] = pm_error
-        extended_hours_stats["premarket_pass_rate_pct"] = round((pm_pass / pm_total * 100), 2) if pm_total > 0 else 0
-        extended_hours_stats["premarket_median_nrmse"] = statistics.median(pm_nrmse_values) if pm_nrmse_values else None
-        extended_hours_stats["premarket_median_hit_rate"] = statistics.median(pm_hit_rate_values) if pm_hit_rate_values else None
+        extended_hours_stats["premarket_pass_rate_pct"] = (
+            round((pm_pass / pm_total * 100), 2) if pm_total > 0 else 0
+        )
+        extended_hours_stats["premarket_median_nrmse"] = (
+            statistics.median(pm_nrmse_values) if pm_nrmse_values else None
+        )
+        extended_hours_stats["premarket_median_hit_rate"] = (
+            statistics.median(pm_hit_rate_values) if pm_hit_rate_values else None
+        )
 
         # After-hours statistics
-        afterhours_results = [r.afterhours_metrics for r in us_equity_results if r.afterhours_metrics]
+        afterhours_results = [
+            r.afterhours_metrics for r in us_equity_results if r.afterhours_metrics
+        ]
         ah_pass = sum(1 for ah in afterhours_results if ah.passes and not ah.error)
         ah_fail = sum(1 for ah in afterhours_results if not ah.passes and not ah.error)
         ah_error = sum(1 for ah in afterhours_results if ah.error)
         ah_total = len(afterhours_results)
 
-        ah_nrmse_values = [ah.nrmse for ah in afterhours_results if ah.nrmse is not None and not ah.error]
-        ah_hit_rate_values = [ah.hit_rate for ah in afterhours_results if ah.hit_rate is not None and not ah.error]
+        ah_nrmse_values = [
+            ah.nrmse
+            for ah in afterhours_results
+            if ah.nrmse is not None and not ah.error
+        ]
+        ah_hit_rate_values = [
+            ah.hit_rate
+            for ah in afterhours_results
+            if ah.hit_rate is not None and not ah.error
+        ]
 
         extended_hours_stats["afterhours_total_feeds"] = ah_total
         extended_hours_stats["afterhours_pass_count"] = ah_pass
         extended_hours_stats["afterhours_fail_count"] = ah_fail
         extended_hours_stats["afterhours_error_count"] = ah_error
-        extended_hours_stats["afterhours_pass_rate_pct"] = round((ah_pass / ah_total * 100), 2) if ah_total > 0 else 0
-        extended_hours_stats["afterhours_median_nrmse"] = statistics.median(ah_nrmse_values) if ah_nrmse_values else None
-        extended_hours_stats["afterhours_median_hit_rate"] = statistics.median(ah_hit_rate_values) if ah_hit_rate_values else None
+        extended_hours_stats["afterhours_pass_rate_pct"] = (
+            round((ah_pass / ah_total * 100), 2) if ah_total > 0 else 0
+        )
+        extended_hours_stats["afterhours_median_nrmse"] = (
+            statistics.median(ah_nrmse_values) if ah_nrmse_values else None
+        )
+        extended_hours_stats["afterhours_median_hit_rate"] = (
+            statistics.median(ah_hit_rate_values) if ah_hit_rate_values else None
+        )
 
     # Overnight statistics (only for US equities when enabled, uses publisher 32 as benchmark)
     overnight_stats = {}
     if include_overnight:
         # Filter US equity results with overnight data
         us_equity_results = [
-            r for r in results
+            r
+            for r in results
             if normalize_asset_class(r.mode) == "us-equities" and r.error is None
         ]
 
-        overnight_results = [r.overnight_metrics for r in us_equity_results if r.overnight_metrics]
+        overnight_results = [
+            r.overnight_metrics for r in us_equity_results if r.overnight_metrics
+        ]
         on_pass = sum(1 for on in overnight_results if on.passes and not on.error)
         on_fail = sum(1 for on in overnight_results if not on.passes and not on.error)
         on_error = sum(1 for on in overnight_results if on.error)
         on_total = len(overnight_results)
 
-        on_nrmse_values = [on.nrmse for on in overnight_results if on.nrmse is not None and not on.error]
-        on_hit_rate_values = [on.hit_rate for on in overnight_results if on.hit_rate is not None and not on.error]
+        on_nrmse_values = [
+            on.nrmse
+            for on in overnight_results
+            if on.nrmse is not None and not on.error
+        ]
+        on_hit_rate_values = [
+            on.hit_rate
+            for on in overnight_results
+            if on.hit_rate is not None and not on.error
+        ]
 
         overnight_stats["overnight_total_feeds"] = on_total
         overnight_stats["overnight_pass_count"] = on_pass
         overnight_stats["overnight_fail_count"] = on_fail
         overnight_stats["overnight_error_count"] = on_error
-        overnight_stats["overnight_pass_rate_pct"] = round((on_pass / on_total * 100), 2) if on_total > 0 else 0
-        overnight_stats["overnight_median_nrmse"] = statistics.median(on_nrmse_values) if on_nrmse_values else None
-        overnight_stats["overnight_median_hit_rate"] = statistics.median(on_hit_rate_values) if on_hit_rate_values else None
-        overnight_stats["overnight_reference_publisher_id"] = OVERNIGHT_REFERENCE_PUBLISHER_ID
+        overnight_stats["overnight_pass_rate_pct"] = (
+            round((on_pass / on_total * 100), 2) if on_total > 0 else 0
+        )
+        overnight_stats["overnight_median_nrmse"] = (
+            statistics.median(on_nrmse_values) if on_nrmse_values else None
+        )
+        overnight_stats["overnight_median_hit_rate"] = (
+            statistics.median(on_hit_rate_values) if on_hit_rate_values else None
+        )
+        overnight_stats[
+            "overnight_reference_publisher_id"
+        ] = OVERNIGHT_REFERENCE_PUBLISHER_ID
 
     per_date_breakdown: dict[str, dict[str, int | float | None]] = {}
     results_by_date: dict[str, list[PublisherBenchmarkResult]] = {}
@@ -769,17 +850,25 @@ def compute_summary_stats(
         date_pass = sum(1 for r in date_results if r.passes and not r.error)
         date_fail = sum(1 for r in date_results if not r.passes and not r.error)
         date_error = sum(1 for r in date_results if r.error)
-        date_nrmse = [r.nrmse for r in date_results if r.nrmse is not None and not r.error]
-        date_hit_rate = [r.hit_rate for r in date_results if r.hit_rate is not None and not r.error]
+        date_nrmse = [
+            r.nrmse for r in date_results if r.nrmse is not None and not r.error
+        ]
+        date_hit_rate = [
+            r.hit_rate for r in date_results if r.hit_rate is not None and not r.error
+        ]
 
         per_date_breakdown[date_value] = {
             "total": date_total,
             "pass": date_pass,
             "fail": date_fail,
             "error": date_error,
-            "pass_rate_pct": round((date_pass / date_total * 100), 2) if date_total > 0 else 0,
+            "pass_rate_pct": round((date_pass / date_total * 100), 2)
+            if date_total > 0
+            else 0,
             "median_nrmse": statistics.median(date_nrmse) if date_nrmse else None,
-            "median_hit_rate": statistics.median(date_hit_rate) if date_hit_rate else None,
+            "median_hit_rate": statistics.median(date_hit_rate)
+            if date_hit_rate
+            else None,
         }
 
     return {
@@ -788,7 +877,9 @@ def compute_summary_stats(
         "pass_count": pass_count,
         "fail_count": fail_count,
         "error_count": error_count,
-        "pass_rate_pct": round((pass_count / total_feeds * 100), 2) if total_feeds > 0 else 0,
+        "pass_rate_pct": round((pass_count / total_feeds * 100), 2)
+        if total_feeds > 0
+        else 0,
         # Pass criteria breakdown
         "pass_by_nrmse_alone": pass_by_nrmse_alone,
         "pass_by_nrmse_and_hit_rate": pass_by_nrmse_and_hit_rate,
@@ -813,10 +904,16 @@ def compute_summary_stats(
         "max_rmse_over_spread": max_rmse,
         # Coverage metrics
         "total_observations": total_observations,
-        "mean_observations_per_feed": round(mean_observations, 1) if mean_observations else 0,
-        "median_observations_per_feed": int(median_observations) if median_observations else 0,
+        "mean_observations_per_feed": round(mean_observations, 1)
+        if mean_observations
+        else 0,
+        "median_observations_per_feed": int(median_observations)
+        if median_observations
+        else 0,
         "total_time_sec": round(total_time, 2),
-        "avg_time_per_feed_ms": int((total_time / total_feeds * 1000)) if total_feeds > 0 else 0,
+        "avg_time_per_feed_ms": int((total_time / total_feeds * 1000))
+        if total_feeds > 0
+        else 0,
         "mode_stats": mode_stats,
         # New statistical metrics
         "median_mae": median_mae,
@@ -827,10 +924,16 @@ def compute_summary_stats(
         "mean_mean_diff": mean_mean_diff,
         "significant_t_tests": significant_t_tests,
         "total_t_tests": total_t_tests,
-        "t_test_significance_rate": round((significant_t_tests / total_t_tests * 100), 2) if total_t_tests > 0 else None,
+        "t_test_significance_rate": round(
+            (significant_t_tests / total_t_tests * 100), 2
+        )
+        if total_t_tests > 0
+        else None,
         "normal_distributions": normal_distributions,
         "total_normality_tests": total_normality_tests,
-        "normality_rate": round((normal_distributions / total_normality_tests * 100), 2) if total_normality_tests > 0 else None,
+        "normality_rate": round((normal_distributions / total_normality_tests * 100), 2)
+        if total_normality_tests > 0
+        else None,
         "median_z_score": median_z_score,
         "mean_z_score": mean_z_score,
         "per_date_breakdown": per_date_breakdown,
@@ -909,7 +1012,9 @@ def get_clients(config: dict) -> tuple:
     return client_lazer, client_analytics
 
 
-def get_feed_metadata(client_lazer, feed_id: int) -> tuple[Optional[str], Optional[int]]:
+def get_feed_metadata(
+    client_lazer, feed_id: int
+) -> tuple[Optional[str], Optional[int]]:
     """Get symbol and exponent for a feed from metadata table."""
     query = f"""
         SELECT symbol, exponent
@@ -926,7 +1031,9 @@ def get_feed_metadata(client_lazer, feed_id: int) -> tuple[Optional[str], Option
     return None, None
 
 
-def get_symbols_for_feeds(client_lazer, feed_ids: list[int]) -> dict[int, Optional[str]]:
+def get_symbols_for_feeds(
+    client_lazer, feed_ids: list[int]
+) -> dict[int, Optional[str]]:
     """
     Batch query symbols for multiple feed IDs.
 
@@ -963,8 +1070,16 @@ def evaluate_session_metrics(
     publisher_time_filter: str,
     benchmark_time_filter: str,
     min_observations: int = 100,
-) -> tuple[int, Optional[float], Optional[float], Optional[float],
-           Optional[float], Optional[float], Optional[float], Optional[str]]:
+) -> tuple[
+    int,
+    Optional[float],
+    Optional[float],
+    Optional[float],
+    Optional[float],
+    Optional[float],
+    Optional[float],
+    Optional[str],
+]:
     """
     Evaluate metrics for a single trading session.
 
@@ -1015,12 +1130,28 @@ def evaluate_session_metrics(
         bench_result = client_analytics.query(benchmark_query)
 
         if not pub_result.result_rows:
-            return (0, None, None, None, None, None, None,
-                    f"No publisher data for session")
+            return (
+                0,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                f"No publisher data for session",
+            )
 
         if not bench_result.result_rows:
-            return (0, None, None, None, None, None, None,
-                    "No benchmark data for session")
+            return (
+                0,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                "No benchmark data for session",
+            )
 
         # Build benchmark lookup dict (allow rows with price but no spread)
         benchmark_by_ts = {
@@ -1043,7 +1174,7 @@ def evaluate_session_metrics(
             diff = pub_price - bench_price
             pct_diff = abs(diff / bench_price) * 100
 
-            squared_errors.append(diff ** 2)
+            squared_errors.append(diff**2)
             if spread is not None:
                 spreads.append(spread)
             pct_diffs.append(pct_diff)
@@ -1052,8 +1183,16 @@ def evaluate_session_metrics(
         n_observations = len(squared_errors)
 
         if n_observations < min_observations:
-            return (n_observations, None, None, None, None, None, None,
-                    f"Insufficient observations ({n_observations} < {min_observations})")
+            return (
+                n_observations,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                f"Insufficient observations ({n_observations} < {min_observations})",
+            )
 
         rmse = (sum(squared_errors) / n_observations) ** 0.5
         n_spreads = len(spreads)
@@ -1069,8 +1208,16 @@ def evaluate_session_metrics(
             rmse / mean_spread if mean_spread and mean_spread > 0 else None
         )
 
-        return (n_observations, rmse, mean_spread, rmse_over_spread,
-                nrmse, hit_rate, benchmark_range, None)
+        return (
+            n_observations,
+            rmse,
+            mean_spread,
+            rmse_over_spread,
+            nrmse,
+            hit_rate,
+            benchmark_range,
+            None,
+        )
 
     except Exception as e:
         return (0, None, None, None, None, None, None, str(e))
@@ -1183,7 +1330,9 @@ def evaluate_overnight_session(
             ts, ref_price, ref_spread, _ = row
             if ref_price is not None:
                 # Use a default spread if bid/ask not available
-                spread = ref_spread if ref_spread is not None and ref_spread > 0 else None
+                spread = (
+                    ref_spread if ref_spread is not None and ref_spread > 0 else None
+                )
                 reference_by_ts[ts] = (ref_price, spread)
 
         n_reference_observations = len(reference_by_ts)
@@ -1203,7 +1352,7 @@ def evaluate_overnight_session(
             diff = pub_price - ref_price
             pct_diff = abs(diff / ref_price) * 100 if ref_price != 0 else 0
 
-            squared_errors.append(diff ** 2)
+            squared_errors.append(diff**2)
             if spread is not None:
                 spreads.append(spread)
             pct_diffs.append(pct_diff)
@@ -1235,7 +1384,9 @@ def evaluate_overnight_session(
         hits_within_10bps = sum(1 for pct in pct_diffs if pct <= 0.1)
         hit_rate = (hits_within_10bps / n_observations) * 100
 
-        rmse_over_spread = rmse / mean_spread if mean_spread and mean_spread > 0 else None
+        rmse_over_spread = (
+            rmse / mean_spread if mean_spread and mean_spread > 0 else None
+        )
 
         # Apply same pass/fail criteria as regular sessions
         if nrmse is not None:
@@ -1434,7 +1585,7 @@ def evaluate_publisher_feed(
             pct_diff = abs(diff / bench_price) * 100  # Percentage difference (absolute)
             signed_pct_diff = (diff / bench_price) * 100  # Signed percentage difference
 
-            squared_errors.append(diff ** 2)
+            squared_errors.append(diff**2)
             if spread is not None:
                 spreads.append(spread)
             pct_diffs.append(pct_diff)
@@ -1519,12 +1670,28 @@ def evaluate_publisher_feed(
                 TradingSession.PREMARKET, date, "date_time"
             )
             pm_result = evaluate_session_metrics(
-                client_lazer, client_analytics, publisher_id, feed_id, date,
-                mode, divisor, benchmark_table,
-                premarket_pub_filter, premarket_bench_filter,
-                min_observations=50  # Lower threshold for extended hours
+                client_lazer,
+                client_analytics,
+                publisher_id,
+                feed_id,
+                date,
+                mode,
+                divisor,
+                benchmark_table,
+                premarket_pub_filter,
+                premarket_bench_filter,
+                min_observations=50,  # Lower threshold for extended hours
             )
-            pm_n_obs, pm_rmse, pm_spread, pm_ros, pm_nrmse, pm_hr, pm_range, pm_err = pm_result
+            (
+                pm_n_obs,
+                pm_rmse,
+                pm_spread,
+                pm_ros,
+                pm_nrmse,
+                pm_hr,
+                pm_range,
+                pm_err,
+            ) = pm_result
 
             # Determine pass/fail for pre-market
             if pm_nrmse is not None and pm_hr is not None:
@@ -1553,12 +1720,28 @@ def evaluate_publisher_feed(
                 TradingSession.AFTERHOURS, date, "date_time"
             )
             ah_result = evaluate_session_metrics(
-                client_lazer, client_analytics, publisher_id, feed_id, date,
-                mode, divisor, benchmark_table,
-                afterhours_pub_filter, afterhours_bench_filter,
-                min_observations=50  # Lower threshold for extended hours
+                client_lazer,
+                client_analytics,
+                publisher_id,
+                feed_id,
+                date,
+                mode,
+                divisor,
+                benchmark_table,
+                afterhours_pub_filter,
+                afterhours_bench_filter,
+                min_observations=50,  # Lower threshold for extended hours
             )
-            ah_n_obs, ah_rmse, ah_spread, ah_ros, ah_nrmse, ah_hr, ah_range, ah_err = ah_result
+            (
+                ah_n_obs,
+                ah_rmse,
+                ah_spread,
+                ah_ros,
+                ah_nrmse,
+                ah_hr,
+                ah_range,
+                ah_err,
+            ) = ah_result
 
             # Determine pass/fail for after-hours
             if ah_nrmse is not None and ah_hr is not None:
@@ -1744,7 +1927,9 @@ def process_csv(
     else:
         feeds_to_process = feeds_raw
 
-    print(f"Processing {len(feeds_to_process)} feeds for publisher {publisher_id} with {max_workers} workers...")
+    print(
+        f"Processing {len(feeds_to_process)} feeds for publisher {publisher_id} with {max_workers} workers..."
+    )
     results = []
 
     def evaluate_single(args):
@@ -1776,7 +1961,9 @@ def process_csv(
                 status = f"ERROR: {result.error[:50]}"
 
             nrmse_str = f"{result.nrmse:.4f}" if result.nrmse is not None else "N/A"
-            hit_rate_str = f"{result.hit_rate:.1f}%" if result.hit_rate is not None else "N/A"
+            hit_rate_str = (
+                f"{result.hit_rate:.1f}%" if result.hit_rate is not None else "N/A"
+            )
             print(
                 f"  [{result.execution_time_ms:>4}ms] Feed {result.feed_id} ({result.symbol or 'unknown'}): "
                 f"{status} - nrmse={nrmse_str}, hit_rate={hit_rate_str}, n={result.n_observations}"
@@ -1826,32 +2013,36 @@ def write_results_csv(
 
     # Add extended hours columns if enabled
     if include_extended_hours:
-        header.extend([
-            # Pre-market columns
-            "premarket_n_observations",
-            "premarket_nrmse",
-            "premarket_hit_rate",
-            "premarket_passes",
-            "premarket_error",
-            # After-hours columns
-            "afterhours_n_observations",
-            "afterhours_nrmse",
-            "afterhours_hit_rate",
-            "afterhours_passes",
-            "afterhours_error",
-        ])
+        header.extend(
+            [
+                # Pre-market columns
+                "premarket_n_observations",
+                "premarket_nrmse",
+                "premarket_hit_rate",
+                "premarket_passes",
+                "premarket_error",
+                # After-hours columns
+                "afterhours_n_observations",
+                "afterhours_nrmse",
+                "afterhours_hit_rate",
+                "afterhours_passes",
+                "afterhours_error",
+            ]
+        )
 
     # Add overnight columns if enabled (uses publisher 32 as benchmark)
     if include_overnight:
-        header.extend([
-            "overnight_n_observations",
-            "overnight_n_reference_observations",
-            "overnight_nrmse",
-            "overnight_hit_rate",
-            "overnight_passes",
-            "overnight_reference_publisher_id",
-            "overnight_error",
-        ])
+        header.extend(
+            [
+                "overnight_n_observations",
+                "overnight_n_reference_observations",
+                "overnight_nrmse",
+                "overnight_hit_rate",
+                "overnight_passes",
+                "overnight_reference_publisher_id",
+                "overnight_error",
+            ]
+        )
 
     header.extend(["error", "execution_time_ms"])
     num_cols = len(header)
@@ -1871,7 +2062,9 @@ def write_results_csv(
                 r.n_observations,
                 f"{r.nrmse:.6f}" if r.nrmse is not None else "",
                 f"{r.hit_rate:.2f}" if r.hit_rate is not None else "",
-                f"{r.benchmark_price_range:.6f}" if r.benchmark_price_range is not None else "",
+                f"{r.benchmark_price_range:.6f}"
+                if r.benchmark_price_range is not None
+                else "",
                 f"{r.rmse:.6f}" if r.rmse is not None else "",
                 f"{r.mean_spread:.6f}" if r.mean_spread is not None else "",
                 f"{r.rmse_over_spread:.6f}" if r.rmse_over_spread is not None else "",
@@ -1883,7 +2076,9 @@ def write_results_csv(
                 f"{r.mae:.8f}" if r.mae is not None else "",
                 f"{r.t_statistic:.4f}" if r.t_statistic is not None else "",
                 f"{r.t_pvalue:.6f}" if r.t_pvalue is not None else "",
-                f"{r.wilcoxon_statistic:.4f}" if r.wilcoxon_statistic is not None else "",
+                f"{r.wilcoxon_statistic:.4f}"
+                if r.wilcoxon_statistic is not None
+                else "",
                 f"{r.wilcoxon_pvalue:.6f}" if r.wilcoxon_pvalue is not None else "",
                 f"{r.normality_pvalue:.6f}" if r.normality_pvalue is not None else "",
                 f"{r.mean_abs_z_score:.4f}" if r.mean_abs_z_score is not None else "",
@@ -1893,33 +2088,37 @@ def write_results_csv(
             if include_extended_hours:
                 pm = r.premarket_metrics
                 ah = r.afterhours_metrics
-                row.extend([
-                    # Pre-market
-                    pm.n_observations if pm else "",
-                    f"{pm.nrmse:.6f}" if pm and pm.nrmse is not None else "",
-                    f"{pm.hit_rate:.2f}" if pm and pm.hit_rate is not None else "",
-                    pm.passes if pm else "",
-                    pm.error or "" if pm else "",
-                    # After-hours
-                    ah.n_observations if ah else "",
-                    f"{ah.nrmse:.6f}" if ah and ah.nrmse is not None else "",
-                    f"{ah.hit_rate:.2f}" if ah and ah.hit_rate is not None else "",
-                    ah.passes if ah else "",
-                    ah.error or "" if ah else "",
-                ])
+                row.extend(
+                    [
+                        # Pre-market
+                        pm.n_observations if pm else "",
+                        f"{pm.nrmse:.6f}" if pm and pm.nrmse is not None else "",
+                        f"{pm.hit_rate:.2f}" if pm and pm.hit_rate is not None else "",
+                        pm.passes if pm else "",
+                        pm.error or "" if pm else "",
+                        # After-hours
+                        ah.n_observations if ah else "",
+                        f"{ah.nrmse:.6f}" if ah and ah.nrmse is not None else "",
+                        f"{ah.hit_rate:.2f}" if ah and ah.hit_rate is not None else "",
+                        ah.passes if ah else "",
+                        ah.error or "" if ah else "",
+                    ]
+                )
 
             # Add overnight data if enabled
             if include_overnight:
                 on = r.overnight_metrics
-                row.extend([
-                    on.n_observations if on else "",
-                    on.n_reference_observations if on else "",
-                    f"{on.nrmse:.6f}" if on and on.nrmse is not None else "",
-                    f"{on.hit_rate:.2f}" if on and on.hit_rate is not None else "",
-                    on.passes if on else "",
-                    on.reference_publisher_id if on else "",
-                    on.error or "" if on else "",
-                ])
+                row.extend(
+                    [
+                        on.n_observations if on else "",
+                        on.n_reference_observations if on else "",
+                        f"{on.nrmse:.6f}" if on and on.nrmse is not None else "",
+                        f"{on.hit_rate:.2f}" if on and on.hit_rate is not None else "",
+                        on.passes if on else "",
+                        on.reference_publisher_id if on else "",
+                        on.error or "" if on else "",
+                    ]
+                )
 
             row.extend([r.error or "", r.execution_time_ms])
             writer.writerow(row)
@@ -1951,8 +2150,13 @@ def write_results_csv(
             write_summary_row("pass_rate_pct", summary_stats["pass_rate_pct"])
 
             # Pass criteria breakdown
-            write_summary_row("pass_by_nrmse_alone", summary_stats["pass_by_nrmse_alone"])
-            write_summary_row("pass_by_nrmse_and_hit_rate", summary_stats["pass_by_nrmse_and_hit_rate"])
+            write_summary_row(
+                "pass_by_nrmse_alone", summary_stats["pass_by_nrmse_alone"]
+            )
+            write_summary_row(
+                "pass_by_nrmse_and_hit_rate",
+                summary_stats["pass_by_nrmse_and_hit_rate"],
+            )
 
             # NRMSE quality metrics (primary)
             write_summary_row("median_nrmse", summary_stats["median_nrmse"])
@@ -1969,21 +2173,41 @@ def write_results_csv(
             write_summary_row("max_hit_rate", summary_stats["max_hit_rate"])
 
             # RMSE over spread metrics (reference, not used for pass/fail)
-            write_summary_row("median_rmse_over_spread", summary_stats["median_rmse_over_spread"])
-            write_summary_row("mean_rmse_over_spread", summary_stats["mean_rmse_over_spread"])
-            write_summary_row("p90_rmse_over_spread", summary_stats["p90_rmse_over_spread"])
-            write_summary_row("p95_rmse_over_spread", summary_stats["p95_rmse_over_spread"])
-            write_summary_row("min_rmse_over_spread", summary_stats["min_rmse_over_spread"])
-            write_summary_row("max_rmse_over_spread", summary_stats["max_rmse_over_spread"])
+            write_summary_row(
+                "median_rmse_over_spread", summary_stats["median_rmse_over_spread"]
+            )
+            write_summary_row(
+                "mean_rmse_over_spread", summary_stats["mean_rmse_over_spread"]
+            )
+            write_summary_row(
+                "p90_rmse_over_spread", summary_stats["p90_rmse_over_spread"]
+            )
+            write_summary_row(
+                "p95_rmse_over_spread", summary_stats["p95_rmse_over_spread"]
+            )
+            write_summary_row(
+                "min_rmse_over_spread", summary_stats["min_rmse_over_spread"]
+            )
+            write_summary_row(
+                "max_rmse_over_spread", summary_stats["max_rmse_over_spread"]
+            )
 
             # Coverage metrics
             write_summary_row("total_observations", summary_stats["total_observations"])
-            write_summary_row("mean_observations_per_feed", summary_stats["mean_observations_per_feed"])
-            write_summary_row("median_observations_per_feed", summary_stats["median_observations_per_feed"])
+            write_summary_row(
+                "mean_observations_per_feed",
+                summary_stats["mean_observations_per_feed"],
+            )
+            write_summary_row(
+                "median_observations_per_feed",
+                summary_stats["median_observations_per_feed"],
+            )
 
             # Timing metrics
             write_summary_row("total_time_sec", summary_stats["total_time_sec"])
-            write_summary_row("avg_time_per_feed_ms", summary_stats["avg_time_per_feed_ms"])
+            write_summary_row(
+                "avg_time_per_feed_ms", summary_stats["avg_time_per_feed_ms"]
+            )
 
             # New statistical summary metrics
             write_summary_row("median_mae", summary_stats.get("median_mae"))
@@ -1992,11 +2216,20 @@ def write_results_csv(
             write_summary_row("p95_mae", summary_stats.get("p95_mae"))
             write_summary_row("median_mean_diff", summary_stats.get("median_mean_diff"))
             write_summary_row("mean_mean_diff", summary_stats.get("mean_mean_diff"))
-            write_summary_row("significant_t_tests", summary_stats.get("significant_t_tests"))
+            write_summary_row(
+                "significant_t_tests", summary_stats.get("significant_t_tests")
+            )
             write_summary_row("total_t_tests", summary_stats.get("total_t_tests"))
-            write_summary_row("t_test_significance_rate", summary_stats.get("t_test_significance_rate"))
-            write_summary_row("normal_distributions", summary_stats.get("normal_distributions"))
-            write_summary_row("total_normality_tests", summary_stats.get("total_normality_tests"))
+            write_summary_row(
+                "t_test_significance_rate",
+                summary_stats.get("t_test_significance_rate"),
+            )
+            write_summary_row(
+                "normal_distributions", summary_stats.get("normal_distributions")
+            )
+            write_summary_row(
+                "total_normality_tests", summary_stats.get("total_normality_tests")
+            )
             write_summary_row("normality_rate", summary_stats.get("normality_rate"))
             write_summary_row("median_z_score", summary_stats.get("median_z_score"))
             write_summary_row("mean_z_score", summary_stats.get("mean_z_score"))
@@ -2014,34 +2247,87 @@ def write_results_csv(
             if ext_stats:
                 write_summary_row("", "")  # Separator
                 write_summary_row("EXTENDED_HOURS", "")
-                write_summary_row("premarket_total_feeds", ext_stats.get("premarket_total_feeds"))
-                write_summary_row("premarket_pass_count", ext_stats.get("premarket_pass_count"))
-                write_summary_row("premarket_fail_count", ext_stats.get("premarket_fail_count"))
-                write_summary_row("premarket_error_count", ext_stats.get("premarket_error_count"))
-                write_summary_row("premarket_pass_rate_pct", ext_stats.get("premarket_pass_rate_pct"))
-                write_summary_row("premarket_median_nrmse", ext_stats.get("premarket_median_nrmse"))
-                write_summary_row("premarket_median_hit_rate", ext_stats.get("premarket_median_hit_rate"))
-                write_summary_row("afterhours_total_feeds", ext_stats.get("afterhours_total_feeds"))
-                write_summary_row("afterhours_pass_count", ext_stats.get("afterhours_pass_count"))
-                write_summary_row("afterhours_fail_count", ext_stats.get("afterhours_fail_count"))
-                write_summary_row("afterhours_error_count", ext_stats.get("afterhours_error_count"))
-                write_summary_row("afterhours_pass_rate_pct", ext_stats.get("afterhours_pass_rate_pct"))
-                write_summary_row("afterhours_median_nrmse", ext_stats.get("afterhours_median_nrmse"))
-                write_summary_row("afterhours_median_hit_rate", ext_stats.get("afterhours_median_hit_rate"))
+                write_summary_row(
+                    "premarket_total_feeds", ext_stats.get("premarket_total_feeds")
+                )
+                write_summary_row(
+                    "premarket_pass_count", ext_stats.get("premarket_pass_count")
+                )
+                write_summary_row(
+                    "premarket_fail_count", ext_stats.get("premarket_fail_count")
+                )
+                write_summary_row(
+                    "premarket_error_count", ext_stats.get("premarket_error_count")
+                )
+                write_summary_row(
+                    "premarket_pass_rate_pct", ext_stats.get("premarket_pass_rate_pct")
+                )
+                write_summary_row(
+                    "premarket_median_nrmse", ext_stats.get("premarket_median_nrmse")
+                )
+                write_summary_row(
+                    "premarket_median_hit_rate",
+                    ext_stats.get("premarket_median_hit_rate"),
+                )
+                write_summary_row(
+                    "afterhours_total_feeds", ext_stats.get("afterhours_total_feeds")
+                )
+                write_summary_row(
+                    "afterhours_pass_count", ext_stats.get("afterhours_pass_count")
+                )
+                write_summary_row(
+                    "afterhours_fail_count", ext_stats.get("afterhours_fail_count")
+                )
+                write_summary_row(
+                    "afterhours_error_count", ext_stats.get("afterhours_error_count")
+                )
+                write_summary_row(
+                    "afterhours_pass_rate_pct",
+                    ext_stats.get("afterhours_pass_rate_pct"),
+                )
+                write_summary_row(
+                    "afterhours_median_nrmse", ext_stats.get("afterhours_median_nrmse")
+                )
+                write_summary_row(
+                    "afterhours_median_hit_rate",
+                    ext_stats.get("afterhours_median_hit_rate"),
+                )
 
             # Overnight summary (if enabled)
             overnight_stats = summary_stats.get("overnight", {})
             if overnight_stats:
                 write_summary_row("", "")  # Separator
                 write_summary_row("OVERNIGHT_SESSION", "")
-                write_summary_row("overnight_reference_publisher_id", overnight_stats.get("overnight_reference_publisher_id"))
-                write_summary_row("overnight_total_feeds", overnight_stats.get("overnight_total_feeds"))
-                write_summary_row("overnight_pass_count", overnight_stats.get("overnight_pass_count"))
-                write_summary_row("overnight_fail_count", overnight_stats.get("overnight_fail_count"))
-                write_summary_row("overnight_error_count", overnight_stats.get("overnight_error_count"))
-                write_summary_row("overnight_pass_rate_pct", overnight_stats.get("overnight_pass_rate_pct"))
-                write_summary_row("overnight_median_nrmse", overnight_stats.get("overnight_median_nrmse"))
-                write_summary_row("overnight_median_hit_rate", overnight_stats.get("overnight_median_hit_rate"))
+                write_summary_row(
+                    "overnight_reference_publisher_id",
+                    overnight_stats.get("overnight_reference_publisher_id"),
+                )
+                write_summary_row(
+                    "overnight_total_feeds",
+                    overnight_stats.get("overnight_total_feeds"),
+                )
+                write_summary_row(
+                    "overnight_pass_count", overnight_stats.get("overnight_pass_count")
+                )
+                write_summary_row(
+                    "overnight_fail_count", overnight_stats.get("overnight_fail_count")
+                )
+                write_summary_row(
+                    "overnight_error_count",
+                    overnight_stats.get("overnight_error_count"),
+                )
+                write_summary_row(
+                    "overnight_pass_rate_pct",
+                    overnight_stats.get("overnight_pass_rate_pct"),
+                )
+                write_summary_row(
+                    "overnight_median_nrmse",
+                    overnight_stats.get("overnight_median_nrmse"),
+                )
+                write_summary_row(
+                    "overnight_median_hit_rate",
+                    overnight_stats.get("overnight_median_hit_rate"),
+                )
 
             per_date_breakdown = summary_stats.get("per_date_breakdown", {})
             if len(per_date_breakdown) > 1:
@@ -2096,12 +2382,16 @@ def print_interpretation_guide(summary_stats: dict) -> None:
     print("\n--- PASS/FAIL CRITERIA ---")
     print("Your feed PASSES if: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 95%)")
     print("  - nrmse: RMSE normalized by benchmark price range (lower is better)")
-    print("  - hit_rate: % of prices within 10 basis points of benchmark (higher is better)")
+    print(
+        "  - hit_rate: % of prices within 10 basis points of benchmark (higher is better)"
+    )
 
     print("\n--- ACCURACY METRICS ---")
     print("MAE (Mean Absolute Error):")
     print("  - Average absolute deviation from benchmark price")
-    print("  - Interpretation: Lower is better; should be small relative to asset price")
+    print(
+        "  - Interpretation: Lower is better; should be small relative to asset price"
+    )
     if summary_stats.get("median_mae") is not None:
         print(f"  - Your median MAE: {summary_stats['median_mae']:.8f}")
 
@@ -2126,7 +2416,9 @@ def print_interpretation_guide(summary_stats: dict) -> None:
         print(f"\nT-Test Significance: {sig_t}/{total_t} feeds ({t_rate:.1f}%)")
         print("  - Tests if mean price difference is statistically different from zero")
         if t_rate > 50:
-            print("  - HIGH rate (>50%) suggests systematic pricing bias across many feeds")
+            print(
+                "  - HIGH rate (>50%) suggests systematic pricing bias across many feeds"
+            )
             print("  - ACTION: Investigate price source accuracy and calibration")
         elif t_rate > 20:
             print("  - MODERATE rate suggests some feeds have systematic bias")
@@ -2138,7 +2430,9 @@ def print_interpretation_guide(summary_stats: dict) -> None:
     total_norm = summary_stats.get("total_normality_tests", 0)
     normal_count = summary_stats.get("normal_distributions", 0)
     if norm_rate is not None:
-        print(f"\nNormality Test: {normal_count}/{total_norm} feeds ({norm_rate:.1f}%) have normally distributed errors")
+        print(
+            f"\nNormality Test: {normal_count}/{total_norm} feeds ({norm_rate:.1f}%) have normally distributed errors"
+        )
         if norm_rate >= 70:
             print("  - HIGH rate indicates consistent, predictable error patterns")
             print("  - Errors are likely due to latency/timing rather than data issues")
@@ -2146,7 +2440,9 @@ def print_interpretation_guide(summary_stats: dict) -> None:
             print("  - MODERATE rate - mixed error patterns")
         else:
             print("  - LOW rate suggests outliers or irregular error patterns")
-            print("  - ACTION: Investigate data quality issues, latency spikes, or stale prices")
+            print(
+                "  - ACTION: Investigate data quality issues, latency spikes, or stale prices"
+            )
 
     median_z = summary_stats.get("median_z_score")
     if median_z is not None:
@@ -2157,7 +2453,9 @@ def print_interpretation_guide(summary_stats: dict) -> None:
             print("  - HIGH z-scores indicate frequent large deviations (outliers)")
             print("  - ACTION: Add spike detection or validate price updates")
         elif median_z < 0.5:
-            print("  - LOW z-scores indicate very stable, consistent pricing (excellent)")
+            print(
+                "  - LOW z-scores indicate very stable, consistent pricing (excellent)"
+            )
         else:
             print("  - NORMAL range - typical error volatility")
 
@@ -2295,26 +2593,26 @@ Examples:
         "--extended-hours",
         action="store_true",
         help="Include extended hours evaluation for US equities. "
-             "Pre-market: 4:00 AM - 9:30 AM EST, After-hours: 4:00 PM - 8:00 PM EST. "
-             "Adds separate columns for pre-market and after-hours metrics. "
-             "Only affects us-equities; other asset classes are unchanged.",
+        "Pre-market: 4:00 AM - 9:30 AM EST, After-hours: 4:00 PM - 8:00 PM EST. "
+        "Adds separate columns for pre-market and after-hours metrics. "
+        "Only affects us-equities; other asset classes are unchanged.",
     )
     parser.add_argument(
         "--overnight",
         action="store_true",
         help="Include overnight session evaluation for US equities (8 PM - 4 AM EST). "
-             "Uses publisher 32 (Blue Ocean ATS) as the benchmark reference instead of Datascope. "
-             "This is a publisher-vs-publisher comparison, not an official benchmark. "
-             "Independent of --extended-hours; both flags can be used together. "
-             "Only affects us-equities; other asset classes are unchanged.",
+        "Uses publisher 32 (Blue Ocean ATS) as the benchmark reference instead of Datascope. "
+        "This is a publisher-vs-publisher comparison, not an official benchmark. "
+        "Independent of --extended-hours; both flags can be used together. "
+        "Only affects us-equities; other asset classes are unchanged.",
     )
     parser.add_argument(
         "--skip-scipy-tests",
         action="store_true",
         help="Skip statistical tests (t-test, Wilcoxon, normality) for faster execution. "
-             "Pass/fail is determined by nrmse and hit_rate only, so scipy tests are "
-             "informational. Statistical metric columns will be empty in output. "
-             "Reduces processing time by ~40%%.",
+        "Pass/fail is determined by nrmse and hit_rate only, so scipy tests are "
+        "informational. Statistical metric columns will be empty in output. "
+        "Reduces processing time by ~40%%.",
     )
 
     args = parser.parse_args()
@@ -2323,10 +2621,14 @@ Examples:
         parser.error("--list-asset-classes requires --csv")
 
     if not args.csv and (args.include_asset_class or args.exclude_asset_class):
-        parser.error("--include-asset-class and --exclude-asset-class only apply to --csv mode")
+        parser.error(
+            "--include-asset-class and --exclude-asset-class only apply to --csv mode"
+        )
 
     if args.csv and args.mode:
-        parser.error("--mode is for single-feed mode. Use either --csv OR (--feed-id, --date, --mode)")
+        parser.error(
+            "--mode is for single-feed mode. Use either --csv OR (--feed-id, --date, --mode)"
+        )
     elif not args.csv and not (args.feed_ids and args.mode):
         parser.error("Either --csv or all of (--feed-id, --date, --mode) are required")
 
@@ -2368,7 +2670,9 @@ Examples:
             print(f"  {ac:<25} {count:>5} feeds  [benchmarkable: {benchmarkable}]")
         print(f"{'='*50}")
         print(f"  {'TOTAL':<25} {total_feeds:>5} feeds")
-        print(f"\nBenchmarkable asset classes: {', '.join(sorted(BENCHMARKABLE_ASSET_CLASSES))}")
+        print(
+            f"\nBenchmarkable asset classes: {', '.join(sorted(BENCHMARKABLE_ASSET_CLASSES))}"
+        )
         sys.exit(0)
 
     # Determine publisher ID
@@ -2376,8 +2680,12 @@ Examples:
     if args.csv and publisher_id is None:
         publisher_id = extract_publisher_id_from_filename(args.csv.name)
         if publisher_id is None:
-            print(f"Error: Could not extract publisher ID from filename '{args.csv.name}'")
-            print("Expected format: publisher_{{id}}_feeds.csv (e.g., publisher_55_feeds.csv)")
+            print(
+                f"Error: Could not extract publisher ID from filename '{args.csv.name}'"
+            )
+            print(
+                "Expected format: publisher_{{id}}_feeds.csv (e.g., publisher_55_feeds.csv)"
+            )
             print("Or use --publisher-id to specify explicitly")
             sys.exit(1)
         print(f"Extracted publisher ID {publisher_id} from filename")
@@ -2388,7 +2696,9 @@ Examples:
         exclude_set = {normalize_asset_class(ac) for ac in args.exclude_asset_class}
         overlap = include_set & exclude_set
         if overlap:
-            parser.error(f"Asset classes cannot be both included and excluded: {overlap}")
+            parser.error(
+                f"Asset classes cannot be both included and excluded: {overlap}"
+            )
 
     # Determine output path
     output_path = args.output
@@ -2456,7 +2766,9 @@ Examples:
                     status = f"ERROR: {result.error[:50]}"
 
                 nrmse_str = f"{result.nrmse:.4f}" if result.nrmse is not None else "N/A"
-                hit_rate_str = f"{result.hit_rate:.1f}%" if result.hit_rate is not None else "N/A"
+                hit_rate_str = (
+                    f"{result.hit_rate:.1f}%" if result.hit_rate is not None else "N/A"
+                )
                 print(
                     f"  [{result.execution_time_ms:>4}ms] Feed {result.feed_id} "
                     f"({result.symbol or 'unknown'}): {status} - nrmse={nrmse_str}, "
@@ -2466,14 +2778,18 @@ Examples:
     # Compute summary statistics
     total_time = time.time() - total_start
     summary_stats = compute_summary_stats(
-        results, publisher_id, total_time,
+        results,
+        publisher_id,
+        total_time,
         include_extended_hours=args.extended_hours,
         include_overnight=args.overnight,
     )
 
     # Write results and summary to CSV
     write_results_csv(
-        results, output_path, summary_stats,
+        results,
+        output_path,
+        summary_stats,
         include_extended_hours=args.extended_hours,
         include_overnight=args.overnight,
     )
@@ -2487,13 +2803,15 @@ Examples:
     print(f"Total feeds evaluated: {summary_stats['total_feeds']}")
     print(f"PASS: {summary_stats['pass_count']}")
     print(f"  - by nrmse < 0.01 alone: {summary_stats['pass_by_nrmse_alone']}")
-    print(f"  - by nrmse < 0.05 + hit_rate >= 95%: {summary_stats['pass_by_nrmse_and_hit_rate']}")
+    print(
+        f"  - by nrmse < 0.05 + hit_rate >= 95%: {summary_stats['pass_by_nrmse_and_hit_rate']}"
+    )
     print(f"FAIL: {summary_stats['fail_count']}")
     print(f"Errors: {summary_stats['error_count']}")
     print(f"Pass rate: {summary_stats['pass_rate_pct']:.1f}%")
     print(f"{'='*70}")
     print("NRMSE Statistics (lower is better):")
-    if summary_stats['median_nrmse'] is not None:
+    if summary_stats["median_nrmse"] is not None:
         print(f"  Median: {summary_stats['median_nrmse']:.6f}")
         print(f"  Mean: {summary_stats['mean_nrmse']:.6f}")
         print(f"  P90: {summary_stats['p90_nrmse']:.6f}")
@@ -2504,7 +2822,7 @@ Examples:
         print("  No valid NRMSE data")
     print(f"{'='*70}")
     print("Hit Rate Statistics (higher is better, % within 10 bps):")
-    if summary_stats['median_hit_rate'] is not None:
+    if summary_stats["median_hit_rate"] is not None:
         print(f"  Median: {summary_stats['median_hit_rate']:.2f}%")
         print(f"  Mean: {summary_stats['mean_hit_rate']:.2f}%")
         print(f"  Min: {summary_stats['min_hit_rate']:.2f}%")
@@ -2513,7 +2831,7 @@ Examples:
         print("  No valid hit rate data")
     print(f"{'='*70}")
     print("RMSE/Spread Statistics (reference metric, not used for pass/fail):")
-    if summary_stats['median_rmse_over_spread'] is not None:
+    if summary_stats["median_rmse_over_spread"] is not None:
         print(f"  Median: {summary_stats['median_rmse_over_spread']:.4f}")
         print(f"  Mean: {summary_stats['mean_rmse_over_spread']:.4f}")
         print(f"  P90: {summary_stats['p90_rmse_over_spread']:.4f}")
@@ -2522,11 +2840,15 @@ Examples:
         print("  No valid rmse/spread data")
     print(f"{'='*70}")
     print(f"Total observations: {summary_stats['total_observations']:,}")
-    print(f"Mean observations per feed: {summary_stats['mean_observations_per_feed']:,.1f}")
-    print(f"Median observations per feed: {summary_stats['median_observations_per_feed']:,}")
+    print(
+        f"Mean observations per feed: {summary_stats['mean_observations_per_feed']:,.1f}"
+    )
+    print(
+        f"Median observations per feed: {summary_stats['median_observations_per_feed']:,}"
+    )
     print(f"{'='*70}")
     print(f"Total time: {summary_stats['total_time_sec']:.2f}s")
-    if summary_stats['total_feeds'] > 0:
+    if summary_stats["total_feeds"] > 0:
         print(f"Average time per feed: {summary_stats['avg_time_per_feed_ms']}ms")
     else:
         print("No feeds were processed (all filtered out or empty CSV)")
@@ -2589,7 +2911,9 @@ Examples:
                 print(f"  PASS: {ext_stats.get('premarket_pass_count', 0)}")
                 print(f"  FAIL: {ext_stats.get('premarket_fail_count', 0)}")
                 print(f"  Errors: {ext_stats.get('premarket_error_count', 0)}")
-                print(f"  Pass rate: {ext_stats.get('premarket_pass_rate_pct', 0):.1f}%")
+                print(
+                    f"  Pass rate: {ext_stats.get('premarket_pass_rate_pct', 0):.1f}%"
+                )
                 pm_nrmse = ext_stats.get("premarket_median_nrmse")
                 pm_hr = ext_stats.get("premarket_median_hit_rate")
                 if pm_nrmse is not None:
@@ -2607,7 +2931,9 @@ Examples:
                 print(f"  PASS: {ext_stats.get('afterhours_pass_count', 0)}")
                 print(f"  FAIL: {ext_stats.get('afterhours_fail_count', 0)}")
                 print(f"  Errors: {ext_stats.get('afterhours_error_count', 0)}")
-                print(f"  Pass rate: {ext_stats.get('afterhours_pass_rate_pct', 0):.1f}%")
+                print(
+                    f"  Pass rate: {ext_stats.get('afterhours_pass_rate_pct', 0):.1f}%"
+                )
                 ah_nrmse = ext_stats.get("afterhours_median_nrmse")
                 ah_hr = ext_stats.get("afterhours_median_hit_rate")
                 if ah_nrmse is not None:
@@ -2624,8 +2950,12 @@ Examples:
             print(f"\n{'='*70}")
             print("OVERNIGHT SESSION - US EQUITIES ONLY")
             print(f"{'='*70}")
-            print(f"Benchmark reference: Publisher {overnight_stats.get('overnight_reference_publisher_id', 32)} (Blue Ocean ATS)")
-            print("NOTE: This is a publisher-vs-publisher comparison, not an official benchmark.")
+            print(
+                f"Benchmark reference: Publisher {overnight_stats.get('overnight_reference_publisher_id', 32)} (Blue Ocean ATS)"
+            )
+            print(
+                "NOTE: This is a publisher-vs-publisher comparison, not an official benchmark."
+            )
             print(f"{'='*70}")
 
             on_total = overnight_stats.get("overnight_total_feeds", 0)
@@ -2635,7 +2965,9 @@ Examples:
                 print(f"  PASS: {overnight_stats.get('overnight_pass_count', 0)}")
                 print(f"  FAIL: {overnight_stats.get('overnight_fail_count', 0)}")
                 print(f"  Errors: {overnight_stats.get('overnight_error_count', 0)}")
-                print(f"  Pass rate: {overnight_stats.get('overnight_pass_rate_pct', 0):.1f}%")
+                print(
+                    f"  Pass rate: {overnight_stats.get('overnight_pass_rate_pct', 0):.1f}%"
+                )
                 on_nrmse = overnight_stats.get("overnight_median_nrmse")
                 on_hr = overnight_stats.get("overnight_median_hit_rate")
                 if on_nrmse is not None:

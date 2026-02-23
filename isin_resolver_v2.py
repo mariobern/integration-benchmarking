@@ -81,7 +81,9 @@ class ISINResult:
     ticker: str
     isin: Optional[str] = None
     cusip: Optional[str] = None
-    source: str = ""  # "financedatabase", "openfigi", "yfinance", "cusip_computed", "cache"
+    source: str = (
+        ""  # "financedatabase", "openfigi", "yfinance", "cusip_computed", "cache"
+    )
     company_name: Optional[str] = None
     exchange: Optional[str] = None
     warnings: tuple[str, ...] = ()
@@ -274,7 +276,10 @@ class FinanceDatabaseSource:
                     "exchange": _clean_pandas_value(exchange),
                 }
 
-        logger.info("FinanceDatabase loaded: %d equities with ISIN/CUSIP", len(self._equity_data))
+        logger.info(
+            "FinanceDatabase loaded: %d equities with ISIN/CUSIP",
+            len(self._equity_data),
+        )
         self._loaded = True
 
     def resolve(self, ticker: str) -> Optional[ISINResult]:
@@ -363,9 +368,14 @@ class ManualOverrideSource:
                             self._data[ticker] = {
                                 "isin": isin,
                                 "cusip": row.get("cusip", "").strip() or None,
-                                "company_name": row.get("company_name", "").strip() or None,
+                                "company_name": row.get("company_name", "").strip()
+                                or None,
                             }
-                logger.info("Manual overrides loaded: %d entries from %s", len(self._data), self._file)
+                logger.info(
+                    "Manual overrides loaded: %d entries from %s",
+                    len(self._data),
+                    self._file,
+                )
             except (OSError, csv.Error) as e:
                 logger.warning("Failed to load override file %s: %s", self._file, e)
         self._loaded = True
@@ -460,7 +470,9 @@ class OpenFIGISource:
             logger.warning("OpenFIGI request failed: %s", e)
             return [None] * len(jobs)
 
-    def lookup(self, ticker: str, exch_code: Optional[str] = "US") -> Optional[OpenFIGIInfo]:
+    def lookup(
+        self, ticker: str, exch_code: Optional[str] = "US"
+    ) -> Optional[OpenFIGIInfo]:
         """Look up ticker metadata via OpenFIGI. Returns OpenFIGIInfo or None."""
         job: dict[str, str] = {"idType": "TICKER", "idValue": ticker.upper()}
         if exch_code:
@@ -474,12 +486,24 @@ class OpenFIGISource:
         if isinstance(entry, dict) and "error" in entry:
             return None
 
-        data = entry.get("data", []) if isinstance(entry, dict) else entry if isinstance(entry, list) else []
+        data = (
+            entry.get("data", [])
+            if isinstance(entry, dict)
+            else entry
+            if isinstance(entry, list)
+            else []
+        )
         if not data:
             return None
 
         # Find best match (prefer Common Stock / ADR / ETP)
-        preferred_types = {"Common Stock", "ADR", "Depositary Receipt", "Open-End Fund", "ETP"}
+        preferred_types = {
+            "Common Stock",
+            "ADR",
+            "Depositary Receipt",
+            "Open-End Fund",
+            "ETP",
+        }
         best_item = None
         for item in data:
             if item.get("securityType", "") in preferred_types:
@@ -532,11 +556,23 @@ class OpenFIGISource:
                 if isinstance(entry, dict) and "error" in entry:
                     continue
 
-                data = entry.get("data", []) if isinstance(entry, dict) else entry if isinstance(entry, list) else []
+                data = (
+                    entry.get("data", [])
+                    if isinstance(entry, dict)
+                    else entry
+                    if isinstance(entry, list)
+                    else []
+                )
                 if not data:
                     continue
 
-                preferred_types = {"Common Stock", "ADR", "Depositary Receipt", "Open-End Fund", "ETP"}
+                preferred_types = {
+                    "Common Stock",
+                    "ADR",
+                    "Depositary Receipt",
+                    "Open-End Fund",
+                    "ETP",
+                }
                 best_item = None
                 for item in data:
                     if item.get("securityType", "") in preferred_types:
@@ -654,11 +690,13 @@ def _cusip_to_isin(cusip: str, country: str = "US") -> Optional[str]:
     if country != "US":
         try:
             from stdnum.isin import from_natid
+
             return from_natid(country, cusip)
         except (ValueError, ValidationError):
             return None
     try:
         from stdnum.cusip import to_isin
+
         return to_isin(cusip)
     except (ValueError, ValidationError):
         return None
@@ -670,6 +708,7 @@ def validate_isin(isin: str) -> bool:
 
     try:
         from stdnum.isin import validate
+
         validate(isin)
         return True
     except (ValueError, ValidationError):
@@ -679,9 +718,7 @@ def validate_isin(isin: str) -> bool:
 # --- ADR / Currency Validation ---
 
 
-def _check_adr_correction_needed(
-    result: ISINResult, ticker_input: TickerInput
-) -> bool:
+def _check_adr_correction_needed(result: ISINResult, ticker_input: TickerInput) -> bool:
     """Check if an ISIN result needs ADR correction.
 
     Returns True if:
@@ -777,7 +814,9 @@ class ISINResolver:
         self.manual_override = ManualOverrideSource(override_file=override_file)
         self.cache = ISINCache(cache_dir=cache_dir, ttl_seconds=cache_ttl)
         self.finance_db = FinanceDatabaseSource()
-        self.openfigi = OpenFIGISource(api_key=openfigi_api_key) if use_openfigi else None
+        self.openfigi = (
+            OpenFIGISource(api_key=openfigi_api_key) if use_openfigi else None
+        )
         self.yfinance = YFinanceSource() if use_yfinance else None
 
     def resolve(self, ticker: Union[str, TickerInput]) -> ISINResult:
@@ -818,9 +857,7 @@ class ISINResolver:
                         return corrected
                 self.cache.put(result)
                 return result
-            warnings.append(
-                f"FinanceDatabase ISIN {result.isin} failed validation"
-            )
+            warnings.append(f"FinanceDatabase ISIN {result.isin} failed validation")
 
         # Tier 2: yfinance
         if self.yfinance:
@@ -837,9 +874,7 @@ class ISINResolver:
                     validated = _validate_currency_consistency(result, ticker_input)
                     self.cache.put(validated)
                     return validated
-                warnings.append(
-                    f"yfinance ISIN {result.isin} failed validation"
-                )
+                warnings.append(f"yfinance ISIN {result.isin} failed validation")
 
         # Not resolved
         return ISINResult(
@@ -875,7 +910,8 @@ class ISINResolver:
                 source="manual_override",
                 company_name=override.company_name or original.company_name,
                 exchange=original.exchange,
-                warnings=original.warnings + (
+                warnings=original.warnings
+                + (
                     f"ADR corrected: replaced {original.isin} ({original.source}) "
                     f"with US ADR {override.isin}",
                 ),
@@ -897,7 +933,8 @@ class ISINResolver:
                     source=original.source,
                     company_name=original.company_name,
                     exchange=original.exchange,
-                    warnings=original.warnings + (
+                    warnings=original.warnings
+                    + (
                         f"ADR detected: {original.isin} is foreign ISIN for USD-denominated "
                         f"security — add US ADR ISIN to manual overrides",
                     ),
@@ -977,10 +1014,14 @@ class ISINResolver:
 
         # Tier 2: yfinance (sequential, per-ticker)
         if self.yfinance and still_remaining:
-            logger.info("Tier 2: yfinance lookup for %d tickers...", len(still_remaining))
+            logger.info(
+                "Tier 2: yfinance lookup for %d tickers...", len(still_remaining)
+            )
             for i, ticker in enumerate(still_remaining):
                 if (i + 1) % 10 == 0:
-                    logger.info("  yfinance progress: %d/%d", i + 1, len(still_remaining))
+                    logger.info(
+                        "  yfinance progress: %d/%d", i + 1, len(still_remaining)
+                    )
                 result = self.yfinance.resolve(ticker)
                 if result and result.isin and validate_isin(result.isin):
                     inp = input_map[ticker]
@@ -1105,11 +1146,13 @@ def parse_enriched_csv(path: Path) -> list[TickerInput]:
             company_name = row.get("company_name", "").strip() or None
             currency = row.get("denomination_currency", "").strip() or None
 
-            inputs.append(TickerInput(
-                ticker=ticker,
-                company_name=company_name,
-                denomination_currency=currency,
-            ))
+            inputs.append(
+                TickerInput(
+                    ticker=ticker,
+                    company_name=company_name,
+                    denomination_currency=currency,
+                )
+            )
 
     return inputs
 
@@ -1121,22 +1164,33 @@ def write_csv_output(results: dict[str, ISINResult], output_path: Path) -> None:
     """Write ISIN results to CSV."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    fieldnames = ["ticker", "isin", "cusip", "source", "confidence", "company_name", "exchange", "warnings"]
+    fieldnames = [
+        "ticker",
+        "isin",
+        "cusip",
+        "source",
+        "confidence",
+        "company_name",
+        "exchange",
+        "warnings",
+    ]
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         for ticker in sorted(results.keys()):
             r = results[ticker]
-            writer.writerow({
-                "ticker": r.ticker,
-                "isin": r.isin or "",
-                "cusip": r.cusip or "",
-                "source": r.source,
-                "confidence": r.confidence,
-                "company_name": r.company_name or "",
-                "exchange": r.exchange or "",
-                "warnings": "; ".join(r.warnings) if r.warnings else "",
-            })
+            writer.writerow(
+                {
+                    "ticker": r.ticker,
+                    "isin": r.isin or "",
+                    "cusip": r.cusip or "",
+                    "source": r.source,
+                    "confidence": r.confidence,
+                    "company_name": r.company_name or "",
+                    "exchange": r.exchange or "",
+                    "warnings": "; ".join(r.warnings) if r.warnings else "",
+                }
+            )
 
     print(f"Wrote {len(results)} results to {output_path}")
 
@@ -1226,44 +1280,57 @@ Examples:
 
     input_group = parser.add_mutually_exclusive_group(required=True)
     input_group.add_argument(
-        "--tickers", type=str,
+        "--tickers",
+        type=str,
         help="Comma-separated ticker list (e.g., AAPL,MSFT,TSM)",
     )
     input_group.add_argument(
-        "--ticker-file", type=Path,
+        "--ticker-file",
+        type=Path,
         help="File with tickers (one per line or CSV first column)",
     )
     input_group.add_argument(
-        "--ric-csv", type=Path,
+        "--ric-csv",
+        type=Path,
         help="RIC CSV file (extracts tickers from RIC column, strips suffix)",
     )
     input_group.add_argument(
-        "--enriched-csv", type=Path,
+        "--enriched-csv",
+        type=Path,
         help="CSV with ticker,company_name,denomination_currency columns",
     )
 
     parser.add_argument(
-        "--output", type=Path, default=None,
+        "--output",
+        type=Path,
+        default=None,
         help="Output CSV path (default: print to console only)",
     )
     parser.add_argument(
-        "--no-yfinance", action="store_true",
+        "--no-yfinance",
+        action="store_true",
         help="Skip yfinance lookups (faster, offline)",
     )
     parser.add_argument(
-        "--no-openfigi", action="store_true",
+        "--no-openfigi",
+        action="store_true",
         help="Skip OpenFIGI lookups",
     )
     parser.add_argument(
-        "--openfigi-api-key", type=str, default=None,
+        "--openfigi-api-key",
+        type=str,
+        default=None,
         help="OpenFIGI API key (or set OPENFIGI_API_KEY env var)",
     )
     parser.add_argument(
-        "--force-refresh", action="store_true",
+        "--force-refresh",
+        action="store_true",
         help="Ignore cache, re-resolve all tickers",
     )
     parser.add_argument(
-        "--verbose", "-v", action="store_true",
+        "--verbose",
+        "-v",
+        action="store_true",
         help="Enable verbose logging",
     )
 

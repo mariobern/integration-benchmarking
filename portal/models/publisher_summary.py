@@ -8,7 +8,16 @@ from datetime import date, datetime
 from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import BigInteger, Column, Date, DateTime, Integer, JSON, Numeric, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    Date,
+    DateTime,
+    Integer,
+    JSON,
+    Numeric,
+    UniqueConstraint,
+)
 
 from portal.models.base import Base
 
@@ -18,7 +27,9 @@ class PublisherDailySummary(Base):
 
     __tablename__ = "publisher_daily_summary"
     __table_args__ = (
-        UniqueConstraint("publisher_id", "summary_date", name="uq_summary_publisher_date"),
+        UniqueConstraint(
+            "publisher_id", "summary_date", name="uq_summary_publisher_date"
+        ),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)

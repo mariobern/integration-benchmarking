@@ -152,7 +152,9 @@ def parse_benchmark_csv(csv_path: Path) -> Iterator[ParsedBenchmarkResult]:
                 # Primary metrics
                 nrmse=_parse_decimal(row.get("nrmse", "")),
                 hit_rate=_parse_decimal(row.get("hit_rate", "")),
-                benchmark_price_range=_parse_decimal(row.get("benchmark_price_range", "")),
+                benchmark_price_range=_parse_decimal(
+                    row.get("benchmark_price_range", "")
+                ),
                 # Secondary metrics
                 rmse=_parse_decimal(row.get("rmse", "")),
                 mean_spread=_parse_decimal(row.get("mean_spread", "")),
@@ -170,24 +172,68 @@ def parse_benchmark_csv(csv_path: Path) -> Iterator[ParsedBenchmarkResult]:
                 normality_pvalue=_parse_decimal(row.get("normality_pvalue", "")),
                 mean_abs_z_score=_parse_decimal(row.get("mean_abs_z_score", "")),
                 # Extended hours (if present)
-                premarket_n_observations=_parse_int(row.get("premarket_n_observations", "")) if has_extended_hours else None,
-                premarket_nrmse=_parse_decimal(row.get("premarket_nrmse", "")) if has_extended_hours else None,
-                premarket_hit_rate=_parse_decimal(row.get("premarket_hit_rate", "")) if has_extended_hours else None,
-                premarket_passes=_parse_bool(row.get("premarket_passes", "")) if has_extended_hours else None,
-                premarket_error=row.get("premarket_error", "").strip() or None if has_extended_hours else None,
-                afterhours_n_observations=_parse_int(row.get("afterhours_n_observations", "")) if has_extended_hours else None,
-                afterhours_nrmse=_parse_decimal(row.get("afterhours_nrmse", "")) if has_extended_hours else None,
-                afterhours_hit_rate=_parse_decimal(row.get("afterhours_hit_rate", "")) if has_extended_hours else None,
-                afterhours_passes=_parse_bool(row.get("afterhours_passes", "")) if has_extended_hours else None,
-                afterhours_error=row.get("afterhours_error", "").strip() or None if has_extended_hours else None,
+                premarket_n_observations=_parse_int(
+                    row.get("premarket_n_observations", "")
+                )
+                if has_extended_hours
+                else None,
+                premarket_nrmse=_parse_decimal(row.get("premarket_nrmse", ""))
+                if has_extended_hours
+                else None,
+                premarket_hit_rate=_parse_decimal(row.get("premarket_hit_rate", ""))
+                if has_extended_hours
+                else None,
+                premarket_passes=_parse_bool(row.get("premarket_passes", ""))
+                if has_extended_hours
+                else None,
+                premarket_error=row.get("premarket_error", "").strip() or None
+                if has_extended_hours
+                else None,
+                afterhours_n_observations=_parse_int(
+                    row.get("afterhours_n_observations", "")
+                )
+                if has_extended_hours
+                else None,
+                afterhours_nrmse=_parse_decimal(row.get("afterhours_nrmse", ""))
+                if has_extended_hours
+                else None,
+                afterhours_hit_rate=_parse_decimal(row.get("afterhours_hit_rate", ""))
+                if has_extended_hours
+                else None,
+                afterhours_passes=_parse_bool(row.get("afterhours_passes", ""))
+                if has_extended_hours
+                else None,
+                afterhours_error=row.get("afterhours_error", "").strip() or None
+                if has_extended_hours
+                else None,
                 # Overnight session (if present)
-                overnight_n_observations=_parse_int(row.get("overnight_n_observations", "")) if has_overnight else None,
-                overnight_n_reference_observations=_parse_int(row.get("overnight_n_reference_observations", "")) if has_overnight else None,
-                overnight_nrmse=_parse_decimal(row.get("overnight_nrmse", "")) if has_overnight else None,
-                overnight_hit_rate=_parse_decimal(row.get("overnight_hit_rate", "")) if has_overnight else None,
-                overnight_passes=_parse_bool(row.get("overnight_passes", "")) if has_overnight else None,
-                overnight_reference_publisher_id=_parse_int(row.get("overnight_reference_publisher_id", "")) if has_overnight else None,
-                overnight_error=row.get("overnight_error", "").strip() or None if has_overnight else None,
+                overnight_n_observations=_parse_int(
+                    row.get("overnight_n_observations", "")
+                )
+                if has_overnight
+                else None,
+                overnight_n_reference_observations=_parse_int(
+                    row.get("overnight_n_reference_observations", "")
+                )
+                if has_overnight
+                else None,
+                overnight_nrmse=_parse_decimal(row.get("overnight_nrmse", ""))
+                if has_overnight
+                else None,
+                overnight_hit_rate=_parse_decimal(row.get("overnight_hit_rate", ""))
+                if has_overnight
+                else None,
+                overnight_passes=_parse_bool(row.get("overnight_passes", ""))
+                if has_overnight
+                else None,
+                overnight_reference_publisher_id=_parse_int(
+                    row.get("overnight_reference_publisher_id", "")
+                )
+                if has_overnight
+                else None,
+                overnight_error=row.get("overnight_error", "").strip() or None
+                if has_overnight
+                else None,
                 # Error and timing
                 error=row.get("error", "").strip() or None,
                 execution_time_ms=_parse_int(row.get("execution_time_ms", "")),
@@ -247,6 +293,7 @@ def result_to_dict(result: ParsedBenchmarkResult) -> dict[str, Any]:
 
     Converts Decimal values to appropriate Python types.
     """
+
     def decimal_to_float(v: Optional[Decimal]) -> Optional[float]:
         return float(v) if v is not None else None
 

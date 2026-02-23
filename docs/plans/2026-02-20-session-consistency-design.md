@@ -9,12 +9,12 @@
 
 ## Design Decisions
 
-| Decision | Choice |
-|----------|--------|
-| Session pass logic | Both benchmark AND uptime must pass (mirrors regular hours) |
-| CSV layout | Separate consistency + classification section pair per session |
-| Publisher inclusion | Only publishers with session data (uptime > 0%) appear in that session's table |
-| Approach | Generalize existing `compute_publisher_consistency` with a status extractor parameter |
+| Decision            | Choice                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| Session pass logic  | Both benchmark AND uptime must pass (mirrors regular hours)                           |
+| CSV layout          | Separate consistency + classification section pair per session                        |
+| Publisher inclusion | Only publishers with session data (uptime > 0%) appear in that session's table        |
+| Approach            | Generalize existing `compute_publisher_consistency` with a status extractor parameter |
 
 ## Changes
 
@@ -138,9 +138,9 @@ overnight_intermittent,...
 
 ## Visibility Rules
 
-| Section | Appears when |
-|---------|-------------|
-| Regular consistency + classifications | `--detailed` + multi-date (existing) |
-| Premarket consistency + classifications | `--detailed` + multi-date + `--extended-hours` |
+| Section                                  | Appears when                                   |
+| ---------------------------------------- | ---------------------------------------------- |
+| Regular consistency + classifications    | `--detailed` + multi-date (existing)           |
+| Premarket consistency + classifications  | `--detailed` + multi-date + `--extended-hours` |
 | Afterhours consistency + classifications | `--detailed` + multi-date + `--extended-hours` |
-| Overnight consistency + classifications | `--detailed` + multi-date + `--overnight` |
+| Overnight consistency + classifications  | `--detailed` + multi-date + `--overnight`      |

@@ -39,10 +39,19 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from portal.batch.result_parser import parse_benchmark_csv, result_to_dict
 from portal.batch.uptime_runner import compute_and_store_uptime_for_publisher
-from portal.batch.uptime_summary import compute_daily_uptime_summary, link_uptime_to_benchmark_summary
+from portal.batch.uptime_summary import (
+    compute_daily_uptime_summary,
+    link_uptime_to_benchmark_summary,
+)
 from portal.config import settings
 from portal.db import get_session
-from portal.models import BenchmarkJob, BenchmarkResult, Feed, Publisher, PublisherDailySummary
+from portal.models import (
+    BenchmarkJob,
+    BenchmarkResult,
+    Feed,
+    Publisher,
+    PublisherDailySummary,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -107,10 +116,14 @@ def run_publisher_feeds(
     cmd = [
         sys.executable,
         str(PUBLISHER_FEEDS_SCRIPT),
-        "--publisher-id", str(publisher_id),
-        "--output", str(output_path),
-        "--date-offset", str(date_offset),
-        "--time-window", str(time_window),
+        "--publisher-id",
+        str(publisher_id),
+        "--output",
+        str(output_path),
+        "--date-offset",
+        str(date_offset),
+        "--time-window",
+        str(time_window),
     ]
 
     try:
@@ -123,7 +136,9 @@ def run_publisher_feeds(
         )
 
         if result.returncode != 0:
-            logger.error(f"publisher_feeds.py failed for publisher {publisher_id}: {result.stderr}")
+            logger.error(
+                f"publisher_feeds.py failed for publisher {publisher_id}: {result.stderr}"
+            )
             return False
 
         return output_path.exists() and output_path.stat().st_size > 0
@@ -132,7 +147,9 @@ def run_publisher_feeds(
         logger.error(f"publisher_feeds.py timed out for publisher {publisher_id}")
         return False
     except Exception as e:
-        logger.error(f"Error running publisher_feeds.py for publisher {publisher_id}: {e}")
+        logger.error(
+            f"Error running publisher_feeds.py for publisher {publisher_id}: {e}"
+        )
         return False
 
 
@@ -171,7 +188,9 @@ def discover_feeds_parallel(
             return (pid, feeds_csv)
         return (pid, None)
 
-    logger.info(f"Discovering feeds for {len(publishers)} publishers with {max_workers} workers...")
+    logger.info(
+        f"Discovering feeds for {len(publishers)} publishers with {max_workers} workers..."
+    )
     discovery_start = time.time()
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -223,10 +242,14 @@ def run_publisher_benchmark(
     cmd = [
         sys.executable,
         str(PUBLISHER_BENCHMARK_SCRIPT),
-        "--csv", str(csv_path),
-        "--publisher-id", str(publisher_id),
-        "--output", str(output_path),
-        "--workers", str(workers),
+        "--csv",
+        str(csv_path),
+        "--publisher-id",
+        str(publisher_id),
+        "--output",
+        str(output_path),
+        "--workers",
+        str(workers),
     ]
 
     if include_extended_hours:
@@ -240,7 +263,13 @@ def run_publisher_benchmark(
 
     # Only include benchmarkable asset classes by default
     if include_asset_classes is None:
-        include_asset_classes = ["fx", "metals", "us-equities", "commodity", "us-treasuries"]
+        include_asset_classes = [
+            "fx",
+            "metals",
+            "us-equities",
+            "commodity",
+            "us-treasuries",
+        ]
 
     if include_asset_classes:
         cmd.extend(["--include-asset-class"] + include_asset_classes)
@@ -255,7 +284,9 @@ def run_publisher_benchmark(
         )
 
         if result.returncode != 0:
-            logger.error(f"publisher_benchmark.py failed for publisher {publisher_id}: {result.stderr}")
+            logger.error(
+                f"publisher_benchmark.py failed for publisher {publisher_id}: {result.stderr}"
+            )
             return False
 
         return output_path.exists() and output_path.stat().st_size > 0
@@ -264,7 +295,9 @@ def run_publisher_benchmark(
         logger.error(f"publisher_benchmark.py timed out for publisher {publisher_id}")
         return False
     except Exception as e:
-        logger.error(f"Error running publisher_benchmark.py for publisher {publisher_id}: {e}")
+        logger.error(
+            f"Error running publisher_benchmark.py for publisher {publisher_id}: {e}"
+        )
         return False
 
 
@@ -417,7 +450,9 @@ def compute_daily_summary(
     )
 
     if not results:
-        logger.warning(f"No results found for publisher {publisher_id} on {target_date}")
+        logger.warning(
+            f"No results found for publisher {publisher_id} on {target_date}"
+        )
         return
 
     # Compute counts
@@ -434,8 +469,7 @@ def compute_daily_summary(
 
     # Pass criteria breakdown
     pass_by_nrmse_alone = sum(
-        1 for r in pass_results
-        if r.nrmse is not None and float(r.nrmse) < 0.01
+        1 for r in pass_results if r.nrmse is not None and float(r.nrmse) < 0.01
     )
     pass_by_nrmse_and_hit_rate = pass_count - pass_by_nrmse_alone
 
@@ -454,7 +488,9 @@ def compute_daily_summary(
         median_nrmse = mean_nrmse = min_nrmse = max_nrmse = p90_nrmse = p95_nrmse = None
 
     # Hit rate aggregates
-    valid_hit_rate = [float(r.hit_rate) for r in valid_results if r.hit_rate is not None]
+    valid_hit_rate = [
+        float(r.hit_rate) for r in valid_results if r.hit_rate is not None
+    ]
     if valid_hit_rate:
         median_hit_rate = statistics.median(valid_hit_rate)
         mean_hit_rate = statistics.mean(valid_hit_rate)
@@ -464,7 +500,11 @@ def compute_daily_summary(
         median_hit_rate = mean_hit_rate = min_hit_rate = max_hit_rate = None
 
     # RMSE/Spread aggregates
-    valid_ros = [float(r.rmse_over_spread) for r in valid_results if r.rmse_over_spread is not None]
+    valid_ros = [
+        float(r.rmse_over_spread)
+        for r in valid_results
+        if r.rmse_over_spread is not None
+    ]
     if valid_ros:
         sorted_ros = sorted(valid_ros)
         median_ros = statistics.median(sorted_ros)
@@ -490,15 +530,25 @@ def compute_daily_summary(
         median_mae = mean_mae = None
 
     # Statistical test summary
-    t_significant = sum(1 for r in valid_results if r.t_pvalue is not None and float(r.t_pvalue) < 0.05)
+    t_significant = sum(
+        1 for r in valid_results if r.t_pvalue is not None and float(r.t_pvalue) < 0.05
+    )
     t_total = sum(1 for r in valid_results if r.t_pvalue is not None)
     t_test_significance_rate = (t_significant / t_total * 100) if t_total > 0 else None
 
-    normal_count = sum(1 for r in valid_results if r.normality_pvalue is not None and float(r.normality_pvalue) >= 0.05)
+    normal_count = sum(
+        1
+        for r in valid_results
+        if r.normality_pvalue is not None and float(r.normality_pvalue) >= 0.05
+    )
     normal_total = sum(1 for r in valid_results if r.normality_pvalue is not None)
     normality_rate = (normal_count / normal_total * 100) if normal_total > 0 else None
 
-    valid_z = [float(r.mean_abs_z_score) for r in valid_results if r.mean_abs_z_score is not None]
+    valid_z = [
+        float(r.mean_abs_z_score)
+        for r in valid_results
+        if r.mean_abs_z_score is not None
+    ]
     median_z_score = statistics.median(valid_z) if valid_z else None
 
     # Asset class breakdown
@@ -515,44 +565,94 @@ def compute_daily_summary(
             asset_class_breakdown[ac]["fail"] += 1
 
     # Extended hours summary (US equities only)
-    us_equity_results = [r for r in valid_results if r.asset_class in ("us-equities", "equity-us")]
+    us_equity_results = [
+        r for r in valid_results if r.asset_class in ("us-equities", "equity-us")
+    ]
     extended_hours_summary = None
     if us_equity_results:
-        pm_results = [r for r in us_equity_results if r.premarket_n_observations is not None]
-        ah_results = [r for r in us_equity_results if r.afterhours_n_observations is not None]
+        pm_results = [
+            r for r in us_equity_results if r.premarket_n_observations is not None
+        ]
+        ah_results = [
+            r for r in us_equity_results if r.afterhours_n_observations is not None
+        ]
 
         if pm_results or ah_results:
             extended_hours_summary = {}
 
             if pm_results:
-                pm_pass = sum(1 for r in pm_results if r.premarket_passes and not r.premarket_error)
-                pm_fail = sum(1 for r in pm_results if not r.premarket_passes and not r.premarket_error)
+                pm_pass = sum(
+                    1
+                    for r in pm_results
+                    if r.premarket_passes and not r.premarket_error
+                )
+                pm_fail = sum(
+                    1
+                    for r in pm_results
+                    if not r.premarket_passes and not r.premarket_error
+                )
                 pm_error = sum(1 for r in pm_results if r.premarket_error)
-                pm_nrmse = [float(r.premarket_nrmse) for r in pm_results if r.premarket_nrmse is not None and not r.premarket_error]
-                pm_hr = [float(r.premarket_hit_rate) for r in pm_results if r.premarket_hit_rate is not None and not r.premarket_error]
+                pm_nrmse = [
+                    float(r.premarket_nrmse)
+                    for r in pm_results
+                    if r.premarket_nrmse is not None and not r.premarket_error
+                ]
+                pm_hr = [
+                    float(r.premarket_hit_rate)
+                    for r in pm_results
+                    if r.premarket_hit_rate is not None and not r.premarket_error
+                ]
 
                 extended_hours_summary["premarket_total_feeds"] = len(pm_results)
                 extended_hours_summary["premarket_pass_count"] = pm_pass
                 extended_hours_summary["premarket_fail_count"] = pm_fail
                 extended_hours_summary["premarket_error_count"] = pm_error
-                extended_hours_summary["premarket_pass_rate_pct"] = (pm_pass / len(pm_results) * 100) if pm_results else 0
-                extended_hours_summary["premarket_median_nrmse"] = statistics.median(pm_nrmse) if pm_nrmse else None
-                extended_hours_summary["premarket_median_hit_rate"] = statistics.median(pm_hr) if pm_hr else None
+                extended_hours_summary["premarket_pass_rate_pct"] = (
+                    (pm_pass / len(pm_results) * 100) if pm_results else 0
+                )
+                extended_hours_summary["premarket_median_nrmse"] = (
+                    statistics.median(pm_nrmse) if pm_nrmse else None
+                )
+                extended_hours_summary["premarket_median_hit_rate"] = (
+                    statistics.median(pm_hr) if pm_hr else None
+                )
 
             if ah_results:
-                ah_pass = sum(1 for r in ah_results if r.afterhours_passes and not r.afterhours_error)
-                ah_fail = sum(1 for r in ah_results if not r.afterhours_passes and not r.afterhours_error)
+                ah_pass = sum(
+                    1
+                    for r in ah_results
+                    if r.afterhours_passes and not r.afterhours_error
+                )
+                ah_fail = sum(
+                    1
+                    for r in ah_results
+                    if not r.afterhours_passes and not r.afterhours_error
+                )
                 ah_error = sum(1 for r in ah_results if r.afterhours_error)
-                ah_nrmse = [float(r.afterhours_nrmse) for r in ah_results if r.afterhours_nrmse is not None and not r.afterhours_error]
-                ah_hr = [float(r.afterhours_hit_rate) for r in ah_results if r.afterhours_hit_rate is not None and not r.afterhours_error]
+                ah_nrmse = [
+                    float(r.afterhours_nrmse)
+                    for r in ah_results
+                    if r.afterhours_nrmse is not None and not r.afterhours_error
+                ]
+                ah_hr = [
+                    float(r.afterhours_hit_rate)
+                    for r in ah_results
+                    if r.afterhours_hit_rate is not None and not r.afterhours_error
+                ]
 
                 extended_hours_summary["afterhours_total_feeds"] = len(ah_results)
                 extended_hours_summary["afterhours_pass_count"] = ah_pass
                 extended_hours_summary["afterhours_fail_count"] = ah_fail
                 extended_hours_summary["afterhours_error_count"] = ah_error
-                extended_hours_summary["afterhours_pass_rate_pct"] = (ah_pass / len(ah_results) * 100) if ah_results else 0
-                extended_hours_summary["afterhours_median_nrmse"] = statistics.median(ah_nrmse) if ah_nrmse else None
-                extended_hours_summary["afterhours_median_hit_rate"] = statistics.median(ah_hr) if ah_hr else None
+                extended_hours_summary["afterhours_pass_rate_pct"] = (
+                    (ah_pass / len(ah_results) * 100) if ah_results else 0
+                )
+                extended_hours_summary["afterhours_median_nrmse"] = (
+                    statistics.median(ah_nrmse) if ah_nrmse else None
+                )
+                extended_hours_summary["afterhours_median_hit_rate"] = (
+                    statistics.median(ah_hr) if ah_hr else None
+                )
 
     # Insert/update summary
     stmt = insert(PublisherDailySummary).values(
@@ -675,7 +775,9 @@ def process_publisher(
             feeds_csv = Path(tmpdir) / f"publisher_{publisher_id}_feeds.csv"
             # Step 1: Generate feeds CSV
             logger.info(f"  Generating feeds list...")
-            if not run_publisher_feeds(publisher_id, feeds_csv, date_offset=1, time_window=60):
+            if not run_publisher_feeds(
+                publisher_id, feeds_csv, date_offset=1, time_window=60
+            ):
                 logger.error(f"  Failed to generate feeds for publisher {publisher_id}")
                 return (0, 0, 1)
         else:
@@ -743,7 +845,9 @@ def process_publisher(
             compute_daily_uptime_summary(session, publisher_id, target_date)
 
         except Exception as e:
-            logger.error(f"  Uptime calculation failed for publisher {publisher_id}: {e}")
+            logger.error(
+                f"  Uptime calculation failed for publisher {publisher_id}: {e}"
+            )
 
         # Step 6: Compute summary
         batch_duration = time.time() - start_time
@@ -794,7 +898,7 @@ def main():
         "--overnight",
         action="store_true",
         help="Include overnight session evaluation for US equities (8 PM - 4 AM EST). "
-             "Uses publisher 32 as reference.",
+        "Uses publisher 32 as reference.",
     )
     parser.add_argument(
         "--dry-run",
@@ -811,14 +915,14 @@ def main():
         "--skip-scipy-tests",
         action="store_true",
         help="Skip scipy statistical tests (t-test, Wilcoxon, normality) for faster execution. "
-             "Pass/fail is determined by nrmse and hit_rate only. Reduces processing time by ~40%%.",
+        "Pass/fail is determined by nrmse and hit_rate only. Reduces processing time by ~40%%.",
     )
     parser.add_argument(
         "--discovery-workers",
         type=int,
         default=8,
         help="Number of parallel workers for feed discovery (default: 8). "
-             "Higher values speed up the discovery phase but increase ClickHouse load.",
+        "Higher values speed up the discovery phase but increase ClickHouse load.",
     )
 
     args = parser.parse_args()
@@ -830,7 +934,9 @@ def main():
         target_date = date.today() - timedelta(days=1)
 
     logger.info(f"Starting daily benchmark batch for {target_date}")
-    logger.info(f"Workers: {args.workers}, Discovery workers: {args.discovery_workers}, Extended hours: {not args.no_extended_hours}, Overnight: {args.overnight}, Skip scipy: {args.skip_scipy_tests}")
+    logger.info(
+        f"Workers: {args.workers}, Discovery workers: {args.discovery_workers}, Extended hours: {not args.no_extended_hours}, Overnight: {args.overnight}, Skip scipy: {args.skip_scipy_tests}"
+    )
 
     if args.dry_run:
         logger.info("DRY RUN MODE - no results will be stored")
@@ -842,7 +948,9 @@ def main():
         publishers = [args.publisher_id]
         logger.info(f"Processing single publisher: {args.publisher_id}")
     else:
-        logger.info(f"Discovering active publishers (last {args.time_window} minutes)...")
+        logger.info(
+            f"Discovering active publishers (last {args.time_window} minutes)..."
+        )
         try:
             client = get_clickhouse_client()
             publishers = get_active_publishers(client, args.time_window)
@@ -860,7 +968,9 @@ def main():
     discovery_temp_dir: Optional[str] = None
 
     if len(publishers) > 1 and args.discovery_workers > 0:
-        logger.info(f"Starting parallel feed discovery with {args.discovery_workers} workers...")
+        logger.info(
+            f"Starting parallel feed discovery with {args.discovery_workers} workers..."
+        )
         pre_discovered_feeds, discovery_temp_dir = discover_feeds_parallel(
             publishers,
             max_workers=args.discovery_workers,
@@ -907,9 +1017,13 @@ def main():
         if discovery_temp_dir:
             try:
                 shutil.rmtree(discovery_temp_dir, ignore_errors=True)
-                logger.debug(f"Cleaned up discovery temp directory: {discovery_temp_dir}")
+                logger.debug(
+                    f"Cleaned up discovery temp directory: {discovery_temp_dir}"
+                )
             except Exception as e:
-                logger.warning(f"Failed to clean up temp directory {discovery_temp_dir}: {e}")
+                logger.warning(
+                    f"Failed to clean up temp directory {discovery_temp_dir}: {e}"
+                )
 
     # Summary
     total_time = time.time() - total_start

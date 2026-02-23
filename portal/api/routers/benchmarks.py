@@ -18,7 +18,13 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from portal.api.dependencies import DbSession, Pagination
-from portal.api.schemas import PaginatedResponse, TrendData, TrendPoint, UptimeSummaryItem, UptimeTrendPoint
+from portal.api.schemas import (
+    PaginatedResponse,
+    TrendData,
+    TrendPoint,
+    UptimeSummaryItem,
+    UptimeTrendPoint,
+)
 from portal.batch.result_parser import parse_benchmark_csv, result_to_dict
 from portal.config import settings
 from portal.db import get_session
@@ -73,10 +79,14 @@ def run_benchmark_job(job_id: UUID) -> None:
             feeds_cmd = [
                 sys.executable,
                 str(PUBLISHER_FEEDS_SCRIPT),
-                "--publisher-id", str(job.publisher_id),
-                "--output", str(feeds_csv),
-                "--date-offset", "1",
-                "--time-window", "5",
+                "--publisher-id",
+                str(job.publisher_id),
+                "--output",
+                str(feeds_csv),
+                "--date-offset",
+                "1",
+                "--time-window",
+                "5",
             ]
 
             result = subprocess.run(
@@ -105,11 +115,20 @@ def run_benchmark_job(job_id: UUID) -> None:
             benchmark_cmd = [
                 sys.executable,
                 str(PUBLISHER_BENCHMARK_SCRIPT),
-                "--csv", str(feeds_csv),
-                "--publisher-id", str(job.publisher_id),
-                "--output", str(results_csv),
-                "--workers", str(settings.batch_workers),
-                "--include-asset-class", "fx", "metals", "us-equities", "commodity", "us-treasuries",
+                "--csv",
+                str(feeds_csv),
+                "--publisher-id",
+                str(job.publisher_id),
+                "--output",
+                str(results_csv),
+                "--workers",
+                str(settings.batch_workers),
+                "--include-asset-class",
+                "fx",
+                "metals",
+                "us-equities",
+                "commodity",
+                "us-treasuries",
             ]
 
             if job.include_extended_hours:
@@ -138,10 +157,15 @@ def run_benchmark_job(job_id: UUID) -> None:
 
                 # Upsert result
                 from sqlalchemy.dialects.postgresql import insert
+
                 stmt = insert(BenchmarkResult).values(**result_dict)
                 stmt = stmt.on_conflict_do_update(
                     constraint="uq_results_publisher_feed_date",
-                    set_={k: v for k, v in result_dict.items() if k not in ("publisher_id", "feed_id", "benchmark_date")},
+                    set_={
+                        k: v
+                        for k, v in result_dict.items()
+                        if k not in ("publisher_id", "feed_id", "benchmark_date")
+                    },
                 )
                 session.execute(stmt)
 
@@ -204,7 +228,9 @@ async def create_benchmark_job(
     existing_job = db.execute(
         select(BenchmarkJob)
         .where(BenchmarkJob.publisher_id == job_request.publisher_id)
-        .where(BenchmarkJob.status.in_([JobStatus.PENDING.value, JobStatus.RUNNING.value]))
+        .where(
+            BenchmarkJob.status.in_([JobStatus.PENDING.value, JobStatus.RUNNING.value])
+        )
     ).scalar()
 
     if existing_job:
@@ -256,13 +282,13 @@ async def list_benchmark_jobs(
 
     # Get total count
     from sqlalchemy import func
+
     count_query = select(func.count()).select_from(query.subquery())
     total = db.execute(count_query).scalar() or 0
 
     # Get paginated results
     query = (
-        query
-        .order_by(desc(BenchmarkJob.requested_at))
+        query.order_by(desc(BenchmarkJob.requested_at))
         .offset(pagination.skip)
         .limit(pagination.limit)
     )
@@ -358,7 +384,9 @@ async def get_publisher_uptime(
     db: DbSession,
     publisher_id: int = Query(..., description="Publisher ID"),
     target_date: date = Query(..., description="Uptime date (YYYY-MM-DD)"),
-    session_name: Optional[str] = Query(None, alias="session", description="Session name"),
+    session_name: Optional[str] = Query(
+        None, alias="session", description="Session name"
+    ),
     asset_class: Optional[str] = Query(None, description="Asset class filter"),
     feed_id: Optional[int] = Query(None, description="Feed ID filter"),
 ):
@@ -456,13 +484,13 @@ async def get_benchmark_job_results(
 
     # Get total count
     from sqlalchemy import func
+
     count_query = select(func.count()).select_from(query.subquery())
     total = db.execute(count_query).scalar() or 0
 
     # Get paginated results
     query = (
-        query
-        .order_by(BenchmarkResult.passes, BenchmarkResult.feed_id)
+        query.order_by(BenchmarkResult.passes, BenchmarkResult.feed_id)
         .offset(pagination.skip)
         .limit(pagination.limit)
     )
@@ -515,9 +543,15 @@ async def get_benchmark_trend(
     """
     # Validate metric
     valid_metrics = {
-        "pass_rate_pct", "median_nrmse", "median_hit_rate",
-        "total_feeds", "pass_count", "fail_count", "error_count",
-        "median_rmse_over_spread", "total_observations",
+        "pass_rate_pct",
+        "median_nrmse",
+        "median_hit_rate",
+        "total_feeds",
+        "pass_count",
+        "fail_count",
+        "error_count",
+        "median_rmse_over_spread",
+        "total_observations",
     }
     if metric not in valid_metrics:
         raise HTTPException(
@@ -557,7 +591,9 @@ async def get_uptime_trend(
     db: DbSession,
     publisher_id: int = Query(..., description="Publisher ID"),
     days: int = Query(30, ge=1, le=90, description="Number of days to include (1-90)"),
-    session_name: str = Query("regular", alias="session", description="Session to trend"),
+    session_name: str = Query(
+        "regular", alias="session", description="Session to trend"
+    ),
 ):
     """
     Get historical uptime metrics for trend analysis.

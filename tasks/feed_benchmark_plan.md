@@ -34,6 +34,7 @@
 Copy from `publisher_benchmark.py` into `quick_benchmark.py`:
 
 **New imports:**
+
 - `from enum import Enum`
 - `from datetime import datetime`
 - `from functools import lru_cache`
@@ -42,12 +43,14 @@ Copy from `publisher_benchmark.py` into `quick_benchmark.py`:
 - `from scipy import stats` (lazy import, only when needed)
 
 **Constants & enums** (from publisher_benchmark.py:47-99):
+
 - `TradingSession` enum
 - All market hours constants (`US_EQUITY_MARKET_OPEN_HOUR`, etc.)
 - `OVERNIGHT_REFERENCE_PUBLISHER_ID = 32`
 - `FUTURES_MONTH_CODES`
 
 **Helper functions** (from publisher_benchmark.py):
+
 - `is_futures_symbol()` (lines 102-146)
 - `get_market_hours_filter_sql()` with `@lru_cache` (lines 149-195)
 - `get_extended_hours_filter_sql()` with `@lru_cache` (lines 198-259)
@@ -57,16 +60,19 @@ Copy from `publisher_benchmark.py` into `quick_benchmark.py`:
 - `compute_statistical_metrics()` (lines 358-434)
 
 **Update existing:**
+
 - `ASSET_CLASS_ALIASES`: add `"us-treasuries"`, `"treasuries"` → `"us-treasuries"`, `"rates"` → `"us-treasuries"`
 - `BENCHMARKABLE_ASSET_CLASSES`: add `"us-treasuries"`
 
 ### Step 2: Add data structures
 
 **New dataclasses** (from publisher_benchmark.py):
+
 - `ExtendedHoursMetrics` (lines 437-449)
 - `OvernightMetrics` (lines 452-471)
 
 **New dataclass for per-publisher detail:**
+
 ```python
 @dataclass
 class PublisherFeedMetrics:
@@ -100,6 +106,7 @@ class PublisherFeedMetrics:
 ```
 
 **Update `BenchmarkResult` dataclass** (lines 52-67):
+
 ```python
 @dataclass
 class BenchmarkResult:
@@ -143,6 +150,7 @@ class BenchmarkResult:
 **File**: `quick_benchmark.py` lines 311-501
 
 **Signature change:**
+
 ```python
 def evaluate_feed_two_queries(
     client_lazer, client_analytics, feed_id, date, mode,
@@ -159,16 +167,19 @@ def evaluate_feed_two_queries(
 a) **Normalize mode** early: `mode = normalize_asset_class(mode)`
 
 b) **Benchmark table** (replace lines 350-354):
+
 ```python
 benchmark_table = get_benchmark_table(mode, symbol)
 ```
 
 c) **Dynamic benchmark columns** (new):
+
 ```python
 price_col, bid_col, ask_col = get_benchmark_columns(mode)
 ```
 
 d) **Market hours time filtering** (new, inject into queries):
+
 ```python
 publisher_market_filter = get_market_hours_filter_sql(mode, date, "publish_time")
 benchmark_market_filter = get_market_hours_filter_sql(mode, date, "date_time")
@@ -177,6 +188,7 @@ benchmark_market_filter = get_market_hours_filter_sql(mode, date, "date_time")
 e) **Update publisher query** (lines 357-370): add `{publisher_market_filter}` and use dynamic columns in benchmark query (lines 374-386).
 
 f) **Expand per-publisher tracking** (lines 432-451):
+
 ```python
 publisher_metrics[pub_id] = {
     "squared_errors": [],
@@ -189,6 +201,7 @@ publisher_metrics[pub_id] = {
 ```
 
 g) **Compute full metrics per publisher** (replace lines 453-469):
+
 - `rmse`, `mean_spread`, `rmse_over_spread` (existing)
 - `benchmark_range`, `nrmse`, `hit_rate` (new)
 - Pass/fail: `nrmse < 0.01 or (nrmse < 0.05 and hit_rate >= 98)`
@@ -196,6 +209,7 @@ g) **Compute full metrics per publisher** (replace lines 453-469):
 - Build `PublisherFeedMetrics` object
 
 h) **Extended hours** (new, after main evaluation):
+
 ```python
 if include_extended_hours and mode == "us-equities":
     premarket_results = evaluate_session_for_all_publishers(
@@ -206,6 +220,7 @@ if include_extended_hours and mode == "us-equities":
 ```
 
 i) **Overnight** (new, after extended hours):
+
 ```python
 if include_overnight and mode == "us-equities":
     overnight_results = evaluate_overnight_for_all_publishers(
@@ -214,6 +229,7 @@ if include_overnight and mode == "us-equities":
 ```
 
 j) **Aggregate metrics**:
+
 - `median_nrmse` = median of all publishers' nrmse values
 - `median_hit_rate` = median of all publishers' hit_rate values
 
@@ -228,6 +244,7 @@ Mark the ASOF JOIN method (lines 148-308) as deprecated. It's unused (line 567 c
 **File**: `quick_benchmark.py` lines 644-725
 
 **New arguments:**
+
 ```python
 --extended-hours    # store_true, pre-market + after-hours for US equities
 --overnight         # store_true, overnight using publisher 32
@@ -237,11 +254,13 @@ Mark the ASOF JOIN method (lines 148-308) as deprecated. It's unused (line 567 c
 ```
 
 **Expand `--mode` choices** (line 686):
+
 ```python
 choices=["fx", "metals", "us-equities", "commodity", "us-treasuries", "treasuries", "rates"]
 ```
 
 **Add validation:**
+
 - `--filter-feed-id` only applies to `--csv` mode
 - `--extended-hours` and `--overnight` only meaningful for US equities (warn, don't error)
 
@@ -262,6 +281,7 @@ Pass all new params through to `evaluate_feed_two_queries()`.
 Accept `include_extended_hours`, `include_overnight`, `include_detailed` params.
 
 **Default output columns** (feed-level, one row per feed):
+
 - Existing: `feed_id`, `date`, `mode`, `symbol`, `ready`, `target_pub_count`, `passing_pub_count`, `failing_pub_count`, `passing_publishers`, `failing_publishers`
 - New always: `median_nrmse`, `median_hit_rate`
 - New if `--extended-hours`: `premarket_passing_count`, `premarket_failing_count`, `afterhours_passing_count`, `afterhours_failing_count`
@@ -269,6 +289,7 @@ Accept `include_extended_hours`, `include_overnight`, `include_detailed` params.
 - Existing: `error`, `execution_time_ms`
 
 **Detailed output** (when `--detailed`): After the feed-level rows, append a `PUBLISHER DETAIL` section with per-publisher rows containing:
+
 - `feed_id`, `publisher_id`, `date`, `mode`, `symbol`, `passes`, `n_observations`
 - `nrmse`, `hit_rate`, `rmse`, `mean_spread`, `rmse_over_spread`, `benchmark_price_range`
 - Statistical metrics (if not skipped)
@@ -292,6 +313,7 @@ Replace minimal summary with comprehensive output:
 ### Step 10: Update module docstring
 
 Update lines 2-16 to reflect:
+
 - New pass/fail criteria
 - New flags (`--extended-hours`, `--overnight`, `--skip-scipy-tests`, `--detailed`, `--filter-feed-id`)
 - Expanded mode choices
@@ -300,8 +322,8 @@ Update lines 2-16 to reflect:
 
 ## Files Modified
 
-| File | Changes |
-|------|---------|
+| File                 | Changes                        |
+| -------------------- | ------------------------------ |
 | `quick_benchmark.py` | All changes above (Steps 1-10) |
 
 No new files. No changes to `publisher_benchmark.py`.
@@ -310,59 +332,67 @@ No new files. No changes to `publisher_benchmark.py`.
 
 ## Key Functions to Reuse from publisher_benchmark.py
 
-| Function | Location | Purpose |
-|----------|----------|---------|
-| `TradingSession` | :47-52 | Enum for session types |
-| `is_futures_symbol()` | :102-146 | Detect futures contracts |
-| `get_market_hours_filter_sql()` | :149-195 | SQL WHERE for regular hours |
-| `get_extended_hours_filter_sql()` | :198-259 | SQL WHERE for pre-market/after-hours |
-| `get_overnight_hours_filter_sql()` | :262-314 | SQL WHERE for overnight |
-| `get_benchmark_table()` | :317-337 | Benchmark table routing |
-| `get_benchmark_columns()` | :340-355 | Price vs yield columns |
-| `compute_statistical_metrics()` | :358-434 | t-test, Wilcoxon, normality, MAE, z-score |
-| `ExtendedHoursMetrics` | :437-449 | Dataclass |
-| `OvernightMetrics` | :452-471 | Dataclass |
+| Function                           | Location | Purpose                                   |
+| ---------------------------------- | -------- | ----------------------------------------- |
+| `TradingSession`                   | :47-52   | Enum for session types                    |
+| `is_futures_symbol()`              | :102-146 | Detect futures contracts                  |
+| `get_market_hours_filter_sql()`    | :149-195 | SQL WHERE for regular hours               |
+| `get_extended_hours_filter_sql()`  | :198-259 | SQL WHERE for pre-market/after-hours      |
+| `get_overnight_hours_filter_sql()` | :262-314 | SQL WHERE for overnight                   |
+| `get_benchmark_table()`            | :317-337 | Benchmark table routing                   |
+| `get_benchmark_columns()`          | :340-355 | Price vs yield columns                    |
+| `compute_statistical_metrics()`    | :358-434 | t-test, Wilcoxon, normality, MAE, z-score |
+| `ExtendedHoursMetrics`             | :437-449 | Dataclass                                 |
+| `OvernightMetrics`                 | :452-471 | Dataclass                                 |
 
 ---
 
 ## Verification
 
 1. **FX mode** (no session filtering):
+
    ```bash
    python quick_benchmark.py --feed-id 327 --date 2025-10-06 --mode fx
    ```
 
 2. **US equities with regular hours filtering**:
+
    ```bash
    python quick_benchmark.py --feed-id 1163 --date 2025-10-02 --mode us-equities
    ```
 
 3. **Extended hours**:
+
    ```bash
    python quick_benchmark.py --feed-id 1163 --date 2025-10-02 --mode us-equities --extended-hours
    ```
 
 4. **Overnight**:
+
    ```bash
    python quick_benchmark.py --feed-id 1163 --date 2025-10-02 --mode us-equities --overnight
    ```
 
 5. **Detailed output**:
+
    ```bash
    python quick_benchmark.py --feed-id 1163 --date 2025-10-02 --mode us-equities --detailed
    ```
 
 6. **CSV batch with all flags**:
+
    ```bash
    python quick_benchmark.py --csv price_id_list.csv --extended-hours --overnight --detailed --include-asset-class us-equities
    ```
 
 7. **Skip scipy tests** (faster execution):
+
    ```bash
    python quick_benchmark.py --csv price_id_list.csv --skip-scipy-tests
    ```
 
 8. **Feed ID filtering**:
+
    ```bash
    python quick_benchmark.py --csv price_id_list.csv --filter-feed-id 327 1163
    ```

@@ -14,7 +14,11 @@ from typing import Optional
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.engine import Engine
 
-from portal.models import PublisherDailyUptimeSummary, PublisherDailySummary, PublisherFeedDailyUptime
+from portal.models import (
+    PublisherDailyUptimeSummary,
+    PublisherDailySummary,
+    PublisherFeedDailyUptime,
+)
 
 
 def _get_dialect_name(session) -> str:
@@ -38,17 +42,22 @@ def _upsert_uptime_summary(session, data: dict) -> None:
         stmt = stmt.on_conflict_do_update(
             constraint="uq_uptime_summary_publisher_date",
             set_={
-                k: v for k, v in data.items()
+                k: v
+                for k, v in data.items()
                 if k not in ("publisher_id", "summary_date")
             },
         )
         session.execute(stmt)
     else:
         # SQLite fallback - use merge approach
-        existing = session.query(PublisherDailyUptimeSummary).filter_by(
-            publisher_id=data["publisher_id"],
-            summary_date=data["summary_date"],
-        ).first()
+        existing = (
+            session.query(PublisherDailyUptimeSummary)
+            .filter_by(
+                publisher_id=data["publisher_id"],
+                summary_date=data["summary_date"],
+            )
+            .first()
+        )
 
         if existing:
             for k, v in data.items():
@@ -213,7 +222,11 @@ def link_uptime_to_benchmark_summary(
         return
 
     # Update benchmark summary with uptime metrics
-    benchmark_summary.overall_median_uptime_pct = uptime_summary.overall_median_uptime_pct
-    benchmark_summary.regular_median_uptime_pct = uptime_summary.regular_median_uptime_pct
+    benchmark_summary.overall_median_uptime_pct = (
+        uptime_summary.overall_median_uptime_pct
+    )
+    benchmark_summary.regular_median_uptime_pct = (
+        uptime_summary.regular_median_uptime_pct
+    )
 
     session.commit()

@@ -46,7 +46,9 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False)
 
     # Batch processing
-    batch_workers: int = Field(default=4, description="Parallel workers for batch processing")
+    batch_workers: int = Field(
+        default=4, description="Parallel workers for batch processing"
+    )
     batch_timeout_minutes: int = Field(default=60, description="Max time for batch job")
 
     # Uptime calculation

@@ -9,12 +9,12 @@ A feed is marked **READY** only if enough publishers pass **both** checks.
 
 ## When to Use
 
-| Scenario | Use This Tool |
-|----------|---------------|
-| Single verdict that combines benchmark + uptime | Yes |
-| Batch readiness checks across many feeds/dates | Yes |
-| Benchmark-only analysis | Use `quick_benchmark.py` / `quick_benchmark_95.py` |
-| Uptime-only analysis | Use `feed_uptime.py` |
+| Scenario                                        | Use This Tool                                      |
+| ----------------------------------------------- | -------------------------------------------------- |
+| Single verdict that combines benchmark + uptime | Yes                                                |
+| Batch readiness checks across many feeds/dates  | Yes                                                |
+| Benchmark-only analysis                         | Use `quick_benchmark.py` / `quick_benchmark_95.py` |
+| Uptime-only analysis                            | Use `feed_uptime.py`                               |
 
 ## Usage
 
@@ -37,27 +37,27 @@ python feed_readiness.py --feed-id 327 --date 2026-02-10 --mode fx --detailed
 
 ## Arguments
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--csv` | CSV with `feed_id,date,mode` rows | - |
-| `--feed-id` | Feed ID(s) (single-feed mode) | - |
-| `--date` | Date(s) `YYYY-MM-DD` | - |
-| `--start-date` / `--end-date` | Inclusive date range | - |
-| `--mode` | Asset class (single-feed mode) | - |
-| `--output` | Output CSV path | `feed_readiness_results.csv` |
-| `--detailed` | Append publisher detail + consistency sections | Off |
-| `--target-pub-count` | Minimum fully-passing publishers for readiness | `4` |
-| `--skip-scipy-tests` | Skip benchmark statistical tests for faster runs | Off |
-| `--precise` | Use gap-based uptime method instead of 1-second window | Off |
-| `--gap-threshold` | Gap threshold in ms for `--precise` mode | `200` |
-| `--uptime-threshold` | Regular-session uptime pass threshold | `95.0` |
-| `--extended-hours` | Include premarket + afterhours for US equities | Off |
-| `--overnight` | Include overnight session for US equities | Off |
-| `--workers` | Parallel workers | `4` |
-| `--include-asset-class` | Only these classes (CSV mode) | All |
-| `--exclude-asset-class` | Exclude these classes (CSV mode) | None |
-| `--filter-feed-id` | Only these feed IDs (CSV mode) | All |
-| `--list-asset-classes` | List asset classes in CSV and exit | Off |
+| Argument                      | Description                                            | Default                      |
+| ----------------------------- | ------------------------------------------------------ | ---------------------------- |
+| `--csv`                       | CSV with `feed_id,date,mode` rows                      | -                            |
+| `--feed-id`                   | Feed ID(s) (single-feed mode)                          | -                            |
+| `--date`                      | Date(s) `YYYY-MM-DD`                                   | -                            |
+| `--start-date` / `--end-date` | Inclusive date range                                   | -                            |
+| `--mode`                      | Asset class (single-feed mode)                         | -                            |
+| `--output`                    | Output CSV path                                        | `feed_readiness_results.csv` |
+| `--detailed`                  | Append publisher detail + consistency sections         | Off                          |
+| `--target-pub-count`          | Minimum fully-passing publishers for readiness         | `4`                          |
+| `--skip-scipy-tests`          | Skip benchmark statistical tests for faster runs       | Off                          |
+| `--precise`                   | Use gap-based uptime method instead of 1-second window | Off                          |
+| `--gap-threshold`             | Gap threshold in ms for `--precise` mode               | `200`                        |
+| `--uptime-threshold`          | Regular-session uptime pass threshold                  | `95.0`                       |
+| `--extended-hours`            | Include premarket + afterhours for US equities         | Off                          |
+| `--overnight`                 | Include overnight session for US equities              | Off                          |
+| `--workers`                   | Parallel workers                                       | `4`                          |
+| `--include-asset-class`       | Only these classes (CSV mode)                          | All                          |
+| `--exclude-asset-class`       | Exclude these classes (CSV mode)                       | None                         |
+| `--filter-feed-id`            | Only these feed IDs (CSV mode)                         | All                          |
+| `--list-asset-classes`        | List asset classes in CSV and exit                     | Off                          |
 
 ## Input Mode Rules
 
@@ -120,6 +120,7 @@ Base output includes:
 Optional per-session readiness columns (with `--extended-hours` / `--overnight`):
 
 For each session (`premarket`, `afterhours`, `overnight`):
+
 - `{session}_ready` — boolean, session-level readiness
 - `{session}_fully_passing_count` — publishers passing both benchmark and uptime for this session
 - `{session}_fully_passing_publishers` — semicolon-separated publisher IDs
@@ -127,6 +128,7 @@ For each session (`premarket`, `afterhours`, `overnight`):
 - `{session}_median_uptime_pct`
 
 Legacy columns (still present for backward compatibility):
+
 - `premarket_benchmark_passing_count`, `afterhours_benchmark_passing_count`, `overnight_benchmark_passing_count`
 
 ### Detailed section (`--detailed`)

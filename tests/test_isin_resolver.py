@@ -587,7 +587,9 @@ class TestNonUSCUSIPConversion:
 
         result = source.resolve("SHOP")
         if result and result.isin:
-            assert result.isin.startswith("CA"), f"Expected CA prefix, got {result.isin}"
+            assert result.isin.startswith(
+                "CA"
+            ), f"Expected CA prefix, got {result.isin}"
 
     @patch("isin_resolver.FinanceDatabaseSource._load")
     def test_us_cusip_still_gets_us_prefix(self, mock_load: MagicMock) -> None:
@@ -640,6 +642,7 @@ class TestPostCacheValidation:
         # Write a bad ISIN directly to cache internals
         cache._load()
         import time as _time
+
         cache._data["BAD"] = {
             "ticker": "BAD",
             "isin": "US0000000009",  # invalid check digit
@@ -719,7 +722,9 @@ class TestConfidenceScoring:
         assert result.confidence == "medium"
 
     @patch.object(FinanceDatabaseSource, "_load")
-    def test_unresolved_confidence_low(self, mock_load: MagicMock, tmp_path: Path) -> None:
+    def test_unresolved_confidence_low(
+        self, mock_load: MagicMock, tmp_path: Path
+    ) -> None:
         """Unresolved tickers should have 'low' confidence."""
         resolver = ISINResolver(use_yfinance=False, cache_dir=tmp_path)
         resolver.finance_db._loaded = True

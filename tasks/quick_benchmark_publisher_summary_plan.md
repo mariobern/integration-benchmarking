@@ -82,6 +82,7 @@ def compute_publisher_summary(
 ```
 
 Logic:
+
 1. Iterate `results` (each has `publisher_details: list[PublisherFeedMetrics]`)
 2. For each publisher, collect `{date: passes}` for regular session
 3. If extended hours: also collect from `premarket_metrics.passes` and `afterhours_metrics.passes`

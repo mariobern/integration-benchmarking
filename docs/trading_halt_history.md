@@ -1,6 +1,7 @@
 # LULD Trading Halt History
 
 Downloads Limit Up-Limit Down (LULD) trading halt data from two sources:
+
 1. **NASDAQ Trader RSS feed** — NASDAQ-listed securities only (market code `Q`)
 2. **NYSE Historical Halt API** — All US exchanges (Nasdaq, NYSE, NYSE American, NYSE Arca, Cboe BZX)
 
@@ -38,15 +39,15 @@ python trading_halt_history.py --time-tolerance 10
 
 ## Arguments
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--days` | Number of calendar days to look back | 365 |
-| `--output` | Output CSV file path | `ludp_halts.csv` |
-| `--delay` | Delay between NASDAQ RSS requests in seconds | 0.2 |
-| `--no-nyse` | Skip NYSE API (original RSS-only behavior) | False |
-| `--no-nasdaq-rss` | Skip NASDAQ RSS (NYSE API only) | False |
-| `--xref-output` | Path for cross-reference detail CSV | None |
-| `--time-tolerance` | Max seconds for halt time matching in cross-reference | 5 |
+| Argument           | Description                                           | Default          |
+| ------------------ | ----------------------------------------------------- | ---------------- |
+| `--days`           | Number of calendar days to look back                  | 365              |
+| `--output`         | Output CSV file path                                  | `ludp_halts.csv` |
+| `--delay`          | Delay between NASDAQ RSS requests in seconds          | 0.2              |
+| `--no-nyse`        | Skip NYSE API (original RSS-only behavior)            | False            |
+| `--no-nasdaq-rss`  | Skip NASDAQ RSS (NYSE API only)                       | False            |
+| `--xref-output`    | Path for cross-reference detail CSV                   | None             |
+| `--time-tolerance` | Max seconds for halt time matching in cross-reference | 5                |
 
 ## Data Sources
 
@@ -88,32 +89,32 @@ date,ticker,halt_time,resume_time,market,source
 2025-02-10,KD,14:22:10,14:27:10,N,nyse
 ```
 
-| Column | Description |
-|--------|-------------|
-| `date` | Halt date (YYYY-MM-DD) |
-| `ticker` | Stock symbol |
-| `halt_time` | Time halt began (HH:MM:SS ET) |
-| `resume_time` | Time trading resumed (HH:MM:SS ET) |
-| `market` | Exchange code (see table below) |
-| `source` | Data source: `both`, `nasdaq_rss`, or `nyse` |
+| Column        | Description                                  |
+| ------------- | -------------------------------------------- |
+| `date`        | Halt date (YYYY-MM-DD)                       |
+| `ticker`      | Stock symbol                                 |
+| `halt_time`   | Time halt began (HH:MM:SS ET)                |
+| `resume_time` | Time trading resumed (HH:MM:SS ET)           |
+| `market`      | Exchange code (see table below)              |
+| `source`      | Data source: `both`, `nasdaq_rss`, or `nyse` |
 
 ### Source Values
 
-| Value | Meaning |
-|-------|---------|
-| `both` | Halt found in both NASDAQ RSS and NYSE API (matched) |
-| `nasdaq_rss` | Halt only found in NASDAQ RSS feed |
-| `nyse` | Halt only found in NYSE API (or non-Nasdaq exchange) |
+| Value        | Meaning                                              |
+| ------------ | ---------------------------------------------------- |
+| `both`       | Halt found in both NASDAQ RSS and NYSE API (matched) |
+| `nasdaq_rss` | Halt only found in NASDAQ RSS feed                   |
+| `nyse`       | Halt only found in NYSE API (or non-Nasdaq exchange) |
 
 ### Market Codes
 
-| Code | Exchange |
-|------|----------|
-| `Q` | NASDAQ |
-| `N` | NYSE |
-| `A` | NYSE American (AMEX) |
-| `P` | NYSE Arca |
-| `Z` | Cboe BZX (BATS) |
+| Code | Exchange             |
+| ---- | -------------------- |
+| `Q`  | NASDAQ               |
+| `N`  | NYSE                 |
+| `A`  | NYSE American (AMEX) |
+| `P`  | NYSE Arca            |
+| `Z`  | Cboe BZX (BATS)      |
 
 ## Cross-Reference
 
@@ -130,6 +131,7 @@ When both sources are enabled, the script cross-references NASDAQ-listed halts (
 ### Cross-Reference Report
 
 The console report shows:
+
 - Matched / NASDAQ-only / NYSE-only counts and percentages
 - Agreement rate
 - Time difference distribution for matched halts
@@ -149,21 +151,22 @@ date,ticker,rss_halt_time,nyse_halt_time,rss_resume_time,nyse_resume_time,time_d
 ## Halt Reason Codes
 
 The script filters for LULD halts only:
+
 - **NASDAQ RSS**: `LUDP` reason code
 - **NYSE API**: `LULD pause` reason
 
 Other common reason codes present in the feeds (all excluded):
 
-| Code | Description |
-|------|-------------|
-| **LUDP** / **LULD pause** | Limit Up-Limit Down Pause (circuit breaker) |
-| `M` | Volatility Trading Pause (Market-Wide Circuit Breaker) |
-| `T1` | News Pending |
-| `T2` | News Dissemination |
-| `T12` | IPO Halt / Additional Information Requested |
-| `T6` | Extraordinary Market Activity |
-| `H10` | SEC Trading Suspension |
-| `MWCB1` | Market-Wide Circuit Breaker Level 1 (7% S&P 500 decline) |
+| Code                      | Description                                              |
+| ------------------------- | -------------------------------------------------------- |
+| **LUDP** / **LULD pause** | Limit Up-Limit Down Pause (circuit breaker)              |
+| `M`                       | Volatility Trading Pause (Market-Wide Circuit Breaker)   |
+| `T1`                      | News Pending                                             |
+| `T2`                      | News Dissemination                                       |
+| `T12`                     | IPO Halt / Additional Information Requested              |
+| `T6`                      | Extraordinary Market Activity                            |
+| `H10`                     | SEC Trading Suspension                                   |
+| `MWCB1`                   | Market-Wide Circuit Breaker Level 1 (7% S&P 500 decline) |
 
 ## Console Summary
 
@@ -209,11 +212,11 @@ Agreement rate:            92.2%
 
 ## Performance
 
-| Mode | Requests | Time |
-|------|----------|------|
-| Both sources (default) | ~250 RSS + 1 NYSE API | ~2-3 minutes |
-| NYSE API only (`--no-nasdaq-rss`) | 1 request | ~5 seconds |
-| NASDAQ RSS only (`--no-nyse`) | ~250 requests | ~2-3 minutes |
+| Mode                              | Requests              | Time         |
+| --------------------------------- | --------------------- | ------------ |
+| Both sources (default)            | ~250 RSS + 1 NYSE API | ~2-3 minutes |
+| NYSE API only (`--no-nasdaq-rss`) | 1 request             | ~5 seconds   |
+| NASDAQ RSS only (`--no-nyse`)     | ~250 requests         | ~2-3 minutes |
 
 ## Typical Patterns
 
@@ -233,6 +236,7 @@ The Limit Up-Limit Down (LULD) mechanism was introduced by the SEC in 2012 to pr
 3. Trading halts for 5 minutes, then reopens with an auction
 
 Price bands are calculated from a reference price (typically the 5-minute rolling average):
+
 - **Tier 1** (S&P 500, Russell 1000, high-volume ETPs): 5% during regular hours, 10% during open/close
 - **Tier 2** (all other NMS stocks): 10% during regular hours, 20% during open/close
 

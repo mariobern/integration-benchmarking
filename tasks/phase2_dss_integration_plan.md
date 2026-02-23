@@ -34,6 +34,7 @@ Standalone DSS REST API client with:
 - **Standalone CLI** with subcommands: `isin-to-ric`, `ric-to-isin`, `ticker-to-isin`
 
 **Data classes** (frozen dataclasses):
+
 ```python
 @dataclass(frozen=True)
 class DSSExtractionResult:
@@ -67,6 +68,7 @@ class DSSTokenInfo:
 ### 2. `DatascopeDSSSource` class (in `isin_resolver.py`, ~50 lines)
 
 Adapter class integrating DSS client into the ISINResolver tier pattern:
+
 - `resolve(ticker)` and `resolve_batch(tickers)` methods
 - Converts `DSSExtractionResult` → `ISINResult` with `source="datascope_dss"`, `confidence="high"`
 - Catches `DSSAuthError`/`DSSAPIError` and returns empty results (graceful degradation)
@@ -93,6 +95,7 @@ datascope_dss:
 ## DSS API Reference
 
 ### Authentication
+
 ```
 POST https://selectapi.datascope.lseg.com/RestApi/v1/Authentication/RequestToken
 Body: {"Credentials": {"Username": "...", "Password": "..."}}
@@ -102,22 +105,32 @@ Token valid 24 hours. Rate limit: 30 requests per 300 seconds.
 ```
 
 ### T&C Extraction (core endpoint)
+
 ```
 POST https://selectapi.datascope.lseg.com/RestApi/v1/Extractions/ExtractWithNotes
 Headers: Authorization: Token {token}, Content-Type: application/json, Prefer: respond-async
 ```
 
 **Request** (ISIN→RIC direction):
+
 ```json
 {
   "ExtractionRequest": {
     "@odata.type": "#DataScope.Select.Api.Extractions.ExtractionRequests.TermsAndConditionsExtractionRequest",
-    "ContentFieldNames": ["RIC", "ISIN", "CUSIP", "SEDOL", "Currency Code", "Exchange Code", "Company Name"],
+    "ContentFieldNames": [
+      "RIC",
+      "ISIN",
+      "CUSIP",
+      "SEDOL",
+      "Currency Code",
+      "Exchange Code",
+      "Company Name"
+    ],
     "IdentifierList": {
       "@odata.type": "#DataScope.Select.Api.Extractions.ExtractionRequests.InstrumentIdentifierList",
       "InstrumentIdentifiers": [
-        {"Identifier": "US0378331005", "IdentifierType": "Isin"},
-        {"Identifier": "US4592001014", "IdentifierType": "Isin"}
+        { "Identifier": "US0378331005", "IdentifierType": "Isin" },
+        { "Identifier": "US4592001014", "IdentifierType": "Isin" }
       ]
     }
   }
@@ -125,21 +138,38 @@ Headers: Authorization: Token {token}, Content-Type: application/json, Prefer: r
 ```
 
 **Response** (200 or 202+polling):
+
 ```json
 {
   "Contents": [
-    {"RIC": "AAPL.O", "ISIN": "US0378331005", "CUSIP": "037833100", "Currency Code": "USD", "Exchange Code": "NAS", "Company Name": "APPLE INC"},
-    {"RIC": "IBM.N", "ISIN": "US4592001014", "CUSIP": "459200101", "Currency Code": "USD", "Exchange Code": "NYS", "Company Name": "INTERNATIONAL BUSINESS MACHINES"}
+    {
+      "RIC": "AAPL.O",
+      "ISIN": "US0378331005",
+      "CUSIP": "037833100",
+      "Currency Code": "USD",
+      "Exchange Code": "NAS",
+      "Company Name": "APPLE INC"
+    },
+    {
+      "RIC": "IBM.N",
+      "ISIN": "US4592001014",
+      "CUSIP": "459200101",
+      "Currency Code": "USD",
+      "Exchange Code": "NYS",
+      "Company Name": "INTERNATIONAL BUSINESS MACHINES"
+    }
   ]
 }
 ```
 
 ### Instrument Validation
+
 ```
 POST https://selectapi.datascope.lseg.com/RestApi/v1/Extractions/InstrumentListValidateIdentifiersWithOptions
 ```
 
 ### LSEG Documentation References
+
 - [ISIN to RIC Conversion](https://developers.lseg.com/en/article-catalog/article/isin-to-ric-conversion-with-dss-datascope-select-rest-api)
 - [Symbology Conversion Python](https://developers.lseg.com/en/article-catalog/article/symbology-conversion-using-the-dss-rest-api-in-python)
 - [Python RIC Mapping (GitHub)](https://github.com/LSEG-API-Samples/Article.DSS.Python.REST.RicMapping)
@@ -167,6 +197,7 @@ POST https://selectapi.datascope.lseg.com/RestApi/v1/Extractions/InstrumentListV
 ### New tests (~35-40 total)
 
 **`tests/test_datascope_dss_client.py`** (~25 tests):
+
 - `TestDSSTokenCache`: put/get, TTL expiration, clear, missing file, corrupted file
 - `TestDatascopeDSSClientAuth`: success, invalid creds (401), cached token reuse, expired refresh, server error, missing value field
 - `TestDatascopeDSSClientExtraction`: isin_to_ric single/batch, ric_to_isin single/batch, 202 polling, polling timeout, API errors, empty input, ticker_to_isin found/not-found
@@ -174,10 +205,12 @@ POST https://selectapi.datascope.lseg.com/RestApi/v1/Extractions/InstrumentListV
 - `TestBatchChunking`: >5000 identifiers split into chunks
 
 **`tests/test_isin_resolver.py`** (~12 new tests):
+
 - `TestDatascopeDSSSource`: resolve found/not-found, batch, auth/API error handling
 - `TestISINResolverWithDSS`: tier 3 integration, tier ordering, caching, graceful degradation, batch with all 3 tiers
 
 ### Mocking strategy
+
 - Mock `httpx.Client` at class level using `@patch("datascope_dss_client.httpx.Client")`
 - Provide realistic JSON responses from docs/isin_research.md examples
 - Test both sync (200) and async (202+polling) paths
@@ -189,6 +222,7 @@ POST https://selectapi.datascope.lseg.com/RestApi/v1/Extractions/InstrumentListV
 These tickers from `missing_ric_tickers.txt` couldn't be resolved by Tier 1 (FinanceDatabase) or Tier 2 (yfinance):
 
 **By category**:
+
 - **ETFs** (largest group): ARKF, ARKQ, ARKW, ARKX, BSV, CALF, COWZ, DFAC, DGRO, EFG, EFV, EMB, EWJ, EWY, EWZ, FLOT, GDX, GDXJ, GOVT, GOVZ, GVI, HYD, IAGG, IDV, IEFA, IEO, IFRA, IGE, IGV, IJH, IJR, INDA, ITB, IYR, IYT, IYW, IYZ, KWEB, MOAT, MTUM, NOBL, OMFL, PAVE, QUAL, REM, SGOV, SIVR, SLV, SPLG, URTH, USMV, VEA, VGK, VGT, VLUE, VNM, VO, VUG, VTEB, VUSB, XLB, XLC, XLI, XLP, XLU, XLY, XOP
 - **Crypto ETFs/products**: BITX, BTCI, BTCL, ETHA, ETHU, ETHV, YBTC, YETH, DEFI, QETH, TETH
 - **Leveraged/Inverse**: SOXL, SOXS, SPXL, TNA, UVIX, UVXY, VIXY, SVIX, SVXY
@@ -201,34 +235,35 @@ These tickers from `missing_ric_tickers.txt` couldn't be resolved by Tier 1 (Fin
 
 ## Error Handling Summary
 
-| Scenario | Behavior |
-|----------|----------|
-| No DSS credentials configured | Tier 3 silently disabled, log info message |
-| Invalid credentials (401) | Log error, return empty results, continue with Tier 1/2 |
-| API error (400/500) | Log error, return empty results, continue |
-| 202 polling timeout (>300s) | Log error, return empty results |
-| Network error (connection refused, timeout) | Log error, return empty results |
-| DSS returns invalid ISIN | Validation warning, ISIN not used |
-| Partial results (some tickers not found) | Unfound tickers remain unresolved |
+| Scenario                                    | Behavior                                                |
+| ------------------------------------------- | ------------------------------------------------------- |
+| No DSS credentials configured               | Tier 3 silently disabled, log info message              |
+| Invalid credentials (401)                   | Log error, return empty results, continue with Tier 1/2 |
+| API error (400/500)                         | Log error, return empty results, continue               |
+| 202 polling timeout (>300s)                 | Log error, return empty results                         |
+| Network error (connection refused, timeout) | Log error, return empty results                         |
+| DSS returns invalid ISIN                    | Validation warning, ISIN not used                       |
+| Partial results (some tickers not found)    | Unfound tickers remain unresolved                       |
 
 ---
 
 ## Files to Create/Modify
 
-| File | Action | Est. Lines |
-|------|--------|-----------|
-| `datascope_dss_client.py` | **New** | ~450 |
-| `tests/test_datascope_dss_client.py` | **New** | ~400 |
-| `isin_resolver.py` | Modify | ~80 |
-| `tests/test_isin_resolver.py` | Modify | ~120 |
-| `config.yaml.sample` | Modify | ~5 |
-| `CLAUDE.md` | Modify | ~30 |
+| File                                 | Action  | Est. Lines |
+| ------------------------------------ | ------- | ---------- |
+| `datascope_dss_client.py`            | **New** | ~450       |
+| `tests/test_datascope_dss_client.py` | **New** | ~400       |
+| `isin_resolver.py`                   | Modify  | ~80        |
+| `tests/test_isin_resolver.py`        | Modify  | ~120       |
+| `config.yaml.sample`                 | Modify  | ~5         |
+| `CLAUDE.md`                          | Modify  | ~30        |
 
 ---
 
 ## To Resume
 
 When credentials are available:
+
 1. Add credentials to `config.yaml` under `datascope_dss` section
 2. Tell Claude: "Continue with Phase 2 DSS integration — see `tasks/phase2_dss_integration_plan.md`"
 3. Implementation starts at Step 1 above

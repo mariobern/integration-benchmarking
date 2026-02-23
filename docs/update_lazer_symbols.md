@@ -14,11 +14,11 @@ python3 update_lazer_symbols.py --summary feeds_ready_170226_summary.md --config
 
 ## Arguments
 
-| Argument | Description | Required |
-|----------|-------------|----------|
-| `--summary` | Path to feeds_ready summary markdown file | Yes |
-| `--config` | Path to after.json config file | Yes |
-| `--dry-run` | Print changes without writing to file | No |
+| Argument    | Description                               | Required |
+| ----------- | ----------------------------------------- | -------- |
+| `--summary` | Path to feeds_ready summary markdown file | Yes      |
+| `--config`  | Path to after.json config file            | Yes      |
+| `--dry-run` | Print changes without writing to file     | No       |
 
 ## What It Does
 

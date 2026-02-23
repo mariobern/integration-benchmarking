@@ -13,6 +13,7 @@
 ### Task 1: Scaffold — Constants, Data Classes, and Symbol Index
 
 **Files:**
+
 - Create: `generate_ric_mapping.py`
 - Test: `tests/test_generate_ric_mapping.py`
 
@@ -244,12 +245,14 @@ git commit -m "feat: scaffold generate_ric_mapping with SymbolIndex"
 ### Task 2: FX RIC Resolver
 
 **Files:**
+
 - Modify: `generate_ric_mapping.py`
 - Test: `tests/test_generate_ric_mapping.py`
 
 **Step 1: Write failing tests**
 
 FX RIC rules derived from all 60 existing mappings:
+
 - USD pairs (one side is USD): non-USD currency + `=` (e.g., `EUR=`, `JPY=`, `AUD=`)
 - Cross pairs with EUR or GBP: `BASECCY` + `QUOTECCY` + `=` (e.g., `EURGBP=`, `GBPJPY=`)
 - Cross pairs among {AUD,NZD,CAD,CHF} only: `BASECCY` + `QUOTECCY` + `=R` (e.g., `AUDCAD=R`, `NZDCHF=R`)
@@ -390,6 +393,7 @@ git commit -m "feat: add FX RIC resolver with =R cross-pair handling"
 ### Task 3: Metal, Rates, and Commodity Futures RIC Resolvers
 
 **Files:**
+
 - Modify: `generate_ric_mapping.py`
 - Test: `tests/test_generate_ric_mapping.py`
 
@@ -602,6 +606,7 @@ git commit -m "feat: add metal, rates, and commodity futures RIC resolvers"
 ### Task 4: Equity Index Futures + Equity RIC Resolvers
 
 **Files:**
+
 - Modify: `generate_ric_mapping.py`
 - Test: `tests/test_generate_ric_mapping.py`
 
@@ -843,6 +848,7 @@ git commit -m "feat: add equity index futures + equity RIC resolvers"
 ### Task 5: Main Resolver Orchestrator + CSV Output
 
 **Files:**
+
 - Modify: `generate_ric_mapping.py`
 - Test: `tests/test_generate_ric_mapping.py`
 
@@ -1152,6 +1158,7 @@ git commit -m "feat: add RICResolver orchestrator and CSV output"
 ### Task 6: CLI + Summary + Polish
 
 **Files:**
+
 - Modify: `generate_ric_mapping.py`
 - Test: `tests/test_generate_ric_mapping.py`
 
@@ -1362,6 +1369,7 @@ git commit -m "feat: add CLI, summary output, and append mode"
 ### Task 7: Integration Test with Real lazer_symbols.json
 
 **Files:**
+
 - Modify: `tests/test_generate_ric_mapping.py`
 
 **Step 1: Write integration tests that validate against known pyth_mappings**

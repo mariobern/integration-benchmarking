@@ -8,7 +8,15 @@ from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import Column, Date, DateTime, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import (
+    Column,
+    Date,
+    DateTime,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.sql.sqltypes import BigInteger
 
 from portal.models.base import Base

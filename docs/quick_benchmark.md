@@ -4,11 +4,11 @@ Evaluates **feed readiness** by benchmarking all publishers for each feed agains
 
 ## When to Use
 
-| Scenario | Use This Tool |
-|----------|---------------|
-| Check if a feed has enough passing publishers | Yes |
-| Batch feed readiness across many feeds | Yes |
-| Evaluate one specific publisher in depth | Use `publisher_benchmark.py` |
+| Scenario                                      | Use This Tool                |
+| --------------------------------------------- | ---------------------------- |
+| Check if a feed has enough passing publishers | Yes                          |
+| Batch feed readiness across many feeds        | Yes                          |
+| Evaluate one specific publisher in depth      | Use `publisher_benchmark.py` |
 
 ## Usage
 
@@ -53,25 +53,25 @@ python quick_benchmark.py --csv price_id_list.csv --filter-feed-id 327 1163
 
 ## Arguments
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--csv` | CSV file with `feed_id,date,mode` rows | - |
-| `--feed-id` | Single feed ID to evaluate | - |
-| `--date` | Date(s) for single-feed mode (`YYYY-MM-DD` list) | - |
-| `--start-date` | Range start date (inclusive) for single-feed mode | - |
-| `--end-date` | Range end date (inclusive) for single-feed mode | - |
-| `--mode` | Single-feed mode: `fx`, `metals`, `us-equities`, `commodity`, `us-treasuries`, `treasuries`, `rates` | - |
-| `--output` | Output CSV path | `quick_benchmark_results.csv` |
-| `--target-pub-count` | Minimum passing publishers for feed readiness | `4` |
-| `--workers` | Parallel worker threads | `4` |
-| `--include-asset-class` | Only process these asset classes (CSV mode only) | All |
-| `--exclude-asset-class` | Exclude these asset classes (CSV mode only) | None |
-| `--extended-hours` | Include US equities pre-market + after-hours checks | Off |
-| `--overnight` | Include US equities overnight checks vs publisher `32` | Off |
-| `--skip-scipy-tests` | Skip t-test / Wilcoxon / normality metrics | Off |
-| `--detailed` | Append per-publisher detail rows to CSV | Off |
-| `--filter-feed-id` | Only process these feed IDs (CSV mode only) | All |
-| `--list-asset-classes` | List unique asset classes in CSV and exit | Off |
+| Argument                | Description                                                                                          | Default                       |
+| ----------------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `--csv`                 | CSV file with `feed_id,date,mode` rows                                                               | -                             |
+| `--feed-id`             | Single feed ID to evaluate                                                                           | -                             |
+| `--date`                | Date(s) for single-feed mode (`YYYY-MM-DD` list)                                                     | -                             |
+| `--start-date`          | Range start date (inclusive) for single-feed mode                                                    | -                             |
+| `--end-date`            | Range end date (inclusive) for single-feed mode                                                      | -                             |
+| `--mode`                | Single-feed mode: `fx`, `metals`, `us-equities`, `commodity`, `us-treasuries`, `treasuries`, `rates` | -                             |
+| `--output`              | Output CSV path                                                                                      | `quick_benchmark_results.csv` |
+| `--target-pub-count`    | Minimum passing publishers for feed readiness                                                        | `4`                           |
+| `--workers`             | Parallel worker threads                                                                              | `4`                           |
+| `--include-asset-class` | Only process these asset classes (CSV mode only)                                                     | All                           |
+| `--exclude-asset-class` | Exclude these asset classes (CSV mode only)                                                          | None                          |
+| `--extended-hours`      | Include US equities pre-market + after-hours checks                                                  | Off                           |
+| `--overnight`           | Include US equities overnight checks vs publisher `32`                                               | Off                           |
+| `--skip-scipy-tests`    | Skip t-test / Wilcoxon / normality metrics                                                           | Off                           |
+| `--detailed`            | Append per-publisher detail rows to CSV                                                              | Off                           |
+| `--filter-feed-id`      | Only process these feed IDs (CSV mode only)                                                          | All                           |
+| `--list-asset-classes`  | List unique asset classes in CSV and exit                                                            | Off                           |
 
 ## Input Mode Rules
 
@@ -104,16 +104,16 @@ python quick_benchmark.py --csv price_id_list.csv --filter-feed-id 327 1163
 
 Base output CSV columns:
 
-| Column | Meaning |
-|--------|---------|
-| `feed_id`, `date`, `mode`, `symbol` | Feed identity |
-| `ready` | Feed readiness result |
-| `target_pub_count` | Required passing publisher count |
-| `passing_pub_count`, `failing_pub_count` | Pass/fail publisher counts |
-| `passing_publishers`, `failing_publishers` | Semicolon-separated publisher IDs |
-| `median_nrmse`, `median_hit_rate` | Median per-publisher quality metrics for the feed |
-| `error` | Feed-level error (if any) |
-| `execution_time_ms` | Feed evaluation time |
+| Column                                     | Meaning                                           |
+| ------------------------------------------ | ------------------------------------------------- |
+| `feed_id`, `date`, `mode`, `symbol`        | Feed identity                                     |
+| `ready`                                    | Feed readiness result                             |
+| `target_pub_count`                         | Required passing publisher count                  |
+| `passing_pub_count`, `failing_pub_count`   | Pass/fail publisher counts                        |
+| `passing_publishers`, `failing_publishers` | Semicolon-separated publisher IDs                 |
+| `median_nrmse`, `median_hit_rate`          | Median per-publisher quality metrics for the feed |
+| `error`                                    | Feed-level error (if any)                         |
+| `execution_time_ms`                        | Feed evaluation time                              |
 
 Additional columns when `--extended-hours` is enabled:
 

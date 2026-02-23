@@ -1,18 +1,19 @@
 /* Publisher Performance Dashboard - Shared Styles */
 
 :root {
-  --pass: #10B981;
-  --fail: #EF4444;
-  --warning: #F59E0B;
-  --info: #3B82F6;
-  --bg: #F9FAFB;
-  --bg-dark: #F3F4F6;
+  --pass: #10b981;
+  --fail: #ef4444;
+  --warning: #f59e0b;
+  --info: #3b82f6;
+  --bg: #f9fafb;
+  --bg-dark: #f3f4f6;
   --text: #111827;
-  --text-muted: #6B7280;
-  --border: #E5E7EB;
-  --white: #FFFFFF;
+  --text-muted: #6b7280;
+  --border: #e5e7eb;
+  --white: #ffffff;
   --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 * {
@@ -20,7 +21,8 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   color: var(--text);
@@ -107,7 +109,7 @@ body {
 }
 
 .btn--primary:hover {
-  background: #2563EB;
+  background: #2563eb;
 }
 
 /* Summary Cards */
@@ -380,7 +382,7 @@ body {
 }
 
 .loading::after {
-  content: '';
+  content: "";
   width: 1.25rem;
   height: 1.25rem;
   margin-left: 0.5rem;
@@ -391,7 +393,9 @@ body {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Empty state */

@@ -3,6 +3,7 @@
 ## Context
 
 `quick_benchmark.py` already supports two modes:
+
 1. **CSV mode**: `--csv feeds.csv`
 2. **Single-feed mode**: `--feed-id 327 328 --date 2025-10-06 --mode fx` (no CSV required)
 
@@ -19,6 +20,7 @@ Change `required=True` to `required=False` (or remove `required` entirely).
 **2. Add `--mode` argument**
 
 Add a new `--mode` argument for single-feed mode (same as quick_benchmark.py):
+
 ```python
 parser.add_argument("--mode", type=str, help="Asset class: fx, metals, us-equities, commodity, us-treasuries")
 ```
@@ -26,6 +28,7 @@ parser.add_argument("--mode", type=str, help="Asset class: fx, metals, us-equiti
 **3. Repurpose `--feed-id` for dual behavior**
 
 Currently `--feed-id` is stored as `dest="feed_ids"` and only filters CSV rows. In the new design:
+
 - **With `--csv`**: `--feed-id` filters CSV rows (unchanged behavior)
 - **Without `--csv`**: `--feed-id` is primary input, combined with `--date`/`--start-date`/`--end-date` + `--mode`
 
@@ -34,6 +37,7 @@ No need to change `dest` — the same `args.feed_ids` list works for both paths.
 **4. Add validation logic** (after `args = parser.parse_args()`, ~line 2306)
 
 Mirroring quick_benchmark.py's pattern:
+
 ```python
 if args.csv and args.mode:
     parser.error("--mode is for single-feed mode. Use either --csv OR (--feed-id, --date, --mode)")
@@ -42,6 +46,7 @@ elif not args.csv and not (args.feed_ids and args.mode):
 ```
 
 When `--csv` is absent:
+
 - `--feed-id` + `--mode` are required
 - `--date` or `--start-date/--end-date` are required (not "overrides" anymore — they're primary)
 - `--publisher-id` is required (can't extract from CSV filename)
@@ -50,6 +55,7 @@ When `--csv` is absent:
 **5. Add single-feed execution path** (after line 2366)
 
 New `else` branch when `args.csv` is None — builds feed list directly and calls `evaluate_publisher_feed()`:
+
 ```python
 if args.csv:
     # existing CSV path (unchanged)
@@ -71,6 +77,7 @@ Guard with `if args.csv:` so it doesn't crash when CSV is None.
 **7. Update epilog/help text** (lines 2188-2213)
 
 Add examples for the new single-feed mode:
+
 ```
 # Single-feed mode (no CSV needed)
 python publisher_benchmark.py --publisher-id 55 --feed-id 327 --date 2025-10-06 --mode fx

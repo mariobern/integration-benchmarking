@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Override database URL BEFORE importing anything else
 import os
+
 os.environ["DATABASE_URL"] = "sqlite:///./test_benchmark.db"
 
 from sqlalchemy import create_engine, event
@@ -94,11 +95,14 @@ def create_test_database():
                 for feed in feeds:
                     # Generate semi-random but realistic results
                     import random
+
                     random.seed(pub.publisher_id * 1000 + feed.feed_id + days_ago)
 
                     base_nrmse = 0.002 + (pub.publisher_id % 10) * 0.001
                     nrmse = base_nrmse + random.uniform(-0.001, 0.003)
-                    hit_rate = 99.5 - (pub.publisher_id % 10) * 0.3 + random.uniform(-0.5, 0.5)
+                    hit_rate = (
+                        99.5 - (pub.publisher_id % 10) * 0.3 + random.uniform(-0.5, 0.5)
+                    )
 
                     passes = nrmse < 0.01 or (nrmse < 0.05 and hit_rate >= 98)
 
@@ -125,17 +129,24 @@ def create_test_database():
 
             # Create daily summaries
             for pub in publishers:
-                pub_results = [r for r in session.query(BenchmarkResult).filter(
-                    BenchmarkResult.publisher_id == pub.publisher_id,
-                    BenchmarkResult.benchmark_date == benchmark_date,
-                ).all()]
+                pub_results = [
+                    r
+                    for r in session.query(BenchmarkResult)
+                    .filter(
+                        BenchmarkResult.publisher_id == pub.publisher_id,
+                        BenchmarkResult.benchmark_date == benchmark_date,
+                    )
+                    .all()
+                ]
 
                 if pub_results:
                     pass_count = sum(1 for r in pub_results if r.passes)
                     total = len(pub_results)
 
                     nrmse_values = [float(r.nrmse) for r in pub_results if r.nrmse]
-                    hit_rate_values = [float(r.hit_rate) for r in pub_results if r.hit_rate]
+                    hit_rate_values = [
+                        float(r.hit_rate) for r in pub_results if r.hit_rate
+                    ]
 
                     summary = PublisherDailySummary(
                         publisher_id=pub.publisher_id,
@@ -145,10 +156,20 @@ def create_test_database():
                         fail_count=total - pass_count,
                         error_count=0,
                         pass_rate_pct=(pass_count / total * 100) if total > 0 else 0,
-                        median_nrmse=sorted(nrmse_values)[len(nrmse_values)//2] if nrmse_values else None,
-                        mean_nrmse=sum(nrmse_values) / len(nrmse_values) if nrmse_values else None,
-                        median_hit_rate=sorted(hit_rate_values)[len(hit_rate_values)//2] if hit_rate_values else None,
-                        mean_hit_rate=sum(hit_rate_values) / len(hit_rate_values) if hit_rate_values else None,
+                        median_nrmse=sorted(nrmse_values)[len(nrmse_values) // 2]
+                        if nrmse_values
+                        else None,
+                        mean_nrmse=sum(nrmse_values) / len(nrmse_values)
+                        if nrmse_values
+                        else None,
+                        median_hit_rate=sorted(hit_rate_values)[
+                            len(hit_rate_values) // 2
+                        ]
+                        if hit_rate_values
+                        else None,
+                        mean_hit_rate=sum(hit_rate_values) / len(hit_rate_values)
+                        if hit_rate_values
+                        else None,
                         total_observations=sum(r.n_observations for r in pub_results),
                         asset_class_breakdown={
                             "fx": {"pass": 2, "fail": 0, "error": 0},
@@ -221,10 +242,10 @@ def main():
     print()
     print("Example curl commands:")
     print()
-    print('  curl http://localhost:8000/health')
-    print('  curl http://localhost:8000/publishers/')
-    print('  curl http://localhost:8000/publishers/55/summary')
-    print('  curl http://localhost:8000/leaderboard/')
+    print("  curl http://localhost:8000/health")
+    print("  curl http://localhost:8000/publishers/")
+    print("  curl http://localhost:8000/publishers/55/summary")
+    print("  curl http://localhost:8000/leaderboard/")
     print('  curl "http://localhost:8000/publishers/55/feeds?passes=false"')
     print()
     print("Press Ctrl+C to stop the server")

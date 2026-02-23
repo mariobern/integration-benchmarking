@@ -51,7 +51,9 @@ router = APIRouter(prefix="/publishers", tags=["publishers"])
 @router.get("/", response_model=list[PublisherWithStats])
 async def list_publishers(
     db: DbSession,
-    has_results: bool = Query(True, description="Only publishers with benchmark results"),
+    has_results: bool = Query(
+        True, description="Only publishers with benchmark results"
+    ),
     is_active: bool = Query(True, description="Only active publishers"),
 ):
     """
@@ -77,9 +79,8 @@ async def list_publishers(
     # Get summaries for latest date
     summaries = {}
     if latest_date:
-        summary_query = (
-            select(PublisherDailySummary)
-            .where(PublisherDailySummary.summary_date == latest_date)
+        summary_query = select(PublisherDailySummary).where(
+            PublisherDailySummary.summary_date == latest_date
         )
         for summary in db.execute(summary_query).scalars().all():
             summaries[summary.publisher_id] = summary
@@ -99,10 +100,16 @@ async def list_publishers(
                 is_active=pub.is_active,
                 last_seen_at=pub.last_seen_at,
                 latest_date=str(latest_date) if latest_date else None,
-                pass_rate_pct=float(summary.pass_rate_pct) if summary and summary.pass_rate_pct else None,
+                pass_rate_pct=float(summary.pass_rate_pct)
+                if summary and summary.pass_rate_pct
+                else None,
                 total_feeds=summary.total_feeds if summary else None,
-                median_nrmse=float(summary.median_nrmse) if summary and summary.median_nrmse else None,
-                median_hit_rate=float(summary.median_hit_rate) if summary and summary.median_hit_rate else None,
+                median_nrmse=float(summary.median_nrmse)
+                if summary and summary.median_nrmse
+                else None,
+                median_hit_rate=float(summary.median_hit_rate)
+                if summary and summary.median_hit_rate
+                else None,
             )
         )
 
@@ -117,7 +124,9 @@ async def get_publisher(publisher_id: int, db: DbSession):
     """Get publisher details."""
     publisher = db.get(Publisher, publisher_id)
     if not publisher:
-        raise HTTPException(status_code=404, detail=f"Publisher {publisher_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Publisher {publisher_id} not found"
+        )
 
     return PublisherResponse.model_validate(publisher)
 
@@ -126,7 +135,9 @@ async def get_publisher(publisher_id: int, db: DbSession):
 async def get_publisher_summary(
     publisher_id: int,
     db: DbSession,
-    target_date: Optional[date] = Query(None, description="Specific date (default: latest)"),
+    target_date: Optional[date] = Query(
+        None, description="Specific date (default: latest)"
+    ),
 ):
     """
     Get detailed summary statistics for a publisher.
@@ -136,7 +147,9 @@ async def get_publisher_summary(
     # Check publisher exists
     publisher = db.get(Publisher, publisher_id)
     if not publisher:
-        raise HTTPException(status_code=404, detail=f"Publisher {publisher_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Publisher {publisher_id} not found"
+        )
 
     # Build query
     query = select(PublisherDailySummary).where(
@@ -153,14 +166,16 @@ async def get_publisher_summary(
     if not summary:
         raise HTTPException(
             status_code=404,
-            detail=f"No summary found for publisher {publisher_id}" +
-                   (f" on {target_date}" if target_date else ""),
+            detail=f"No summary found for publisher {publisher_id}"
+            + (f" on {target_date}" if target_date else ""),
         )
 
     return PublisherSummaryDetail.model_validate(summary)
 
 
-@router.get("/{publisher_id}/summary/history", response_model=list[PublisherSummaryResponse])
+@router.get(
+    "/{publisher_id}/summary/history", response_model=list[PublisherSummaryResponse]
+)
 async def get_publisher_summary_history(
     publisher_id: int,
     db: DbSession,
@@ -175,7 +190,9 @@ async def get_publisher_summary_history(
     # Check publisher exists
     publisher = db.get(Publisher, publisher_id)
     if not publisher:
-        raise HTTPException(status_code=404, detail=f"Publisher {publisher_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Publisher {publisher_id} not found"
+        )
 
     query = (
         select(PublisherDailySummary)
@@ -210,7 +227,9 @@ async def get_publisher_trends(
     # Check publisher exists
     publisher = db.get(Publisher, publisher_id)
     if not publisher:
-        raise HTTPException(status_code=404, detail=f"Publisher {publisher_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Publisher {publisher_id} not found"
+        )
 
     # Get summaries in date range
     query = (
@@ -261,13 +280,17 @@ async def get_publisher_trends(
     return result
 
 
-@router.get("/{publisher_id}/feeds", response_model=PaginatedResponse[BenchmarkResultListItem])
+@router.get(
+    "/{publisher_id}/feeds", response_model=PaginatedResponse[BenchmarkResultListItem]
+)
 async def get_publisher_feeds(
     publisher_id: int,
     db: DbSession,
     pagination: Pagination,
     asset_filter: AssetFilter,
-    target_date: Optional[date] = Query(None, description="Specific date (default: latest)"),
+    target_date: Optional[date] = Query(
+        None, description="Specific date (default: latest)"
+    ),
     passes: Optional[bool] = Query(None, description="Filter by pass/fail status"),
     has_error: Optional[bool] = Query(None, description="Filter by error status"),
 ):
@@ -279,13 +302,14 @@ async def get_publisher_feeds(
     # Check publisher exists
     publisher = db.get(Publisher, publisher_id)
     if not publisher:
-        raise HTTPException(status_code=404, detail=f"Publisher {publisher_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Publisher {publisher_id} not found"
+        )
 
     # Determine target date
     if target_date is None:
-        latest_date_query = (
-            select(func.max(BenchmarkResult.benchmark_date))
-            .where(BenchmarkResult.publisher_id == publisher_id)
+        latest_date_query = select(func.max(BenchmarkResult.benchmark_date)).where(
+            BenchmarkResult.publisher_id == publisher_id
         )
         target_date = db.execute(latest_date_query).scalar()
 
@@ -323,8 +347,7 @@ async def get_publisher_feeds(
 
     # Get paginated results
     query = (
-        query
-        .order_by(BenchmarkResult.passes, BenchmarkResult.feed_id)
+        query.order_by(BenchmarkResult.passes, BenchmarkResult.feed_id)
         .offset(pagination.skip)
         .limit(pagination.limit)
     )
@@ -359,7 +382,9 @@ async def get_publisher_feed_result(
     publisher_id: int,
     feed_id: int,
     db: DbSession,
-    target_date: Optional[date] = Query(None, description="Specific date (default: latest)"),
+    target_date: Optional[date] = Query(
+        None, description="Specific date (default: latest)"
+    ),
 ):
     """
     Get detailed benchmark result for a specific feed and publisher.
@@ -402,7 +427,9 @@ async def get_publisher_feed_result(
 async def get_publisher_asset_class_breakdown(
     publisher_id: int,
     db: DbSession,
-    target_date: Optional[date] = Query(None, description="Specific date (default: latest)"),
+    target_date: Optional[date] = Query(
+        None, description="Specific date (default: latest)"
+    ),
 ):
     """
     Get breakdown of results by asset class for a publisher.
@@ -410,13 +437,14 @@ async def get_publisher_asset_class_breakdown(
     # Check publisher exists
     publisher = db.get(Publisher, publisher_id)
     if not publisher:
-        raise HTTPException(status_code=404, detail=f"Publisher {publisher_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Publisher {publisher_id} not found"
+        )
 
     # Determine target date
     if target_date is None:
-        latest_date_query = (
-            select(func.max(BenchmarkResult.benchmark_date))
-            .where(BenchmarkResult.publisher_id == publisher_id)
+        latest_date_query = select(func.max(BenchmarkResult.benchmark_date)).where(
+            BenchmarkResult.publisher_id == publisher_id
         )
         target_date = db.execute(latest_date_query).scalar()
 
@@ -429,7 +457,9 @@ async def get_publisher_asset_class_breakdown(
             BenchmarkResult.asset_class,
             func.count().label("total"),
             func.sum(func.cast(BenchmarkResult.passes, Integer)).label("pass_count"),
-            func.sum(func.cast(BenchmarkResult.error.isnot(None), Integer)).label("error_count"),
+            func.sum(func.cast(BenchmarkResult.error.isnot(None), Integer)).label(
+                "error_count"
+            ),
         )
         .where(BenchmarkResult.publisher_id == publisher_id)
         .where(BenchmarkResult.benchmark_date == target_date)
@@ -475,13 +505,14 @@ async def get_publisher_dashboard(
     # Check publisher exists
     publisher = db.get(Publisher, publisher_id)
     if not publisher:
-        raise HTTPException(status_code=404, detail=f"Publisher {publisher_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Publisher {publisher_id} not found"
+        )
 
     # Determine target date from benchmark summary
     if target_date is None:
-        latest_date_query = (
-            select(func.max(PublisherDailySummary.summary_date))
-            .where(PublisherDailySummary.publisher_id == publisher_id)
+        latest_date_query = select(func.max(PublisherDailySummary.summary_date)).where(
+            PublisherDailySummary.publisher_id == publisher_id
         )
         target_date = db.execute(latest_date_query).scalar()
 
@@ -507,9 +538,15 @@ async def get_publisher_dashboard(
 
     # Build benchmark metrics
     benchmark_metrics = BenchmarkMetrics(
-        pass_rate_pct=float(benchmark_summary.pass_rate_pct) if benchmark_summary and benchmark_summary.pass_rate_pct else None,
-        median_nrmse=float(benchmark_summary.median_nrmse) if benchmark_summary and benchmark_summary.median_nrmse else None,
-        median_hit_rate=float(benchmark_summary.median_hit_rate) if benchmark_summary and benchmark_summary.median_hit_rate else None,
+        pass_rate_pct=float(benchmark_summary.pass_rate_pct)
+        if benchmark_summary and benchmark_summary.pass_rate_pct
+        else None,
+        median_nrmse=float(benchmark_summary.median_nrmse)
+        if benchmark_summary and benchmark_summary.median_nrmse
+        else None,
+        median_hit_rate=float(benchmark_summary.median_hit_rate)
+        if benchmark_summary and benchmark_summary.median_hit_rate
+        else None,
         total_feeds=benchmark_summary.total_feeds if benchmark_summary else 0,
         pass_count=benchmark_summary.pass_count if benchmark_summary else 0,
         fail_count=benchmark_summary.fail_count if benchmark_summary else 0,
@@ -518,11 +555,21 @@ async def get_publisher_dashboard(
 
     # Build uptime metrics
     uptime_metrics = UptimeMetrics(
-        overall_median_uptime_pct=float(uptime_summary.overall_median_uptime_pct) if uptime_summary and uptime_summary.overall_median_uptime_pct else None,
-        regular_median_uptime_pct=float(uptime_summary.regular_median_uptime_pct) if uptime_summary and uptime_summary.regular_median_uptime_pct else None,
-        premarket_median_uptime_pct=float(uptime_summary.premarket_median_uptime_pct) if uptime_summary and uptime_summary.premarket_median_uptime_pct else None,
-        afterhours_median_uptime_pct=float(uptime_summary.afterhours_median_uptime_pct) if uptime_summary and uptime_summary.afterhours_median_uptime_pct else None,
-        overnight_median_uptime_pct=float(uptime_summary.overnight_median_uptime_pct) if uptime_summary and uptime_summary.overnight_median_uptime_pct else None,
+        overall_median_uptime_pct=float(uptime_summary.overall_median_uptime_pct)
+        if uptime_summary and uptime_summary.overall_median_uptime_pct
+        else None,
+        regular_median_uptime_pct=float(uptime_summary.regular_median_uptime_pct)
+        if uptime_summary and uptime_summary.regular_median_uptime_pct
+        else None,
+        premarket_median_uptime_pct=float(uptime_summary.premarket_median_uptime_pct)
+        if uptime_summary and uptime_summary.premarket_median_uptime_pct
+        else None,
+        afterhours_median_uptime_pct=float(uptime_summary.afterhours_median_uptime_pct)
+        if uptime_summary and uptime_summary.afterhours_median_uptime_pct
+        else None,
+        overnight_median_uptime_pct=float(uptime_summary.overnight_median_uptime_pct)
+        if uptime_summary and uptime_summary.overnight_median_uptime_pct
+        else None,
     )
 
     # Build alerts
@@ -598,7 +645,9 @@ def _build_dashboard_alerts(
         top_issues.append(
             AlertItem(
                 severity="warning",
-                message=f"Feed {result.symbol or result.feed_id}: {result.error[:50]}..." if result.error and len(result.error) > 50 else f"Feed {result.symbol or result.feed_id}: {result.error}",
+                message=f"Feed {result.symbol or result.feed_id}: {result.error[:50]}..."
+                if result.error and len(result.error) > 50
+                else f"Feed {result.symbol or result.feed_id}: {result.error}",
                 feed_id=result.feed_id,
                 symbol=result.symbol,
             )

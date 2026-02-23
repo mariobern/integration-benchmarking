@@ -207,14 +207,20 @@ class UptimeCalculator:
         gaps_over_threshold = int(row[2] or 0)
         total_downtime_ms = int(row[7] or 0)
 
-        uptime_pct = ((period_length_ms - total_downtime_ms) / period_length_ms * 100) if period_length_ms > 0 else 0.0
+        uptime_pct = (
+            ((period_length_ms - total_downtime_ms) / period_length_ms * 100)
+            if period_length_ms > 0
+            else 0.0
+        )
 
         return UptimeResult(
             uptime_pct=round(uptime_pct, 4),
             downtime_ms=total_downtime_ms,
             period_length_ms=period_length_ms,
             updates_total=updates_total,
-            updates_per_second=round(updates_total / total_seconds, 2) if total_seconds > 0 else 0.0,
+            updates_per_second=round(updates_total / total_seconds, 2)
+            if total_seconds > 0
+            else 0.0,
             max_gap_ms=max_gap_ms,
             gaps_over_threshold=gaps_over_threshold,
         )
@@ -358,14 +364,20 @@ class UptimeCalculator:
             gaps_over_threshold = int(row[3] or 0)
             total_downtime_ms = int(row[8] or 0)
 
-            uptime_pct = ((period_length_ms - total_downtime_ms) / period_length_ms * 100) if period_length_ms > 0 else 0.0
+            uptime_pct = (
+                ((period_length_ms - total_downtime_ms) / period_length_ms * 100)
+                if period_length_ms > 0
+                else 0.0
+            )
 
             results[feed_id] = UptimeResult(
                 uptime_pct=round(uptime_pct, 4),
                 downtime_ms=total_downtime_ms,
                 period_length_ms=period_length_ms,
                 updates_total=updates_total,
-                updates_per_second=round(updates_total / total_seconds, 2) if total_seconds > 0 else 0.0,
+                updates_per_second=round(updates_total / total_seconds, 2)
+                if total_seconds > 0
+                else 0.0,
                 max_gap_ms=max_gap_ms,
                 gaps_over_threshold=gaps_over_threshold,
             )

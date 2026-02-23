@@ -36,7 +36,9 @@ log = logging.getLogger(__name__)
 
 # --- Constants ---
 
-RSS_URL_TEMPLATE = "https://www.nasdaqtrader.com/rss.aspx?feed=tradehalts&haltdate={date}"
+RSS_URL_TEMPLATE = (
+    "https://www.nasdaqtrader.com/rss.aspx?feed=tradehalts&haltdate={date}"
+)
 NYSE_API_URL = "https://www.nyse.com/api/trade-halts/historical/download"
 MAX_RETRIES = 3
 RETRY_BACKOFF = 1.0  # seconds, doubles each retry
@@ -52,6 +54,7 @@ EXCHANGE_CODE_TO_NAME = {v: k for k, v in EXCHANGE_NAME_TO_CODE.items()}
 
 
 # --- Data classes ---
+
 
 @dataclass
 class CrossRefResult:
@@ -86,6 +89,7 @@ class CrossRefResult:
 
 # --- NASDAQ RSS functions ---
 
+
 def fetch_halts_for_date(
     date: datetime, delay: float, retries: int = MAX_RETRIES
 ) -> list[dict]:
@@ -101,10 +105,14 @@ def fetch_halts_for_date(
             break
         except Exception as exc:
             if attempt == retries:
-                log.warning("Failed to fetch %s after %d attempts: %s", date_str, retries, exc)
+                log.warning(
+                    "Failed to fetch %s after %d attempts: %s", date_str, retries, exc
+                )
                 return []
             wait = RETRY_BACKOFF * (2 ** (attempt - 1))
-            log.debug("Retry %d/%d for %s in %.1fs: %s", attempt, retries, date_str, wait, exc)
+            log.debug(
+                "Retry %d/%d for %s in %.1fs: %s", attempt, retries, date_str, wait, exc
+            )
             time.sleep(wait)
 
     halts = []
@@ -166,7 +174,9 @@ def _strip_html(text: str) -> str:
     return re.sub(r"<[^>]+>", "", text).strip()
 
 
-def fetch_nasdaq_rss_halts(start_date: datetime, end_date: datetime, delay: float) -> list[dict]:
+def fetch_nasdaq_rss_halts(
+    start_date: datetime, end_date: datetime, delay: float
+) -> list[dict]:
     """Fetch all LUDP halts from the NASDAQ RSS feed for a date range."""
     bdays = pd.bdate_range(start=start_date, end=end_date)
     log.info(
@@ -194,6 +204,7 @@ def fetch_nasdaq_rss_halts(start_date: datetime, end_date: datetime, delay: floa
 
 
 # --- NYSE API functions ---
+
 
 def fetch_halts_from_nyse(
     start_date: datetime, end_date: datetime, retries: int = MAX_RETRIES
@@ -227,10 +238,14 @@ def fetch_halts_from_nyse(
             break
         except Exception as exc:
             if attempt == retries:
-                log.error("Failed to fetch NYSE API after %d attempts: %s", retries, exc)
+                log.error(
+                    "Failed to fetch NYSE API after %d attempts: %s", retries, exc
+                )
                 return []
             wait = RETRY_BACKOFF * (2 ** (attempt - 1))
-            log.warning("NYSE API retry %d/%d in %.1fs: %s", attempt, retries, wait, exc)
+            log.warning(
+                "NYSE API retry %d/%d in %.1fs: %s", attempt, retries, wait, exc
+            )
             time.sleep(wait)
 
     halts = []
@@ -263,6 +278,7 @@ def fetch_halts_from_nyse(
 
 
 # --- Cross-reference ---
+
 
 def _time_to_seconds(t: str) -> Optional[int]:
     """Convert HH:MM:SS (or HH:MM:SS.fff) string to seconds since midnight."""
@@ -368,6 +384,7 @@ def cross_reference_halts(
 
 # --- Merge ---
 
+
 def merge_halts(
     rss_halts: list[dict],
     nyse_halts: list[dict],
@@ -438,6 +455,7 @@ def merge_halts(
 
 # --- Reporting ---
 
+
 def _print_cross_reference_report(xref: CrossRefResult) -> None:
     """Print cross-reference analysis between NASDAQ RSS and NYSE API."""
     print(f"\n{'='*60}")
@@ -450,7 +468,11 @@ def _print_cross_reference_report(xref: CrossRefResult) -> None:
     print(f"Agreement rate:          {xref.agreement_rate:>6.1f}%")
 
     if xref.matched:
-        diffs = [m["time_diff_sec"] for m in xref.matched if isinstance(m["time_diff_sec"], int)]
+        diffs = [
+            m["time_diff_sec"]
+            for m in xref.matched
+            if isinstance(m["time_diff_sec"], int)
+        ]
         if diffs:
             print(f"\nTime differences (matched halts):")
             print(f"  Exact match (0s):  {sum(1 for d in diffs if d == 0):,}")
@@ -528,8 +550,14 @@ def _print_summary(halts: list[dict]) -> None:
 def _write_xref_csv(xref: CrossRefResult, path: str) -> None:
     """Write cross-reference detail to a CSV file."""
     fieldnames = [
-        "date", "ticker", "rss_halt_time", "nyse_halt_time",
-        "rss_resume_time", "nyse_resume_time", "time_diff_sec", "status",
+        "date",
+        "ticker",
+        "rss_halt_time",
+        "nyse_halt_time",
+        "rss_resume_time",
+        "nyse_resume_time",
+        "time_diff_sec",
+        "status",
     ]
     all_rows = xref.matched + xref.nasdaq_only + xref.nyse_only
     all_rows.sort(key=lambda r: (r["date"], r["ticker"]))
@@ -543,6 +571,7 @@ def _write_xref_csv(xref: CrossRefResult, path: str) -> None:
 
 
 # --- Main ---
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -591,7 +620,9 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.no_nyse and args.no_nasdaq_rss:
-        log.error("Cannot skip both sources. Use --no-nyse OR --no-nasdaq-rss, not both.")
+        log.error(
+            "Cannot skip both sources. Use --no-nyse OR --no-nasdaq-rss, not both."
+        )
         return
 
     if args.days <= 0:
@@ -614,7 +645,9 @@ def main() -> None:
     # Cross-reference (only if both sources present)
     xref: Optional[CrossRefResult] = None
     if rss_halts and nyse_halts:
-        xref = cross_reference_halts(rss_halts, nyse_halts, time_tolerance=args.time_tolerance)
+        xref = cross_reference_halts(
+            rss_halts, nyse_halts, time_tolerance=args.time_tolerance
+        )
 
     # Merge halts
     all_halts = merge_halts(rss_halts, nyse_halts, xref)

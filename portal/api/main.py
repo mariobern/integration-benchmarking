@@ -159,10 +159,14 @@ async def get_stats():
 
     db = SessionLocal()
     try:
-        publisher_count = db.execute(select(func.count(Publisher.publisher_id))).scalar() or 0
+        publisher_count = (
+            db.execute(select(func.count(Publisher.publisher_id))).scalar() or 0
+        )
         feed_count = db.execute(select(func.count(Feed.feed_id))).scalar() or 0
         result_count = db.execute(select(func.count(BenchmarkResult.id))).scalar() or 0
-        summary_count = db.execute(select(func.count(PublisherDailySummary.id))).scalar() or 0
+        summary_count = (
+            db.execute(select(func.count(PublisherDailySummary.id))).scalar() or 0
+        )
 
         latest_date = db.execute(
             select(func.max(BenchmarkResult.benchmark_date))

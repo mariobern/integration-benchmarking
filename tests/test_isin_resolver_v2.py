@@ -37,7 +37,9 @@ from isin_resolver_v2 import (
 
 class TestTickerInput:
     def test_frozen_dataclass(self) -> None:
-        inp = TickerInput(ticker="AAPL", company_name="Apple", denomination_currency="USD")
+        inp = TickerInput(
+            ticker="AAPL", company_name="Apple", denomination_currency="USD"
+        )
         with pytest.raises(AttributeError):
             inp.ticker = "MSFT"  # type: ignore[misc]
 
@@ -63,7 +65,9 @@ class TestTickerInput:
         assert result.company_name is None
 
     def test_normalize_ticker_input(self) -> None:
-        inp = TickerInput(ticker="bidu", company_name="Baidu", denomination_currency="usd")
+        inp = TickerInput(
+            ticker="bidu", company_name="Baidu", denomination_currency="usd"
+        )
         result = _normalize_input(inp)
         assert result.ticker == "BIDU"
         assert result.company_name == "Baidu"
@@ -290,8 +294,7 @@ class TestManualOverrideSource:
     def test_resolve_case_insensitive(self, tmp_path: Path) -> None:
         override_file = tmp_path / "overrides.csv"
         override_file.write_text(
-            "ticker,isin,cusip,company_name\n"
-            "bidu,US0567521085,056752108,Baidu\n"
+            "ticker,isin,cusip,company_name\n" "bidu,US0567521085,056752108,Baidu\n"
         )
         source = ManualOverrideSource(override_file=override_file)
         assert source.resolve("BIDU") is not None
@@ -316,8 +319,7 @@ class TestManualOverrideSource:
     def test_invalid_isin_rejected(self, tmp_path: Path) -> None:
         override_file = tmp_path / "overrides.csv"
         override_file.write_text(
-            "ticker,isin,cusip,company_name\n"
-            "BAD,INVALID_ISIN,,Bad Entry\n"
+            "ticker,isin,cusip,company_name\n" "BAD,INVALID_ISIN,,Bad Entry\n"
         )
         source = ManualOverrideSource(override_file=override_file)
         assert source.resolve("BAD") is None
@@ -398,9 +400,7 @@ class TestOpenFIGISource:
     def test_lookup_not_found(self, mock_post: MagicMock) -> None:
         """OpenFIGI returns None for unknown ticker."""
         mock_response = MagicMock()
-        mock_response.json.return_value = [
-            {"error": "No identifier found."}
-        ]
+        mock_response.json.return_value = [{"error": "No identifier found."}]
         mock_response.raise_for_status = MagicMock()
         mock_post.return_value = mock_response
 
@@ -411,6 +411,7 @@ class TestOpenFIGISource:
     def test_lookup_network_error(self, mock_post: MagicMock) -> None:
         """Graceful degradation on network error."""
         import httpx
+
         mock_post.side_effect = httpx.ConnectError("connection refused")
 
         source = OpenFIGISource()
@@ -575,17 +576,23 @@ class TestYFinanceSource:
 
 class TestADRDetection:
     def test_adr_check_needed_usd_with_foreign_isin(self) -> None:
-        result = ISINResult(ticker="BIDU", isin="KYG070341048", source="financedatabase")
+        result = ISINResult(
+            ticker="BIDU", isin="KYG070341048", source="financedatabase"
+        )
         inp = TickerInput(ticker="BIDU", denomination_currency="USD")
         assert _check_adr_correction_needed(result, inp) is True
 
     def test_adr_check_not_needed_usd_with_us_isin(self) -> None:
-        result = ISINResult(ticker="AAPL", isin="US0378331005", source="financedatabase")
+        result = ISINResult(
+            ticker="AAPL", isin="US0378331005", source="financedatabase"
+        )
         inp = TickerInput(ticker="AAPL", denomination_currency="USD")
         assert _check_adr_correction_needed(result, inp) is False
 
     def test_adr_check_not_needed_no_currency(self) -> None:
-        result = ISINResult(ticker="BIDU", isin="KYG070341048", source="financedatabase")
+        result = ISINResult(
+            ticker="BIDU", isin="KYG070341048", source="financedatabase"
+        )
         inp = TickerInput(ticker="BIDU")
         assert _check_adr_correction_needed(result, inp) is False
 
@@ -617,7 +624,9 @@ class TestCurrencyValidation:
 
     def test_usd_with_indian_isin_flagged(self) -> None:
         """Indian ISIN for USD security should be flagged."""
-        result = ISINResult(ticker="SWDA", isin="INE243N01029", source="yfinance", confidence="medium")
+        result = ISINResult(
+            ticker="SWDA", isin="INE243N01029", source="yfinance", confidence="medium"
+        )
         inp = TickerInput(ticker="SWDA", denomination_currency="USD")
         validated = _validate_currency_consistency(result, inp)
         assert validated.confidence == "low"
@@ -625,7 +634,9 @@ class TestCurrencyValidation:
 
     def test_usd_with_argentine_isin_flagged(self) -> None:
         """Argentine ISIN for USD security should be flagged."""
-        result = ISINResult(ticker="SPXL", isin="AR0748859532", source="yfinance", confidence="medium")
+        result = ISINResult(
+            ticker="SPXL", isin="AR0748859532", source="yfinance", confidence="medium"
+        )
         inp = TickerInput(ticker="SPXL", denomination_currency="USD")
         validated = _validate_currency_consistency(result, inp)
         assert validated.confidence == "low"
@@ -633,7 +644,9 @@ class TestCurrencyValidation:
 
     def test_no_currency_no_validation(self) -> None:
         """Without denomination currency, no validation is applied."""
-        result = ISINResult(ticker="SWDA", isin="INE243N01029", source="yfinance", confidence="medium")
+        result = ISINResult(
+            ticker="SWDA", isin="INE243N01029", source="yfinance", confidence="medium"
+        )
         inp = TickerInput(ticker="SWDA")
         validated = _validate_currency_consistency(result, inp)
         assert validated == result  # unchanged
@@ -662,7 +675,9 @@ class TestISINResolver:
         cache.save()
 
         resolver = ISINResolver(
-            use_yfinance=False, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=self._no_override(tmp_path),
         )
         resolved = resolver.resolve("AAPL")
@@ -671,7 +686,9 @@ class TestISINResolver:
     @patch.object(FinanceDatabaseSource, "_load")
     def test_resolve_tier1(self, mock_load: MagicMock, tmp_path: Path) -> None:
         resolver = ISINResolver(
-            use_yfinance=False, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=self._no_override(tmp_path),
         )
         resolver.finance_db._loaded = True
@@ -695,7 +712,9 @@ class TestISINResolver:
         self, mock_load: MagicMock, mock_ticker_cls: MagicMock, tmp_path: Path
     ) -> None:
         resolver = ISINResolver(
-            use_yfinance=True, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=True,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=self._no_override(tmp_path),
         )
         resolver.finance_db._loaded = True
@@ -713,7 +732,9 @@ class TestISINResolver:
     @patch.object(FinanceDatabaseSource, "_load")
     def test_resolve_unresolved(self, mock_load: MagicMock, tmp_path: Path) -> None:
         resolver = ISINResolver(
-            use_yfinance=False, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=self._no_override(tmp_path),
         )
         resolver.finance_db._loaded = True
@@ -727,7 +748,9 @@ class TestISINResolver:
     @patch.object(FinanceDatabaseSource, "_load")
     def test_resolve_batch(self, mock_load: MagicMock, tmp_path: Path) -> None:
         resolver = ISINResolver(
-            use_yfinance=False, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=self._no_override(tmp_path),
         )
         resolver.finance_db._loaded = True
@@ -750,7 +773,9 @@ class TestISINResolver:
     @patch.object(FinanceDatabaseSource, "_load")
     def test_batch_caches_results(self, mock_load: MagicMock, tmp_path: Path) -> None:
         resolver = ISINResolver(
-            use_yfinance=False, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=self._no_override(tmp_path),
         )
         resolver.finance_db._loaded = True
@@ -768,7 +793,9 @@ class TestISINResolver:
         resolver.save_cache()
 
         resolver2 = ISINResolver(
-            use_yfinance=False, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=self._no_override(tmp_path),
         )
         cached = resolver2.cache.get("AAPL")
@@ -778,7 +805,9 @@ class TestISINResolver:
     def test_resolve_with_string_input(self, tmp_path: Path) -> None:
         """Backward compatible: resolve() accepts str."""
         resolver = ISINResolver(
-            use_yfinance=False, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=self._no_override(tmp_path),
         )
         # Should not raise — just return unresolved
@@ -788,7 +817,9 @@ class TestISINResolver:
     def test_resolve_with_ticker_input(self, tmp_path: Path) -> None:
         """New: resolve() accepts TickerInput."""
         resolver = ISINResolver(
-            use_yfinance=False, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=self._no_override(tmp_path),
         )
         inp = TickerInput(ticker="AAPL", denomination_currency="USD")
@@ -798,7 +829,9 @@ class TestISINResolver:
     def test_resolve_batch_with_strings(self, tmp_path: Path) -> None:
         """Backward compatible: resolve_batch() accepts list[str]."""
         resolver = ISINResolver(
-            use_yfinance=False, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=self._no_override(tmp_path),
         )
         results = resolver.resolve_batch(["AAPL"])
@@ -807,7 +840,9 @@ class TestISINResolver:
     def test_resolve_batch_with_ticker_inputs(self, tmp_path: Path) -> None:
         """New: resolve_batch() accepts list[TickerInput]."""
         resolver = ISINResolver(
-            use_yfinance=False, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=self._no_override(tmp_path),
         )
         inputs = [
@@ -826,7 +861,9 @@ class TestISINResolver:
         )
 
         resolver = ISINResolver(
-            use_yfinance=False, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=override_file,
         )
         result = resolver.resolve("AAPL")
@@ -838,12 +875,13 @@ class TestISINResolver:
         """Manual override in batch mode takes priority."""
         override_file = tmp_path / "overrides.csv"
         override_file.write_text(
-            "ticker,isin,cusip,company_name\n"
-            "BIDU,US0567521085,056752108,Baidu ADR\n"
+            "ticker,isin,cusip,company_name\n" "BIDU,US0567521085,056752108,Baidu ADR\n"
         )
 
         resolver = ISINResolver(
-            use_yfinance=False, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=override_file,
         )
         resolver.finance_db._loaded = True
@@ -877,7 +915,9 @@ class TestADRCorrection:
         )
 
         resolver = ISINResolver(
-            use_yfinance=False, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=override_file,
         )
         # Note: Manual override is Tier 0 and resolves BEFORE FinanceDatabase
@@ -905,7 +945,9 @@ class TestADRCorrection:
         )
 
         resolver = ISINResolver(
-            use_yfinance=False, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=override_file,
         )
 
@@ -923,7 +965,9 @@ class TestADRCorrection:
         """Without denomination_currency, foreign ISIN is kept as-is."""
         # No override file
         resolver = ISINResolver(
-            use_yfinance=False, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=tmp_path / "nonexistent.csv",
         )
         resolver.finance_db._loaded = True
@@ -948,7 +992,9 @@ class TestADRCorrection:
     ) -> None:
         """When OpenFIGI confirms ADR but no manual override exists, add warning."""
         resolver = ISINResolver(
-            use_yfinance=False, use_openfigi=True, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=True,
+            cache_dir=tmp_path,
             override_file=tmp_path / "nonexistent.csv",
         )
         resolver.finance_db._loaded = True
@@ -986,7 +1032,9 @@ class TestADRCorrection:
     ) -> None:
         """Without OpenFIGI or override, foreign ISIN is kept without ADR warning."""
         resolver = ISINResolver(
-            use_yfinance=False, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=tmp_path / "nonexistent.csv",
         )
         resolver.finance_db._loaded = True
@@ -1029,9 +1077,7 @@ class TestEnrichedCSVParsing:
     def test_parse_enriched_csv_missing_fields(self, tmp_path: Path) -> None:
         f = tmp_path / "enriched.csv"
         f.write_text(
-            "ticker,company_name,denomination_currency\n"
-            "AAPL,,\n"
-            "BIDU,Baidu Inc,\n"
+            "ticker,company_name,denomination_currency\n" "AAPL,,\n" "BIDU,Baidu Inc,\n"
         )
         inputs = parse_enriched_csv(f)
         assert len(inputs) == 2
@@ -1098,7 +1144,9 @@ class TestConfidenceScoring:
     @patch.object(FinanceDatabaseSource, "_load")
     def test_tier1_confidence_high(self, mock_load: MagicMock, tmp_path: Path) -> None:
         resolver = ISINResolver(
-            use_yfinance=False, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=self._no_override(tmp_path),
         )
         resolver.finance_db._loaded = True
@@ -1121,7 +1169,9 @@ class TestConfidenceScoring:
         self, mock_load: MagicMock, mock_ticker_cls: MagicMock, tmp_path: Path
     ) -> None:
         resolver = ISINResolver(
-            use_yfinance=True, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=True,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=self._no_override(tmp_path),
         )
         resolver.finance_db._loaded = True
@@ -1140,7 +1190,9 @@ class TestConfidenceScoring:
         self, mock_load: MagicMock, tmp_path: Path
     ) -> None:
         resolver = ISINResolver(
-            use_yfinance=False, use_openfigi=False, cache_dir=tmp_path,
+            use_yfinance=False,
+            use_openfigi=False,
+            cache_dir=tmp_path,
             override_file=self._no_override(tmp_path),
         )
         resolver.finance_db._loaded = True
@@ -1181,6 +1233,7 @@ class TestPostCacheValidation:
         cache = ISINCache(cache_dir=tmp_path, ttl_seconds=3600)
         cache._load()
         import time as _time
+
         cache._data["BAD"] = {
             "ticker": "BAD",
             "isin": "US0000000009",

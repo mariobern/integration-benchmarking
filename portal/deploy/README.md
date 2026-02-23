@@ -4,11 +4,11 @@ This directory contains deployment configurations for the Publisher Performance 
 
 ## Files
 
-| File | Description |
-|------|-------------|
-| `benchmark-daily.service` | Systemd service for the daily batch job |
-| `benchmark-daily.timer` | Systemd timer that triggers the service at 6 AM UTC |
-| `install.sh` | Automated installation script |
+| File                      | Description                                         |
+| ------------------------- | --------------------------------------------------- |
+| `benchmark-daily.service` | Systemd service for the daily batch job             |
+| `benchmark-daily.timer`   | Systemd timer that triggers the service at 6 AM UTC |
+| `install.sh`              | Automated installation script                       |
 
 ## Quick Start
 
@@ -20,6 +20,7 @@ sudo ./install.sh
 ```
 
 This will:
+
 1. Create a `benchmark` system user
 2. Set up the application directory at `/opt/integration-benchmarking`
 3. Create a PostgreSQL database
@@ -30,35 +31,41 @@ This will:
 ### Manual Installation
 
 1. **Create system user:**
+
    ```bash
    sudo useradd --system --no-create-home benchmark
    ```
 
 2. **Create application directory:**
+
    ```bash
    sudo mkdir -p /opt/integration-benchmarking
    sudo chown benchmark:benchmark /opt/integration-benchmarking
    ```
 
 3. **Copy application files and create venv:**
+
    ```bash
    sudo -u benchmark python3 -m venv /opt/integration-benchmarking/venv
    sudo -u benchmark /opt/integration-benchmarking/venv/bin/pip install -r requirements.txt
    ```
 
 4. **Create PostgreSQL database:**
+
    ```bash
    sudo -u postgres createuser benchmark
    sudo -u postgres createdb -O benchmark benchmark
    ```
 
 5. **Create `.env` file:**
+
    ```bash
    cp portal/.env.example portal/.env
    # Edit portal/.env with your credentials
    ```
 
 6. **Run migrations:**
+
    ```bash
    cd /opt/integration-benchmarking
    alembic -c portal/alembic.ini upgrade head
@@ -124,6 +131,7 @@ journalctl -u benchmark-daily.service
 ### Troubleshooting
 
 **Timer not firing:**
+
 ```bash
 # Check if timer is enabled
 systemctl is-enabled benchmark-daily.timer
@@ -133,6 +141,7 @@ systemctl show benchmark-daily.timer
 ```
 
 **Service failing:**
+
 ```bash
 # Check service status
 systemctl status benchmark-daily.service
@@ -142,6 +151,7 @@ journalctl -u benchmark-daily.service -n 50 --no-pager
 ```
 
 **Database connection issues:**
+
 ```bash
 # Test database connection
 sudo -u benchmark psql -h localhost -U benchmark -d benchmark -c "SELECT 1"
@@ -155,22 +165,26 @@ cat /opt/integration-benchmarking/portal/.env
 The timer is configured to run at **6:00 AM UTC daily**.
 
 This timing ensures:
+
 - Benchmark data (Datascope) for T-1 is available
 - Results are ready before business hours in most timezones
 - Plenty of time for the batch to complete before the next market day
 
 To change the schedule, edit `benchmark-daily.timer`:
+
 ```ini
 [Timer]
 OnCalendar=*-*-* 06:00:00 UTC
 ```
 
 Common alternatives:
+
 - `OnCalendar=*-*-* 00:00:00 UTC` - Midnight UTC
 - `OnCalendar=Mon..Fri *-*-* 06:00:00 UTC` - Weekdays only
 - `OnCalendar=*-*-* 06,18:00:00 UTC` - Twice daily (6 AM and 6 PM)
 
 After editing, reload:
+
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl restart benchmark-daily.timer

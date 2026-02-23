@@ -134,10 +134,15 @@ class TestComputeDailyUptimeSummary:
         )
 
         # Verify record was created
-        summary = db_session.query(PublisherDailyUptimeSummary).filter(
-            PublisherDailyUptimeSummary.publisher_id == sample_publisher.publisher_id,
-            PublisherDailyUptimeSummary.summary_date == target_date,
-        ).first()
+        summary = (
+            db_session.query(PublisherDailyUptimeSummary)
+            .filter(
+                PublisherDailyUptimeSummary.publisher_id
+                == sample_publisher.publisher_id,
+                PublisherDailyUptimeSummary.summary_date == target_date,
+            )
+            .first()
+        )
         assert summary is not None
         original_id = summary.id
 
@@ -149,17 +154,24 @@ class TestComputeDailyUptimeSummary:
         )
 
         # Should still be only one record
-        count = db_session.query(PublisherDailyUptimeSummary).filter(
-            PublisherDailyUptimeSummary.publisher_id == sample_publisher.publisher_id,
-            PublisherDailyUptimeSummary.summary_date == target_date,
-        ).count()
+        count = (
+            db_session.query(PublisherDailyUptimeSummary)
+            .filter(
+                PublisherDailyUptimeSummary.publisher_id
+                == sample_publisher.publisher_id,
+                PublisherDailyUptimeSummary.summary_date == target_date,
+            )
+            .count()
+        )
         assert count == 1
 
 
 class TestLinkUptimeToBenchmarkSummary:
     """Tests for link_uptime_to_benchmark_summary function."""
 
-    def test_no_uptime_summary(self, db_session, sample_publisher, sample_daily_summary):
+    def test_no_uptime_summary(
+        self, db_session, sample_publisher, sample_daily_summary
+    ):
         """Test when no uptime summary exists."""
         # Should not raise error
         link_uptime_to_benchmark_summary(
@@ -172,7 +184,9 @@ class TestLinkUptimeToBenchmarkSummary:
         db_session.refresh(sample_daily_summary)
         assert sample_daily_summary.overall_median_uptime_pct is None
 
-    def test_no_benchmark_summary(self, db_session, sample_publisher, sample_uptime_summary):
+    def test_no_benchmark_summary(
+        self, db_session, sample_publisher, sample_uptime_summary
+    ):
         """Test when no benchmark summary exists."""
         # Should not raise error
         link_uptime_to_benchmark_summary(

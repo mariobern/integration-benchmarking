@@ -23,9 +23,15 @@ class TestLRUCacheOnFilterFunctions:
         from publisher_benchmark import get_market_hours_filter_sql
 
         # Call with same parameters multiple times
-        result1 = get_market_hours_filter_sql("us-equities", "2025-10-06", "publish_time")
-        result2 = get_market_hours_filter_sql("us-equities", "2025-10-06", "publish_time")
-        result3 = get_market_hours_filter_sql("us-equities", "2025-10-06", "publish_time")
+        result1 = get_market_hours_filter_sql(
+            "us-equities", "2025-10-06", "publish_time"
+        )
+        result2 = get_market_hours_filter_sql(
+            "us-equities", "2025-10-06", "publish_time"
+        )
+        result3 = get_market_hours_filter_sql(
+            "us-equities", "2025-10-06", "publish_time"
+        )
 
         # All should be identical (from cache or not)
         assert result1 == result2
@@ -68,9 +74,15 @@ class TestLRUCacheOnFilterFunctions:
         get_extended_hours_filter_sql.cache_clear()
 
         # Make several calls
-        get_extended_hours_filter_sql(TradingSession.PREMARKET, "2025-10-06", "publish_time")
-        get_extended_hours_filter_sql(TradingSession.PREMARKET, "2025-10-06", "publish_time")
-        get_extended_hours_filter_sql(TradingSession.AFTERHOURS, "2025-10-06", "publish_time")
+        get_extended_hours_filter_sql(
+            TradingSession.PREMARKET, "2025-10-06", "publish_time"
+        )
+        get_extended_hours_filter_sql(
+            TradingSession.PREMARKET, "2025-10-06", "publish_time"
+        )
+        get_extended_hours_filter_sql(
+            TradingSession.AFTERHOURS, "2025-10-06", "publish_time"
+        )
 
         # Check cache info
         cache_info = get_extended_hours_filter_sql.cache_info()
@@ -237,7 +249,9 @@ class TestParallelFeedDiscovery:
         from portal.batch import daily_benchmark_runner
 
         source = inspect.getsource(daily_benchmark_runner)
-        assert "--discovery-workers" in source, "Flag not found in daily_benchmark_runner"
+        assert (
+            "--discovery-workers" in source
+        ), "Flag not found in daily_benchmark_runner"
 
 
 class TestProcessPublisherWithPreDiscoveredFeeds:
@@ -252,7 +266,9 @@ class TestProcessPublisherWithPreDiscoveredFeeds:
         sig = inspect.signature(process_publisher)
         params = list(sig.parameters.keys())
 
-        assert "feeds_csv" in params, "feeds_csv parameter not found in process_publisher"
+        assert (
+            "feeds_csv" in params
+        ), "feeds_csv parameter not found in process_publisher"
 
     def test_process_publisher_feeds_csv_is_optional(self):
         """Test that feeds_csv parameter has a default value (is optional)."""
@@ -279,7 +295,9 @@ class TestRunPublisherBenchmarkSkipScipy:
         sig = inspect.signature(run_publisher_benchmark)
         params = list(sig.parameters.keys())
 
-        assert "skip_scipy_tests" in params, "skip_scipy_tests not found in run_publisher_benchmark"
+        assert (
+            "skip_scipy_tests" in params
+        ), "skip_scipy_tests not found in run_publisher_benchmark"
 
     def test_run_publisher_benchmark_skip_scipy_default_is_false(self):
         """Test that skip_scipy_tests defaults to False."""

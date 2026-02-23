@@ -13,6 +13,7 @@
 ### Task 1: Add commodity futures test cases
 
 **Files:**
+
 - Modify: `tests/test_generate_ric_mapping.py:218` (add after `test_nikkei_march_2026`)
 
 **Step 1: Write the failing tests**
@@ -67,6 +68,7 @@ Expected: 9 new tests FAIL with `AssertionError` (returns `None` because roots n
 ### Task 2: Add commodity futures mappings
 
 **Files:**
+
 - Modify: `generate_ric_mapping.py:124-135` (add entries to `FUTURES_PYTH_TO_RIC`)
 
 **Step 1: Add the 5 new entries to the dictionary**
@@ -98,6 +100,7 @@ git commit -m "feat: add NL/LE/TI/RS/GO commodity futures RIC mappings"
 ### Task 3: Add equity index futures test cases
 
 **Files:**
+
 - Modify: `tests/test_generate_ric_mapping.py:242` (add after `test_non_futures` in `TestEquityIndexFuturesResolver`)
 
 **Step 1: Write the failing tests**
@@ -136,6 +139,7 @@ Expected: 5 new tests FAIL — the regex `([A-Z]{2})` rejects `US500`, `US100`, 
 ### Task 4: Fix equity index regex and add mappings
 
 **Files:**
+
 - Modify: `generate_ric_mapping.py:162-170` (add dict entries + fix regex)
 
 **Step 1: Add the 3 new entries to the dictionary**
@@ -183,6 +187,7 @@ git commit -m "feat: add US500/US100/US30 equity index futures aliases and fix r
 ### Task 5: Add integration test with lazer_symbols fixture + full regression
 
 **Files:**
+
 - Modify: `tests/test_generate_ric_mapping.py` (add fixture entries + integration tests in `TestRICResolver`)
 
 **Step 1: Add new symbols to `SAMPLE_SYMBOLS` fixture**
@@ -253,6 +258,7 @@ python3 generate_ric_mapping.py --ticker-file test_tickers.txt --symbols lazer_s
 ```
 
 Expected: All 19 tickers resolve successfully with RICs:
+
 - NLG6 → MNIG26, NLH6 → MNIH26, NLJ6 → MNIJ26
 - NGDM6 → NGM26
 - LEM6 → MPBM26, LEU6 → MPBU26

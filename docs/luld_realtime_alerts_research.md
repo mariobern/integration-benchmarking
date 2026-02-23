@@ -32,6 +32,7 @@ The authoritative source for LULD price bands is the SIP (Securities Information
 - **Connection limits:** 1 concurrent WebSocket per asset class by default (more available via support)
 
 **Example payload:**
+
 ```json
 {
   "ev": "LULD",
@@ -67,6 +68,7 @@ The authoritative source for LULD price bands is the SIP (Securities Information
 - **Extras:** Also streams trades, quotes, and minute bars in the same connection
 
 **Good option if:**
+
 - You want to prototype at zero cost first
 - You also need trade/quote data alongside LULD
 
@@ -96,6 +98,7 @@ The authoritative source for LULD price bands is the SIP (Securities Information
 - **Note:** Already used in `trading_halt_history.py` for historical halt data
 
 **Related NASDAQ resources:**
+
 - Current halts page: https://www.nasdaqtrader.com/trader.aspx?id=tradehalts
 - Halt history search: https://www.nasdaqtrader.com/trader.aspx?id=TradingHaltHistory
 - Halt reason codes: https://www.nasdaqtrader.com/trader.aspx?id=tradehaltcodes
@@ -154,16 +157,16 @@ The authoritative source for LULD price bands is the SIP (Securities Information
 
 ## Comparison Matrix
 
-| Provider | Delivery | Latency | Cost | Python SDK | Free Tier | Halt Events | Price Bands |
-|----------|----------|---------|------|------------|-----------|-------------|-------------|
-| **Polygon/Massive** | WebSocket | Sub-second | ~$29/mo | Yes | No | Yes | Yes |
-| **Alpaca** | WebSocket | Sub-second | Free-$99/mo | Yes | Yes | Yes | Yes |
-| **Databento** | Live API | 42-590us | Pay-per-use | Yes | $125 credit | Yes | Yes |
-| **NASDAQ RSS** | RSS polling | Seconds-minutes | Free | DIY | Yes | Yes | No |
-| **HaltAlerts.org** | Webhook | Near real-time | Free/Paid | Webhook | 20/day | Yes | No |
-| **NYSE** | Web page | N/A | Free | No | Yes | Yes | No |
-| **CTA/UTP SIP** | Direct feed | Microseconds | $$$$$ | No | No | Yes | Yes |
-| **TradingView** | Chart alerts | Real-time | Free | No | Yes | Yes | Yes |
+| Provider            | Delivery     | Latency         | Cost        | Python SDK | Free Tier   | Halt Events | Price Bands |
+| ------------------- | ------------ | --------------- | ----------- | ---------- | ----------- | ----------- | ----------- |
+| **Polygon/Massive** | WebSocket    | Sub-second      | ~$29/mo     | Yes        | No          | Yes         | Yes         |
+| **Alpaca**          | WebSocket    | Sub-second      | Free-$99/mo | Yes        | Yes         | Yes         | Yes         |
+| **Databento**       | Live API     | 42-590us        | Pay-per-use | Yes        | $125 credit | Yes         | Yes         |
+| **NASDAQ RSS**      | RSS polling  | Seconds-minutes | Free        | DIY        | Yes         | Yes         | No          |
+| **HaltAlerts.org**  | Webhook      | Near real-time  | Free/Paid   | Webhook    | 20/day      | Yes         | No          |
+| **NYSE**            | Web page     | N/A             | Free        | No         | Yes         | Yes         | No          |
+| **CTA/UTP SIP**     | Direct feed  | Microseconds    | $$$$$       | No         | No          | Yes         | Yes         |
+| **TradingView**     | Chart alerts | Real-time       | Free        | No         | Yes         | Yes         | Yes         |
 
 ---
 
@@ -194,6 +197,7 @@ For halt event notifications within $30-100/mo budget:
 ## Existing Infrastructure
 
 The project already has `trading_halt_history.py` which:
+
 - Downloads LULD halts from NASDAQ Trader RSS feed (historical, batch)
 - Parses HTML tables from RSS entries
 - Filters for `LUDP` reason code

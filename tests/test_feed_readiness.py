@@ -103,7 +103,9 @@ def make_result(
 
 class TestRegularStatus:
     def test_pass(self):
-        detail = make_detail(publisher_id=1, fully_passes=True, benchmark_passes=True, uptime_passes=True)
+        detail = make_detail(
+            publisher_id=1, fully_passes=True, benchmark_passes=True, uptime_passes=True
+        )
         assert _regular_status(detail) == "PASS"
 
     def test_fail(self):
@@ -225,22 +227,38 @@ class TestComputePublisherConsistency:
         """Two dates, publisher 19 passes regular+premarket, publisher 20 fails both."""
         details_d1 = [
             make_detail(
-                publisher_id=19, fully_passes=True, benchmark_passes=True, uptime_passes=True,
-                premarket_benchmark_passes=True, premarket_uptime_passes=True, premarket_uptime_pct=99.0,
+                publisher_id=19,
+                fully_passes=True,
+                benchmark_passes=True,
+                uptime_passes=True,
+                premarket_benchmark_passes=True,
+                premarket_uptime_passes=True,
+                premarket_uptime_pct=99.0,
             ),
             make_detail(
-                publisher_id=20, fully_passes=False,
-                premarket_benchmark_passes=False, premarket_uptime_passes=True, premarket_uptime_pct=80.0,
+                publisher_id=20,
+                fully_passes=False,
+                premarket_benchmark_passes=False,
+                premarket_uptime_passes=True,
+                premarket_uptime_pct=80.0,
             ),
         ]
         details_d2 = [
             make_detail(
-                publisher_id=19, fully_passes=True, benchmark_passes=True, uptime_passes=True,
-                premarket_benchmark_passes=True, premarket_uptime_passes=True, premarket_uptime_pct=99.0,
+                publisher_id=19,
+                fully_passes=True,
+                benchmark_passes=True,
+                uptime_passes=True,
+                premarket_benchmark_passes=True,
+                premarket_uptime_passes=True,
+                premarket_uptime_pct=99.0,
             ),
             make_detail(
-                publisher_id=20, fully_passes=False,
-                premarket_benchmark_passes=True, premarket_uptime_passes=True, premarket_uptime_pct=95.0,
+                publisher_id=20,
+                fully_passes=False,
+                premarket_benchmark_passes=True,
+                premarket_uptime_passes=True,
+                premarket_uptime_pct=95.0,
             ),
         ]
         return [
@@ -260,7 +278,9 @@ class TestComputePublisherConsistency:
 
     def test_premarket_extractor(self):
         results = self._make_two_date_results()
-        consistency = compute_publisher_consistency(results, status_extractor=_premarket_status)
+        consistency = compute_publisher_consistency(
+            results, status_extractor=_premarket_status
+        )
         row_19 = next(r for r in consistency["rows"] if r["publisher_id"] == 19)
         assert row_19["pass_count"] == 2
         row_20 = next(r for r in consistency["rows"] if r["publisher_id"] == 20)
@@ -271,11 +291,15 @@ class TestComputePublisherConsistency:
     def test_extractor_none_excludes_publisher(self):
         details = [
             make_detail(
-                publisher_id=19, fully_passes=True,
-                premarket_uptime_pct=99.0, premarket_benchmark_passes=True, premarket_uptime_passes=True,
+                publisher_id=19,
+                fully_passes=True,
+                premarket_uptime_pct=99.0,
+                premarket_benchmark_passes=True,
+                premarket_uptime_passes=True,
             ),
             make_detail(
-                publisher_id=20, fully_passes=False,
+                publisher_id=20,
+                fully_passes=False,
                 premarket_uptime_pct=None,
             ),
         ]
@@ -283,13 +307,22 @@ class TestComputePublisherConsistency:
             make_result(feed_id=100, date="2026-02-17", details=details),
             make_result(feed_id=100, date="2026-02-18", details=details),
         ]
-        consistency = compute_publisher_consistency(results, status_extractor=_premarket_status)
+        consistency = compute_publisher_consistency(
+            results, status_extractor=_premarket_status
+        )
         publisher_ids = {r["publisher_id"] for r in consistency["rows"]}
         assert 19 in publisher_ids
         assert 20 not in publisher_ids
 
     def test_backward_compatible_no_extractor(self):
-        details = [make_detail(publisher_id=19, fully_passes=True, benchmark_passes=True, uptime_passes=True)]
+        details = [
+            make_detail(
+                publisher_id=19,
+                fully_passes=True,
+                benchmark_passes=True,
+                uptime_passes=True,
+            )
+        ]
         results = [
             make_result(feed_id=100, date="2026-02-17", details=details),
             make_result(feed_id=100, date="2026-02-18", details=details),
@@ -307,7 +340,9 @@ class TestWritePublisherConsistencyCsv:
     def _write_and_read(self, consistency, session_prefix=""):
         buf = io.StringIO()
         writer = csv.writer(buf)
-        write_publisher_consistency_csv(writer, consistency, session_prefix=session_prefix)
+        write_publisher_consistency_csv(
+            writer, consistency, session_prefix=session_prefix
+        )
         buf.seek(0)
         return buf.getvalue()
 
@@ -339,14 +374,18 @@ class TestWritePublisherConsistencyCsv:
         assert "regular_always_passing" in output
 
     def test_premarket_prefix(self):
-        output = self._write_and_read(self._make_consistency(), session_prefix="PREMARKET ")
+        output = self._write_and_read(
+            self._make_consistency(), session_prefix="PREMARKET "
+        )
         assert "PREMARKET PUBLISHER CONSISTENCY" in output
         assert "PREMARKET PUBLISHER CLASSIFICATIONS" in output
         assert "premarket_always_passing" in output
         assert "regular_always_passing" not in output
 
     def test_overnight_prefix(self):
-        output = self._write_and_read(self._make_consistency(), session_prefix="OVERNIGHT ")
+        output = self._write_and_read(
+            self._make_consistency(), session_prefix="OVERNIGHT "
+        )
         assert "OVERNIGHT PUBLISHER CONSISTENCY" in output
         assert "overnight_always_passing" in output
 
@@ -385,12 +424,16 @@ class TestPrintPublisherConsistency:
         assert "Always passing:" in out
 
     def test_premarket_session(self, capsys):
-        print_publisher_consistency(self._make_consistency(), session_prefix="PREMARKET ")
+        print_publisher_consistency(
+            self._make_consistency(), session_prefix="PREMARKET "
+        )
         out = capsys.readouterr().out
         assert "PREMARKET SESSION:" in out
 
     def test_overnight_session(self, capsys):
-        print_publisher_consistency(self._make_consistency(), session_prefix="OVERNIGHT ")
+        print_publisher_consistency(
+            self._make_consistency(), session_prefix="OVERNIGHT "
+        )
         out = capsys.readouterr().out
         assert "OVERNIGHT SESSION:" in out
 
@@ -405,29 +448,57 @@ class TestWriteResultsCsvSessionConsistency:
         """Two dates with session data for premarket and overnight."""
         details_d1 = [
             make_detail(
-                publisher_id=19, fully_passes=True, benchmark_passes=True, uptime_passes=True,
-                premarket_benchmark_passes=True, premarket_uptime_passes=True, premarket_uptime_pct=99.0,
-                afterhours_benchmark_passes=True, afterhours_uptime_passes=True, afterhours_uptime_pct=98.0,
-                overnight_benchmark_passes=True, overnight_uptime_passes=True, overnight_uptime_pct=98.0,
+                publisher_id=19,
+                fully_passes=True,
+                benchmark_passes=True,
+                uptime_passes=True,
+                premarket_benchmark_passes=True,
+                premarket_uptime_passes=True,
+                premarket_uptime_pct=99.0,
+                afterhours_benchmark_passes=True,
+                afterhours_uptime_passes=True,
+                afterhours_uptime_pct=98.0,
+                overnight_benchmark_passes=True,
+                overnight_uptime_passes=True,
+                overnight_uptime_pct=98.0,
             ),
             make_detail(
-                publisher_id=20, fully_passes=False,
-                premarket_benchmark_passes=False, premarket_uptime_passes=True, premarket_uptime_pct=80.0,
-                afterhours_benchmark_passes=False, afterhours_uptime_passes=True, afterhours_uptime_pct=70.0,
+                publisher_id=20,
+                fully_passes=False,
+                premarket_benchmark_passes=False,
+                premarket_uptime_passes=True,
+                premarket_uptime_pct=80.0,
+                afterhours_benchmark_passes=False,
+                afterhours_uptime_passes=True,
+                afterhours_uptime_pct=70.0,
                 overnight_uptime_pct=None,
             ),
         ]
         details_d2 = [
             make_detail(
-                publisher_id=19, fully_passes=True, benchmark_passes=True, uptime_passes=True,
-                premarket_benchmark_passes=True, premarket_uptime_passes=True, premarket_uptime_pct=99.0,
-                afterhours_benchmark_passes=True, afterhours_uptime_passes=True, afterhours_uptime_pct=97.0,
-                overnight_benchmark_passes=False, overnight_uptime_passes=True, overnight_uptime_pct=95.0,
+                publisher_id=19,
+                fully_passes=True,
+                benchmark_passes=True,
+                uptime_passes=True,
+                premarket_benchmark_passes=True,
+                premarket_uptime_passes=True,
+                premarket_uptime_pct=99.0,
+                afterhours_benchmark_passes=True,
+                afterhours_uptime_passes=True,
+                afterhours_uptime_pct=97.0,
+                overnight_benchmark_passes=False,
+                overnight_uptime_passes=True,
+                overnight_uptime_pct=95.0,
             ),
             make_detail(
-                publisher_id=20, fully_passes=False,
-                premarket_benchmark_passes=True, premarket_uptime_passes=True, premarket_uptime_pct=95.0,
-                afterhours_benchmark_passes=True, afterhours_uptime_passes=True, afterhours_uptime_pct=90.0,
+                publisher_id=20,
+                fully_passes=False,
+                premarket_benchmark_passes=True,
+                premarket_uptime_passes=True,
+                premarket_uptime_pct=95.0,
+                afterhours_benchmark_passes=True,
+                afterhours_uptime_passes=True,
+                afterhours_uptime_pct=90.0,
                 overnight_uptime_pct=None,
             ),
         ]
@@ -440,7 +511,13 @@ class TestWriteResultsCsvSessionConsistency:
         results = self._make_multi_date_results()
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             path = Path(f.name)
-        write_results_csv(results, path, include_extended_hours=False, include_overnight=False, include_detailed=True)
+        write_results_csv(
+            results,
+            path,
+            include_extended_hours=False,
+            include_overnight=False,
+            include_detailed=True,
+        )
         content = path.read_text()
         assert "PUBLISHER CONSISTENCY" in content
         assert "PREMARKET PUBLISHER CONSISTENCY" not in content
@@ -451,7 +528,13 @@ class TestWriteResultsCsvSessionConsistency:
         results = self._make_multi_date_results()
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             path = Path(f.name)
-        write_results_csv(results, path, include_extended_hours=True, include_overnight=False, include_detailed=True)
+        write_results_csv(
+            results,
+            path,
+            include_extended_hours=True,
+            include_overnight=False,
+            include_detailed=True,
+        )
         content = path.read_text()
         assert "PUBLISHER CONSISTENCY" in content
         assert "PREMARKET PUBLISHER CONSISTENCY" in content
@@ -466,7 +549,13 @@ class TestWriteResultsCsvSessionConsistency:
         results = self._make_multi_date_results()
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             path = Path(f.name)
-        write_results_csv(results, path, include_extended_hours=False, include_overnight=True, include_detailed=True)
+        write_results_csv(
+            results,
+            path,
+            include_extended_hours=False,
+            include_overnight=True,
+            include_detailed=True,
+        )
         content = path.read_text()
         assert "OVERNIGHT PUBLISHER CONSISTENCY" in content
         assert "overnight_always_passing" in content
@@ -477,7 +566,13 @@ class TestWriteResultsCsvSessionConsistency:
         results = self._make_multi_date_results()
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             path = Path(f.name)
-        write_results_csv(results, path, include_extended_hours=True, include_overnight=True, include_detailed=True)
+        write_results_csv(
+            results,
+            path,
+            include_extended_hours=True,
+            include_overnight=True,
+            include_detailed=True,
+        )
         content = path.read_text()
         assert "PUBLISHER CONSISTENCY" in content
         assert "PREMARKET PUBLISHER CONSISTENCY" in content
@@ -488,14 +583,25 @@ class TestWriteResultsCsvSessionConsistency:
     def test_single_date_no_session_sections(self):
         details = [
             make_detail(
-                publisher_id=19, fully_passes=True, benchmark_passes=True, uptime_passes=True,
-                premarket_benchmark_passes=True, premarket_uptime_passes=True, premarket_uptime_pct=99.0,
+                publisher_id=19,
+                fully_passes=True,
+                benchmark_passes=True,
+                uptime_passes=True,
+                premarket_benchmark_passes=True,
+                premarket_uptime_passes=True,
+                premarket_uptime_pct=99.0,
             ),
         ]
         results = [make_result(feed_id=100, date="2026-02-17", details=details)]
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             path = Path(f.name)
-        write_results_csv(results, path, include_extended_hours=True, include_overnight=True, include_detailed=True)
+        write_results_csv(
+            results,
+            path,
+            include_extended_hours=True,
+            include_overnight=True,
+            include_detailed=True,
+        )
         content = path.read_text()
         assert "PREMARKET PUBLISHER CONSISTENCY" not in content
         path.unlink()

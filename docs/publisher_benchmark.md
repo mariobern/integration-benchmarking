@@ -4,10 +4,10 @@ Evaluates a **single publisher's** data quality. Faster than `quick_benchmark.py
 
 ## When to Use
 
-| Scenario | Use This Tool |
-|----------|---------------|
-| Evaluate one specific publisher | Yes |
-| Onboard a new publisher | Yes |
+| Scenario                              | Use This Tool                    |
+| ------------------------------------- | -------------------------------- |
+| Evaluate one specific publisher       | Yes                              |
+| Onboard a new publisher               | Yes                              |
 | Check if a feed has enough publishers | Use `quick_benchmark.py` instead |
 
 ## Usage
@@ -36,22 +36,22 @@ python publisher_benchmark.py --csv publisher_55_feeds.csv --publisher-id 55 \
 
 ## Arguments
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--csv` | CSV file with feed_id,date,mode columns (required) | - |
-| `--publisher-id` | Publisher ID to evaluate | Extracted from filename |
-| `--output` | Output CSV path | `publisher_{id}_benchmark_results.csv` |
-| `--workers` | Parallel workers | 4 |
-| `--date` | Override CSV dates with explicit date(s) | - |
-| `--start-date` | Override CSV dates with range start (inclusive) | - |
-| `--end-date` | Override CSV dates with range end (inclusive) | - |
-| `--include-asset-class` | Only process these asset classes | All |
-| `--exclude-asset-class` | Skip these asset classes | None |
-| `--feed-id` | Only process these feed IDs | All |
-| `--list-asset-classes` | List asset classes in CSV and exit | - |
-| `--extended-hours` | Include pre-market and after-hours evaluation for US equities | Disabled |
-| `--overnight` | Include overnight session evaluation for US equities | Disabled |
-| `--skip-scipy-tests` | Skip t-test/Wilcoxon/normality metrics for speed | Disabled |
+| Argument                | Description                                                   | Default                                |
+| ----------------------- | ------------------------------------------------------------- | -------------------------------------- |
+| `--csv`                 | CSV file with feed_id,date,mode columns (required)            | -                                      |
+| `--publisher-id`        | Publisher ID to evaluate                                      | Extracted from filename                |
+| `--output`              | Output CSV path                                               | `publisher_{id}_benchmark_results.csv` |
+| `--workers`             | Parallel workers                                              | 4                                      |
+| `--date`                | Override CSV dates with explicit date(s)                      | -                                      |
+| `--start-date`          | Override CSV dates with range start (inclusive)               | -                                      |
+| `--end-date`            | Override CSV dates with range end (inclusive)                 | -                                      |
+| `--include-asset-class` | Only process these asset classes                              | All                                    |
+| `--exclude-asset-class` | Skip these asset classes                                      | None                                   |
+| `--feed-id`             | Only process these feed IDs                                   | All                                    |
+| `--list-asset-classes`  | List asset classes in CSV and exit                            | -                                      |
+| `--extended-hours`      | Include pre-market and after-hours evaluation for US equities | Disabled                               |
+| `--overnight`           | Include overnight session evaluation for US equities          | Disabled                               |
+| `--skip-scipy-tests`    | Skip t-test/Wilcoxon/normality metrics for speed              | Disabled                               |
 
 ## Date Override Behavior
 
@@ -65,18 +65,18 @@ Input CSV rows are `feed_id,date,mode`.
 
 Results CSV contains:
 
-| Column | Meaning |
-|--------|---------|
-| `publisher_id` | The publisher that was evaluated |
-| `feed_id` | The feed that was evaluated |
-| `date` | Evaluation date |
-| `symbol` | Feed symbol (e.g., EUR/USD) |
-| `passes` | `True` if pass criteria are met |
-| `n_observations` | Number of matched data points |
-| `rmse` | Root Mean Square Error vs benchmark |
-| `mean_spread` | Average benchmark spread |
-| `rmse_over_spread` | RMSE divided by spread |
-| `error` | Error message if evaluation failed |
+| Column             | Meaning                             |
+| ------------------ | ----------------------------------- |
+| `publisher_id`     | The publisher that was evaluated    |
+| `feed_id`          | The feed that was evaluated         |
+| `date`             | Evaluation date                     |
+| `symbol`           | Feed symbol (e.g., EUR/USD)         |
+| `passes`           | `True` if pass criteria are met     |
+| `n_observations`   | Number of matched data points       |
+| `rmse`             | Root Mean Square Error vs benchmark |
+| `mean_spread`      | Average benchmark spread            |
+| `rmse_over_spread` | RMSE divided by spread              |
+| `error`            | Error message if evaluation failed  |
 
 ## Pass/Fail Criteria
 
@@ -101,6 +101,7 @@ After processing, the script outputs a summary (console + CSV):
 | `min/max_rmse_over_spread` | Best/worst values |
 
 **Interpreting rmse_over_spread:**
+
 - `< 0.5` = Excellent (price deviation < half the spread)
 - `0.5 - 1.0` = Good (within tolerance)
 - `> 1.0` = Failing (deviation exceeds spread)
@@ -110,6 +111,7 @@ After processing, the script outputs a summary (console + CSV):
 **Asset class breakdown:** `pass_count_{mode}`, `fail_count_{mode}`, `error_count_{mode}`
 
 **Per-date breakdown (when multiple dates are evaluated):**
+
 - Console includes `PER-DATE BREAKDOWN` with total/pass/fail/error and median quality metrics per date.
 - Output CSV appends a `PER_DATE_BREAKDOWN` section after `SUMMARY`.
 
@@ -123,24 +125,24 @@ python publisher_benchmark.py --csv publisher_55_feeds.csv --extended-hours
 
 ### Trading Sessions
 
-| Session | Time (EST) | Flag Required |
-|---------|-----------|---------------|
-| Regular Hours | 9:30 AM - 4:00 PM | Always evaluated |
-| Pre-market | 4:00 AM - 9:30 AM | `--extended-hours` |
-| After-hours | 4:00 PM - 8:00 PM | `--extended-hours` |
+| Session       | Time (EST)        | Flag Required      |
+| ------------- | ----------------- | ------------------ |
+| Regular Hours | 9:30 AM - 4:00 PM | Always evaluated   |
+| Pre-market    | 4:00 AM - 9:30 AM | `--extended-hours` |
+| After-hours   | 4:00 PM - 8:00 PM | `--extended-hours` |
 
 ### Extended Hours Output
 
 When enabled, the CSV includes additional columns:
 
-| Column | Description |
-|--------|-------------|
+| Column                     | Description                       |
+| -------------------------- | --------------------------------- |
 | `premarket_n_observations` | Data points in pre-market session |
-| `premarket_nrmse` | NRMSE for pre-market |
-| `premarket_hit_rate` | Hit rate for pre-market |
-| `premarket_passes` | Pass/fail for pre-market |
-| `premarket_error` | Error message if any |
-| `afterhours_*` | Same metrics for after-hours |
+| `premarket_nrmse`          | NRMSE for pre-market              |
+| `premarket_hit_rate`       | Hit rate for pre-market           |
+| `premarket_passes`         | Pass/fail for pre-market          |
+| `premarket_error`          | Error message if any              |
+| `afterhours_*`             | Same metrics for after-hours      |
 
 ### Notes
 
@@ -151,6 +153,7 @@ When enabled, the CSV includes additional columns:
 - Extended hours typically have lower liquidity and may have higher error rates
 
 Example console output:
+
 ```
 ============================================================
 SUMMARY - Publisher 55

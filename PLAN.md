@@ -6,29 +6,29 @@ Add 10 statistical metrics from the research notebook (`pythresearch/data_qualit
 
 ## New Metrics to Add
 
-| Metric | Description | Why It Matters |
-|--------|-------------|----------------|
-| `mean_diff` | Mean of (publisher - benchmark) | Detects systematic bias |
-| `std_diff` | Std dev of price differences | Measures error volatility |
-| `mean_pct_diff` | Mean % difference | Relative accuracy |
-| `std_pct_diff` | Std dev of % differences | Relative error volatility |
-| `mae` | Mean Absolute Error | Average deviation magnitude |
-| `t_statistic` | t-test statistic | Tests if bias is significant |
-| `t_pvalue` | t-test p-value | < 0.05 = significant bias |
-| `wilcoxon_statistic` | Wilcoxon test statistic | Non-parametric bias test |
-| `wilcoxon_pvalue` | Wilcoxon p-value | < 0.05 = significant bias |
-| `normality_pvalue` | Normality test p-value | >= 0.05 = errors are normal |
-| `mean_abs_z_score` | Mean absolute z-score | Typical deviation magnitude |
+| Metric               | Description                     | Why It Matters               |
+| -------------------- | ------------------------------- | ---------------------------- |
+| `mean_diff`          | Mean of (publisher - benchmark) | Detects systematic bias      |
+| `std_diff`           | Std dev of price differences    | Measures error volatility    |
+| `mean_pct_diff`      | Mean % difference               | Relative accuracy            |
+| `std_pct_diff`       | Std dev of % differences        | Relative error volatility    |
+| `mae`                | Mean Absolute Error             | Average deviation magnitude  |
+| `t_statistic`        | t-test statistic                | Tests if bias is significant |
+| `t_pvalue`           | t-test p-value                  | < 0.05 = significant bias    |
+| `wilcoxon_statistic` | Wilcoxon test statistic         | Non-parametric bias test     |
+| `wilcoxon_pvalue`    | Wilcoxon p-value                | < 0.05 = significant bias    |
+| `normality_pvalue`   | Normality test p-value          | >= 0.05 = errors are normal  |
+| `mean_abs_z_score`   | Mean absolute z-score           | Typical deviation magnitude  |
 
 ---
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
+| File                     | Changes                                                                  |
+| ------------------------ | ------------------------------------------------------------------------ |
 | `publisher_benchmark.py` | Add metrics calculation, summary stats, CSV output, interpretation guide |
-| `requirements.txt` | Add scipy dependency |
-| `CLAUDE.md` | Document new metrics |
+| `requirements.txt`       | Add scipy dependency                                                     |
+| `CLAUDE.md`              | Document new metrics                                                     |
 
 ---
 
@@ -39,6 +39,7 @@ Add 10 statistical metrics from the research notebook (`pythresearch/data_qualit
 **File:** `requirements.txt`
 
 Add scipy dependency:
+
 ```
 scipy>=1.11.0
 ```
@@ -46,6 +47,7 @@ scipy>=1.11.0
 **File:** `publisher_benchmark.py` (imports section)
 
 Add import:
+
 ```python
 from scipy import stats
 ```
@@ -172,6 +174,7 @@ def compute_statistical_metrics(
 **Location:** Around line 561, after initializing lists
 
 Add new list to store raw differences:
+
 ```python
 diffs = []  # Raw price differences for statistical tests
 signed_pct_diffs = []  # Signed percentage differences
@@ -180,6 +183,7 @@ signed_pct_diffs = []  # Signed percentage differences
 **Location:** In the loop (around line 574)
 
 Add after computing `diff` and `pct_diff`:
+
 ```python
 diffs.append(diff)
 signed_pct_diffs.append((diff / bench_price) * 100)  # Signed pct diff
@@ -188,6 +192,7 @@ signed_pct_diffs.append((diff / bench_price) * 100)  # Signed pct diff
 **Location:** After RMSE/hit_rate calculation (around line 617)
 
 Add:
+
 ```python
 # Compute advanced statistical metrics
 stat_metrics = compute_statistical_metrics(diffs, signed_pct_diffs)
@@ -256,6 +261,7 @@ else:
 ```
 
 Add to return dictionary:
+
 ```python
 # New statistical metrics
 "median_mae": median_mae,
@@ -283,6 +289,7 @@ Add to return dictionary:
 #### Step 5.1: Update header (line 752)
 
 Add new columns before `error` and `execution_time_ms`:
+
 ```python
 "mean_diff",
 "std_diff",
@@ -300,6 +307,7 @@ Add new columns before `error` and `execution_time_ms`:
 #### Step 5.2: Update row output (line 776)
 
 Add new field formatting:
+
 ```python
 f"{r.mean_diff:.8f}" if r.mean_diff is not None else "",
 f"{r.std_diff:.8f}" if r.std_diff is not None else "",
@@ -317,6 +325,7 @@ f"{r.mean_abs_z_score:.4f}" if r.mean_abs_z_score is not None else "",
 #### Step 5.3: Add summary rows
 
 Add after existing summary rows:
+
 ```python
 # New statistical summary metrics
 write_summary_row("median_mae", summary_stats.get("median_mae"))
@@ -443,6 +452,7 @@ def print_interpretation_guide(summary_stats: dict) -> None:
 **Location:** In `main()` function, after existing console summary
 
 Add call:
+
 ```python
 print_interpretation_guide(summary_stats)
 ```
@@ -462,31 +472,32 @@ The `publisher_benchmark.py` script includes advanced statistical metrics for de
 
 **Per-Feed Metrics:**
 
-| Metric | Description | Interpretation |
-|--------|-------------|----------------|
-| `mean_diff` | Mean of (publisher - benchmark) | Systematic bias; should be ~0 |
-| `std_diff` | Std dev of price differences | Error volatility; lower is better |
-| `mean_pct_diff` | Mean % difference | Relative accuracy |
-| `std_pct_diff` | Std dev of % differences | Relative error volatility |
-| `mae` | Mean Absolute Error | Average deviation; lower is better |
-| `t_statistic` | t-test statistic | Tests if bias is significant |
-| `t_pvalue` | t-test p-value | < 0.05 indicates significant bias |
-| `wilcoxon_statistic` | Wilcoxon test statistic | Non-parametric bias test |
-| `wilcoxon_pvalue` | Wilcoxon p-value | < 0.05 indicates significant bias |
-| `normality_pvalue` | Normality test p-value | >= 0.05 means errors are normally distributed |
-| `mean_abs_z_score` | Mean |z-score| | Typical deviation magnitude; ~0.8 expected |
+| Metric               | Description                     | Interpretation                                |
+| -------------------- | ------------------------------- | --------------------------------------------- | --- | ------------------------------------------ |
+| `mean_diff`          | Mean of (publisher - benchmark) | Systematic bias; should be ~0                 |
+| `std_diff`           | Std dev of price differences    | Error volatility; lower is better             |
+| `mean_pct_diff`      | Mean % difference               | Relative accuracy                             |
+| `std_pct_diff`       | Std dev of % differences        | Relative error volatility                     |
+| `mae`                | Mean Absolute Error             | Average deviation; lower is better            |
+| `t_statistic`        | t-test statistic                | Tests if bias is significant                  |
+| `t_pvalue`           | t-test p-value                  | < 0.05 indicates significant bias             |
+| `wilcoxon_statistic` | Wilcoxon test statistic         | Non-parametric bias test                      |
+| `wilcoxon_pvalue`    | Wilcoxon p-value                | < 0.05 indicates significant bias             |
+| `normality_pvalue`   | Normality test p-value          | >= 0.05 means errors are normally distributed |
+| `mean_abs_z_score`   | Mean                            | z-score                                       |     | Typical deviation magnitude; ~0.8 expected |
 
 **Summary Metrics:**
 
-| Metric | Description |
-|--------|-------------|
+| Metric                     | Description                                               |
+| -------------------------- | --------------------------------------------------------- |
 | `t_test_significance_rate` | % of feeds with statistically significant bias (p < 0.05) |
-| `normality_rate` | % of feeds with normally distributed errors |
-| `median_z_score` | Typical z-score across all feeds |
+| `normality_rate`           | % of feeds with normally distributed errors               |
+| `median_z_score`           | Typical z-score across all feeds                          |
 
 **Interpretation Guide:**
 
 The script outputs an interpretation guide explaining:
+
 - What each metric means
 - How to interpret your results (good/bad thresholds)
 - Actionable recommendations for improving data quality
@@ -496,14 +507,14 @@ The script outputs an interpretation guide explaining:
 
 ## Expected Performance Impact
 
-| Operation | Time Added |
-|-----------|------------|
-| Basic stats (mean, std, mae) | ~1-2ms |
-| Z-score calculation | ~1ms |
-| t-test | ~1-2ms |
-| Wilcoxon test | ~5-10ms |
-| Normality test | ~1-2ms |
-| **Total per feed** | **~10-20ms** |
+| Operation                    | Time Added   |
+| ---------------------------- | ------------ |
+| Basic stats (mean, std, mae) | ~1-2ms       |
+| Z-score calculation          | ~1ms         |
+| t-test                       | ~1-2ms       |
+| Wilcoxon test                | ~5-10ms      |
+| Normality test               | ~1-2ms       |
+| **Total per feed**           | **~10-20ms** |
 
 Current average: ~200ms per feed
 New average: ~215ms per feed
@@ -513,12 +524,12 @@ New average: ~215ms per feed
 
 ## Risks & Mitigations
 
-| Risk | Severity | Mitigation |
-|------|----------|------------|
-| Statistical tests fail on edge cases | Medium | Wrap in try/except, return None |
-| Performance degradation | Low | ~15ms per feed is acceptable |
-| CSV backwards compatibility | Low | New columns added before error column |
-| scipy import failure | Low | Already in venv; add to requirements.txt |
+| Risk                                 | Severity | Mitigation                               |
+| ------------------------------------ | -------- | ---------------------------------------- |
+| Statistical tests fail on edge cases | Medium   | Wrap in try/except, return None          |
+| Performance degradation              | Low      | ~15ms per feed is acceptable             |
+| CSV backwards compatibility          | Low      | New columns added before error column    |
+| scipy import failure                 | Low      | Already in venv; add to requirements.txt |
 
 ---
 

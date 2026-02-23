@@ -13,6 +13,7 @@
 ### Task 1: Write the markdown parser + test
 
 **Files:**
+
 - Create: `update_lazer_symbols.py`
 - Create: `tests/test_update_lazer_symbols.py`
 
@@ -122,6 +123,7 @@ git commit -m "feat: add markdown parser for feed promotion script"
 ### Task 2: Write the JSON modifier + test
 
 **Files:**
+
 - Modify: `update_lazer_symbols.py`
 - Modify: `tests/test_update_lazer_symbols.py`
 
@@ -397,6 +399,7 @@ git commit -m "feat: add surgical JSON modifier for feed promotion"
 ### Task 3: Write the CLI + integration test
 
 **Files:**
+
 - Modify: `update_lazer_symbols.py`
 - Modify: `tests/test_update_lazer_symbols.py`
 
@@ -546,6 +549,7 @@ python3 update_lazer_symbols.py \
 ```
 
 Expected output:
+
 - 95 tickers modified (COMING_SOON -> STABLE)
 - 3 tickers skipped (AIQ, APP, SHLD already STABLE)
 - 0 not found
@@ -553,6 +557,7 @@ Expected output:
 **Step 2: Verify dry run output looks correct**
 
 Manually check that:
+
 - Each ticker shows the correct publisher IDs from the markdown
 - The 3 already-stable tickers are skipped
 - No warnings or errors
@@ -586,6 +591,7 @@ print(f'States: {states}')
 ```
 
 Expected:
+
 - AWK: state=STABLE, minPub=2, pubs=[12, 19, 22, 42, 55, 65, 69, 71]
 - VOO: state=STABLE, minPub=2, pubs=[13, 19, 20, 21, 22, 28, 29, 42, 52, 54, 55, 64, 65, 69, 71]
 - MARA: state=STABLE, minPub=2, pubs=[22, 28, 65, 69]

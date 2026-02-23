@@ -26,16 +26,16 @@ python publisher_feeds.py --publisher-id 29 --start-date 2026-02-10 --end-date 2
 
 ## Arguments
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--publisher-id` | Publisher ID to query (required) | - |
-| `--output` | Output CSV path | `publisher_{id}_feeds.csv` |
-| `--asset-class` | Filter by asset class | All |
-| `--time-window` | Minutes to look back for recent activity | 1 |
-| `--date-offset` | Days to subtract from query date for benchmark data availability | 1 |
-| `--date` | Explicit output date(s), overrides `--date-offset` | - |
-| `--start-date` | Range start date (inclusive), requires `--end-date` | - |
-| `--end-date` | Range end date (inclusive), requires `--start-date` | - |
+| Argument         | Description                                                      | Default                    |
+| ---------------- | ---------------------------------------------------------------- | -------------------------- |
+| `--publisher-id` | Publisher ID to query (required)                                 | -                          |
+| `--output`       | Output CSV path                                                  | `publisher_{id}_feeds.csv` |
+| `--asset-class`  | Filter by asset class                                            | All                        |
+| `--time-window`  | Minutes to look back for recent activity                         | 1                          |
+| `--date-offset`  | Days to subtract from query date for benchmark data availability | 1                          |
+| `--date`         | Explicit output date(s), overrides `--date-offset`               | -                          |
+| `--start-date`   | Range start date (inclusive), requires `--end-date`              | -                          |
+| `--end-date`     | Range end date (inclusive), requires `--start-date`              | -                          |
 
 ### How Discovery Works
 
@@ -63,19 +63,19 @@ price_id,date,asset_class
 
 ## Asset Classes
 
-| Asset Class | Description |
-|-------------|-------------|
-| `crypto` | Cryptocurrency pairs |
-| `fx` | Foreign exchange |
-| `metal` | Precious metals |
-| `commodity` | Commodities |
-| `equity-us` | US equities |
-| `equity-gb` | UK equities |
-| `equity-hk` | Hong Kong equities |
-| `equity-jp` | Japanese equities |
-| `rates` | Interest rates |
-| `nav` | Net asset values |
-| `funding-rate` | Funding rates |
+| Asset Class    | Description          |
+| -------------- | -------------------- |
+| `crypto`       | Cryptocurrency pairs |
+| `fx`           | Foreign exchange     |
+| `metal`        | Precious metals      |
+| `commodity`    | Commodities          |
+| `equity-us`    | US equities          |
+| `equity-gb`    | UK equities          |
+| `equity-hk`    | Hong Kong equities   |
+| `equity-jp`    | Japanese equities    |
+| `rates`        | Interest rates       |
+| `nav`          | Net asset values     |
+| `funding-rate` | Funding rates        |
 
 > Equities use ISO country codes based on symbol suffix (`.L` -> `equity-gb`, `.HK` -> `equity-hk`, etc.)
 

@@ -34,6 +34,7 @@ http://localhost:8000/ui/dashboard.html
 1. Select a **Publisher ID** from the dropdown
 2. Optionally select a **Date** (defaults to latest available)
 3. View the summary cards showing:
+
    - Pass Rate
    - Median NRMSE
    - Median Uptime
@@ -142,12 +143,12 @@ Publishers are expected to send updates multiple times per second. A gap > 200ms
 
 ### Metrics Provided
 
-| Metric | Description |
-|--------|-------------|
-| `uptime_pct` | Percentage uptime (0-100) |
-| `downtime_ms` | Total downtime in milliseconds |
-| `max_gap_ms` | Maximum gap between consecutive updates |
-| `gaps_over_threshold` | Count of gaps exceeding 200ms |
+| Metric                | Description                             |
+| --------------------- | --------------------------------------- |
+| `uptime_pct`          | Percentage uptime (0-100)               |
+| `downtime_ms`         | Total downtime in milliseconds          |
+| `max_gap_ms`          | Maximum gap between consecutive updates |
+| `gaps_over_threshold` | Count of gaps exceeding 200ms           |
 
 ### Verifying Uptime
 
@@ -165,5 +166,6 @@ python verify_uptime.py --publisher-id 55 --date 2026-01-28 --output results.csv
 ```
 
 The script compares:
+
 - **1-second window method** (legacy) - counts seconds with at least one update
 - **200ms gap-based method** (current) - measures actual gaps between updates

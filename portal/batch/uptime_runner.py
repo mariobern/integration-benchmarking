@@ -95,7 +95,9 @@ def query_uptime_windows(
     if not feed_ids:
         return {}
 
-    query = _build_uptime_query(publisher_id, feed_ids, window.start_utc, window.end_utc, window_ms)
+    query = _build_uptime_query(
+        publisher_id, feed_ids, window.start_utc, window.end_utc, window_ms
+    )
     result = client.query(query)
     rows = result.result_rows
 
@@ -133,8 +135,12 @@ def compute_session_uptime(
         # Aggregate per session name
         sessions = {}
         for window in windows:
-            per_window = query_uptime_windows(client, publisher_id, feed_ids, window, window_ms)
-            period_length_ms = int((window.end_utc - window.start_utc).total_seconds() * 1000)
+            per_window = query_uptime_windows(
+                client, publisher_id, feed_ids, window, window_ms
+            )
+            period_length_ms = int(
+                (window.end_utc - window.start_utc).total_seconds() * 1000
+            )
             total_windows = period_length_ms // window_ms if period_length_ms > 0 else 0
 
             for feed in asset_feeds:
@@ -156,7 +162,9 @@ def compute_session_uptime(
                     continue
                 entry = per_window.get(feed.feed_id)
                 if entry:
-                    sessions[key]["windows_with_updates"] += entry["windows_with_updates"]
+                    sessions[key]["windows_with_updates"] += entry[
+                        "windows_with_updates"
+                    ]
 
         for (feed_id, session), data in sessions.items():
             period_length_ms = data["period_length_ms"]
@@ -167,7 +175,9 @@ def compute_session_uptime(
                 downtime_ms = period_length_ms
             else:
                 uptime = windows_with_updates / total_windows
-                downtime_ms = int(max(0, total_windows - windows_with_updates) * window_ms)
+                downtime_ms = int(
+                    max(0, total_windows - windows_with_updates) * window_ms
+                )
 
             rows.append(
                 {

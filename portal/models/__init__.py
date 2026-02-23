@@ -55,7 +55,10 @@ from portal.models.publisher_summary import (
     PublisherSummaryDetail,
     PublisherSummaryResponse,
 )
-from portal.models.publisher_uptime import PublisherFeedUptimeBase, PublisherFeedUptimeResponse
+from portal.models.publisher_uptime import (
+    PublisherFeedUptimeBase,
+    PublisherFeedUptimeResponse,
+)
 
 # Pydantic Schemas - Publisher Uptime Summary
 from portal.models.publisher_uptime_summary import (

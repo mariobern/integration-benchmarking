@@ -4,24 +4,24 @@
 
 These have Datascope benchmark data available:
 
-| Asset Class | Aliases | Notes |
-|-------------|---------|-------|
-| `fx` | - | Foreign exchange |
-| `metals` | `metal` | Precious metals |
+| Asset Class   | Aliases     | Notes                              |
+| ------------- | ----------- | ---------------------------------- |
+| `fx`          | -           | Foreign exchange                   |
+| `metals`      | `metal`     | Precious metals                    |
 | `us-equities` | `equity-us` | US equities + equity index futures |
-| `commodity` | - | Commodities + commodity futures |
+| `commodity`   | -           | Commodities + commodity futures    |
 
 ## Non-Benchmarkable Asset Classes
 
 These will return errors (no benchmark data):
 
-| Asset Class | Description |
-|-------------|-------------|
-| `crypto` | Cryptocurrency |
+| Asset Class              | Description             |
+| ------------------------ | ----------------------- |
+| `crypto`                 | Cryptocurrency          |
 | `crypto-redemption-rate` | Crypto redemption rates |
-| `funding-rate` | Funding rates |
-| `rates` | Interest rates |
-| `nav` | Net asset value |
+| `funding-rate`           | Funding rates           |
+| `rates`                  | Interest rates          |
+| `nav`                    | Net asset value         |
 
 ## Discovering Asset Classes
 
@@ -30,6 +30,7 @@ python quick_benchmark.py --csv your_file.csv --list-asset-classes
 ```
 
 Output:
+
 ```
 Asset classes in your_file.csv:
 ==================================================
@@ -66,5 +67,6 @@ Futures contracts are automatically detected by symbol pattern and use `datascop
 | `WTIF6` | WTI Crude January 2026 |
 
 **Supported futures:**
+
 - Commodity: `CC` (Copper), `WTI`, `BRENT`
 - Equity index: `EM` (E-Mini S&P), `NM` (Nasdaq Mini), `DM` (Dow Mini)

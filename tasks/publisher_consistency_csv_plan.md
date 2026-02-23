@@ -6,14 +6,15 @@ The publisher consistency report (cross-date pass/fail matrix with classificatio
 
 ## Current State
 
-| Script | Terminal consistency | CSV consistency | CSV classifications | Requires --detailed |
-|--------|-------------------|-----------------|--------------------|--------------------|
-| quick_benchmark.py | Yes (with --detailed + multi-date) | Yes (PUBLISHER SUMMARY) | No | Yes |
-| quick_benchmark_95.py | Same as above | Same as above | No | Yes |
-| feed_uptime.py | Yes (with multi-date) | Yes (PUBLISHER SUMMARY) | No | No |
+| Script                | Terminal consistency               | CSV consistency         | CSV classifications | Requires --detailed |
+| --------------------- | ---------------------------------- | ----------------------- | ------------------- | ------------------- |
+| quick_benchmark.py    | Yes (with --detailed + multi-date) | Yes (PUBLISHER SUMMARY) | No                  | Yes                 |
+| quick_benchmark_95.py | Same as above                      | Same as above           | No                  | Yes                 |
+| feed_uptime.py        | Yes (with multi-date)              | Yes (PUBLISHER SUMMARY) | No                  | No                  |
 
 **What's missing:**
-1. **quick_benchmark.py / _95**: Publisher consistency only writes to CSV when `--detailed` is used. Should always write when multi-date.
+
+1. **quick_benchmark.py / \_95**: Publisher consistency only writes to CSV when `--detailed` is used. Should always write when multi-date.
 2. **All three scripts**: Classifications (always_passing, always_failing, intermittent) are printed to terminal but NOT included in the CSV.
 
 ## Files to Modify
@@ -145,19 +146,23 @@ This matches the terminal output format where classifications are listed per ses
 ## Verification
 
 1. **quick_benchmark.py** — Run with multi-date, WITHOUT `--detailed`:
+
    ```bash
    source venv/bin/activate
    python3 quick_benchmark.py --feed-id 327 --start-date 2026-02-10 --end-date 2026-02-12 --mode fx --output /tmp/test_qb.csv
    ```
+
    - Verify PUBLISHER SUMMARY + PUBLISHER CLASSIFICATIONS sections appear in CSV
    - Verify terminal still prints the consistency report
 
 2. **quick_benchmark_95.py** — Same test as above with `quick_benchmark_95.py`
 
 3. **feed_uptime.py** — Run with multi-date:
+
    ```bash
    python3 feed_uptime.py --feed-id 922 --start-date 2026-02-10 --end-date 2026-02-12 --mode us-equities --output /tmp/test_fu.csv
    ```
+
    - Verify PUBLISHER CLASSIFICATIONS section appears after PUBLISHER SUMMARY in CSV
 
 4. For all scripts: Verify single-date runs still work normally (no summary/classifications section)

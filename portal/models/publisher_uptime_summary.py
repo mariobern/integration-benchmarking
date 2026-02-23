@@ -18,7 +18,9 @@ class PublisherDailyUptimeSummary(Base):
 
     __tablename__ = "publisher_daily_uptime_summary"
     __table_args__ = (
-        UniqueConstraint("publisher_id", "summary_date", name="uq_uptime_summary_publisher_date"),
+        UniqueConstraint(
+            "publisher_id", "summary_date", name="uq_uptime_summary_publisher_date"
+        ),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -180,8 +182,18 @@ class PublisherUptimeSummaryDetail(PublisherUptimeSummaryResponse):
 class UptimeDashboardMetrics(BaseModel):
     """Uptime metrics for dashboard display."""
 
-    overall_median_uptime_pct: Optional[float] = Field(None, description="Overall median uptime %")
-    regular_median_uptime_pct: Optional[float] = Field(None, description="Regular hours median uptime %")
-    premarket_median_uptime_pct: Optional[float] = Field(None, description="Pre-market median uptime %")
-    afterhours_median_uptime_pct: Optional[float] = Field(None, description="After-hours median uptime %")
-    overnight_median_uptime_pct: Optional[float] = Field(None, description="Overnight median uptime %")
+    overall_median_uptime_pct: Optional[float] = Field(
+        None, description="Overall median uptime %"
+    )
+    regular_median_uptime_pct: Optional[float] = Field(
+        None, description="Regular hours median uptime %"
+    )
+    premarket_median_uptime_pct: Optional[float] = Field(
+        None, description="Pre-market median uptime %"
+    )
+    afterhours_median_uptime_pct: Optional[float] = Field(
+        None, description="After-hours median uptime %"
+    )
+    overnight_median_uptime_pct: Optional[float] = Field(
+        None, description="Overnight median uptime %"
+    )

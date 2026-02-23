@@ -57,8 +57,7 @@ async def list_feeds(
 
     # Get paginated feeds
     query = (
-        query
-        .order_by(Feed.asset_class, Feed.feed_id)
+        query.order_by(Feed.asset_class, Feed.feed_id)
         .offset(pagination.skip)
         .limit(pagination.limit)
     )
@@ -133,7 +132,9 @@ async def get_feed(feed_id: int, db: DbSession):
 async def get_feed_publishers(
     feed_id: int,
     db: DbSession,
-    target_date: Optional[date] = Query(None, description="Specific date (default: latest)"),
+    target_date: Optional[date] = Query(
+        None, description="Specific date (default: latest)"
+    ),
 ):
     """
     Get all publishers for a feed with their benchmark results.
@@ -147,9 +148,8 @@ async def get_feed_publishers(
 
     # Determine target date
     if target_date is None:
-        latest_date_query = (
-            select(func.max(BenchmarkResult.benchmark_date))
-            .where(BenchmarkResult.feed_id == feed_id)
+        latest_date_query = select(func.max(BenchmarkResult.benchmark_date)).where(
+            BenchmarkResult.feed_id == feed_id
         )
         target_date = db.execute(latest_date_query).scalar()
 
@@ -179,7 +179,9 @@ async def get_feed_publishers(
             "n_observations": r.n_observations,
             "nrmse": float(r.nrmse) if r.nrmse else None,
             "hit_rate": float(r.hit_rate) if r.hit_rate else None,
-            "rmse_over_spread": float(r.rmse_over_spread) if r.rmse_over_spread else None,
+            "rmse_over_spread": float(r.rmse_over_spread)
+            if r.rmse_over_spread
+            else None,
             "error": r.error,
         }
         for r in results
@@ -191,12 +193,16 @@ async def get_feed_publishers(
         "asset_class": feed.asset_class,
         "date": str(target_date),
         "total_publishers": len(publishers),
-        "passing_publishers": sum(1 for p in publishers if p["passes"] and not p["error"]),
+        "passing_publishers": sum(
+            1 for p in publishers if p["passes"] and not p["error"]
+        ),
         "publishers": publishers,
     }
 
 
-@router.get("/{feed_id}/history", response_model=PaginatedResponse[BenchmarkResultResponse])
+@router.get(
+    "/{feed_id}/history", response_model=PaginatedResponse[BenchmarkResultResponse]
+)
 async def get_feed_history(
     feed_id: int,
     db: DbSession,
@@ -231,8 +237,9 @@ async def get_feed_history(
 
     # Get paginated results
     query = (
-        query
-        .order_by(desc(BenchmarkResult.benchmark_date), BenchmarkResult.publisher_id)
+        query.order_by(
+            desc(BenchmarkResult.benchmark_date), BenchmarkResult.publisher_id
+        )
         .offset(pagination.skip)
         .limit(pagination.limit)
     )
@@ -324,7 +331,9 @@ async def get_feed_publisher_result(
     feed_id: int,
     publisher_id: int,
     db: DbSession,
-    target_date: Optional[date] = Query(None, description="Specific date (default: latest)"),
+    target_date: Optional[date] = Query(
+        None, description="Specific date (default: latest)"
+    ),
 ):
     """
     Get detailed benchmark result for a specific feed and publisher combination.

@@ -42,24 +42,24 @@ python feed_uptime.py --feed-id 922 --date 2026-02-09 --mode us-equities --preci
 python feed_uptime.py --csv feeds.csv --precise --gap-threshold 100
 ```
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--csv` | CSV with feed_id,date,mode | - |
-| `--feed-id` | Feed ID(s) | - |
-| `--date` | Date(s) YYYY-MM-DD | - |
-| `--start-date` / `--end-date` | Date range (inclusive) | - |
-| `--mode` | Asset class (single-feed mode) | - |
-| `--output` | Output CSV | `feed_uptime_results.csv` |
-| `--workers` | Parallel workers | 4 |
-| `--include-asset-class` | Only these (CSV mode) | - |
-| `--exclude-asset-class` | Skip these (CSV mode) | - |
-| `--list-asset-classes` | List and exit | - |
-| `--filter-feed-id` | Filter CSV to these feeds | - |
-| `--extended-hours` | Premarket + afterhours | False |
-| `--overnight` | Overnight session | False |
-| `--precise` | Use 200ms gap-based method | False (uses 1s window) |
-| `--gap-threshold` | Gap threshold in ms (with `--precise`) | 200 |
-| `--uptime-threshold` | Pass threshold % | 95.0 |
+| Argument                      | Description                            | Default                   |
+| ----------------------------- | -------------------------------------- | ------------------------- |
+| `--csv`                       | CSV with feed_id,date,mode             | -                         |
+| `--feed-id`                   | Feed ID(s)                             | -                         |
+| `--date`                      | Date(s) YYYY-MM-DD                     | -                         |
+| `--start-date` / `--end-date` | Date range (inclusive)                 | -                         |
+| `--mode`                      | Asset class (single-feed mode)         | -                         |
+| `--output`                    | Output CSV                             | `feed_uptime_results.csv` |
+| `--workers`                   | Parallel workers                       | 4                         |
+| `--include-asset-class`       | Only these (CSV mode)                  | -                         |
+| `--exclude-asset-class`       | Skip these (CSV mode)                  | -                         |
+| `--list-asset-classes`        | List and exit                          | -                         |
+| `--filter-feed-id`            | Filter CSV to these feeds              | -                         |
+| `--extended-hours`            | Premarket + afterhours                 | False                     |
+| `--overnight`                 | Overnight session                      | False                     |
+| `--precise`                   | Use 200ms gap-based method             | False (uses 1s window)    |
+| `--gap-threshold`             | Gap threshold in ms (with `--precise`) | 200                       |
+| `--uptime-threshold`          | Pass threshold %                       | 95.0                      |
 
 ## Core Data Flow
 
@@ -124,19 +124,20 @@ class FeedUptimeResult:
 
 ## Key Functions
 
-| Function | Description |
-|----------|-------------|
-| `discover_publishers_for_feed(client, feed_id, date)` | **New.** Query `publisher_updates` for distinct publisher_ids |
-| `compute_uptime_1s_window(client, pub_id, feed_id, start, end)` | **Copied from** `verify_uptime.py:126-186` (default) |
-| `compute_uptime_200ms_gap(client, pub_id, feed_id, start, end, threshold)` | **Copied from** `verify_uptime.py:189-302` (--precise) |
-| `filter_sessions(sessions, extended_hours, overnight)` | **New.** Filter SessionWindows by flags |
-| `evaluate_feed_uptime(client, feed_id, date, mode, ...)` | **New.** Core: discover publishers, compute per-publisher uptime |
-| `get_feed_symbol(client, feed_id)` | **New.** Lookup symbol from `feeds_metadata_latest` |
-| `compute_publisher_summary(results)` | **New.** Build cross-date pass/fail matrix |
-| `load_config()`, `get_lazer_client()` | **Copied** (standard pattern) |
-| `normalize_asset_class()` | **Copied** from quick_benchmark.py |
+| Function                                                                   | Description                                                      |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `discover_publishers_for_feed(client, feed_id, date)`                      | **New.** Query `publisher_updates` for distinct publisher_ids    |
+| `compute_uptime_1s_window(client, pub_id, feed_id, start, end)`            | **Copied from** `verify_uptime.py:126-186` (default)             |
+| `compute_uptime_200ms_gap(client, pub_id, feed_id, start, end, threshold)` | **Copied from** `verify_uptime.py:189-302` (--precise)           |
+| `filter_sessions(sessions, extended_hours, overnight)`                     | **New.** Filter SessionWindows by flags                          |
+| `evaluate_feed_uptime(client, feed_id, date, mode, ...)`                   | **New.** Core: discover publishers, compute per-publisher uptime |
+| `get_feed_symbol(client, feed_id)`                                         | **New.** Lookup symbol from `feeds_metadata_latest`              |
+| `compute_publisher_summary(results)`                                       | **New.** Build cross-date pass/fail matrix                       |
+| `load_config()`, `get_lazer_client()`                                      | **Copied** (standard pattern)                                    |
+| `normalize_asset_class()`                                                  | **Copied** from quick_benchmark.py                               |
 
 **Imported from existing modules:**
+
 - `from portal.batch.uptime_sessions import get_session_windows, SessionWindow`
 - `from date_utils import expand_date_args, validate_date_args`
 
@@ -204,16 +205,16 @@ PREMARKET:
 
 ## Code Reuse
 
-| Component | Source | Method |
-|-----------|--------|--------|
-| `compute_uptime_1s_window()` | `verify_uptime.py:126-186` | Copy (default) |
-| `compute_uptime_200ms_gap()` | `verify_uptime.py:189-302` | Copy (--precise) |
-| `get_session_windows()` | `portal/batch/uptime_sessions.py` | Import |
-| `expand_date_args()` | `date_utils.py` | Import |
-| `load_config()` / client setup | `quick_benchmark.py` | Copy pattern |
-| `normalize_asset_class()` + aliases | `quick_benchmark.py` | Copy |
-| ThreadPoolExecutor + as_completed | `quick_benchmark.py` | Follow pattern |
-| argparse structure | `quick_benchmark.py` | Follow pattern |
+| Component                           | Source                            | Method           |
+| ----------------------------------- | --------------------------------- | ---------------- |
+| `compute_uptime_1s_window()`        | `verify_uptime.py:126-186`        | Copy (default)   |
+| `compute_uptime_200ms_gap()`        | `verify_uptime.py:189-302`        | Copy (--precise) |
+| `get_session_windows()`             | `portal/batch/uptime_sessions.py` | Import           |
+| `expand_date_args()`                | `date_utils.py`                   | Import           |
+| `load_config()` / client setup      | `quick_benchmark.py`              | Copy pattern     |
+| `normalize_asset_class()` + aliases | `quick_benchmark.py`              | Copy             |
+| ThreadPoolExecutor + as_completed   | `quick_benchmark.py`              | Follow pattern   |
+| argparse structure                  | `quick_benchmark.py`              | Follow pattern   |
 
 ## Key Design Decisions
 
@@ -228,15 +229,15 @@ PREMARKET:
 
 ## Edge Cases
 
-| Case | Handling |
-|------|----------|
-| No publishers for feed | `error="No publishers found"`, `publisher_count=0` |
-| Weekend (no sessions) | `error="No trading sessions for date"` |
-| Feed metadata not found | `symbol=None`, continue |
-| `--extended-hours` with non-US | Ignored; only regular sessions |
-| Single date (no matrix) | Publisher summary matrix omitted, just overall stats |
-| Connection error | Catch exception, set `error=str(e)` |
-| Empty CSV | Warning message, exit gracefully |
+| Case                           | Handling                                             |
+| ------------------------------ | ---------------------------------------------------- |
+| No publishers for feed         | `error="No publishers found"`, `publisher_count=0`   |
+| Weekend (no sessions)          | `error="No trading sessions for date"`               |
+| Feed metadata not found        | `symbol=None`, continue                              |
+| `--extended-hours` with non-US | Ignored; only regular sessions                       |
+| Single date (no matrix)        | Publisher summary matrix omitted, just overall stats |
+| Connection error               | Catch exception, set `error=str(e)`                  |
+| Empty CSV                      | Warning message, exit gracefully                     |
 
 ## Verification
 

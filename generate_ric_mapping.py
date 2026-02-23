@@ -35,8 +35,13 @@ BENCHMARKABLE_ASSET_TYPES = {"equity", "fx", "metal", "commodity", "rates"}
 
 # Asset types with no Datascope benchmark
 NON_BENCHMARKABLE_ASSET_TYPES = {
-    "crypto", "crypto-index", "crypto-redemption-rate",
-    "funding-rate", "nav", "kalshi", "custom",
+    "crypto",
+    "crypto-index",
+    "crypto-redemption-rate",
+    "funding-rate",
+    "nav",
+    "kalshi",
+    "custom",
 }
 
 
@@ -45,6 +50,7 @@ _R_SUFFIX_CURRENCIES = {"AUD", "NZD", "CAD", "CHF"}
 
 
 # --- FX RIC Resolver ---
+
 
 def resolve_fx_ric(symbol: str) -> Optional[str]:
     """Derive Datascope RIC for an FX symbol.
@@ -122,26 +128,24 @@ def resolve_rates_ric(symbol: str) -> Optional[str]:
 # --- Commodity Futures RIC ---
 
 FUTURES_PYTH_TO_RIC: dict[str, str] = {
-    "CC":    "HG",   # Copper (COMEX)
-    "WTI":   "CL",   # WTI Crude Oil (NYMEX)
-    "NGD":   "NG",   # Natural Gas (NYMEX)
-    "AL":    "ALI",  # Aluminum (LME/COMEX)
-    "PL":    "PA",   # Palladium (NYMEX)
-    "PT":    "PL",   # Platinum (NYMEX)
-    "UR":    "UX",   # Uranium (COMEX)
-    "CO":    "C",    # Corn (CBOT)
+    "CC": "HG",  # Copper (COMEX)
+    "WTI": "CL",  # WTI Crude Oil (NYMEX)
+    "NGD": "NG",  # Natural Gas (NYMEX)
+    "AL": "ALI",  # Aluminum (LME/COMEX)
+    "PL": "PA",  # Palladium (NYMEX)
+    "PT": "PL",  # Platinum (NYMEX)
+    "UR": "UX",  # Uranium (COMEX)
+    "CO": "C",  # Corn (CBOT)
     "BRENT": "LCO",  # Brent Crude (ICE)
-    "NID":   "NK",   # Nikkei 225 (CME)
-    "NL":    "MNI",  # Nickel (LME)
-    "LE":    "MPB",  # Lead (LME)
-    "TI":    "MSN",  # Tin (LME)
-    "RS":    "SB",   # Raw Sugar No. 11 (ICE US)
-    "GO":    "LGO",  # Low Sulphur Gasoil (ICE Europe)
+    "NID": "NK",  # Nikkei 225 (CME)
+    "NL": "MNI",  # Nickel (LME)
+    "LE": "MPB",  # Lead (LME)
+    "TI": "MSN",  # Tin (LME)
+    "RS": "SB",  # Raw Sugar No. 11 (ICE US)
+    "GO": "LGO",  # Low Sulphur Gasoil (ICE Europe)
 }
 
-_FUTURES_PATTERN = re.compile(
-    r"^Commodities\.([A-Z]+)([FGHJKMNQUVXZ])(\d)/USD$"
-)
+_FUTURES_PATTERN = re.compile(r"^Commodities\.([A-Z]+)([FGHJKMNQUVXZ])(\d)/USD$")
 
 
 def resolve_commodity_futures_ric(symbol: str) -> Optional[str]:
@@ -165,12 +169,12 @@ def resolve_commodity_futures_ric(symbol: str) -> Optional[str]:
 # --- Equity Index Futures RIC ---
 
 INDEX_FUTURES_PYTH_TO_RIC: dict[str, str] = {
-    "EM": "ES",   # E-Mini S&P 500
-    "NM": "NQ",   # Nasdaq Mini
-    "DM": "YM",   # Dow Jones Mini
+    "EM": "ES",  # E-Mini S&P 500
+    "NM": "NQ",  # Nasdaq Mini
+    "DM": "YM",  # Dow Jones Mini
     "US500": "ES",  # S&P 500 E-mini (alias for EM)
     "US100": "NQ",  # Nasdaq 100 E-mini (alias for NM)
-    "US30":  "YM",  # Dow Jones E-mini (alias for DM)
+    "US30": "YM",  # Dow Jones E-mini (alias for DM)
 }
 
 _INDEX_FUTURES_PATTERN = re.compile(
@@ -205,11 +209,11 @@ EQUITY_CACHE_DIR = Path(".nasdaq_cache")
 EQUITY_CACHE_TTL = 24 * 60 * 60  # 24 hours
 
 OTHER_EXCHANGE_SUFFIX_MAP = {
-    "N": ".N",   # NYSE
-    "P": ".P",   # NYSE Arca
-    "Z": ".Z",   # BATS
-    "A": ".A",   # NYSE American (AMEX)
-    "V": ".K",   # IEXG -> .K in RIC
+    "N": ".N",  # NYSE
+    "P": ".P",  # NYSE Arca
+    "Z": ".Z",  # BATS
+    "A": ".A",  # NYSE American (AMEX)
+    "V": ".K",  # IEXG -> .K in RIC
 }
 
 
@@ -275,20 +279,27 @@ class EquityResolver:
         nasdaq_path = self.cache_dir / "nasdaqlisted.txt"
         other_path = self.cache_dir / "otherlisted.txt"
 
-        for url, path in [(NASDAQ_LISTED_URL, nasdaq_path), (OTHER_LISTED_URL, other_path)]:
+        for url, path in [
+            (NASDAQ_LISTED_URL, nasdaq_path),
+            (OTHER_LISTED_URL, other_path),
+        ]:
             need_download = self.force_refresh or not path.exists()
             if not need_download:
                 age = time.time() - path.stat().st_mtime
                 need_download = age > EQUITY_CACHE_TTL
             if need_download:
                 try:
-                    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                    req = urllib.request.Request(
+                        url, headers={"User-Agent": "Mozilla/5.0"}
+                    )
                     with urllib.request.urlopen(req, timeout=30) as resp:
                         path.write_text(resp.read().decode("utf-8"))
                 except (urllib.error.URLError, OSError) as e:
                     if path.exists():
-                        print(f"Warning: Failed to refresh {path.name}, using cached: {e}",
-                              file=sys.stderr)
+                        print(
+                            f"Warning: Failed to refresh {path.name}, using cached: {e}",
+                            file=sys.stderr,
+                        )
                     else:
                         raise RuntimeError(
                             f"Cannot download {url} and no cached version exists: {e}"
@@ -325,9 +336,11 @@ class EquityResolver:
 
 # --- Data Classes ---
 
+
 @dataclass
 class RICResult:
     """Result of RIC resolution for a single ticker."""
+
     ticker: str
     ric: str = ""
     source_type: str = "RIC"
@@ -344,6 +357,7 @@ class RICResult:
 
 
 # --- Symbol Index ---
+
 
 class SymbolIndex:
     """Index over lazer_symbols.json for fast ticker lookups."""
@@ -378,9 +392,15 @@ class SymbolIndex:
                     # Prefer US equities over non-US (most users want US)
                     is_us = "Equity.US." in symbol
                     existing_us = "Equity.US." in existing_symbol
-                    if (is_benchmarkable and not existing_benchmarkable) or \
-                       (is_us and not existing_us) or \
-                       (existing_ext and not is_ext and is_benchmarkable == existing_benchmarkable):
+                    if (
+                        (is_benchmarkable and not existing_benchmarkable)
+                        or (is_us and not existing_us)
+                        or (
+                            existing_ext
+                            and not is_ext
+                            and is_benchmarkable == existing_benchmarkable
+                        )
+                    ):
                         self._by_name[name] = entry
 
             # Extract ticker from symbol (e.g., "AAPL" from "Equity.US.AAPL/USD")
@@ -433,7 +453,13 @@ class SymbolIndex:
 
 # --- Asset Class Classification ---
 
-ADR_KEYWORDS = ["american depositary", "depositary shares", "depositary receipts", " adr", " ads"]
+ADR_KEYWORDS = [
+    "american depositary",
+    "depositary shares",
+    "depositary receipts",
+    " adr",
+    " ads",
+]
 
 
 def _classify_equity(description: str) -> str:
@@ -480,6 +506,7 @@ def _derive_pyth_id(entry: dict) -> str:
 
 # --- Main Resolver ---
 
+
 class RICResolver:
     """Orchestrates RIC resolution across all asset classes."""
 
@@ -490,7 +517,9 @@ class RICResolver:
         force_refresh: bool = False,
     ):
         self._index = SymbolIndex(symbols_path)
-        self._equity = EquityResolver(cache_dir=equity_cache_dir, force_refresh=force_refresh)
+        self._equity = EquityResolver(
+            cache_dir=equity_cache_dir, force_refresh=force_refresh
+        )
 
     def resolve(self, ticker: str) -> RICResult:
         """Resolve a ticker to its Datascope RIC."""
@@ -567,9 +596,13 @@ class RICResolver:
                     ric_base = ticker_to_ric_base(equity_ticker)
                     result.ric = f"{ric_base}.N"
                     result.confidence = "low"
-                    result.warnings.append(f"Defaulting to {result.ric} — verify exchange suffix")
+                    result.warnings.append(
+                        f"Defaulting to {result.ric} — verify exchange suffix"
+                    )
             else:
-                result.warnings.append(f"Non-US equity '{symbol}' — RIC resolution not supported")
+                result.warnings.append(
+                    f"Non-US equity '{symbol}' — RIC resolution not supported"
+                )
                 result.confidence = "low"
 
         if not result.ric and not result.warnings:
@@ -585,9 +618,16 @@ class RICResolver:
 # --- CSV Output ---
 
 CSV_COLUMNS = [
-    "source_value", "source_type", "pyth_id", "pythnet_id",
-    "pyth_lazer_id", "valid_from", "valid_to", "ticker",
-    "asset_full_name", "asset_class",
+    "source_value",
+    "source_type",
+    "pyth_id",
+    "pythnet_id",
+    "pyth_lazer_id",
+    "valid_from",
+    "valid_to",
+    "ticker",
+    "asset_full_name",
+    "asset_class",
 ]
 
 
@@ -607,7 +647,9 @@ def _result_to_row(r: RICResult) -> dict:
     }
 
 
-def write_csv(results: list[RICResult], output_path: Path, append: bool = False) -> None:
+def write_csv(
+    results: list[RICResult], output_path: Path, append: bool = False
+) -> None:
     """Write results in pyth_mappings_export CSV format."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     valid = [r for r in results if r.ric]
@@ -626,6 +668,7 @@ def write_csv(results: list[RICResult], output_path: Path, append: bool = False)
 
 
 # --- Summary ---
+
 
 def print_summary(results: list[RICResult]) -> None:
     """Print resolution summary to console."""
@@ -667,6 +710,7 @@ def print_summary(results: list[RICResult]) -> None:
 
 # --- CLI ---
 
+
 def parse_tickers_from_file(path: Path) -> list[str]:
     """Parse tickers from file (one per line, or CSV first column)."""
     tickers: list[str] = []
@@ -703,14 +747,27 @@ Examples:
     input_group.add_argument("--ticker", nargs="+", help="Ticker(s) to resolve")
     input_group.add_argument("--ticker-file", type=Path, help="File with tickers")
 
-    parser.add_argument("--output", type=Path, default=Path("ric_mappings.csv"),
-                        help="Output CSV path (default: ric_mappings.csv)")
-    parser.add_argument("--symbols", type=Path, default=DEFAULT_SYMBOLS_PATH,
-                        help="Path to lazer_symbols.json")
-    parser.add_argument("--force-refresh", action="store_true",
-                        help="Re-download NASDAQ Trader data")
-    parser.add_argument("--append-to", type=Path, default=None,
-                        help="Append to existing CSV instead of creating new")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("ric_mappings.csv"),
+        help="Output CSV path (default: ric_mappings.csv)",
+    )
+    parser.add_argument(
+        "--symbols",
+        type=Path,
+        default=DEFAULT_SYMBOLS_PATH,
+        help="Path to lazer_symbols.json",
+    )
+    parser.add_argument(
+        "--force-refresh", action="store_true", help="Re-download NASDAQ Trader data"
+    )
+    parser.add_argument(
+        "--append-to",
+        type=Path,
+        default=None,
+        help="Append to existing CSV instead of creating new",
+    )
 
     args = parser.parse_args()
 

@@ -13,11 +13,11 @@ same daily batch process as `publisher_benchmark.py`.
 
 ## Summary of Approach (Low-Risk)
 
-1) **Daily batch only** (no on-demand uptime initially).
-2) **Compute per-day, session-aware uptime** per (publisher_id, feed_id, session) using ClickHouse data.
-3) **Store uptime results in Postgres** in a separate table keyed by date/publisher/feed/session.
-4) **Join in API/UI** to show uptime next to benchmark metrics.
-5) **Keep logic modular** so we can extend to holiday calendars and symbol-specific sessions later.
+1. **Daily batch only** (no on-demand uptime initially).
+2. **Compute per-day, session-aware uptime** per (publisher_id, feed_id, session) using ClickHouse data.
+3. **Store uptime results in Postgres** in a separate table keyed by date/publisher/feed/session.
+4. **Join in API/UI** to show uptime next to benchmark metrics.
+5. **Keep logic modular** so we can extend to holiday calendars and symbol-specific sessions later.
 
 ---
 
@@ -86,10 +86,13 @@ CREATE TABLE publisher_daily_uptime_summary (
 ## Data Sources / Query Strategy
 
 ### Feed discovery
+
 Use `publisher_feeds.py` logic or shared helper to determine feed list for a publisher.
 
 ### Uptime query
+
 Leverage existing uptime calculation logic from:
+
 - `research/pythresearch/lazer/reliability/uptime.py`
 - `research/pythresearch/data/lazer_db.py`
 
@@ -108,6 +111,7 @@ Start with time-of-day sessions (no holiday calendars); add holidays later.
 ## Batch Pipeline Integration (Low-Risk)
 
 ### 1) Add a new batch step
+
 In `portal/batch/daily_benchmark_runner.py`, after running `publisher_benchmark.py`:
 
 - Load publisher feeds (same list used for benchmarking).
@@ -115,6 +119,7 @@ In `portal/batch/daily_benchmark_runner.py`, after running `publisher_benchmark.
 - Persist to Postgres `publisher_feed_daily_uptime`.
 
 ### 2) Add a parser/ingest helper
+
 Create `portal/batch/uptime_runner.py` to:
 
 - Connect to ClickHouse (reuse config).
@@ -126,12 +131,14 @@ Create `portal/batch/uptime_runner.py` to:
 ## API and UI Integration
 
 ### API
+
 Add a new endpoint for uptime:
 
 - `GET /benchmarks/uptime?publisher_id=...&date=...`
   - returns per-feed uptime for the date.
 
 ### UI
+
 Add an “Uptime” section to the publisher detail view:
 
 - Daily uptime summary (avg/median).
@@ -141,17 +148,20 @@ Add an “Uptime” section to the publisher detail view:
 
 ## Low-Risk Milestones
 
-1) **Schema changes only**
+1. **Schema changes only**
+
    - Add `publisher_feed_daily_uptime` table.
 
-2) **Batch uptime ingestion**
+2. **Batch uptime ingestion**
+
    - Implement `portal/batch/uptime_runner.py`.
    - Wire into `daily_benchmark_runner.py`.
 
-3) **API endpoint**
+3. **API endpoint**
+
    - Serve uptime rows for a given publisher/date.
 
-4) **UI surface**
+4. **UI surface**
    - Minimal display next to benchmark metrics.
 
 ---

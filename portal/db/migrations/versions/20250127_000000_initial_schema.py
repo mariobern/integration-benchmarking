@@ -30,10 +30,24 @@ def upgrade() -> None:
         sa.Column("publisher_id", sa.Integer(), nullable=False),
         sa.Column("name", sa.String(255), nullable=True),
         sa.Column("is_active", sa.Boolean(), server_default="true", nullable=False),
-        sa.Column("first_seen_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False),
-        sa.Column("last_seen_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False),
+        sa.Column(
+            "first_seen_at",
+            sa.DateTime(),
+            server_default=sa.text("NOW()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "last_seen_at",
+            sa.DateTime(),
+            server_default=sa.text("NOW()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "created_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False
+        ),
         sa.PrimaryKeyConstraint("publisher_id"),
     )
     op.create_index(
@@ -51,10 +65,24 @@ def upgrade() -> None:
         sa.Column("asset_class", sa.String(50), nullable=True),
         sa.Column("exponent", sa.Integer(), nullable=True),
         sa.Column("is_active", sa.Boolean(), server_default="true", nullable=False),
-        sa.Column("first_seen_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False),
-        sa.Column("last_seen_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False),
+        sa.Column(
+            "first_seen_at",
+            sa.DateTime(),
+            server_default=sa.text("NOW()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "last_seen_at",
+            sa.DateTime(),
+            server_default=sa.text("NOW()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "created_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False
+        ),
         sa.PrimaryKeyConstraint("feed_id"),
     )
     op.create_index("idx_feeds_asset_class", "feeds", ["asset_class"])
@@ -115,15 +143,40 @@ def upgrade() -> None:
         sa.Column("error", sa.Text(), nullable=True),
         sa.Column("execution_time_ms", sa.Integer(), nullable=True),
         # Metadata
-        sa.Column("created_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False
+        ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("publisher_id", "feed_id", "benchmark_date", name="uq_results_publisher_feed_date"),
+        sa.UniqueConstraint(
+            "publisher_id",
+            "feed_id",
+            "benchmark_date",
+            name="uq_results_publisher_feed_date",
+        ),
     )
-    op.create_index("idx_results_publisher_date", "benchmark_results", ["publisher_id", sa.text("benchmark_date DESC")])
-    op.create_index("idx_results_feed_date", "benchmark_results", ["feed_id", sa.text("benchmark_date DESC")])
-    op.create_index("idx_results_asset_class_date", "benchmark_results", ["asset_class", sa.text("benchmark_date DESC")])
-    op.create_index("idx_results_date", "benchmark_results", [sa.text("benchmark_date DESC")])
-    op.create_index("idx_results_passes", "benchmark_results", ["passes", sa.text("benchmark_date DESC")])
+    op.create_index(
+        "idx_results_publisher_date",
+        "benchmark_results",
+        ["publisher_id", sa.text("benchmark_date DESC")],
+    )
+    op.create_index(
+        "idx_results_feed_date",
+        "benchmark_results",
+        ["feed_id", sa.text("benchmark_date DESC")],
+    )
+    op.create_index(
+        "idx_results_asset_class_date",
+        "benchmark_results",
+        ["asset_class", sa.text("benchmark_date DESC")],
+    )
+    op.create_index(
+        "idx_results_date", "benchmark_results", [sa.text("benchmark_date DESC")]
+    )
+    op.create_index(
+        "idx_results_passes",
+        "benchmark_results",
+        ["passes", sa.text("benchmark_date DESC")],
+    )
     op.create_index(
         "idx_results_errors",
         "benchmark_results",
@@ -145,8 +198,15 @@ def upgrade() -> None:
         sa.Column("error_count", sa.Integer(), server_default="0", nullable=False),
         sa.Column("pass_rate_pct", sa.Numeric(5, 2), nullable=True),
         # Pass criteria breakdown
-        sa.Column("pass_by_nrmse_alone", sa.Integer(), server_default="0", nullable=True),
-        sa.Column("pass_by_nrmse_and_hit_rate", sa.Integer(), server_default="0", nullable=True),
+        sa.Column(
+            "pass_by_nrmse_alone", sa.Integer(), server_default="0", nullable=True
+        ),
+        sa.Column(
+            "pass_by_nrmse_and_hit_rate",
+            sa.Integer(),
+            server_default="0",
+            nullable=True,
+        ),
         # NRMSE aggregates
         sa.Column("median_nrmse", sa.Numeric(12, 8), nullable=True),
         sa.Column("mean_nrmse", sa.Numeric(12, 8), nullable=True),
@@ -165,7 +225,9 @@ def upgrade() -> None:
         sa.Column("p90_rmse_over_spread", sa.Numeric(12, 6), nullable=True),
         sa.Column("p95_rmse_over_spread", sa.Numeric(12, 6), nullable=True),
         # Coverage metrics
-        sa.Column("total_observations", sa.BigInteger(), server_default="0", nullable=True),
+        sa.Column(
+            "total_observations", sa.BigInteger(), server_default="0", nullable=True
+        ),
         sa.Column("mean_observations_per_feed", sa.Numeric(10, 1), nullable=True),
         sa.Column("median_observations_per_feed", sa.Integer(), nullable=True),
         # Statistical summary
@@ -180,27 +242,60 @@ def upgrade() -> None:
         # Timing
         sa.Column("batch_duration_sec", sa.Numeric(10, 2), nullable=True),
         # Metadata
-        sa.Column("created_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False
+        ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("publisher_id", "summary_date", name="uq_summary_publisher_date"),
+        sa.UniqueConstraint(
+            "publisher_id", "summary_date", name="uq_summary_publisher_date"
+        ),
     )
-    op.create_index("idx_summary_date", "publisher_daily_summary", [sa.text("summary_date DESC")])
-    op.create_index("idx_summary_publisher_date", "publisher_daily_summary", ["publisher_id", sa.text("summary_date DESC")])
-    op.create_index("idx_summary_pass_rate", "publisher_daily_summary", [sa.text("summary_date DESC"), sa.text("pass_rate_pct DESC NULLS LAST")])
-    op.create_index("idx_summary_nrmse", "publisher_daily_summary", [sa.text("summary_date DESC"), sa.text("median_nrmse ASC NULLS LAST")])
+    op.create_index(
+        "idx_summary_date", "publisher_daily_summary", [sa.text("summary_date DESC")]
+    )
+    op.create_index(
+        "idx_summary_publisher_date",
+        "publisher_daily_summary",
+        ["publisher_id", sa.text("summary_date DESC")],
+    )
+    op.create_index(
+        "idx_summary_pass_rate",
+        "publisher_daily_summary",
+        [sa.text("summary_date DESC"), sa.text("pass_rate_pct DESC NULLS LAST")],
+    )
+    op.create_index(
+        "idx_summary_nrmse",
+        "publisher_daily_summary",
+        [sa.text("summary_date DESC"), sa.text("median_nrmse ASC NULLS LAST")],
+    )
 
     # Benchmark jobs table
     op.create_table(
         "benchmark_jobs",
-        sa.Column("id", postgresql.UUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
+        sa.Column(
+            "id",
+            postgresql.UUID(),
+            server_default=sa.text("uuid_generate_v4()"),
+            nullable=False,
+        ),
         # Job parameters
         sa.Column("publisher_id", sa.Integer(), nullable=True),
         sa.Column("feed_ids", postgresql.ARRAY(sa.Integer()), nullable=True),
         sa.Column("target_date", sa.Date(), nullable=False),
-        sa.Column("include_extended_hours", sa.Boolean(), server_default="false", nullable=False),
+        sa.Column(
+            "include_extended_hours",
+            sa.Boolean(),
+            server_default="false",
+            nullable=False,
+        ),
         # Job lifecycle
         sa.Column("status", sa.String(20), server_default="pending", nullable=False),
-        sa.Column("requested_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False),
+        sa.Column(
+            "requested_at",
+            sa.DateTime(),
+            server_default=sa.text("NOW()"),
+            nullable=False,
+        ),
         sa.Column("started_at", sa.DateTime(), nullable=True),
         sa.Column("completed_at", sa.DateTime(), nullable=True),
         # Results summary
@@ -211,12 +306,20 @@ def upgrade() -> None:
         # Error tracking
         sa.Column("error", sa.Text(), nullable=True),
         # Metadata
-        sa.Column("job_type", sa.String(20), server_default="on_demand", nullable=False),
+        sa.Column(
+            "job_type", sa.String(20), server_default="on_demand", nullable=False
+        ),
         sa.Column("requested_by", sa.String(255), nullable=True),
         sa.PrimaryKeyConstraint("id"),
-        sa.CheckConstraint("status IN ('pending', 'running', 'completed', 'failed')", name="chk_status"),
+        sa.CheckConstraint(
+            "status IN ('pending', 'running', 'completed', 'failed')", name="chk_status"
+        ),
     )
-    op.create_index("idx_jobs_publisher", "benchmark_jobs", ["publisher_id", sa.text("requested_at DESC")])
+    op.create_index(
+        "idx_jobs_publisher",
+        "benchmark_jobs",
+        ["publisher_id", sa.text("requested_at DESC")],
+    )
     op.create_index(
         "idx_jobs_status",
         "benchmark_jobs",

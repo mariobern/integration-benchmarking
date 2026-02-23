@@ -16,12 +16,12 @@ An **International Securities Identification Number (ISIN)** is a 12-character a
 
 ### Structure: `[CC][NSIN][C]`
 
-| Component | Length | Description | Example (Apple) |
-|-----------|--------|-------------|-----------------|
-| Country Code | 2 chars | ISO 3166-1 alpha-2 | `US` |
-| NSIN | 9 chars | National Securities ID (= CUSIP for US) | `037833100` |
-| Check Digit | 1 digit | Luhn algorithm | `5` |
-| **Full ISIN** | **12 chars** | | **`US0378331005`** |
+| Component     | Length       | Description                             | Example (Apple)    |
+| ------------- | ------------ | --------------------------------------- | ------------------ |
+| Country Code  | 2 chars      | ISO 3166-1 alpha-2                      | `US`               |
+| NSIN          | 9 chars      | National Securities ID (= CUSIP for US) | `037833100`        |
+| Check Digit   | 1 digit      | Luhn algorithm                          | `5`                |
+| **Full ISIN** | **12 chars** |                                         | **`US0378331005`** |
 
 ### Key Properties
 
@@ -51,18 +51,18 @@ The algorithm: convert letters to numbers (A=10..Z=35), double alternating digit
 
 Analysis of `ric.csv` (752 RICs) and Pyth's broader asset coverage:
 
-| Instrument Type | Has ISIN? | ISIN Source | Examples from ric.csv |
-|----------------|-----------|-------------|----------------------|
-| **US Equities** | Yes | US + CUSIP + check | `AAPL.O`, `MSFT.O`, `IBM.N` |
-| **US ETFs** | Yes | US + CUSIP + check | `SPY.N`, `QQQ.O`, `IWM.N`, `GLD.N` |
-| **ADRs** | Yes | US + CUSIP + check | `BABA.Z`, `TSM.N`, `NVO.N`, `SONY.N` |
-| **Crypto ETFs** | Yes | US + CUSIP + check | `IBIT.N`, `GBTC.N`, `FBTC.N` |
-| **US Treasuries** | Yes | US + CUSIP + check | (in benchmark data, not ric.csv) |
-| **Futures** | Yes | Allocated per contract by ANNA DSB | `EMH6`, `NMH6` (not in ric.csv) |
-| **FX Spot** | Partial | XC prefix (supranational) | EUR/USD → `XC` + code; complex |
-| **Commodity Spot** | Partial | XC prefix | Gold: `XC0009655157` |
-| **OTC/Pink Sheet** | Rare | Varies | `GLCNF.PK`, `GMBXF.PK` |
-| **Canadian** | Yes | CA + CUSIP + check | `GLXY.TO` |
+| Instrument Type    | Has ISIN? | ISIN Source                        | Examples from ric.csv                |
+| ------------------ | --------- | ---------------------------------- | ------------------------------------ |
+| **US Equities**    | Yes       | US + CUSIP + check                 | `AAPL.O`, `MSFT.O`, `IBM.N`          |
+| **US ETFs**        | Yes       | US + CUSIP + check                 | `SPY.N`, `QQQ.O`, `IWM.N`, `GLD.N`   |
+| **ADRs**           | Yes       | US + CUSIP + check                 | `BABA.Z`, `TSM.N`, `NVO.N`, `SONY.N` |
+| **Crypto ETFs**    | Yes       | US + CUSIP + check                 | `IBIT.N`, `GBTC.N`, `FBTC.N`         |
+| **US Treasuries**  | Yes       | US + CUSIP + check                 | (in benchmark data, not ric.csv)     |
+| **Futures**        | Yes       | Allocated per contract by ANNA DSB | `EMH6`, `NMH6` (not in ric.csv)      |
+| **FX Spot**        | Partial   | XC prefix (supranational)          | EUR/USD → `XC` + code; complex       |
+| **Commodity Spot** | Partial   | XC prefix                          | Gold: `XC0009655157`                 |
+| **OTC/Pink Sheet** | Rare      | Varies                             | `GLCNF.PK`, `GMBXF.PK`               |
+| **Canadian**       | Yes       | CA + CUSIP + check                 | `GLXY.TO`                            |
 
 **Bottom line**: ISINs cover ~95% of `ric.csv` instruments (equities, ETFs, ADRs). FX pairs and commodity spot are edge cases with non-standard ISIN treatment.
 
@@ -70,31 +70,31 @@ Analysis of `ric.csv` (752 RICs) and Pyth's broader asset coverage:
 
 The official LSEG/Refinitiv RIC Symbology Card (`20240205WorkspaceWAinstrumentCode.pdf`) confirms the naming conventions:
 
-| Instrument | RIC Pattern | ISIN-Addressable? | Notes |
-|------------|------------|-------------------|-------|
-| US Equities | `AAPL.O`, `IBM.N` | **Yes** | Exchange suffix varies by listing exchange |
-| US ETFs | `SPY.P`, `QQQ.O` | **Yes** | Same as equities; ETF valuations use `nv`, `iv` suffixes |
-| ADRs | `BABA.Z`, `TSM.N` | **Yes** | US-listed → US CUSIP/ISIN |
-| FX Spot | `EUR=`, `GBPJPY=` | **No** | Uses `=` suffix, no ISIN exists |
-| Metal Spot | `XAU=`, `XAG=` | **No** | Uses `=` suffix, gold ISIN `XC0009655157` exists but not used in RIC |
-| Index Futures | `ESc1`, `NQc1` | **Partial** | ISIN per contract but RIC uses continuation codes |
-| Commodity Futures | `GCc1`, `CLc1` | **Partial** | Same as index futures |
-| US Treasuries | `US10YT=RRPS` | **No** | Specialized RIC format with yield provider suffix |
-| Indexes | `.SPX`, `.DJI` | **No** | Dot-prefixed, no ISIN |
+| Instrument        | RIC Pattern       | ISIN-Addressable? | Notes                                                                |
+| ----------------- | ----------------- | ----------------- | -------------------------------------------------------------------- |
+| US Equities       | `AAPL.O`, `IBM.N` | **Yes**           | Exchange suffix varies by listing exchange                           |
+| US ETFs           | `SPY.P`, `QQQ.O`  | **Yes**           | Same as equities; ETF valuations use `nv`, `iv` suffixes             |
+| ADRs              | `BABA.Z`, `TSM.N` | **Yes**           | US-listed → US CUSIP/ISIN                                            |
+| FX Spot           | `EUR=`, `GBPJPY=` | **No**            | Uses `=` suffix, no ISIN exists                                      |
+| Metal Spot        | `XAU=`, `XAG=`    | **No**            | Uses `=` suffix, gold ISIN `XC0009655157` exists but not used in RIC |
+| Index Futures     | `ESc1`, `NQc1`    | **Partial**       | ISIN per contract but RIC uses continuation codes                    |
+| Commodity Futures | `GCc1`, `CLc1`    | **Partial**       | Same as index futures                                                |
+| US Treasuries     | `US10YT=RRPS`     | **No**            | Specialized RIC format with yield provider suffix                    |
+| Indexes           | `.SPX`, `.DJI`    | **No**            | Dot-prefixed, no ISIN                                                |
 
 **Key exchange suffixes** (definitive list from Symbology Card):
 
-| Suffix | Exchange | Example |
-|--------|----------|---------|
-| `.N` | NYSE | `IBM.N` |
-| `.O` | NASDAQ (consolidated) | `MSFT.O` |
-| `.OQ` | NASDAQ (specific) | `MSFT.OQ` |
-| `.P` | NYSE Arca | `SPY.P` |
-| `.Z` | Cboe BZX | `BABA.Z` |
-| `.A` | NYSE American | `MSFT.A` |
-| `.K` | US Consolidated (4+ char root) | `TWTR.K` |
-| `.PK` | OTC/Pink Sheets | `NSRGY.PK` |
-| `.B` | NASDAQ BX | `BABA.B` |
+| Suffix | Exchange                       | Example    |
+| ------ | ------------------------------ | ---------- |
+| `.N`   | NYSE                           | `IBM.N`    |
+| `.O`   | NASDAQ (consolidated)          | `MSFT.O`   |
+| `.OQ`  | NASDAQ (specific)              | `MSFT.OQ`  |
+| `.P`   | NYSE Arca                      | `SPY.P`    |
+| `.Z`   | Cboe BZX                       | `BABA.Z`   |
+| `.A`   | NYSE American                  | `MSFT.A`   |
+| `.K`   | US Consolidated (4+ char root) | `TWTR.K`   |
+| `.PK`  | OTC/Pink Sheets                | `NSRGY.PK` |
+| `.B`   | NASDAQ BX                      | `BABA.B`   |
 
 **Implication**: ISIN-based resolution will work for equities/ETFs/ADRs (the bulk of our instruments). FX, metals spot, treasuries, and indexes need a different resolution approach (direct RIC mapping, not ISIN-based).
 
@@ -105,6 +105,7 @@ The official LSEG/Refinitiv RIC Symbology Card (`20240205WorkspaceWAinstrumentCo
 The LSEG Datascope Select (DSS) REST API provides authoritative ISIN-to-RIC conversion.
 
 ### Authentication
+
 ```
 POST https://selectapi.datascope.lseg.com/RestApi/v1/Authentication/RequestToken
 Body: {"Credentials": {"Username": "...", "Password": "..."}}
@@ -112,16 +113,26 @@ Returns Bearer token for all subsequent requests
 ```
 
 ### ISIN to Primary RIC
+
 ```
 POST https://selectapi.datascope.lseg.com/RestApi/v1/Extractions/ExtractWithNotes
 ```
 
 **Request**:
+
 ```json
 {
   "ExtractionRequest": {
     "@odata.type": "#DataScope.Select.Api.Extractions.ExtractionRequests.TermsAndConditionsExtractionRequest",
-    "ContentFieldNames": ["RIC", "ISIN", "CUSIP", "SEDOL", "Currency Code", "Exchange Code", "Company Name"],
+    "ContentFieldNames": [
+      "RIC",
+      "ISIN",
+      "CUSIP",
+      "SEDOL",
+      "Currency Code",
+      "Exchange Code",
+      "Company Name"
+    ],
     "IdentifierList": {
       "@odata.type": "#DataScope.Select.Api.Extractions.ExtractionRequests.InstrumentIdentifierList",
       "InstrumentIdentifiers": [
@@ -134,22 +145,32 @@ POST https://selectapi.datascope.lseg.com/RestApi/v1/Extractions/ExtractWithNote
 ```
 
 **Response**:
+
 ```json
 {
   "Contents": [
     {
-      "RIC": "AAPL.O", "ISIN": "US0378331005", "CUSIP": "037833100",
-      "Currency Code": "USD", "Exchange Code": "NAS", "Company Name": "APPLE INC"
+      "RIC": "AAPL.O",
+      "ISIN": "US0378331005",
+      "CUSIP": "037833100",
+      "Currency Code": "USD",
+      "Exchange Code": "NAS",
+      "Company Name": "APPLE INC"
     },
     {
-      "RIC": "IBM.N", "ISIN": "US4592001014", "CUSIP": "459200101",
-      "Currency Code": "USD", "Exchange Code": "NYS", "Company Name": "INTERNATIONAL BUSINESS MACHINES"
+      "RIC": "IBM.N",
+      "ISIN": "US4592001014",
+      "CUSIP": "459200101",
+      "Currency Code": "USD",
+      "Exchange Code": "NYS",
+      "Company Name": "INTERNATIONAL BUSINESS MACHINES"
     }
   ]
 }
 ```
 
 **Key capabilities**:
+
 - Batch: multiple ISINs per request
 - Bidirectional: also RIC-to-ISIN via same API
 - Returns primary RIC (the exact one Datascope uses for benchmarking)
@@ -195,6 +216,7 @@ Find all exchanges where an ISIN trades:
 ```
 
 **References**:
+
 - [ISIN to RIC Conversion](https://developers.lseg.com/en/article-catalog/article/isin-to-ric-conversion-with-dss-datascope-select-rest-api)
 - [Symbology Conversion](https://developers.lseg.com/en/article-catalog/article/symbology--isin-cusip-sedol--conversion-to-ric-using-datascope)
 - [Symbology Conversion Python](https://developers.lseg.com/en/article-catalog/article/symbology-conversion-using-the-dss-rest-api-in-python)
@@ -219,13 +241,13 @@ us = equities.select(country="United States")
 # DataFrame with columns: symbol, isin, cusip, figi, composite_figi, shareclass_figi, name, ...
 ```
 
-| Metric | Value |
-|--------|-------|
-| Coverage | 158K+ equities, global |
-| Fields | ISIN, CUSIP, FIGI, composite_figi, shareclass_figi |
-| Cost | Free (MIT license) |
-| Speed | Instant (local DataFrame) |
-| Update frequency | Community-maintained |
+| Metric           | Value                                              |
+| ---------------- | -------------------------------------------------- |
+| Coverage         | 158K+ equities, global                             |
+| Fields           | ISIN, CUSIP, FIGI, composite_figi, shareclass_figi |
+| Cost             | Free (MIT license)                                 |
+| Speed            | Instant (local DataFrame)                          |
+| Update frequency | Community-maintained                               |
 
 **Limitations**: May have gaps for newer/smaller securities; ETF coverage unclear.
 
@@ -241,12 +263,12 @@ ticker = yf.Ticker("AAPL")
 isin = ticker.isin  # "US0378331005" (experimental)
 ```
 
-| Metric | Value |
-|--------|-------|
-| Coverage | Broad (anything on Yahoo Finance) |
-| Cost | Free |
-| Speed | ~1-2s per ticker (HTTP request) |
-| Reliability | Marked "experimental" |
+| Metric      | Value                             |
+| ----------- | --------------------------------- |
+| Coverage    | Broad (anything on Yahoo Finance) |
+| Cost        | Free                              |
+| Speed       | ~1-2s per ticker (HTTP request)   |
+| Reliability | Marked "experimental"             |
 
 **References**: [yfinance docs](https://ranaroussi.github.io/yfinance/reference/yfinance.ticker_tickers.html) | [PyPI](https://pypi.org/project/yfinance/)
 
@@ -264,12 +286,12 @@ validate('US0378331005')          # 'US0378331005' (valid)
 from_natid('CA', '135087311')     # 'CA1350873119' (Canadian)
 ```
 
-| Metric | Value |
-|--------|-------|
-| Coverage | Any security with a known CUSIP |
-| Cost | Free (LGPL) |
-| Speed | Instant (pure computation) |
-| Requirement | Must already have the CUSIP |
+| Metric      | Value                           |
+| ----------- | ------------------------------- |
+| Coverage    | Any security with a known CUSIP |
+| Cost        | Free (LGPL)                     |
+| Speed       | Instant (pure computation)      |
+| Requirement | Must already have the CUSIP     |
 
 **References**: [GitHub](https://github.com/arthurdejong/python-stdnum) | [PyPI](https://pypi.org/project/python-stdnum/)
 
@@ -284,11 +306,11 @@ r = requests.post("https://api.openfigi.com/v3/mapping", json=jobs)
 # Returns: figi, compositeFIGI, shareClassFIGI, name, ticker, exchCode
 ```
 
-| Metric | Value |
-|--------|-------|
-| Rate limits | 25/min (unauth), 25/6s (API key), 100 jobs/request |
-| ISIN in response? | **No** (can use ISIN as input via `ID_ISIN`) |
-| Cost | Free |
+| Metric            | Value                                              |
+| ----------------- | -------------------------------------------------- |
+| Rate limits       | 25/min (unauth), 25/6s (API key), 100 jobs/request |
+| ISIN in response? | **No** (can use ISIN as input via `ID_ISIN`)       |
+| Cost              | Free                                               |
 
 **Use case**: Supplementary metadata (security type, exchange) but NOT for ISIN resolution.
 
@@ -298,11 +320,11 @@ r = requests.post("https://api.openfigi.com/v3/mapping", json=jobs)
 
 Use Datascope credentials for RIC-to-ISIN and ISIN-to-RIC conversion. See Part 3 above.
 
-| Metric | Value |
-|--------|-------|
-| Coverage | Everything Datascope has |
-| Cost | Existing license (need DSS API access) |
-| Speed | ~1-2s per batch |
+| Metric         | Value                                  |
+| -------------- | -------------------------------------- |
+| Coverage       | Everything Datascope has               |
+| Cost           | Existing license (need DSS API access) |
+| Speed          | ~1-2s per batch                        |
 | Authoritative? | **Yes** - this is the benchmark source |
 
 ### Source 6: FMP ISIN API (Paid, Simple)
@@ -311,10 +333,10 @@ Use Datascope credentials for RIC-to-ISIN and ISIN-to-RIC conversion. See Part 3
 GET https://financialmodelingprep.com/stable/search-isin?isin=US0378331005&apikey=KEY
 ```
 
-| Metric | Value |
-|--------|-------|
+| Metric    | Value          |
+| --------- | -------------- |
 | Free tier | ~250 calls/day |
-| Coverage | Global |
+| Coverage  | Global         |
 
 **References**: [FMP ISIN API](https://site.financialmodelingprep.com/developer/docs/stable/search-isin)
 
@@ -324,10 +346,10 @@ GET https://financialmodelingprep.com/stable/search-isin?isin=US0378331005&apike
 GET https://eodhd.com/api/query?api_token=KEY&filter[symbol]=AAPL&fmt=json
 ```
 
-| Metric | Value |
-|--------|-------|
+| Metric    | Value                           |
+| --------- | ------------------------------- |
 | Free tier | 20 calls/day (too low for bulk) |
-| Fields | ISIN, CUSIP, FIGI, LEI, CIK |
+| Fields    | ISIN, CUSIP, FIGI, LEI, CIK     |
 
 **References**: [EODHD ID Mapping](https://eodhd.com/financial-apis/id-mapping-api-cusip-isin-figi-lei-cik-%E2%86%94-symbol)
 
@@ -335,12 +357,12 @@ GET https://eodhd.com/api/query?api_token=KEY&filter[symbol]=AAPL&fmt=json
 
 The SEC publishes quarterly 13F lists with CUSIPs. Starting Q4 2025, available in `.txt` format (previously PDF-only).
 
-| Metric | Value |
-|--------|-------|
-| Coverage | ~9,000 institutional securities |
-| Cost | Free |
-| Format | PDF (historical), .txt (Q4 2025+) |
-| URL | [SEC 13F Data](https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets) |
+| Metric   | Value                                                                                 |
+| -------- | ------------------------------------------------------------------------------------- |
+| Coverage | ~9,000 institutional securities                                                       |
+| Cost     | Free                                                                                  |
+| Format   | PDF (historical), .txt (Q4 2025+)                                                     |
+| URL      | [SEC 13F Data](https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets) |
 
 ### Source 9: ANNA Free ISIN Lookup
 
@@ -399,17 +421,17 @@ This eliminates the 16% exchange suffix mismatch entirely.
 
 ## Part 6: Coverage Gaps & Edge Cases
 
-| Instrument | ISIN Strategy | Notes |
-|------------|---------------|-------|
-| US Equities | `US` + CUSIP + check | Standard, well-supported |
-| US ETFs | `US` + CUSIP + check | Same as equities |
-| ADRs (US-listed) | `US` + CUSIP + check | ADRs get US CUSIPs |
-| Canadian equities | `CA` + CUSIP + check | `GLXY.TO` -> Canadian ISIN |
-| OTC/Pink Sheets | May not have CUSIP | `GLCNF.PK` - needs manual check |
-| Futures contracts | New ISIN per contract/expiry | Complex; ANNA DSB allocates |
-| FX spot (EUR/USD) | `XC` prefix (supranational) | Gold spot: `XC0009655157` |
-| Commodities spot | `XC` prefix | Not all have ISINs |
-| US Treasuries | `US` + CUSIP + check | Standard |
+| Instrument        | ISIN Strategy                | Notes                           |
+| ----------------- | ---------------------------- | ------------------------------- |
+| US Equities       | `US` + CUSIP + check         | Standard, well-supported        |
+| US ETFs           | `US` + CUSIP + check         | Same as equities                |
+| ADRs (US-listed)  | `US` + CUSIP + check         | ADRs get US CUSIPs              |
+| Canadian equities | `CA` + CUSIP + check         | `GLXY.TO` -> Canadian ISIN      |
+| OTC/Pink Sheets   | May not have CUSIP           | `GLCNF.PK` - needs manual check |
+| Futures contracts | New ISIN per contract/expiry | Complex; ANNA DSB allocates     |
+| FX spot (EUR/USD) | `XC` prefix (supranational)  | Gold spot: `XC0009655157`       |
+| Commodities spot  | `XC` prefix                  | Not all have ISINs              |
+| US Treasuries     | `US` + CUSIP + check         | Standard                        |
 
 **Practical recommendation**: Start with equities/ETFs/ADRs (covers ~95% of ric.csv), then add futures/FX/treasuries support incrementally.
 
@@ -417,17 +439,17 @@ This eliminates the 16% exchange suffix mismatch entirely.
 
 ## Summary of All Sources
 
-| Source | Coverage | ISIN? | CUSIP? | Cost | Bulk? | Speed |
-|--------|----------|-------|--------|------|-------|-------|
-| [FinanceDatabase](https://github.com/JerBouma/FinanceDatabase) | 158K equities | Yes | Yes | Free | Yes | Instant |
-| [yfinance](https://pypi.org/project/yfinance/) | Broad | Yes | No | Free | Slow | 1-2s/ticker |
-| [python-stdnum](https://github.com/arthurdejong/python-stdnum) | Needs CUSIP | Computes | Input | Free | Yes | Instant |
-| [OpenFIGI](https://www.openfigi.com/api) | Broad | **No** | **No** | Free | Yes | Fast |
-| [Datascope DSS](https://developers.lseg.com/en/api-catalog/datascope-select/datascope-select-rest-api) | Authoritative | Yes | Yes | License | Batched | 1-2s |
-| [FMP](https://site.financialmodelingprep.com/developer/docs/stable/search-isin) | Global | Yes | Yes | Freemium | Limited | Fast |
-| [EODHD](https://eodhd.com/financial-apis/id-mapping-api-cusip-isin-figi-lei-cik-%E2%86%94-symbol) | Global | Yes | Yes | 20/day free | No | Fast |
-| [SEC 13F](https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets) | ~9K securities | Via CUSIP | Yes | Free | Quarterly | N/A |
-| [ANNA Lookup](https://anna-web.org/anna-launches-free-international-isin-lookup-service/) | Global | Yes | No | Free (reg) | Manual | Manual |
+| Source                                                                                                 | Coverage       | ISIN?     | CUSIP? | Cost        | Bulk?     | Speed       |
+| ------------------------------------------------------------------------------------------------------ | -------------- | --------- | ------ | ----------- | --------- | ----------- |
+| [FinanceDatabase](https://github.com/JerBouma/FinanceDatabase)                                         | 158K equities  | Yes       | Yes    | Free        | Yes       | Instant     |
+| [yfinance](https://pypi.org/project/yfinance/)                                                         | Broad          | Yes       | No     | Free        | Slow      | 1-2s/ticker |
+| [python-stdnum](https://github.com/arthurdejong/python-stdnum)                                         | Needs CUSIP    | Computes  | Input  | Free        | Yes       | Instant     |
+| [OpenFIGI](https://www.openfigi.com/api)                                                               | Broad          | **No**    | **No** | Free        | Yes       | Fast        |
+| [Datascope DSS](https://developers.lseg.com/en/api-catalog/datascope-select/datascope-select-rest-api) | Authoritative  | Yes       | Yes    | License     | Batched   | 1-2s        |
+| [FMP](https://site.financialmodelingprep.com/developer/docs/stable/search-isin)                        | Global         | Yes       | Yes    | Freemium    | Limited   | Fast        |
+| [EODHD](https://eodhd.com/financial-apis/id-mapping-api-cusip-isin-figi-lei-cik-%E2%86%94-symbol)      | Global         | Yes       | Yes    | 20/day free | No        | Fast        |
+| [SEC 13F](https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets)                       | ~9K securities | Via CUSIP | Yes    | Free        | Quarterly | N/A         |
+| [ANNA Lookup](https://anna-web.org/anna-launches-free-international-isin-lookup-service/)              | Global         | Yes       | No     | Free (reg)  | Manual    | Manual      |
 
 ---
 
@@ -438,6 +460,7 @@ This eliminates the 16% exchange suffix mismatch entirely.
 **File**: `isin_resolver.py` (new standalone utility)
 
 **Dependencies** (add to `requirements.txt`):
+
 ```
 financedatabase
 python-stdnum
@@ -445,6 +468,7 @@ yfinance
 ```
 
 **Module structure**:
+
 ```python
 class ISINResolver:
     """Tiered ISIN resolution for US equities, ETFs, and ADRs."""
@@ -461,6 +485,7 @@ class ISINResolver:
 ```
 
 **Data class**:
+
 ```python
 @dataclass
 class ISINResult:

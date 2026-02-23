@@ -29,14 +29,14 @@ python generate_source_upload.py --ticker-file tickers.txt --output source_uploa
 python generate_source_upload.py --ticker-file tickers.txt --no-clickhouse   # offline mode
 ```
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--tickers` | Comma-separated ticker list | - |
-| `--ticker-file` | File with one ticker per line (or CSV) | - |
-| `--output` | Output CSV path | `source_upload.csv` |
-| `--no-clickhouse` | Skip ClickHouse lookups (offline mode) | False |
-| `--us-stocks-path` | Path to US-Stock-Symbols repo | `../US-Stock-Symbols` |
-| `--force-refresh` | Re-download NASDAQ Trader data (ignores cache) | False |
+| Argument           | Description                                    | Default               |
+| ------------------ | ---------------------------------------------- | --------------------- |
+| `--tickers`        | Comma-separated ticker list                    | -                     |
+| `--ticker-file`    | File with one ticker per line (or CSV)         | -                     |
+| `--output`         | Output CSV path                                | `source_upload.csv`   |
+| `--no-clickhouse`  | Skip ClickHouse lookups (offline mode)         | False                 |
+| `--us-stocks-path` | Path to US-Stock-Symbols repo                  | `../US-Stock-Symbols` |
+| `--force-refresh`  | Re-download NASDAQ Trader data (ignores cache) | False                 |
 
 ### Step 2: Data Sources & Resolution Strategy
 
@@ -65,13 +65,13 @@ CLI:              main() with argparse
 
 ### Step 4: Edge Cases
 
-| Edge Case | Handling |
-|-----------|----------|
-| Ticker not in any source | Default `.N` suffix, warn user |
-| Multiple Datascope RICs for same ticker | Prefer one with non-zero `pyth_lazer_id` |
-| BRK.B style tickers | Handle both `BRK.B` and `BRKb` forms |
-| Duplicate tickers in input | De-duplicate, preserve order |
-| ClickHouse unavailable | `--no-clickhouse` flag; degrade gracefully |
+| Edge Case                               | Handling                                   |
+| --------------------------------------- | ------------------------------------------ |
+| Ticker not in any source                | Default `.N` suffix, warn user             |
+| Multiple Datascope RICs for same ticker | Prefer one with non-zero `pyth_lazer_id`   |
+| BRK.B style tickers                     | Handle both `BRK.B` and `BRKb` forms       |
+| Duplicate tickers in input              | De-duplicate, preserve order               |
+| ClickHouse unavailable                  | `--no-clickhouse` flag; degrade gracefully |
 
 ## Existing Code to Reuse
 

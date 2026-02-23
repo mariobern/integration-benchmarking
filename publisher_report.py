@@ -46,6 +46,7 @@ from date_utils import expand_date_args, validate_date_args
 @dataclass
 class FeedHealthResult:
     """Combined benchmark + uptime result for a single feed."""
+
     # Core identification
     publisher_id: int
     feed_id: int
@@ -148,26 +149,58 @@ def get_uptime_sessions(
     sessions: list[dict] = []
 
     if mode in ("fx", "metals", "commodity", "us-treasuries"):
-        sessions.append({
-            "name": "regular",
-            "start": datetime.combine(dt.date(), datetime.min.time()),
-            "end": datetime.combine(dt.date() + timedelta(days=1), datetime.min.time()),
-        })
+        sessions.append(
+            {
+                "name": "regular",
+                "start": datetime.combine(dt.date(), datetime.min.time()),
+                "end": datetime.combine(
+                    dt.date() + timedelta(days=1), datetime.min.time()
+                ),
+            }
+        )
     else:
-        market_open = dt.replace(hour=9, minute=30, tzinfo=est).astimezone(utc).replace(tzinfo=None)
-        market_close = dt.replace(hour=16, minute=0, tzinfo=est).astimezone(utc).replace(tzinfo=None)
+        market_open = (
+            dt.replace(hour=9, minute=30, tzinfo=est)
+            .astimezone(utc)
+            .replace(tzinfo=None)
+        )
+        market_close = (
+            dt.replace(hour=16, minute=0, tzinfo=est)
+            .astimezone(utc)
+            .replace(tzinfo=None)
+        )
         sessions.append({"name": "regular", "start": market_open, "end": market_close})
 
         if extended_hours:
-            pm_start = dt.replace(hour=4, minute=0, tzinfo=est).astimezone(utc).replace(tzinfo=None)
-            sessions.append({"name": "premarket", "start": pm_start, "end": market_open})
-            ah_end = dt.replace(hour=20, minute=0, tzinfo=est).astimezone(utc).replace(tzinfo=None)
-            sessions.append({"name": "afterhours", "start": market_close, "end": ah_end})
+            pm_start = (
+                dt.replace(hour=4, minute=0, tzinfo=est)
+                .astimezone(utc)
+                .replace(tzinfo=None)
+            )
+            sessions.append(
+                {"name": "premarket", "start": pm_start, "end": market_open}
+            )
+            ah_end = (
+                dt.replace(hour=20, minute=0, tzinfo=est)
+                .astimezone(utc)
+                .replace(tzinfo=None)
+            )
+            sessions.append(
+                {"name": "afterhours", "start": market_close, "end": ah_end}
+            )
 
         if overnight:
-            on_start = dt.replace(hour=20, minute=0, tzinfo=est).astimezone(utc).replace(tzinfo=None)
+            on_start = (
+                dt.replace(hour=20, minute=0, tzinfo=est)
+                .astimezone(utc)
+                .replace(tzinfo=None)
+            )
             next_day = dt + timedelta(days=1)
-            on_end = next_day.replace(hour=4, minute=0, tzinfo=est).astimezone(utc).replace(tzinfo=None)
+            on_end = (
+                next_day.replace(hour=4, minute=0, tzinfo=est)
+                .astimezone(utc)
+                .replace(tzinfo=None)
+            )
             sessions.append({"name": "overnight", "start": on_start, "end": on_end})
 
     return sessions
@@ -261,14 +294,14 @@ def merge_benchmark_and_uptime(
         n_observations=benchmark.n_observations,
         nrmse=benchmark.nrmse,
         hit_rate=benchmark.hit_rate,
-        benchmark_price_range=getattr(benchmark, 'benchmark_price_range', None),
+        benchmark_price_range=getattr(benchmark, "benchmark_price_range", None),
         rmse=benchmark.rmse,
         mean_spread=benchmark.mean_spread,
         rmse_over_spread=benchmark.rmse_over_spread,
-        mean_diff=getattr(benchmark, 'mean_diff', None),
-        t_pvalue=getattr(benchmark, 't_pvalue', None),
-        normality_pvalue=getattr(benchmark, 'normality_pvalue', None),
-        mean_abs_z_score=getattr(benchmark, 'mean_abs_z_score', None),
+        mean_diff=getattr(benchmark, "mean_diff", None),
+        t_pvalue=getattr(benchmark, "t_pvalue", None),
+        normality_pvalue=getattr(benchmark, "normality_pvalue", None),
+        mean_abs_z_score=getattr(benchmark, "mean_abs_z_score", None),
         uptime_pct=uptime["uptime_pct"],
         seconds_with_data=uptime["seconds_with_data"],
         total_seconds=uptime["total_seconds"],
@@ -276,7 +309,7 @@ def merge_benchmark_and_uptime(
         updates_per_second=uptime["updates_per_second"],
         health_status=health,
         error=benchmark.error,
-        execution_time_ms=getattr(benchmark, 'execution_time_ms', 0),
+        execution_time_ms=getattr(benchmark, "execution_time_ms", 0),
     )
 
 
@@ -350,7 +383,9 @@ def print_health_report(
     valid_uptime = [r.uptime_pct for r in results if not r.error]
     median_uptime = statistics.median(valid_uptime) if valid_uptime else None
 
-    uptime_above = sum(1 for r in results if r.uptime_pct >= uptime_threshold and not r.error)
+    uptime_above = sum(
+        1 for r in results if r.uptime_pct >= uptime_threshold and not r.error
+    )
 
     # Collect unique dates for display
     dates = sorted({r.date for r in results})
@@ -360,16 +395,32 @@ def print_health_report(
     print(f"\n{'='*70}")
     print(f"PUBLISHER HEALTH REPORT - Publisher {publisher_id} - {date_display}")
     print(f"{'='*70}")
-    print(f"Overall: {healthy_count}/{total} feeds HEALTHY, "
-          f"{degraded_count} DEGRADED, {failing_count} FAILING")
+    print(
+        f"Overall: {healthy_count}/{total} feeds HEALTHY, "
+        f"{degraded_count} DEGRADED, {failing_count} FAILING"
+    )
     print()
 
-    benchmark_str = f"{pass_count}/{total} pass ({pass_count/total*100:.1f}%)" if total > 0 else "N/A"
-    nrmse_str = f"Median NRMSE: {median_nrmse:.6f}" if median_nrmse is not None else "Median NRMSE: N/A"
+    benchmark_str = (
+        f"{pass_count}/{total} pass ({pass_count/total*100:.1f}%)"
+        if total > 0
+        else "N/A"
+    )
+    nrmse_str = (
+        f"Median NRMSE: {median_nrmse:.6f}"
+        if median_nrmse is not None
+        else "Median NRMSE: N/A"
+    )
     print(f"  Benchmark:  {benchmark_str:<25} |  {nrmse_str}")
 
-    uptime_str = f"{uptime_above}/{total} above {uptime_threshold:.0f}%" if total > 0 else "N/A"
-    uptime_med_str = f"Median uptime: {median_uptime:.2f}%" if median_uptime is not None else "Median uptime: N/A"
+    uptime_str = (
+        f"{uptime_above}/{total} above {uptime_threshold:.0f}%" if total > 0 else "N/A"
+    )
+    uptime_med_str = (
+        f"Median uptime: {median_uptime:.2f}%"
+        if median_uptime is not None
+        else "Median uptime: N/A"
+    )
     print(f"  Uptime:     {uptime_str:<25} |  {uptime_med_str}")
 
     if error_count > 0:
@@ -385,27 +436,42 @@ def print_health_report(
     else:
         print(f"\nFEEDS NEEDING ATTENTION ({len(attention_feeds)} of {total}):")
         print(f"{'-'*90}")
-        print(f"{'Feed':<8} {'Symbol':<25} {'Status':<10} {'Pass':<6} {'Uptime':<8} {'Diagnostics'}")
+        print(
+            f"{'Feed':<8} {'Symbol':<25} {'Status':<10} {'Pass':<6} {'Uptime':<8} {'Diagnostics'}"
+        )
         print(f"{'-'*90}")
 
-        for r in sorted(attention_feeds, key=lambda x: (
-            {"FAILING": 0, "DEGRADED": 1}.get(x.health_status, 2), x.feed_id
-        )):
+        for r in sorted(
+            attention_feeds,
+            key=lambda x: (
+                {"FAILING": 0, "DEGRADED": 1}.get(x.health_status, 2),
+                x.feed_id,
+            ),
+        ):
             symbol_str = (r.symbol or "unknown")[:25]
             pass_str = "PASS" if r.passes else "FAIL"
             uptime_str = f"{r.uptime_pct:.1f}%"
             diag = format_diagnostics(
-                r.mean_diff, r.t_pvalue, r.normality_pvalue, r.mean_abs_z_score,
-                r.passes, r.uptime_pct, uptime_threshold,
+                r.mean_diff,
+                r.t_pvalue,
+                r.normality_pvalue,
+                r.mean_abs_z_score,
+                r.passes,
+                r.uptime_pct,
+                uptime_threshold,
             )
-            print(f"{r.feed_id:<8} {symbol_str:<25} {r.health_status:<10} {pass_str:<6} {uptime_str:<8} {diag}")
+            print(
+                f"{r.feed_id:<8} {symbol_str:<25} {r.health_status:<10} {pass_str:<6} {uptime_str:<8} {diag}"
+            )
 
         print(f"{'-'*90}")
 
     # Section 3: All Feeds
     print(f"\nALL FEEDS:")
     print(f"{'-'*110}")
-    print(f"{'Feed':<8} {'Symbol':<22} {'Date':<12} {'Mode':<14} {'Pass':<6} {'NRMSE':<10} {'Hit%':<8} {'Uptime%':<9} {'Status'}")
+    print(
+        f"{'Feed':<8} {'Symbol':<22} {'Date':<12} {'Mode':<14} {'Pass':<6} {'NRMSE':<10} {'Hit%':<8} {'Uptime%':<9} {'Status'}"
+    )
     print(f"{'-'*110}")
 
     for r in sorted(results, key=lambda x: (x.date, x.feed_id)):
@@ -414,13 +480,17 @@ def print_health_report(
         nrmse_str = f"{r.nrmse:.6f}" if r.nrmse is not None else "N/A"
         hit_str = f"{r.hit_rate:.1f}%" if r.hit_rate is not None else "N/A"
         uptime_str = f"{r.uptime_pct:.2f}%"
-        print(f"{r.feed_id:<8} {symbol_str:<22} {r.date:<12} {r.mode:<14} {pass_str:<6} {nrmse_str:<10} {hit_str:<8} {uptime_str:<9} {r.health_status}")
+        print(
+            f"{r.feed_id:<8} {symbol_str:<22} {r.date:<12} {r.mode:<14} {pass_str:<6} {nrmse_str:<10} {hit_str:<8} {uptime_str:<9} {r.health_status}"
+        )
 
     print(f"{'-'*110}")
 
     # Section 4: Action Items
     quality_fails = sum(1 for r in results if not r.passes and not r.error)
-    uptime_fails = sum(1 for r in results if r.uptime_pct < uptime_threshold and not r.error)
+    uptime_fails = sum(
+        1 for r in results if r.uptime_pct < uptime_threshold and not r.error
+    )
 
     if quality_fails > 0 or uptime_fails > 0:
         print(f"\n{'='*70}")
@@ -431,7 +501,9 @@ def print_health_report(
             print(f"    Check price source calibration, reduce latency")
             print(f"    Target: nrmse < 0.01 or (nrmse < 0.05 + hit_rate >= 95%)")
         if uptime_fails > 0:
-            print(f"  - {uptime_fails} feed(s) with low uptime (< {uptime_threshold:.0f}%):")
+            print(
+                f"  - {uptime_fails} feed(s) with low uptime (< {uptime_threshold:.0f}%):"
+            )
             print(f"    Investigate connectivity gaps, increase update frequency")
         print(f"  - See CSV output for detailed per-feed metrics")
         print(f"{'='*70}")
@@ -457,29 +529,62 @@ def write_health_csv(
 
     # Base header
     header = [
-        "publisher_id", "feed_id", "date", "mode", "symbol",
-        "passes", "n_observations", "nrmse", "hit_rate",
-        "benchmark_price_range", "rmse", "mean_spread", "rmse_over_spread",
-        "mean_diff", "t_pvalue", "normality_pvalue", "mean_abs_z_score",
-        "uptime_pct", "seconds_with_data", "total_seconds",
-        "updates_total", "updates_per_second",
+        "publisher_id",
+        "feed_id",
+        "date",
+        "mode",
+        "symbol",
+        "passes",
+        "n_observations",
+        "nrmse",
+        "hit_rate",
+        "benchmark_price_range",
+        "rmse",
+        "mean_spread",
+        "rmse_over_spread",
+        "mean_diff",
+        "t_pvalue",
+        "normality_pvalue",
+        "mean_abs_z_score",
+        "uptime_pct",
+        "seconds_with_data",
+        "total_seconds",
+        "updates_total",
+        "updates_per_second",
         "health_status",
     ]
 
     if include_extended_hours:
-        header.extend([
-            "premarket_n_observations", "premarket_nrmse", "premarket_hit_rate",
-            "premarket_passes", "premarket_uptime_pct", "premarket_error",
-            "afterhours_n_observations", "afterhours_nrmse", "afterhours_hit_rate",
-            "afterhours_passes", "afterhours_uptime_pct", "afterhours_error",
-        ])
+        header.extend(
+            [
+                "premarket_n_observations",
+                "premarket_nrmse",
+                "premarket_hit_rate",
+                "premarket_passes",
+                "premarket_uptime_pct",
+                "premarket_error",
+                "afterhours_n_observations",
+                "afterhours_nrmse",
+                "afterhours_hit_rate",
+                "afterhours_passes",
+                "afterhours_uptime_pct",
+                "afterhours_error",
+            ]
+        )
 
     if include_overnight:
-        header.extend([
-            "overnight_n_observations", "overnight_n_reference_observations",
-            "overnight_nrmse", "overnight_hit_rate", "overnight_passes",
-            "overnight_uptime_pct", "overnight_reference_publisher_id", "overnight_error",
-        ])
+        header.extend(
+            [
+                "overnight_n_observations",
+                "overnight_n_reference_observations",
+                "overnight_nrmse",
+                "overnight_hit_rate",
+                "overnight_passes",
+                "overnight_uptime_pct",
+                "overnight_reference_publisher_id",
+                "overnight_error",
+            ]
+        )
 
     header.extend(["error", "execution_time_ms"])
 
@@ -489,11 +594,18 @@ def write_health_csv(
 
         for r in sorted(results, key=lambda x: (x.date, x.feed_id)):
             row = [
-                r.publisher_id, r.feed_id, r.date, r.mode, r.symbol or "",
-                r.passes, r.n_observations,
+                r.publisher_id,
+                r.feed_id,
+                r.date,
+                r.mode,
+                r.symbol or "",
+                r.passes,
+                r.n_observations,
                 f"{r.nrmse:.6f}" if r.nrmse is not None else "",
                 f"{r.hit_rate:.2f}" if r.hit_rate is not None else "",
-                f"{r.benchmark_price_range:.6f}" if r.benchmark_price_range is not None else "",
+                f"{r.benchmark_price_range:.6f}"
+                if r.benchmark_price_range is not None
+                else "",
                 f"{r.rmse:.6f}" if r.rmse is not None else "",
                 f"{r.mean_spread:.6f}" if r.mean_spread is not None else "",
                 f"{r.rmse_over_spread:.6f}" if r.rmse_over_spread is not None else "",
@@ -501,38 +613,63 @@ def write_health_csv(
                 f"{r.t_pvalue:.6f}" if r.t_pvalue is not None else "",
                 f"{r.normality_pvalue:.6f}" if r.normality_pvalue is not None else "",
                 f"{r.mean_abs_z_score:.4f}" if r.mean_abs_z_score is not None else "",
-                f"{r.uptime_pct:.2f}", r.seconds_with_data, r.total_seconds,
-                r.updates_total, f"{r.updates_per_second:.1f}",
+                f"{r.uptime_pct:.2f}",
+                r.seconds_with_data,
+                r.total_seconds,
+                r.updates_total,
+                f"{r.updates_per_second:.1f}",
                 r.health_status,
             ]
 
             if include_extended_hours:
-                row.extend([
-                    r.premarket_n_observations or "",
-                    f"{r.premarket_nrmse:.6f}" if r.premarket_nrmse is not None else "",
-                    f"{r.premarket_hit_rate:.2f}" if r.premarket_hit_rate is not None else "",
-                    r.premarket_passes if r.premarket_passes is not None else "",
-                    f"{r.premarket_uptime_pct:.2f}" if r.premarket_uptime_pct is not None else "",
-                    r.premarket_error or "",
-                    r.afterhours_n_observations or "",
-                    f"{r.afterhours_nrmse:.6f}" if r.afterhours_nrmse is not None else "",
-                    f"{r.afterhours_hit_rate:.2f}" if r.afterhours_hit_rate is not None else "",
-                    r.afterhours_passes if r.afterhours_passes is not None else "",
-                    f"{r.afterhours_uptime_pct:.2f}" if r.afterhours_uptime_pct is not None else "",
-                    r.afterhours_error or "",
-                ])
+                row.extend(
+                    [
+                        r.premarket_n_observations or "",
+                        f"{r.premarket_nrmse:.6f}"
+                        if r.premarket_nrmse is not None
+                        else "",
+                        f"{r.premarket_hit_rate:.2f}"
+                        if r.premarket_hit_rate is not None
+                        else "",
+                        r.premarket_passes if r.premarket_passes is not None else "",
+                        f"{r.premarket_uptime_pct:.2f}"
+                        if r.premarket_uptime_pct is not None
+                        else "",
+                        r.premarket_error or "",
+                        r.afterhours_n_observations or "",
+                        f"{r.afterhours_nrmse:.6f}"
+                        if r.afterhours_nrmse is not None
+                        else "",
+                        f"{r.afterhours_hit_rate:.2f}"
+                        if r.afterhours_hit_rate is not None
+                        else "",
+                        r.afterhours_passes if r.afterhours_passes is not None else "",
+                        f"{r.afterhours_uptime_pct:.2f}"
+                        if r.afterhours_uptime_pct is not None
+                        else "",
+                        r.afterhours_error or "",
+                    ]
+                )
 
             if include_overnight:
-                row.extend([
-                    r.overnight_n_observations or "",
-                    r.overnight_n_reference_observations or "",
-                    f"{r.overnight_nrmse:.6f}" if r.overnight_nrmse is not None else "",
-                    f"{r.overnight_hit_rate:.2f}" if r.overnight_hit_rate is not None else "",
-                    r.overnight_passes if r.overnight_passes is not None else "",
-                    f"{r.overnight_uptime_pct:.2f}" if r.overnight_uptime_pct is not None else "",
-                    r.overnight_reference_publisher_id or "",
-                    r.overnight_error or "",
-                ])
+                row.extend(
+                    [
+                        r.overnight_n_observations or "",
+                        r.overnight_n_reference_observations or "",
+                        f"{r.overnight_nrmse:.6f}"
+                        if r.overnight_nrmse is not None
+                        else "",
+                        f"{r.overnight_hit_rate:.2f}"
+                        if r.overnight_hit_rate is not None
+                        else "",
+                        r.overnight_passes if r.overnight_passes is not None else "",
+                        f"{r.overnight_uptime_pct:.2f}"
+                        if r.overnight_uptime_pct is not None
+                        else "",
+                        r.overnight_reference_publisher_id or "",
+                        r.overnight_error or "",
+                    ]
+                )
 
             row.extend([r.error or "", r.execution_time_ms])
             writer.writerow(row)
@@ -551,21 +688,47 @@ def write_health_csv(
 
         valid_nrmse = [r.nrmse for r in results if r.nrmse is not None and not r.error]
         valid_uptime = [r.uptime_pct for r in results if not r.error]
-        valid_hit_rate = [r.hit_rate for r in results if r.hit_rate is not None and not r.error]
+        valid_hit_rate = [
+            r.hit_rate for r in results if r.hit_rate is not None and not r.error
+        ]
 
         writer.writerow(["total_feeds", total])
         writer.writerow(["pass_count", pass_count])
         writer.writerow(["fail_count", fail_count])
         writer.writerow(["error_count", error_count])
-        writer.writerow(["pass_rate_pct", f"{pass_count/total*100:.1f}" if total > 0 else "0"])
+        writer.writerow(
+            ["pass_rate_pct", f"{pass_count/total*100:.1f}" if total > 0 else "0"]
+        )
         writer.writerow(["healthy_count", healthy_count])
         writer.writerow(["degraded_count", degraded_count])
         writer.writerow(["failing_count", failing_count])
-        writer.writerow(["median_nrmse", f"{statistics.median(valid_nrmse):.6f}" if valid_nrmse else ""])
-        writer.writerow(["mean_nrmse", f"{statistics.mean(valid_nrmse):.6f}" if valid_nrmse else ""])
-        writer.writerow(["median_hit_rate", f"{statistics.median(valid_hit_rate):.2f}" if valid_hit_rate else ""])
-        writer.writerow(["median_uptime_pct", f"{statistics.median(valid_uptime):.2f}" if valid_uptime else ""])
-        writer.writerow(["mean_uptime_pct", f"{statistics.mean(valid_uptime):.2f}" if valid_uptime else ""])
+        writer.writerow(
+            [
+                "median_nrmse",
+                f"{statistics.median(valid_nrmse):.6f}" if valid_nrmse else "",
+            ]
+        )
+        writer.writerow(
+            ["mean_nrmse", f"{statistics.mean(valid_nrmse):.6f}" if valid_nrmse else ""]
+        )
+        writer.writerow(
+            [
+                "median_hit_rate",
+                f"{statistics.median(valid_hit_rate):.2f}" if valid_hit_rate else "",
+            ]
+        )
+        writer.writerow(
+            [
+                "median_uptime_pct",
+                f"{statistics.median(valid_uptime):.2f}" if valid_uptime else "",
+            ]
+        )
+        writer.writerow(
+            [
+                "mean_uptime_pct",
+                f"{statistics.mean(valid_uptime):.2f}" if valid_uptime else "",
+            ]
+        )
 
     print(f"Results written to {output_path}")
 
@@ -607,7 +770,8 @@ def run_report(
 
         # Get session windows
         sessions = get_uptime_sessions(
-            benchmark_result.date, mode,
+            benchmark_result.date,
+            mode,
             extended_hours=include_extended_hours,
             overnight=include_overnight,
         )
@@ -616,17 +780,25 @@ def run_report(
         regular_session = next((s for s in sessions if s["name"] == "regular"), None)
         if regular_session:
             regular_uptime = compute_feed_uptime(
-                client, publisher_id, benchmark_result.feed_id,
-                regular_session["start"], regular_session["end"],
+                client,
+                publisher_id,
+                benchmark_result.feed_id,
+                regular_session["start"],
+                regular_session["end"],
             )
         else:
             regular_uptime = {
-                "uptime_pct": 0.0, "seconds_with_data": 0,
-                "total_seconds": 0, "updates_total": 0, "updates_per_second": 0.0,
+                "uptime_pct": 0.0,
+                "seconds_with_data": 0,
+                "total_seconds": 0,
+                "updates_total": 0,
+                "updates_per_second": 0.0,
             }
 
         # Merge benchmark + regular uptime
-        health = merge_benchmark_and_uptime(benchmark_result, regular_uptime, uptime_threshold)
+        health = merge_benchmark_and_uptime(
+            benchmark_result, regular_uptime, uptime_threshold
+        )
 
         # Compute uptime for extended/overnight sessions
         for session in sessions:
@@ -634,8 +806,11 @@ def run_report(
                 continue
 
             session_uptime = compute_feed_uptime(
-                client, publisher_id, benchmark_result.feed_id,
-                session["start"], session["end"],
+                client,
+                publisher_id,
+                benchmark_result.feed_id,
+                session["start"],
+                session["end"],
             )
 
             if session["name"] == "premarket":
@@ -646,7 +821,11 @@ def run_report(
                 health.overnight_uptime_pct = session_uptime["uptime_pct"]
 
         # Populate extended benchmark fields from the benchmark result
-        if include_extended_hours and hasattr(benchmark_result, "premarket_metrics") and benchmark_result.premarket_metrics:
+        if (
+            include_extended_hours
+            and hasattr(benchmark_result, "premarket_metrics")
+            and benchmark_result.premarket_metrics
+        ):
             pm = benchmark_result.premarket_metrics
             health.premarket_n_observations = pm.n_observations
             health.premarket_nrmse = pm.nrmse
@@ -654,7 +833,11 @@ def run_report(
             health.premarket_passes = pm.passes
             health.premarket_error = pm.error
 
-        if include_extended_hours and hasattr(benchmark_result, "afterhours_metrics") and benchmark_result.afterhours_metrics:
+        if (
+            include_extended_hours
+            and hasattr(benchmark_result, "afterhours_metrics")
+            and benchmark_result.afterhours_metrics
+        ):
             ah = benchmark_result.afterhours_metrics
             health.afterhours_n_observations = ah.n_observations
             health.afterhours_nrmse = ah.nrmse
@@ -662,7 +845,11 @@ def run_report(
             health.afterhours_passes = ah.passes
             health.afterhours_error = ah.error
 
-        if include_overnight and hasattr(benchmark_result, "overnight_metrics") and benchmark_result.overnight_metrics:
+        if (
+            include_overnight
+            and hasattr(benchmark_result, "overnight_metrics")
+            and benchmark_result.overnight_metrics
+        ):
             on = benchmark_result.overnight_metrics
             health.overnight_n_observations = on.n_observations
             health.overnight_n_reference_observations = on.n_reference_observations
@@ -676,10 +863,7 @@ def run_report(
 
     # Process in parallel
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(process_single, br): br
-            for br in benchmark_results
-        }
+        futures = {executor.submit(process_single, br): br for br in benchmark_results}
         for future in as_completed(futures):
             br = futures[future]
             try:
@@ -687,14 +871,19 @@ def run_report(
                 health_results.append(result)
                 status_str = result.health_status
                 uptime_str = f"{result.uptime_pct:.1f}%"
-                print(f"  Feed {result.feed_id} ({result.symbol or 'unknown'}): "
-                      f"{status_str} - uptime={uptime_str}")
+                print(
+                    f"  Feed {result.feed_id} ({result.symbol or 'unknown'}): "
+                    f"{status_str} - uptime={uptime_str}"
+                )
             except Exception as e:
                 print(f"  Feed {br.feed_id}: ERROR computing uptime - {e}")
                 # Create a result with 0 uptime on error
                 fallback_uptime = {
-                    "uptime_pct": 0.0, "seconds_with_data": 0,
-                    "total_seconds": 0, "updates_total": 0, "updates_per_second": 0.0,
+                    "uptime_pct": 0.0,
+                    "seconds_with_data": 0,
+                    "total_seconds": 0,
+                    "updates_total": 0,
+                    "updates_per_second": 0.0,
                 }
                 health_results.append(
                     merge_benchmark_and_uptime(br, fallback_uptime, uptime_threshold)
@@ -735,30 +924,72 @@ Examples:
 """,
     )
 
-    parser.add_argument("--csv", type=Path, help="CSV file with feed_id,date,mode columns")
+    parser.add_argument(
+        "--csv", type=Path, help="CSV file with feed_id,date,mode columns"
+    )
     parser.add_argument("--publisher-id", type=int, help="Publisher ID")
     parser.add_argument("--output", type=Path, help="Output CSV path")
-    parser.add_argument("--workers", type=int, default=4, help="Parallel workers (default: 4)")
-    parser.add_argument("--date", nargs="+", metavar="YYYY-MM-DD", help="Date(s) to evaluate")
+    parser.add_argument(
+        "--workers", type=int, default=4, help="Parallel workers (default: 4)"
+    )
+    parser.add_argument(
+        "--date", nargs="+", metavar="YYYY-MM-DD", help="Date(s) to evaluate"
+    )
     parser.add_argument("--start-date", help="Range start date (inclusive)")
     parser.add_argument("--end-date", help="Range end date (inclusive)")
-    parser.add_argument("--mode", type=str, help="Asset class: fx, metals, us-equities, commodity, us-treasuries")
-    parser.add_argument("--include-asset-class", type=str, nargs="+", metavar="CLASS",
-                        help="Only these asset classes")
-    parser.add_argument("--exclude-asset-class", type=str, nargs="+", metavar="CLASS",
-                        help="Exclude these asset classes")
-    parser.add_argument("--feed-id", type=int, nargs="+", metavar="ID", dest="feed_ids",
-                        help="Feed ID(s)")
-    parser.add_argument("--list-asset-classes", action="store_true",
-                        help="List asset classes in CSV and exit")
-    parser.add_argument("--extended-hours", action="store_true",
-                        help="Include extended hours (US equities)")
-    parser.add_argument("--overnight", action="store_true",
-                        help="Include overnight session (US equities)")
-    parser.add_argument("--skip-scipy-tests", action="store_true",
-                        help="Skip statistical tests for faster execution")
-    parser.add_argument("--uptime-threshold", type=float, default=95.0,
-                        help="Minimum uptime %% for HEALTHY status (default: 95.0)")
+    parser.add_argument(
+        "--mode",
+        type=str,
+        help="Asset class: fx, metals, us-equities, commodity, us-treasuries",
+    )
+    parser.add_argument(
+        "--include-asset-class",
+        type=str,
+        nargs="+",
+        metavar="CLASS",
+        help="Only these asset classes",
+    )
+    parser.add_argument(
+        "--exclude-asset-class",
+        type=str,
+        nargs="+",
+        metavar="CLASS",
+        help="Exclude these asset classes",
+    )
+    parser.add_argument(
+        "--feed-id",
+        type=int,
+        nargs="+",
+        metavar="ID",
+        dest="feed_ids",
+        help="Feed ID(s)",
+    )
+    parser.add_argument(
+        "--list-asset-classes",
+        action="store_true",
+        help="List asset classes in CSV and exit",
+    )
+    parser.add_argument(
+        "--extended-hours",
+        action="store_true",
+        help="Include extended hours (US equities)",
+    )
+    parser.add_argument(
+        "--overnight",
+        action="store_true",
+        help="Include overnight session (US equities)",
+    )
+    parser.add_argument(
+        "--skip-scipy-tests",
+        action="store_true",
+        help="Skip statistical tests for faster execution",
+    )
+    parser.add_argument(
+        "--uptime-threshold",
+        type=float,
+        default=95.0,
+        help="Minimum uptime %% for HEALTHY status (default: 95.0)",
+    )
 
     args = parser.parse_args()
 
@@ -767,7 +998,9 @@ Examples:
         parser.error("--list-asset-classes requires --csv")
 
     if not args.csv and (args.include_asset_class or args.exclude_asset_class):
-        parser.error("--include-asset-class and --exclude-asset-class only apply to --csv mode")
+        parser.error(
+            "--include-asset-class and --exclude-asset-class only apply to --csv mode"
+        )
 
     if args.csv and args.mode:
         parser.error("--mode is for single-feed mode only")
@@ -846,7 +1079,9 @@ Examples:
 
     if args.csv:
         benchmark_results = process_csv(
-            args.csv, publisher_id, args.workers,
+            args.csv,
+            publisher_id,
+            args.workers,
             date_override=date_override,
             include_asset_classes=args.include_asset_class,
             exclude_asset_classes=args.exclude_asset_class,
@@ -858,17 +1093,22 @@ Examples:
     else:
         benchmark_results = []
         feed_date_pairs = [
-            (fid, dv, args.mode)
-            for fid in args.feed_ids
-            for dv in resolved_dates
+            (fid, dv, args.mode) for fid in args.feed_ids for dv in resolved_dates
         ]
-        print(f"Processing {len(feed_date_pairs)} evaluations with {args.workers} workers...")
+        print(
+            f"Processing {len(feed_date_pairs)} evaluations with {args.workers} workers..."
+        )
 
         def eval_single(args_tuple):
             fid, dv, mode = args_tuple
             cl, ca = get_clients(config)
             return evaluate_publisher_feed(
-                cl, ca, publisher_id, fid, dv, mode,
+                cl,
+                ca,
+                publisher_id,
+                fid,
+                dv,
+                mode,
                 include_extended_hours=args.extended_hours,
                 include_overnight=args.overnight,
                 skip_scipy_tests=args.skip_scipy_tests,
@@ -885,7 +1125,9 @@ Examples:
                     if r.error:
                         status = f"ERROR: {r.error[:50]}"
                     nrmse_s = f"{r.nrmse:.4f}" if r.nrmse is not None else "N/A"
-                    print(f"  Feed {r.feed_id} ({r.symbol or 'unknown'}): {status} nrmse={nrmse_s}")
+                    print(
+                        f"  Feed {r.feed_id} ({r.symbol or 'unknown'}): {status} nrmse={nrmse_s}"
+                    )
                 except Exception as e:
                     fid, dv, mode_val = t
                     print(f"  Feed {fid} ({dv}): ERROR - {e}")
@@ -900,7 +1142,9 @@ Examples:
     print(f"{'='*70}")
 
     health_results = run_report(
-        benchmark_results, publisher_id, config,
+        benchmark_results,
+        publisher_id,
+        config,
         uptime_threshold=args.uptime_threshold,
         include_extended_hours=args.extended_hours,
         include_overnight=args.overnight,
@@ -911,20 +1155,25 @@ Examples:
 
     # Output
     print_health_report(health_results, publisher_id, args.uptime_threshold)
-    print_interpretation_guide({
-        "median_mae": None,
-        "mean_mean_diff": None,
-        "t_test_significance_rate": None,
-        "total_t_tests": 0,
-        "significant_t_tests": 0,
-        "normality_rate": None,
-        "total_normality_tests": 0,
-        "normal_distributions": 0,
-        "median_z_score": None,
-    })
-    write_health_csv(health_results, output_path,
-                     include_extended_hours=args.extended_hours,
-                     include_overnight=args.overnight)
+    print_interpretation_guide(
+        {
+            "median_mae": None,
+            "mean_mean_diff": None,
+            "t_test_significance_rate": None,
+            "total_t_tests": 0,
+            "significant_t_tests": 0,
+            "normality_rate": None,
+            "total_normality_tests": 0,
+            "normal_distributions": 0,
+            "median_z_score": None,
+        }
+    )
+    write_health_csv(
+        health_results,
+        output_path,
+        include_extended_hours=args.extended_hours,
+        include_overnight=args.overnight,
+    )
 
     print(f"\nTotal time: {total_time:.1f}s")
 

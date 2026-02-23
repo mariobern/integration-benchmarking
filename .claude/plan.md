@@ -3,12 +3,14 @@
 ## Requirements Restatement
 
 The user wants to enhance the `publisher_benchmark.py` script to:
+
 1. Add summary metrics as part of the CSV output (currently only printed to console)
 2. Add additional summary metrics that would be useful for evaluating publisher data quality
 
 ## Current State Analysis
 
 **Current output**: The script writes per-feed results to CSV, then prints a summary to console:
+
 - Total feeds evaluated
 - PASS count (rmse/spread <= 1.0)
 - FAIL count
@@ -23,6 +25,7 @@ The user wants to enhance the `publisher_benchmark.py` script to:
 ### Phase 1: Add Summary Section to CSV
 
 Append a summary section at the end of the CSV file with:
+
 - Empty row separator
 - Summary header row: `SUMMARY`
 - Key-value pairs for summary metrics
@@ -30,6 +33,7 @@ Append a summary section at the end of the CSV file with:
 ### Phase 2: Add Additional Useful Summary Metrics
 
 **Aggregate Statistics:**
+
 - `total_feeds`: Total number of feeds evaluated
 - `pass_count`: Number of feeds that passed (rmse/spread <= 1.0)
 - `fail_count`: Number of feeds that failed (rmse/spread > 1.0)
@@ -37,6 +41,7 @@ Append a summary section at the end of the CSV file with:
 - `pass_rate_pct`: Pass rate as percentage
 
 **Quality Metrics:**
+
 - `median_rmse_over_spread`: Median rmse/spread ratio (more robust than mean)
 - `mean_rmse_over_spread`: Average rmse/spread ratio for successful evaluations
 - `p90_rmse_over_spread`: 90th percentile rmse/spread (identifies worst performers)
@@ -45,15 +50,18 @@ Append a summary section at the end of the CSV file with:
 - `max_rmse_over_spread`: Worst performing feed (excluding errors)
 
 **Coverage Metrics:**
+
 - `total_observations`: Total number of matched observations across all feeds
 - `mean_observations_per_feed`: Average observations per feed
 - `median_observations_per_feed`: Median observations per feed
 
 **Breakdown by Asset Class:**
+
 - `pass_count_by_mode`: Pass counts grouped by mode (fx, metals, us-equities, etc.)
 - `fail_count_by_mode`: Fail counts grouped by mode
 
 **Timing Metrics:**
+
 - `total_time_sec`: Total execution time
 - `avg_time_per_feed_ms`: Average time per feed in milliseconds
 
@@ -62,15 +70,18 @@ Append a summary section at the end of the CSV file with:
 ### File: `publisher_benchmark.py`
 
 1. **Modify `write_results_csv()` function** (lines 513-554):
+
    - Add parameter for summary stats
    - After writing per-feed results, add summary section
 
 2. **Create new function `compute_summary_stats()`**:
+
    - Takes list of PublisherBenchmarkResult
    - Returns dict of summary metrics
    - Uses Python statistics module for median/percentiles
 
 3. **Modify `process_csv()` function** (lines 427-510):
+
    - Call `compute_summary_stats()` before `write_results_csv()`
    - Pass stats to `write_results_csv()`
 

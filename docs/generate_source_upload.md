@@ -23,14 +23,14 @@ python generate_source_upload.py --tickers AAPL --force-refresh
 
 ## Arguments
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--tickers` | Comma-separated ticker list (e.g., `AAPL,NVDA,META`) | - |
-| `--ticker-file` | File with one ticker per line (or CSV) | - |
-| `--output` | Output CSV path | `source_upload.csv` |
-| `--no-clickhouse` | Skip ClickHouse lookups (offline mode) | False |
-| `--us-stocks-path` | Path to US-Stock-Symbols repo | `../US-Stock-Symbols` |
-| `--force-refresh` | Re-download NASDAQ Trader data (ignores cache) | False |
+| Argument           | Description                                          | Default               |
+| ------------------ | ---------------------------------------------------- | --------------------- |
+| `--tickers`        | Comma-separated ticker list (e.g., `AAPL,NVDA,META`) | -                     |
+| `--ticker-file`    | File with one ticker per line (or CSV)               | -                     |
+| `--output`         | Output CSV path                                      | `source_upload.csv`   |
+| `--no-clickhouse`  | Skip ClickHouse lookups (offline mode)               | False                 |
+| `--us-stocks-path` | Path to US-Stock-Symbols repo                        | `../US-Stock-Symbols` |
+| `--force-refresh`  | Re-download NASDAQ Trader data (ignores cache)       | False                 |
 
 > `--tickers` and `--ticker-file` are mutually exclusive; one is required.
 
@@ -47,6 +47,7 @@ If multiple RICs exist for the same ticker (e.g., `TSM.N` and `TSM.Z`), the one 
 ### Tier 2: NASDAQ Trader (offline fallback)
 
 Downloads and parses two files from `nasdaqtrader.com`:
+
 - `nasdaqlisted.txt` — All NASDAQ-listed securities (assigned `.O` suffix)
 - `otherlisted.txt` — NYSE, ARCA, BATS, AMEX securities (exchange column maps to `.N`, `.P`, `.Z`, `.A` suffixes)
 
@@ -61,6 +62,7 @@ Tickers not found in any source default to NYSE suffix (`.N`) and are flagged fo
 ## Name Resolution
 
 Company names are resolved from:
+
 1. **NASDAQ Trader** listings (primary)
 2. **US-Stock-Symbols** repo JSON files (fallback, also provides country for ADR detection)
 3. **Ticker symbol itself** (final fallback, with warning)
@@ -68,12 +70,14 @@ Company names are resolved from:
 ## Asset Classification
 
 Each ticker is classified as either:
+
 - **Equity** — Default for US-domiciled companies, ETFs, and common stock
 - **American Depositary Shares** — If the security name contains ADR-related keywords (`"american depositary"`, `"depositary shares"`, etc.) or if the company's country (from US-Stock-Symbols) is not "United States"
 
 ## Dotted Ticker Handling
 
 Tickers with share class notation (e.g., `BRK.B`, `BF.B`) are converted to Datascope's RIC format:
+
 - `BRK.B` → `BRKb.N` (lowercase class letter, no dot)
 - `BRK.A` → `BRKa.N`
 - `BF.B` → `BFb.N`
@@ -91,18 +95,18 @@ TSM.N,RIC,equity.tsm,Equity.US.TSM/USD,1436,,,TSM,Taiwan Semiconductor Manufactu
 BRKb.N,RIC,equity.brk.b,Equity.US.BRK.B/USD,,,,BRK.B,Berkshire Hathaway Inc. New Common Stock,Equity
 ```
 
-| Column | Description |
-|--------|-------------|
-| `source_value` | RIC (e.g., `AAPL.O`) |
-| `source_type` | Always `RIC` |
-| `pyth_id` | `equity.<ticker_lower>` |
-| `pythnet_id` | `Equity.US.<TICKER>/USD` |
-| `pyth_lazer_id` | Numeric feed ID from `feeds_metadata_latest`, or empty |
-| `valid_from` | Empty (for manual entry) |
-| `valid_to` | Empty (for manual entry) |
-| `ticker` | Original ticker symbol |
-| `asset_full_name` | Company/security name |
-| `asset_class` | `Equity` or `American Depositary Shares` |
+| Column            | Description                                            |
+| ----------------- | ------------------------------------------------------ |
+| `source_value`    | RIC (e.g., `AAPL.O`)                                   |
+| `source_type`     | Always `RIC`                                           |
+| `pyth_id`         | `equity.<ticker_lower>`                                |
+| `pythnet_id`      | `Equity.US.<TICKER>/USD`                               |
+| `pyth_lazer_id`   | Numeric feed ID from `feeds_metadata_latest`, or empty |
+| `valid_from`      | Empty (for manual entry)                               |
+| `valid_to`        | Empty (for manual entry)                               |
+| `ticker`          | Original ticker symbol                                 |
+| `asset_full_name` | Company/security name                                  |
+| `asset_class`     | `Equity` or `American Depositary Shares`               |
 
 > **Note:** The header uses spaces after commas but data rows do not. This matches the existing `source_upload_15_Jan.csv` convention.
 
@@ -117,6 +121,7 @@ AAPL,NVDA,META,TSM,BRK.B
 ### File (`--ticker-file`)
 
 One ticker per line:
+
 ```
 AAPL
 NVDA
@@ -126,6 +131,7 @@ TSM
 ```
 
 Or CSV (first column is used, header rows like `ticker` or `symbol` are auto-detected and skipped):
+
 ```
 ticker,other_column
 AAPL,whatever
@@ -158,20 +164,23 @@ Warnings (1):
 
 ## Data Sources
 
-| Source | What It Provides | Requires |
-|--------|-----------------|----------|
-| Datascope ClickHouse (`analytics_clickhouse`) | RICs, `pyth_lazer_id` | `config.yaml` credentials |
-| Lazer ClickHouse (`lazer_clickhouse_prod`) | `pyth_lazer_id` via `feeds_metadata_latest` | `config.yaml` credentials |
-| NASDAQ Trader (`nasdaqtrader.com`) | Exchange listing, security names | Internet (cached 24h) |
-| US-Stock-Symbols repo (`../US-Stock-Symbols`) | Company names, country | Local clone |
+| Source                                        | What It Provides                            | Requires                  |
+| --------------------------------------------- | ------------------------------------------- | ------------------------- |
+| Datascope ClickHouse (`analytics_clickhouse`) | RICs, `pyth_lazer_id`                       | `config.yaml` credentials |
+| Lazer ClickHouse (`lazer_clickhouse_prod`)    | `pyth_lazer_id` via `feeds_metadata_latest` | `config.yaml` credentials |
+| NASDAQ Trader (`nasdaqtrader.com`)            | Exchange listing, security names            | Internet (cached 24h)     |
+| US-Stock-Symbols repo (`../US-Stock-Symbols`) | Company names, country                      | Local clone               |
 
 ## Troubleshooting
 
 ### ClickHouse connection fails
+
 The script gracefully falls back to offline mode (NASDAQ Trader only). You can also use `--no-clickhouse` explicitly.
 
 ### NASDAQ Trader download fails
+
 If a cached version exists, it uses the stale cache with a warning. If no cache exists, the script errors out.
 
 ### Ticker format validation fails
+
 Only tickers matching `[A-Z]{1,5}(\.[A-Z])?` are accepted. Invalid formats are skipped with a warning.

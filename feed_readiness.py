@@ -300,16 +300,22 @@ def merge_results(
 
     for detail in benchmark_details:
         if detail.premarket_metrics is not None:
-            premarket_bench_passes[detail.publisher_id] = (
-                detail.premarket_metrics.passes and not bool(detail.premarket_metrics.error)
+            premarket_bench_passes[
+                detail.publisher_id
+            ] = detail.premarket_metrics.passes and not bool(
+                detail.premarket_metrics.error
             )
         if detail.afterhours_metrics is not None:
-            afterhours_bench_passes[detail.publisher_id] = (
-                detail.afterhours_metrics.passes and not bool(detail.afterhours_metrics.error)
+            afterhours_bench_passes[
+                detail.publisher_id
+            ] = detail.afterhours_metrics.passes and not bool(
+                detail.afterhours_metrics.error
             )
         if detail.overnight_metrics is not None:
-            overnight_bench_passes[detail.publisher_id] = (
-                detail.overnight_metrics.passes and not bool(detail.overnight_metrics.error)
+            overnight_bench_passes[
+                detail.publisher_id
+            ] = detail.overnight_metrics.passes and not bool(
+                detail.overnight_metrics.error
             )
 
     all_publisher_ids = sorted(set(benchmark_by_pub) | set(regular_uptime_by_pub))
@@ -335,7 +341,9 @@ def merge_results(
                 else "Missing benchmark publisher result"
             )
         else:
-            benchmark_passes = benchmark_detail.passes and not bool(benchmark_detail.error)
+            benchmark_passes = benchmark_detail.passes and not bool(
+                benchmark_detail.error
+            )
             benchmark_nrmse = benchmark_detail.nrmse
             benchmark_hit_rate = benchmark_detail.hit_rate
             benchmark_n_observations = benchmark_detail.n_observations
@@ -378,37 +386,102 @@ def merge_results(
                 uptime_error=uptime_error,
                 fully_passes=fully_passes,
                 benchmark_detail=benchmark_detail if include_detailed else None,
-                uptime_sessions=uptime_sessions_by_pub.get(publisher_id) if include_detailed else None,
-                premarket_benchmark_passes=(benchmark_detail.premarket_metrics.passes and not bool(benchmark_detail.premarket_metrics.error)) if benchmark_detail is not None and benchmark_detail.premarket_metrics is not None else None,
-                premarket_benchmark_nrmse=benchmark_detail.premarket_metrics.nrmse if benchmark_detail is not None and benchmark_detail.premarket_metrics is not None else None,
-                premarket_benchmark_hit_rate=benchmark_detail.premarket_metrics.hit_rate if benchmark_detail is not None and benchmark_detail.premarket_metrics is not None else None,
-                premarket_benchmark_n_observations=benchmark_detail.premarket_metrics.n_observations if benchmark_detail is not None and benchmark_detail.premarket_metrics is not None else None,
-                afterhours_benchmark_passes=(benchmark_detail.afterhours_metrics.passes and not bool(benchmark_detail.afterhours_metrics.error)) if benchmark_detail is not None and benchmark_detail.afterhours_metrics is not None else None,
-                afterhours_benchmark_nrmse=benchmark_detail.afterhours_metrics.nrmse if benchmark_detail is not None and benchmark_detail.afterhours_metrics is not None else None,
-                afterhours_benchmark_hit_rate=benchmark_detail.afterhours_metrics.hit_rate if benchmark_detail is not None and benchmark_detail.afterhours_metrics is not None else None,
-                afterhours_benchmark_n_observations=benchmark_detail.afterhours_metrics.n_observations if benchmark_detail is not None and benchmark_detail.afterhours_metrics is not None else None,
-                overnight_benchmark_passes=(benchmark_detail.overnight_metrics.passes and not bool(benchmark_detail.overnight_metrics.error)) if benchmark_detail is not None and benchmark_detail.overnight_metrics is not None else None,
-                overnight_benchmark_nrmse=benchmark_detail.overnight_metrics.nrmse if benchmark_detail is not None and benchmark_detail.overnight_metrics is not None else None,
-                overnight_benchmark_hit_rate=benchmark_detail.overnight_metrics.hit_rate if benchmark_detail is not None and benchmark_detail.overnight_metrics is not None else None,
-                overnight_benchmark_n_observations=benchmark_detail.overnight_metrics.n_observations if benchmark_detail is not None and benchmark_detail.overnight_metrics is not None else None,
-                premarket_uptime_passes=premarket_uptime_by_pub[publisher_id].passes if publisher_id in premarket_uptime_by_pub else None,
-                premarket_uptime_pct=premarket_uptime_by_pub[publisher_id].uptime_pct if publisher_id in premarket_uptime_by_pub else None,
-                afterhours_uptime_passes=afterhours_uptime_by_pub[publisher_id].passes if publisher_id in afterhours_uptime_by_pub else None,
-                afterhours_uptime_pct=afterhours_uptime_by_pub[publisher_id].uptime_pct if publisher_id in afterhours_uptime_by_pub else None,
-                overnight_uptime_passes=overnight_uptime_by_pub[publisher_id].passes if publisher_id in overnight_uptime_by_pub else None,
-                overnight_uptime_pct=overnight_uptime_by_pub[publisher_id].uptime_pct if publisher_id in overnight_uptime_by_pub else None,
+                uptime_sessions=uptime_sessions_by_pub.get(publisher_id)
+                if include_detailed
+                else None,
+                premarket_benchmark_passes=(
+                    benchmark_detail.premarket_metrics.passes
+                    and not bool(benchmark_detail.premarket_metrics.error)
+                )
+                if benchmark_detail is not None
+                and benchmark_detail.premarket_metrics is not None
+                else None,
+                premarket_benchmark_nrmse=benchmark_detail.premarket_metrics.nrmse
+                if benchmark_detail is not None
+                and benchmark_detail.premarket_metrics is not None
+                else None,
+                premarket_benchmark_hit_rate=benchmark_detail.premarket_metrics.hit_rate
+                if benchmark_detail is not None
+                and benchmark_detail.premarket_metrics is not None
+                else None,
+                premarket_benchmark_n_observations=benchmark_detail.premarket_metrics.n_observations
+                if benchmark_detail is not None
+                and benchmark_detail.premarket_metrics is not None
+                else None,
+                afterhours_benchmark_passes=(
+                    benchmark_detail.afterhours_metrics.passes
+                    and not bool(benchmark_detail.afterhours_metrics.error)
+                )
+                if benchmark_detail is not None
+                and benchmark_detail.afterhours_metrics is not None
+                else None,
+                afterhours_benchmark_nrmse=benchmark_detail.afterhours_metrics.nrmse
+                if benchmark_detail is not None
+                and benchmark_detail.afterhours_metrics is not None
+                else None,
+                afterhours_benchmark_hit_rate=benchmark_detail.afterhours_metrics.hit_rate
+                if benchmark_detail is not None
+                and benchmark_detail.afterhours_metrics is not None
+                else None,
+                afterhours_benchmark_n_observations=benchmark_detail.afterhours_metrics.n_observations
+                if benchmark_detail is not None
+                and benchmark_detail.afterhours_metrics is not None
+                else None,
+                overnight_benchmark_passes=(
+                    benchmark_detail.overnight_metrics.passes
+                    and not bool(benchmark_detail.overnight_metrics.error)
+                )
+                if benchmark_detail is not None
+                and benchmark_detail.overnight_metrics is not None
+                else None,
+                overnight_benchmark_nrmse=benchmark_detail.overnight_metrics.nrmse
+                if benchmark_detail is not None
+                and benchmark_detail.overnight_metrics is not None
+                else None,
+                overnight_benchmark_hit_rate=benchmark_detail.overnight_metrics.hit_rate
+                if benchmark_detail is not None
+                and benchmark_detail.overnight_metrics is not None
+                else None,
+                overnight_benchmark_n_observations=benchmark_detail.overnight_metrics.n_observations
+                if benchmark_detail is not None
+                and benchmark_detail.overnight_metrics is not None
+                else None,
+                premarket_uptime_passes=premarket_uptime_by_pub[publisher_id].passes
+                if publisher_id in premarket_uptime_by_pub
+                else None,
+                premarket_uptime_pct=premarket_uptime_by_pub[publisher_id].uptime_pct
+                if publisher_id in premarket_uptime_by_pub
+                else None,
+                afterhours_uptime_passes=afterhours_uptime_by_pub[publisher_id].passes
+                if publisher_id in afterhours_uptime_by_pub
+                else None,
+                afterhours_uptime_pct=afterhours_uptime_by_pub[publisher_id].uptime_pct
+                if publisher_id in afterhours_uptime_by_pub
+                else None,
+                overnight_uptime_passes=overnight_uptime_by_pub[publisher_id].passes
+                if publisher_id in overnight_uptime_by_pub
+                else None,
+                overnight_uptime_pct=overnight_uptime_by_pub[publisher_id].uptime_pct
+                if publisher_id in overnight_uptime_by_pub
+                else None,
             )
         )
 
-    regular_uptime_rows = [u for u in uptime_result.publisher_uptimes if u.session == SESSION_REGULAR]
+    regular_uptime_rows = [
+        u for u in uptime_result.publisher_uptimes if u.session == SESSION_REGULAR
+    ]
     uptime_passing_count = sum(1 for u in regular_uptime_rows if u.passes)
     uptime_failing_count = len(regular_uptime_rows) - uptime_passing_count
 
     regular_uptime_values = [u.uptime_pct for u in regular_uptime_rows]
-    median_uptime_pct = statistics.median(regular_uptime_values) if regular_uptime_values else None
+    median_uptime_pct = (
+        statistics.median(regular_uptime_values) if regular_uptime_values else None
+    )
 
     benchmark_ready = benchmark_result.ready and not bool(benchmark_result.error)
-    uptime_ready = not bool(uptime_result.error) and uptime_passing_count >= target_pub_count
+    uptime_ready = (
+        not bool(uptime_result.error) and uptime_passing_count >= target_pub_count
+    )
 
     ready = (
         not bool(benchmark_result.error)
@@ -423,17 +496,23 @@ def merge_results(
         error_parts.append(f"uptime: {uptime_result.error}")
 
     premarket_stats = (
-        _compute_session_readiness(premarket_bench_passes, premarket_uptime_by_pub, target_pub_count)
+        _compute_session_readiness(
+            premarket_bench_passes, premarket_uptime_by_pub, target_pub_count
+        )
         if premarket_bench_passes or premarket_uptime_by_pub
         else None
     )
     afterhours_stats = (
-        _compute_session_readiness(afterhours_bench_passes, afterhours_uptime_by_pub, target_pub_count)
+        _compute_session_readiness(
+            afterhours_bench_passes, afterhours_uptime_by_pub, target_pub_count
+        )
         if afterhours_bench_passes or afterhours_uptime_by_pub
         else None
     )
     overnight_stats = (
-        _compute_session_readiness(overnight_bench_passes, overnight_uptime_by_pub, target_pub_count)
+        _compute_session_readiness(
+            overnight_bench_passes, overnight_uptime_by_pub, target_pub_count
+        )
         if overnight_bench_passes or overnight_uptime_by_pub
         else None
     )
@@ -467,23 +546,53 @@ def merge_results(
         afterhours_benchmark_passing_count=benchmark_result.afterhours_passing_count,
         overnight_benchmark_passing_count=benchmark_result.overnight_passing_count,
         premarket_ready=premarket_stats["ready"] if premarket_stats else None,
-        premarket_fully_passing_count=premarket_stats["fully_passing_count"] if premarket_stats else None,
-        premarket_uptime_passing_count=premarket_stats["uptime_passing_count"] if premarket_stats else None,
-        premarket_uptime_failing_count=premarket_stats["uptime_failing_count"] if premarket_stats else None,
-        premarket_median_uptime_pct=premarket_stats["median_uptime_pct"] if premarket_stats else None,
-        premarket_fully_passing_publishers=premarket_stats["fully_passing_publishers"] if premarket_stats else None,
+        premarket_fully_passing_count=premarket_stats["fully_passing_count"]
+        if premarket_stats
+        else None,
+        premarket_uptime_passing_count=premarket_stats["uptime_passing_count"]
+        if premarket_stats
+        else None,
+        premarket_uptime_failing_count=premarket_stats["uptime_failing_count"]
+        if premarket_stats
+        else None,
+        premarket_median_uptime_pct=premarket_stats["median_uptime_pct"]
+        if premarket_stats
+        else None,
+        premarket_fully_passing_publishers=premarket_stats["fully_passing_publishers"]
+        if premarket_stats
+        else None,
         afterhours_ready=afterhours_stats["ready"] if afterhours_stats else None,
-        afterhours_fully_passing_count=afterhours_stats["fully_passing_count"] if afterhours_stats else None,
-        afterhours_uptime_passing_count=afterhours_stats["uptime_passing_count"] if afterhours_stats else None,
-        afterhours_uptime_failing_count=afterhours_stats["uptime_failing_count"] if afterhours_stats else None,
-        afterhours_median_uptime_pct=afterhours_stats["median_uptime_pct"] if afterhours_stats else None,
-        afterhours_fully_passing_publishers=afterhours_stats["fully_passing_publishers"] if afterhours_stats else None,
+        afterhours_fully_passing_count=afterhours_stats["fully_passing_count"]
+        if afterhours_stats
+        else None,
+        afterhours_uptime_passing_count=afterhours_stats["uptime_passing_count"]
+        if afterhours_stats
+        else None,
+        afterhours_uptime_failing_count=afterhours_stats["uptime_failing_count"]
+        if afterhours_stats
+        else None,
+        afterhours_median_uptime_pct=afterhours_stats["median_uptime_pct"]
+        if afterhours_stats
+        else None,
+        afterhours_fully_passing_publishers=afterhours_stats["fully_passing_publishers"]
+        if afterhours_stats
+        else None,
         overnight_ready=overnight_stats["ready"] if overnight_stats else None,
-        overnight_fully_passing_count=overnight_stats["fully_passing_count"] if overnight_stats else None,
-        overnight_uptime_passing_count=overnight_stats["uptime_passing_count"] if overnight_stats else None,
-        overnight_uptime_failing_count=overnight_stats["uptime_failing_count"] if overnight_stats else None,
-        overnight_median_uptime_pct=overnight_stats["median_uptime_pct"] if overnight_stats else None,
-        overnight_fully_passing_publishers=overnight_stats["fully_passing_publishers"] if overnight_stats else None,
+        overnight_fully_passing_count=overnight_stats["fully_passing_count"]
+        if overnight_stats
+        else None,
+        overnight_uptime_passing_count=overnight_stats["uptime_passing_count"]
+        if overnight_stats
+        else None,
+        overnight_uptime_failing_count=overnight_stats["uptime_failing_count"]
+        if overnight_stats
+        else None,
+        overnight_median_uptime_pct=overnight_stats["median_uptime_pct"]
+        if overnight_stats
+        else None,
+        overnight_fully_passing_publishers=overnight_stats["fully_passing_publishers"]
+        if overnight_stats
+        else None,
         benchmark_error=benchmark_result.error,
         uptime_error=uptime_result.error,
         error=" | ".join(error_parts) if error_parts else None,
@@ -696,7 +805,9 @@ def process_work_items(
                 f"both_fail={result.both_failing_count}"
             )
 
-    return sorted(results, key=lambda r: (r.date, r.feed_id, normalize_asset_class(r.mode)))
+    return sorted(
+        results, key=lambda r: (r.date, r.feed_id, normalize_asset_class(r.mode))
+    )
 
 
 def process_csv(
@@ -716,11 +827,15 @@ def process_csv(
 ) -> list[FeedReadinessResult]:
     include_normalized = None
     if include_asset_classes:
-        include_normalized = {normalize_asset_class(asset) for asset in include_asset_classes}
+        include_normalized = {
+            normalize_asset_class(asset) for asset in include_asset_classes
+        }
 
     exclude_normalized: set[str] = set()
     if exclude_asset_classes:
-        exclude_normalized = {normalize_asset_class(asset) for asset in exclude_asset_classes}
+        exclude_normalized = {
+            normalize_asset_class(asset) for asset in exclude_asset_classes
+        }
 
     work_items: list[tuple[int, str, str]] = []
     skipped_by_asset_class = 0
@@ -734,7 +849,11 @@ def process_csv(
                 print(f"Warning: Skipping incomplete row: {row}")
                 continue
 
-            feed_id_str, date_value, mode_value = row[0].strip(), row[1].strip(), row[2].strip()
+            feed_id_str, date_value, mode_value = (
+                row[0].strip(),
+                row[1].strip(),
+                row[2].strip(),
+            )
             normalized_mode = normalize_asset_class(mode_value)
 
             if include_normalized and normalized_mode not in include_normalized:
@@ -906,7 +1025,9 @@ def write_publisher_consistency_csv(
     consistency: dict,
     session_prefix: str = "",
 ) -> None:
-    label_prefix = session_prefix.lower().replace(" ", "") + "_" if session_prefix else "regular_"
+    label_prefix = (
+        session_prefix.lower().replace(" ", "") + "_" if session_prefix else "regular_"
+    )
 
     writer.writerow([])
     writer.writerow([f"{session_prefix}PUBLISHER CONSISTENCY"])
@@ -922,7 +1043,9 @@ def write_publisher_consistency_csv(
     )
 
     for row in consistency["rows"]:
-        results_str = ";".join(f"{date_value}:{status}" for date_value, status in row["results"].items())
+        results_str = ";".join(
+            f"{date_value}:{status}" for date_value, status in row["results"].items()
+        )
         writer.writerow(
             [
                 row["publisher_id"],
@@ -937,9 +1060,24 @@ def write_publisher_consistency_csv(
     writer.writerow([])
     writer.writerow([f"{session_prefix}PUBLISHER CLASSIFICATIONS"])
     _fmt = lambda ids: ";".join(str(x) for x in ids) if ids else ""
-    writer.writerow([f"{label_prefix}always_passing", _fmt(consistency["classifications"]["always_passing"])])
-    writer.writerow([f"{label_prefix}always_failing", _fmt(consistency["classifications"]["always_failing"])])
-    writer.writerow([f"{label_prefix}intermittent", _fmt(consistency["classifications"]["intermittent"])])
+    writer.writerow(
+        [
+            f"{label_prefix}always_passing",
+            _fmt(consistency["classifications"]["always_passing"]),
+        ]
+    )
+    writer.writerow(
+        [
+            f"{label_prefix}always_failing",
+            _fmt(consistency["classifications"]["always_failing"]),
+        ]
+    )
+    writer.writerow(
+        [
+            f"{label_prefix}intermittent",
+            _fmt(consistency["classifications"]["intermittent"]),
+        ]
+    )
 
 
 def write_results_csv(
@@ -979,20 +1117,33 @@ def write_results_csv(
     ]
 
     if include_extended_hours:
-        header.extend([
-            "premarket_ready", "premarket_benchmark_passing_count",
-            "premarket_uptime_passing_count", "premarket_uptime_failing_count",
-            "premarket_median_uptime_pct", "premarket_fully_passing_count",
-            "afterhours_ready", "afterhours_benchmark_passing_count",
-            "afterhours_uptime_passing_count", "afterhours_uptime_failing_count",
-            "afterhours_median_uptime_pct", "afterhours_fully_passing_count",
-        ])
+        header.extend(
+            [
+                "premarket_ready",
+                "premarket_benchmark_passing_count",
+                "premarket_uptime_passing_count",
+                "premarket_uptime_failing_count",
+                "premarket_median_uptime_pct",
+                "premarket_fully_passing_count",
+                "afterhours_ready",
+                "afterhours_benchmark_passing_count",
+                "afterhours_uptime_passing_count",
+                "afterhours_uptime_failing_count",
+                "afterhours_median_uptime_pct",
+                "afterhours_fully_passing_count",
+            ]
+        )
     if include_overnight:
-        header.extend([
-            "overnight_ready", "overnight_benchmark_passing_count",
-            "overnight_uptime_passing_count", "overnight_uptime_failing_count",
-            "overnight_median_uptime_pct", "overnight_fully_passing_count",
-        ])
+        header.extend(
+            [
+                "overnight_ready",
+                "overnight_benchmark_passing_count",
+                "overnight_uptime_passing_count",
+                "overnight_uptime_failing_count",
+                "overnight_median_uptime_pct",
+                "overnight_fully_passing_count",
+            ]
+        )
 
     header.extend(["benchmark_error", "uptime_error", "error", "execution_time_ms"])
 
@@ -1000,7 +1151,9 @@ def write_results_csv(
         writer = csv.writer(f)
         writer.writerow(header)
 
-        for result in sorted(results, key=lambda r: (r.date, r.feed_id, normalize_asset_class(r.mode))):
+        for result in sorted(
+            results, key=lambda r: (r.date, r.feed_id, normalize_asset_class(r.mode))
+        ):
             row = [
                 result.feed_id,
                 result.date,
@@ -1018,10 +1171,14 @@ def write_results_csv(
                 result.benchmark_passing_count,
                 result.benchmark_failing_count,
                 f"{result.median_nrmse:.6f}" if result.median_nrmse is not None else "",
-                f"{result.median_hit_rate:.2f}" if result.median_hit_rate is not None else "",
+                f"{result.median_hit_rate:.2f}"
+                if result.median_hit_rate is not None
+                else "",
                 result.uptime_passing_count,
                 result.uptime_failing_count,
-                f"{result.median_uptime_pct:.4f}" if result.median_uptime_pct is not None else "",
+                f"{result.median_uptime_pct:.4f}"
+                if result.median_uptime_pct is not None
+                else "",
                 ";".join(str(pid) for pid in result.fully_passing_publishers),
                 ";".join(str(pid) for pid in result.benchmark_only_publishers),
                 ";".join(str(pid) for pid in result.uptime_only_publishers),
@@ -1029,29 +1186,69 @@ def write_results_csv(
             ]
 
             if include_extended_hours:
-                row.extend([
-                    result.premarket_ready if result.premarket_ready is not None else "",
-                    result.premarket_benchmark_passing_count if result.premarket_benchmark_passing_count is not None else "",
-                    result.premarket_uptime_passing_count if result.premarket_uptime_passing_count is not None else "",
-                    result.premarket_uptime_failing_count if result.premarket_uptime_failing_count is not None else "",
-                    f"{result.premarket_median_uptime_pct:.4f}" if result.premarket_median_uptime_pct is not None else "",
-                    result.premarket_fully_passing_count if result.premarket_fully_passing_count is not None else "",
-                    result.afterhours_ready if result.afterhours_ready is not None else "",
-                    result.afterhours_benchmark_passing_count if result.afterhours_benchmark_passing_count is not None else "",
-                    result.afterhours_uptime_passing_count if result.afterhours_uptime_passing_count is not None else "",
-                    result.afterhours_uptime_failing_count if result.afterhours_uptime_failing_count is not None else "",
-                    f"{result.afterhours_median_uptime_pct:.4f}" if result.afterhours_median_uptime_pct is not None else "",
-                    result.afterhours_fully_passing_count if result.afterhours_fully_passing_count is not None else "",
-                ])
+                row.extend(
+                    [
+                        result.premarket_ready
+                        if result.premarket_ready is not None
+                        else "",
+                        result.premarket_benchmark_passing_count
+                        if result.premarket_benchmark_passing_count is not None
+                        else "",
+                        result.premarket_uptime_passing_count
+                        if result.premarket_uptime_passing_count is not None
+                        else "",
+                        result.premarket_uptime_failing_count
+                        if result.premarket_uptime_failing_count is not None
+                        else "",
+                        f"{result.premarket_median_uptime_pct:.4f}"
+                        if result.premarket_median_uptime_pct is not None
+                        else "",
+                        result.premarket_fully_passing_count
+                        if result.premarket_fully_passing_count is not None
+                        else "",
+                        result.afterhours_ready
+                        if result.afterhours_ready is not None
+                        else "",
+                        result.afterhours_benchmark_passing_count
+                        if result.afterhours_benchmark_passing_count is not None
+                        else "",
+                        result.afterhours_uptime_passing_count
+                        if result.afterhours_uptime_passing_count is not None
+                        else "",
+                        result.afterhours_uptime_failing_count
+                        if result.afterhours_uptime_failing_count is not None
+                        else "",
+                        f"{result.afterhours_median_uptime_pct:.4f}"
+                        if result.afterhours_median_uptime_pct is not None
+                        else "",
+                        result.afterhours_fully_passing_count
+                        if result.afterhours_fully_passing_count is not None
+                        else "",
+                    ]
+                )
             if include_overnight:
-                row.extend([
-                    result.overnight_ready if result.overnight_ready is not None else "",
-                    result.overnight_benchmark_passing_count if result.overnight_benchmark_passing_count is not None else "",
-                    result.overnight_uptime_passing_count if result.overnight_uptime_passing_count is not None else "",
-                    result.overnight_uptime_failing_count if result.overnight_uptime_failing_count is not None else "",
-                    f"{result.overnight_median_uptime_pct:.4f}" if result.overnight_median_uptime_pct is not None else "",
-                    result.overnight_fully_passing_count if result.overnight_fully_passing_count is not None else "",
-                ])
+                row.extend(
+                    [
+                        result.overnight_ready
+                        if result.overnight_ready is not None
+                        else "",
+                        result.overnight_benchmark_passing_count
+                        if result.overnight_benchmark_passing_count is not None
+                        else "",
+                        result.overnight_uptime_passing_count
+                        if result.overnight_uptime_passing_count is not None
+                        else "",
+                        result.overnight_uptime_failing_count
+                        if result.overnight_uptime_failing_count is not None
+                        else "",
+                        f"{result.overnight_median_uptime_pct:.4f}"
+                        if result.overnight_median_uptime_pct is not None
+                        else "",
+                        result.overnight_fully_passing_count
+                        if result.overnight_fully_passing_count is not None
+                        else "",
+                    ]
+                )
 
             row.extend(
                 [
@@ -1067,30 +1264,59 @@ def write_results_csv(
             writer.writerow([])
             writer.writerow(["PUBLISHER DETAIL"])
             detail_header = [
-                "feed_id", "publisher_id", "date", "mode", "symbol",
-                "fully_passes", "benchmark_passes", "uptime_passes",
-                "benchmark_nrmse", "benchmark_hit_rate", "benchmark_n_observations",
-                "uptime_pct", "benchmark_error", "uptime_error",
+                "feed_id",
+                "publisher_id",
+                "date",
+                "mode",
+                "symbol",
+                "fully_passes",
+                "benchmark_passes",
+                "uptime_passes",
+                "benchmark_nrmse",
+                "benchmark_hit_rate",
+                "benchmark_n_observations",
+                "uptime_pct",
+                "benchmark_error",
+                "uptime_error",
             ]
             if include_extended_hours:
-                detail_header.extend([
-                    "premarket_benchmark_passes", "premarket_benchmark_nrmse",
-                    "premarket_benchmark_hit_rate", "premarket_benchmark_n_observations",
-                    "premarket_uptime_pct", "premarket_uptime_passes",
-                    "afterhours_benchmark_passes", "afterhours_benchmark_nrmse",
-                    "afterhours_benchmark_hit_rate", "afterhours_benchmark_n_observations",
-                    "afterhours_uptime_pct", "afterhours_uptime_passes",
-                ])
+                detail_header.extend(
+                    [
+                        "premarket_benchmark_passes",
+                        "premarket_benchmark_nrmse",
+                        "premarket_benchmark_hit_rate",
+                        "premarket_benchmark_n_observations",
+                        "premarket_uptime_pct",
+                        "premarket_uptime_passes",
+                        "afterhours_benchmark_passes",
+                        "afterhours_benchmark_nrmse",
+                        "afterhours_benchmark_hit_rate",
+                        "afterhours_benchmark_n_observations",
+                        "afterhours_uptime_pct",
+                        "afterhours_uptime_passes",
+                    ]
+                )
             if include_overnight:
-                detail_header.extend([
-                    "overnight_benchmark_passes", "overnight_benchmark_nrmse",
-                    "overnight_benchmark_hit_rate", "overnight_benchmark_n_observations",
-                    "overnight_uptime_pct", "overnight_uptime_passes",
-                ])
+                detail_header.extend(
+                    [
+                        "overnight_benchmark_passes",
+                        "overnight_benchmark_nrmse",
+                        "overnight_benchmark_hit_rate",
+                        "overnight_benchmark_n_observations",
+                        "overnight_uptime_pct",
+                        "overnight_uptime_passes",
+                    ]
+                )
             writer.writerow(detail_header)
 
-            for result in sorted(results, key=lambda r: (r.date, r.feed_id, normalize_asset_class(r.mode))):
-                details = sorted(result.publisher_details or [], key=lambda detail: detail.publisher_id)
+            for result in sorted(
+                results,
+                key=lambda r: (r.date, r.feed_id, normalize_asset_class(r.mode)),
+            ):
+                details = sorted(
+                    result.publisher_details or [],
+                    key=lambda detail: detail.publisher_id,
+                )
                 for detail in details:
                     detail_row = [
                         result.feed_id,
@@ -1101,37 +1327,84 @@ def write_results_csv(
                         detail.fully_passes,
                         detail.benchmark_passes,
                         detail.uptime_passes,
-                        f"{detail.benchmark_nrmse:.6f}" if detail.benchmark_nrmse is not None else "",
-                        f"{detail.benchmark_hit_rate:.2f}" if detail.benchmark_hit_rate is not None else "",
+                        f"{detail.benchmark_nrmse:.6f}"
+                        if detail.benchmark_nrmse is not None
+                        else "",
+                        f"{detail.benchmark_hit_rate:.2f}"
+                        if detail.benchmark_hit_rate is not None
+                        else "",
                         detail.benchmark_n_observations,
-                        f"{detail.uptime_pct:.4f}" if detail.uptime_pct is not None else "",
+                        f"{detail.uptime_pct:.4f}"
+                        if detail.uptime_pct is not None
+                        else "",
                         detail.benchmark_error or "",
                         detail.uptime_error or "",
                     ]
                     if include_extended_hours:
-                        detail_row.extend([
-                            detail.premarket_benchmark_passes if detail.premarket_benchmark_passes is not None else "",
-                            f"{detail.premarket_benchmark_nrmse:.6f}" if detail.premarket_benchmark_nrmse is not None else "",
-                            f"{detail.premarket_benchmark_hit_rate:.2f}" if detail.premarket_benchmark_hit_rate is not None else "",
-                            detail.premarket_benchmark_n_observations if detail.premarket_benchmark_n_observations is not None else "",
-                            f"{detail.premarket_uptime_pct:.4f}" if detail.premarket_uptime_pct is not None else "",
-                            detail.premarket_uptime_passes if detail.premarket_uptime_passes is not None else "",
-                            detail.afterhours_benchmark_passes if detail.afterhours_benchmark_passes is not None else "",
-                            f"{detail.afterhours_benchmark_nrmse:.6f}" if detail.afterhours_benchmark_nrmse is not None else "",
-                            f"{detail.afterhours_benchmark_hit_rate:.2f}" if detail.afterhours_benchmark_hit_rate is not None else "",
-                            detail.afterhours_benchmark_n_observations if detail.afterhours_benchmark_n_observations is not None else "",
-                            f"{detail.afterhours_uptime_pct:.4f}" if detail.afterhours_uptime_pct is not None else "",
-                            detail.afterhours_uptime_passes if detail.afterhours_uptime_passes is not None else "",
-                        ])
+                        detail_row.extend(
+                            [
+                                detail.premarket_benchmark_passes
+                                if detail.premarket_benchmark_passes is not None
+                                else "",
+                                f"{detail.premarket_benchmark_nrmse:.6f}"
+                                if detail.premarket_benchmark_nrmse is not None
+                                else "",
+                                f"{detail.premarket_benchmark_hit_rate:.2f}"
+                                if detail.premarket_benchmark_hit_rate is not None
+                                else "",
+                                detail.premarket_benchmark_n_observations
+                                if detail.premarket_benchmark_n_observations is not None
+                                else "",
+                                f"{detail.premarket_uptime_pct:.4f}"
+                                if detail.premarket_uptime_pct is not None
+                                else "",
+                                detail.premarket_uptime_passes
+                                if detail.premarket_uptime_passes is not None
+                                else "",
+                                detail.afterhours_benchmark_passes
+                                if detail.afterhours_benchmark_passes is not None
+                                else "",
+                                f"{detail.afterhours_benchmark_nrmse:.6f}"
+                                if detail.afterhours_benchmark_nrmse is not None
+                                else "",
+                                f"{detail.afterhours_benchmark_hit_rate:.2f}"
+                                if detail.afterhours_benchmark_hit_rate is not None
+                                else "",
+                                detail.afterhours_benchmark_n_observations
+                                if detail.afterhours_benchmark_n_observations
+                                is not None
+                                else "",
+                                f"{detail.afterhours_uptime_pct:.4f}"
+                                if detail.afterhours_uptime_pct is not None
+                                else "",
+                                detail.afterhours_uptime_passes
+                                if detail.afterhours_uptime_passes is not None
+                                else "",
+                            ]
+                        )
                     if include_overnight:
-                        detail_row.extend([
-                            detail.overnight_benchmark_passes if detail.overnight_benchmark_passes is not None else "",
-                            f"{detail.overnight_benchmark_nrmse:.6f}" if detail.overnight_benchmark_nrmse is not None else "",
-                            f"{detail.overnight_benchmark_hit_rate:.2f}" if detail.overnight_benchmark_hit_rate is not None else "",
-                            detail.overnight_benchmark_n_observations if detail.overnight_benchmark_n_observations is not None else "",
-                            f"{detail.overnight_uptime_pct:.4f}" if detail.overnight_uptime_pct is not None else "",
-                            detail.overnight_uptime_passes if detail.overnight_uptime_passes is not None else "",
-                        ])
+                        detail_row.extend(
+                            [
+                                detail.overnight_benchmark_passes
+                                if detail.overnight_benchmark_passes is not None
+                                else "",
+                                f"{detail.overnight_benchmark_nrmse:.6f}"
+                                if detail.overnight_benchmark_nrmse is not None
+                                else "",
+                                f"{detail.overnight_benchmark_hit_rate:.2f}"
+                                if detail.overnight_benchmark_hit_rate is not None
+                                else "",
+                                detail.overnight_benchmark_n_observations
+                                if detail.overnight_benchmark_n_observations is not None
+                                else "",
+                                f"{detail.overnight_uptime_pct:.4f}"
+                                if detail.overnight_uptime_pct is not None
+                                else "",
+                                detail.overnight_uptime_passes
+                                if detail.overnight_uptime_passes is not None
+                                else "",
+                            ]
+                        )
                     writer.writerow(detail_row)
 
             consistency = compute_publisher_consistency(results)
@@ -1140,22 +1413,45 @@ def write_results_csv(
 
             # Per-session consistency (only for multi-date with session flags)
             if include_extended_hours:
-                for session_name, extractor in [("PREMARKET", _premarket_status), ("AFTERHOURS", _afterhours_status)]:
-                    session_consistency = compute_publisher_consistency(results, status_extractor=extractor)
-                    if len(session_consistency["dates"]) > 1 and session_consistency["rows"]:
-                        write_publisher_consistency_csv(writer, session_consistency, session_prefix=f"{session_name} ")
+                for session_name, extractor in [
+                    ("PREMARKET", _premarket_status),
+                    ("AFTERHOURS", _afterhours_status),
+                ]:
+                    session_consistency = compute_publisher_consistency(
+                        results, status_extractor=extractor
+                    )
+                    if (
+                        len(session_consistency["dates"]) > 1
+                        and session_consistency["rows"]
+                    ):
+                        write_publisher_consistency_csv(
+                            writer,
+                            session_consistency,
+                            session_prefix=f"{session_name} ",
+                        )
 
             if include_overnight:
-                session_consistency = compute_publisher_consistency(results, status_extractor=_overnight_status)
-                if len(session_consistency["dates"]) > 1 and session_consistency["rows"]:
-                    write_publisher_consistency_csv(writer, session_consistency, session_prefix="OVERNIGHT ")
+                session_consistency = compute_publisher_consistency(
+                    results, status_extractor=_overnight_status
+                )
+                if (
+                    len(session_consistency["dates"]) > 1
+                    and session_consistency["rows"]
+                ):
+                    write_publisher_consistency_csv(
+                        writer, session_consistency, session_prefix="OVERNIGHT "
+                    )
 
 
-def compute_summary_stats(results: list[FeedReadinessResult], total_time_seconds: float) -> dict:
+def compute_summary_stats(
+    results: list[FeedReadinessResult], total_time_seconds: float
+) -> dict:
     total_feeds = len(results)
     error_count = sum(1 for result in results if result.error)
     ready_count = sum(1 for result in results if result.ready and not result.error)
-    not_ready_count = sum(1 for result in results if not result.ready and not result.error)
+    not_ready_count = sum(
+        1 for result in results if not result.ready and not result.error
+    )
 
     benchmark_ready_count = sum(1 for result in results if result.benchmark_ready)
     uptime_ready_count = sum(1 for result in results if result.uptime_ready)
@@ -1226,14 +1522,22 @@ def compute_summary_stats(results: list[FeedReadinessResult], total_time_seconds
         "error_count": error_count,
         "benchmark_ready_count": benchmark_ready_count,
         "uptime_ready_count": uptime_ready_count,
-        "nrmse": _distribution_stats([value for value in nrmse_values if value is not None]),
-        "hit_rate": _distribution_stats([value for value in hit_rate_values if value is not None]),
-        "uptime": _distribution_stats([value for value in uptime_values if value is not None]),
+        "nrmse": _distribution_stats(
+            [value for value in nrmse_values if value is not None]
+        ),
+        "hit_rate": _distribution_stats(
+            [value for value in hit_rate_values if value is not None]
+        ),
+        "uptime": _distribution_stats(
+            [value for value in uptime_values if value is not None]
+        ),
         "mode_stats": mode_stats,
         "per_date_stats": per_date_stats,
         "extended_session_stats": extended_session_stats,
         "total_time_sec": total_time_seconds,
-        "avg_time_ms": (total_time_seconds / total_feeds * 1000) if total_feeds > 0 else 0,
+        "avg_time_ms": (total_time_seconds / total_feeds * 1000)
+        if total_feeds > 0
+        else 0,
     }
 
 
@@ -1261,9 +1565,13 @@ def print_console_summary(
     print("=" * 70)
     print("FEED READINESS REPORT")
     print("=" * 70)
-    print(f"Feeds evaluated: {summary['total_feeds']} | Target publishers: {target_pub_count}")
+    print(
+        f"Feeds evaluated: {summary['total_feeds']} | Target publishers: {target_pub_count}"
+    )
     print("Benchmark: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 95%)")
-    print(f"Uptime: regular session >= {uptime_threshold_pct:.1f}% (1s window unless --precise)")
+    print(
+        f"Uptime: regular session >= {uptime_threshold_pct:.1f}% (1s window unless --precise)"
+    )
     print("=" * 70)
 
     total = summary["total_feeds"]
@@ -1364,7 +1672,9 @@ def print_console_summary(
             else:
                 print("    Uptime: no data")
 
-    print(f"\nTiming: {summary['total_time_sec']:.1f}s total, {summary['avg_time_ms']:.0f}ms avg/feed")
+    print(
+        f"\nTiming: {summary['total_time_sec']:.1f}s total, {summary['avg_time_ms']:.0f}ms avg/feed"
+    )
 
 
 def print_publisher_consistency(consistency: dict, session_prefix: str = "") -> None:
@@ -1379,7 +1689,9 @@ def print_publisher_consistency(consistency: dict, session_prefix: str = "") -> 
     for row in consistency["rows"]:
         if row["dates_seen"] == 0:
             continue
-        results_str = " ".join(f"{date_value}:{status}" for date_value, status in row["results"].items())
+        results_str = " ".join(
+            f"{date_value}:{status}" for date_value, status in row["results"].items()
+        )
         rate_str = f"{row['pass_rate']:.1f}%" if row["pass_rate"] is not None else "N/A"
         print(
             f"  {row['publisher_id']:<9} {row['pass_count']:<5} "
@@ -1387,9 +1699,15 @@ def print_publisher_consistency(consistency: dict, session_prefix: str = "") -> 
         )
 
     print()
-    print(f"  Always passing: {_format_id_list(consistency['classifications']['always_passing'])}")
-    print(f"  Always failing: {_format_id_list(consistency['classifications']['always_failing'])}")
-    print(f"  Intermittent: {_format_id_list(consistency['classifications']['intermittent'])}")
+    print(
+        f"  Always passing: {_format_id_list(consistency['classifications']['always_passing'])}"
+    )
+    print(
+        f"  Always failing: {_format_id_list(consistency['classifications']['always_failing'])}"
+    )
+    print(
+        f"  Intermittent: {_format_id_list(consistency['classifications']['intermittent'])}"
+    )
 
 
 def main() -> None:
@@ -1415,8 +1733,12 @@ Examples:
 """,
     )
 
-    parser.add_argument("--csv", type=Path, help="CSV file containing feed_id,date,mode columns")
-    parser.add_argument("--feed-id", type=int, nargs="+", metavar="ID", help="Feed ID(s) to evaluate")
+    parser.add_argument(
+        "--csv", type=Path, help="CSV file containing feed_id,date,mode columns"
+    )
+    parser.add_argument(
+        "--feed-id", type=int, nargs="+", metavar="ID", help="Feed ID(s) to evaluate"
+    )
     parser.add_argument(
         "--date",
         nargs="+",
@@ -1475,7 +1797,9 @@ Examples:
         action="store_true",
         help="Include overnight session for US equities",
     )
-    parser.add_argument("--workers", type=int, default=4, help="Number of parallel workers (default: 4)")
+    parser.add_argument(
+        "--workers", type=int, default=4, help="Number of parallel workers (default: 4)"
+    )
     parser.add_argument(
         "--include-asset-class",
         type=str,
@@ -1520,7 +1844,9 @@ Examples:
     if args.list_asset_classes:
         if not args.csv:
             parser.error("--list-asset-classes requires --csv")
-    elif args.csv and (args.feed_id or args.date or args.start_date or args.end_date or args.mode):
+    elif args.csv and (
+        args.feed_id or args.date or args.start_date or args.end_date or args.mode
+    ):
         parser.error(
             "Use either --csv OR (--feed-id, --date/--start-date+--end-date, --mode), not both"
         )
@@ -1532,23 +1858,33 @@ Examples:
     if not args.csv:
         try:
             validate_date_args(args)
-            single_feed_dates = expand_date_args(args.date, args.start_date, args.end_date)
+            single_feed_dates = expand_date_args(
+                args.date, args.start_date, args.end_date
+            )
         except ValueError as exc:
             parser.error(str(exc))
         if not single_feed_dates:
             parser.error("Single-feed mode requires --date or --start-date/--end-date")
 
     if not args.csv and (args.include_asset_class or args.exclude_asset_class):
-        parser.error("--include-asset-class and --exclude-asset-class only apply to --csv mode")
+        parser.error(
+            "--include-asset-class and --exclude-asset-class only apply to --csv mode"
+        )
     if not args.csv and args.filter_feed_id:
         parser.error("--filter-feed-id only applies to --csv mode")
 
     if args.include_asset_class and args.exclude_asset_class:
-        include_set = {normalize_asset_class(asset) for asset in args.include_asset_class}
-        exclude_set = {normalize_asset_class(asset) for asset in args.exclude_asset_class}
+        include_set = {
+            normalize_asset_class(asset) for asset in args.include_asset_class
+        }
+        exclude_set = {
+            normalize_asset_class(asset) for asset in args.exclude_asset_class
+        }
         overlap = include_set & exclude_set
         if overlap:
-            parser.error(f"Asset classes cannot be both included and excluded: {overlap}")
+            parser.error(
+                f"Asset classes cannot be both included and excluded: {overlap}"
+            )
 
     if args.csv and not args.csv.exists():
         print(f"Error: CSV file '{args.csv}' not found")
@@ -1563,14 +1899,18 @@ Examples:
         for asset_class, count in sorted(asset_classes.items(), key=lambda x: -x[1]):
             normalized = normalize_asset_class(asset_class)
             benchmarkable = "Y" if normalized in BENCHMARKABLE_ASSET_CLASSES else "N"
-            alias_display = ASSET_CLASS_ALIASES.get(asset_class.lower(), asset_class.lower())
+            alias_display = ASSET_CLASS_ALIASES.get(
+                asset_class.lower(), asset_class.lower()
+            )
             print(
                 f"  {asset_class:<25} {count:>5} feeds  "
                 f"[normalized: {alias_display:<12} benchmarkable: {benchmarkable}]"
             )
         print(f"{'='*56}")
         print(f"  {'TOTAL':<25} {total_feeds:>5} feeds")
-        print(f"\nBenchmarkable asset classes: {', '.join(sorted(BENCHMARKABLE_ASSET_CLASSES))}")
+        print(
+            f"\nBenchmarkable asset classes: {', '.join(sorted(BENCHMARKABLE_ASSET_CLASSES))}"
+        )
         sys.exit(0)
 
     if args.extended_hours or args.overnight:
@@ -1605,7 +1945,11 @@ Examples:
             include_detailed=args.detailed,
         )
     else:
-        work_items = [(feed_id, date, args.mode) for feed_id in args.feed_id for date in single_feed_dates]
+        work_items = [
+            (feed_id, date, args.mode)
+            for feed_id in args.feed_id
+            for date in single_feed_dates
+        ]
         results = process_work_items(
             work_items=work_items,
             max_workers=args.workers,
@@ -1642,15 +1986,26 @@ Examples:
 
         # Per-session consistency console output
         if args.extended_hours:
-            for session_name, extractor in [("PREMARKET", _premarket_status), ("AFTERHOURS", _afterhours_status)]:
-                session_consistency = compute_publisher_consistency(results, status_extractor=extractor)
+            for session_name, extractor in [
+                ("PREMARKET", _premarket_status),
+                ("AFTERHOURS", _afterhours_status),
+            ]:
+                session_consistency = compute_publisher_consistency(
+                    results, status_extractor=extractor
+                )
                 if session_consistency["rows"]:
-                    print_publisher_consistency(session_consistency, session_prefix=f"{session_name} ")
+                    print_publisher_consistency(
+                        session_consistency, session_prefix=f"{session_name} "
+                    )
 
         if args.overnight:
-            session_consistency = compute_publisher_consistency(results, status_extractor=_overnight_status)
+            session_consistency = compute_publisher_consistency(
+                results, status_extractor=_overnight_status
+            )
             if session_consistency["rows"]:
-                print_publisher_consistency(session_consistency, session_prefix="OVERNIGHT ")
+                print_publisher_consistency(
+                    session_consistency, session_prefix="OVERNIGHT "
+                )
 
     print(f"\nResults written to: {args.output}")
 

@@ -9,6 +9,7 @@ This repository contains standalone benchmark scripts for Pyth Network Lazer fee
 ## Common Commands
 
 ### Setup
+
 ```bash
 pip install -r requirements.txt
 cp config.yaml.sample config.yaml  # then fill in ClickHouse credentials
@@ -50,25 +51,25 @@ python quick_benchmark.py --csv feeds.csv --exclude-asset-class crypto funding-r
 
 ### Arguments
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--csv` | CSV file with feed_id,date,mode columns | - |
-| `--feed-id` | Feed ID(s) to evaluate (one or more) | - |
-| `--date` | Date(s) for feed evaluation (YYYY-MM-DD, one or more) | - |
-| `--start-date` | Range start date (inclusive, YYYY-MM-DD) | - |
-| `--end-date` | Range end date (inclusive, YYYY-MM-DD) | - |
-| `--mode` | Market type: `fx`, `metals`, `us-equities` | - |
-| `--output` | Output CSV path | `quick_benchmark_results.csv` |
-| `--target-pub-count` | Min publishers for feed readiness | 4 |
-| `--workers` | Parallel workers for processing | 4 |
-| `--include-asset-class` | Only process these asset classes (CSV mode) | - |
-| `--exclude-asset-class` | Skip these asset classes (CSV mode) | - |
-| `--list-asset-classes` | List unique asset classes in CSV and exit | - |
-| `--extended-hours` | Include pre-market and after-hours (US equities) | False |
-| `--overnight` | Include overnight session vs publisher 32 | False |
-| `--skip-scipy-tests` | Skip statistical tests for faster runs | False |
-| `--detailed` | Output per-publisher detailed rows | False |
-| `--filter-feed-id` | Filter CSV to specific feed IDs | - |
+| Argument                | Description                                           | Default                       |
+| ----------------------- | ----------------------------------------------------- | ----------------------------- |
+| `--csv`                 | CSV file with feed_id,date,mode columns               | -                             |
+| `--feed-id`             | Feed ID(s) to evaluate (one or more)                  | -                             |
+| `--date`                | Date(s) for feed evaluation (YYYY-MM-DD, one or more) | -                             |
+| `--start-date`          | Range start date (inclusive, YYYY-MM-DD)              | -                             |
+| `--end-date`            | Range end date (inclusive, YYYY-MM-DD)                | -                             |
+| `--mode`                | Market type: `fx`, `metals`, `us-equities`            | -                             |
+| `--output`              | Output CSV path                                       | `quick_benchmark_results.csv` |
+| `--target-pub-count`    | Min publishers for feed readiness                     | 4                             |
+| `--workers`             | Parallel workers for processing                       | 4                             |
+| `--include-asset-class` | Only process these asset classes (CSV mode)           | -                             |
+| `--exclude-asset-class` | Skip these asset classes (CSV mode)                   | -                             |
+| `--list-asset-classes`  | List unique asset classes in CSV and exit             | -                             |
+| `--extended-hours`      | Include pre-market and after-hours (US equities)      | False                         |
+| `--overnight`           | Include overnight session vs publisher 32             | False                         |
+| `--skip-scipy-tests`    | Skip statistical tests for faster runs                | False                         |
+| `--detailed`            | Output per-publisher detailed rows                    | False                         |
+| `--filter-feed-id`      | Filter CSV to specific feed IDs                       | -                             |
 
 ## Pass/Fail Criteria
 
@@ -78,6 +79,7 @@ python quick_benchmark.py --csv feeds.csv --exclude-asset-class crypto funding-r
 ## Database Configuration
 
 Requires ClickHouse access configured in `config.yaml`:
+
 - `lazer_clickhouse_prod`: Lazer production cluster (publisher data, feed metadata)
 - `analytics_clickhouse`: Analytics cluster (Datascope benchmark data)
 
@@ -86,6 +88,7 @@ If connection fails with "EOF occurred in violation of protocol", the hostname i
 ## Input CSV Format
 
 CSV files for batch processing (no header required):
+
 ```
 feed_id,date,mode
 327,2025-10-06,fx
@@ -96,6 +99,7 @@ feed_id,date,mode
 ### Asset Classes (Modes)
 
 Asset classes with benchmark data available:
+
 - `fx` - Foreign exchange
 - `metals` / `metal` - Precious metals
 - `us-equities` / `equity-us` - US equities (includes equity index futures)
@@ -103,6 +107,7 @@ Asset classes with benchmark data available:
 - `us-treasuries` / `treasuries` / `rates` - US Treasury bonds (uses yield values instead of prices)
 
 Asset classes WITHOUT benchmark data (will error):
+
 - `crypto` - Cryptocurrency
 - `crypto-redemption-rate` - Crypto redemption rates
 - `funding-rate` - Funding rates
@@ -115,11 +120,13 @@ Use `--list-asset-classes` to discover asset classes in your CSV file.
 The scripts automatically detect futures contracts by their symbol pattern and use the appropriate benchmark table (`datascope_futures_benchmark_data`).
 
 **Futures contract naming convention:**
+
 - Symbol ends with `[MONTH_CODE][YEAR_DIGIT]` (e.g., `CCH6`, `EMH6`)
 - Month codes: F=Jan, G=Feb, H=Mar, J=Apr, K=May, M=Jun, N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec
 - Year digit: 5=2025, 6=2026, 7=2027, etc.
 
 **Supported futures:**
+
 - **Commodity futures**: `Commodities.CCH6/USD` (Copper), `Commodities.WTIH6/USD` (WTI Crude)
 - **Equity index futures**:
   - `Equity.US.EMH6/USD` - E-Mini S&P 500 March 2026
@@ -132,6 +139,7 @@ Use `--list-asset-classes` to discover asset classes in your CSV file.
 ## Output
 
 Results CSV contains:
+
 - `feed_id`, `date`, `mode`, `symbol`
 - `ready` (boolean)
 - `passing_pub_count`, `failing_pub_count`
@@ -172,36 +180,38 @@ python feed_readiness.py --csv price_id_list.csv --workers 8 --skip-scipy-tests
 
 ### Feed Readiness Arguments
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--csv` | CSV with `feed_id,date,mode` rows | - |
-| `--feed-id` | Feed ID(s) (single-feed mode) | - |
-| `--date` | Date(s) `YYYY-MM-DD` | - |
-| `--start-date` / `--end-date` | Inclusive date range | - |
-| `--mode` | Asset class (single-feed mode) | - |
-| `--output` | Output CSV path | `feed_readiness_results.csv` |
-| `--detailed` | Append publisher detail + consistency sections | Off |
-| `--target-pub-count` | Minimum fully-passing publishers for readiness | `4` |
-| `--skip-scipy-tests` | Skip benchmark statistical tests for faster runs | Off |
-| `--precise` | Use gap-based uptime method instead of 1-second window | Off |
-| `--gap-threshold` | Gap threshold in ms for `--precise` mode | `200` |
-| `--uptime-threshold` | Regular-session uptime pass threshold | `95.0` |
-| `--extended-hours` | Include premarket + afterhours for US equities | Off |
-| `--overnight` | Include overnight session for US equities | Off |
-| `--workers` | Parallel workers | `4` |
-| `--include-asset-class` | Only these classes (CSV mode) | All |
-| `--exclude-asset-class` | Exclude these classes (CSV mode) | None |
-| `--filter-feed-id` | Only these feed IDs (CSV mode) | All |
-| `--list-asset-classes` | List asset classes in CSV and exit | Off |
+| Argument                      | Description                                            | Default                      |
+| ----------------------------- | ------------------------------------------------------ | ---------------------------- |
+| `--csv`                       | CSV with `feed_id,date,mode` rows                      | -                            |
+| `--feed-id`                   | Feed ID(s) (single-feed mode)                          | -                            |
+| `--date`                      | Date(s) `YYYY-MM-DD`                                   | -                            |
+| `--start-date` / `--end-date` | Inclusive date range                                   | -                            |
+| `--mode`                      | Asset class (single-feed mode)                         | -                            |
+| `--output`                    | Output CSV path                                        | `feed_readiness_results.csv` |
+| `--detailed`                  | Append publisher detail + consistency sections         | Off                          |
+| `--target-pub-count`          | Minimum fully-passing publishers for readiness         | `4`                          |
+| `--skip-scipy-tests`          | Skip benchmark statistical tests for faster runs       | Off                          |
+| `--precise`                   | Use gap-based uptime method instead of 1-second window | Off                          |
+| `--gap-threshold`             | Gap threshold in ms for `--precise` mode               | `200`                        |
+| `--uptime-threshold`          | Regular-session uptime pass threshold                  | `95.0`                       |
+| `--extended-hours`            | Include premarket + afterhours for US equities         | Off                          |
+| `--overnight`                 | Include overnight session for US equities              | Off                          |
+| `--workers`                   | Parallel workers                                       | `4`                          |
+| `--include-asset-class`       | Only these classes (CSV mode)                          | All                          |
+| `--exclude-asset-class`       | Exclude these classes (CSV mode)                       | None                         |
+| `--filter-feed-id`            | Only these feed IDs (CSV mode)                         | All                          |
+| `--list-asset-classes`        | List asset classes in CSV and exit                     | Off                          |
 
 ### Readiness Logic
 
 Per publisher:
+
 - `benchmark_passes`: benchmark pass/fail from quality evaluation
 - `uptime_passes`: regular-session uptime above threshold
 - `fully_passes`: `benchmark_passes AND uptime_passes`
 
 Per feed:
+
 - `ready`: `fully_passing_count >= target_pub_count`
 - `benchmark_ready`: benchmark passing publishers >= target
 - `uptime_ready`: regular-session uptime passing publishers >= target
@@ -211,6 +221,7 @@ Publisher buckets: `fully_passing`, `benchmark_only`, `uptime_only`, `both_faili
 ### Per-Session Readiness (Extended Hours)
 
 When `--extended-hours` or `--overnight` is enabled, feed readiness is also computed per session (premarket, afterhours, overnight). Each session gets its own:
+
 - `{session}_ready` boolean
 - `{session}_fully_passing_count` and `{session}_fully_passing_publishers`
 - `{session}_uptime_passing_count`, `{session}_uptime_failing_count`
@@ -221,6 +232,7 @@ The console summary includes a per-session breakdown table showing readiness rat
 ### Feed Readiness Output
 
 Results CSV includes:
+
 - identity: `feed_id`, `date`, `mode`, `symbol`
 - readiness: `ready`, `benchmark_ready`, `uptime_ready`
 - counts: `fully_passing_count`, `benchmark_only_passing_count`, `uptime_only_passing_count`, `both_failing_count`
@@ -235,16 +247,20 @@ With `--detailed`, CSV appends publisher-level detail rows (per publisher per fe
 `publisher_benchmark.py` outputs summary statistics after processing (console + CSV):
 
 **Core metrics:**
+
 - `pass_count`, `fail_count`, `error_count`, `pass_rate_pct`
 
 **Quality metrics (rmse_over_spread distribution):**
+
 - `median`, `mean`, `p90`, `p95`, `min`, `max`
 - Interpretation: `< 0.5` excellent, `0.5-1.0` good, `> 1.0` failing (lower is better)
 
 **Coverage metrics:**
+
 - `total_observations`, `mean_observations_per_feed`, `median_observations_per_feed`
 
 **Asset class breakdown:**
+
 - `pass_count_{mode}`, `fail_count_{mode}`, `error_count_{mode}` per asset class
 
 Summary is appended to output CSV under a `SUMMARY` header row.
@@ -255,31 +271,32 @@ The `publisher_benchmark.py` script includes advanced statistical metrics for de
 
 **Per-Feed Metrics:**
 
-| Metric | Description | Interpretation |
-|--------|-------------|----------------|
-| `mean_diff` | Mean of (publisher - benchmark) | Systematic bias; should be ~0 |
-| `std_diff` | Std dev of price differences | Error volatility; lower is better |
-| `mean_pct_diff` | Mean % difference | Relative accuracy |
-| `std_pct_diff` | Std dev of % differences | Relative error volatility |
-| `mae` | Mean Absolute Error | Average deviation; lower is better |
-| `t_statistic` | t-test statistic | Tests if bias is significant |
-| `t_pvalue` | t-test p-value | < 0.05 indicates significant bias |
-| `wilcoxon_statistic` | Wilcoxon test statistic | Non-parametric bias test |
-| `wilcoxon_pvalue` | Wilcoxon p-value | < 0.05 indicates significant bias |
-| `normality_pvalue` | Normality test p-value | >= 0.05 means errors are normally distributed |
-| `mean_abs_z_score` | Mean |z-score| | Typical deviation magnitude; ~0.8 expected |
+| Metric               | Description                     | Interpretation                                |
+| -------------------- | ------------------------------- | --------------------------------------------- | --- | ------------------------------------------ |
+| `mean_diff`          | Mean of (publisher - benchmark) | Systematic bias; should be ~0                 |
+| `std_diff`           | Std dev of price differences    | Error volatility; lower is better             |
+| `mean_pct_diff`      | Mean % difference               | Relative accuracy                             |
+| `std_pct_diff`       | Std dev of % differences        | Relative error volatility                     |
+| `mae`                | Mean Absolute Error             | Average deviation; lower is better            |
+| `t_statistic`        | t-test statistic                | Tests if bias is significant                  |
+| `t_pvalue`           | t-test p-value                  | < 0.05 indicates significant bias             |
+| `wilcoxon_statistic` | Wilcoxon test statistic         | Non-parametric bias test                      |
+| `wilcoxon_pvalue`    | Wilcoxon p-value                | < 0.05 indicates significant bias             |
+| `normality_pvalue`   | Normality test p-value          | >= 0.05 means errors are normally distributed |
+| `mean_abs_z_score`   | Mean                            | z-score                                       |     | Typical deviation magnitude; ~0.8 expected |
 
 **Summary Metrics:**
 
-| Metric | Description |
-|--------|-------------|
+| Metric                     | Description                                               |
+| -------------------------- | --------------------------------------------------------- |
 | `t_test_significance_rate` | % of feeds with statistically significant bias (p < 0.05) |
-| `normality_rate` | % of feeds with normally distributed errors |
-| `median_z_score` | Typical z-score across all feeds |
+| `normality_rate`           | % of feeds with normally distributed errors               |
+| `median_z_score`           | Typical z-score across all feeds                          |
 
 **Interpretation Guide:**
 
 The script outputs an interpretation guide explaining:
+
 - What each metric means
 - How to interpret your results (good/bad thresholds)
 - Actionable recommendations for improving data quality
@@ -293,16 +310,18 @@ The `publisher_benchmark.py` script includes flags for faster execution:
 python publisher_benchmark.py --csv publisher_55_feeds.csv --skip-scipy-tests
 ```
 
-| Flag | Description | Impact |
-|------|-------------|--------|
+| Flag                 | Description                  | Impact                                                                                                                                      |
+| -------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--skip-scipy-tests` | Skip scipy statistical tests | ~30-50% faster execution. Metrics like `t_statistic`, `t_pvalue`, `wilcoxon_statistic`, `wilcoxon_pvalue`, `normality_pvalue` will be null. |
 
 **When to use `--skip-scipy-tests`:**
+
 - Daily batch processing where statistical metrics aren't needed
 - Quick validation runs
 - When you only need pass/fail results (based on NRMSE and hit rate)
 
 **When NOT to use:**
+
 - Deep quality analysis requiring bias detection
 - Investigating specific publisher issues
 - When statistical significance of errors matters
@@ -318,13 +337,14 @@ python publisher_benchmark.py --csv publisher_55_feeds.csv --extended-hours
 
 **Trading Sessions:**
 
-| Session | Time (EST) | Flag Required |
-|---------|-----------|---------------|
-| Regular Hours | 9:30 AM - 4:00 PM | Always evaluated |
-| Pre-market | 4:00 AM - 9:30 AM | `--extended-hours` |
-| After-hours | 4:00 PM - 8:00 PM | `--extended-hours` |
+| Session       | Time (EST)        | Flag Required      |
+| ------------- | ----------------- | ------------------ |
+| Regular Hours | 9:30 AM - 4:00 PM | Always evaluated   |
+| Pre-market    | 4:00 AM - 9:30 AM | `--extended-hours` |
+| After-hours   | 4:00 PM - 8:00 PM | `--extended-hours` |
 
 **Important Notes:**
+
 - Extended hours evaluation only applies to `us-equities` asset class
 - Other asset classes (fx, metals, commodity) are unaffected
 - Regular hours results are always shown separately (not mixed with extended hours)
@@ -334,6 +354,7 @@ python publisher_benchmark.py --csv publisher_55_feeds.csv --extended-hours
 **Extended Hours Output:**
 
 When `--extended-hours` is enabled, the CSV output includes additional columns:
+
 - `premarket_n_observations`, `premarket_nrmse`, `premarket_hit_rate`, `premarket_passes`, `premarket_error`
 - `afterhours_n_observations`, `afterhours_nrmse`, `afterhours_hit_rate`, `afterhours_passes`, `afterhours_error`
 
@@ -360,6 +381,7 @@ python publisher_benchmark.py --publisher-id 55 --feed-id 327 --start-date 2025-
 ```
 
 **Notes:**
+
 - `--csv` is optional
 - In single-feed mode, `--publisher-id` and `--mode` are required
 - In single-feed mode, you must provide either `--date` or `--start-date` + `--end-date`
@@ -381,6 +403,7 @@ python publisher_benchmark.py --csv publisher_55_feeds.csv --feed-id 500 --overn
 ```
 
 **Notes:**
+
 - Feed IDs are matched exactly against the CSV input
 - Feed ID filtering is applied after asset class filtering
 - Useful for testing specific feeds without modifying the CSV file
@@ -399,12 +422,12 @@ python publisher_benchmark.py --csv publisher_55_feeds.csv --extended-hours --ov
 
 **Trading Sessions:**
 
-| Session | Time (EST) | Benchmark Source | Flag Required |
-|---------|-----------|------------------|---------------|
-| Regular Hours | 9:30 AM - 4:00 PM | Datascope | Always evaluated |
-| Pre-market | 4:00 AM - 9:30 AM | Datascope | `--extended-hours` |
-| After-hours | 4:00 PM - 8:00 PM | Datascope | `--extended-hours` |
-| Overnight | 8:00 PM - 4:00 AM | Publisher 32 | `--overnight` |
+| Session       | Time (EST)        | Benchmark Source | Flag Required      |
+| ------------- | ----------------- | ---------------- | ------------------ |
+| Regular Hours | 9:30 AM - 4:00 PM | Datascope        | Always evaluated   |
+| Pre-market    | 4:00 AM - 9:30 AM | Datascope        | `--extended-hours` |
+| After-hours   | 4:00 PM - 8:00 PM | Datascope        | `--extended-hours` |
+| Overnight     | 8:00 PM - 4:00 AM | Publisher 32     | `--overnight`      |
 
 **Important Caveats:**
 
@@ -416,6 +439,7 @@ python publisher_benchmark.py --csv publisher_55_feeds.csv --extended-hours --ov
 **Overnight Output:**
 
 When `--overnight` is enabled, the CSV output includes additional columns:
+
 - `overnight_n_observations`, `overnight_n_reference_observations`
 - `overnight_nrmse`, `overnight_hit_rate`, `overnight_passes`
 - `overnight_reference_publisher_id`, `overnight_error`
@@ -451,14 +475,14 @@ python generate_source_upload.py --tickers AAPL --force-refresh
 
 ### Source Upload Arguments
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--tickers` | Comma-separated ticker list | - |
-| `--ticker-file` | File with one ticker per line (or CSV) | - |
-| `--output` | Output CSV path | `source_upload.csv` |
-| `--no-clickhouse` | Skip ClickHouse lookups (offline mode) | False |
-| `--us-stocks-path` | Path to US-Stock-Symbols repo | `../US-Stock-Symbols` |
-| `--force-refresh` | Re-download NASDAQ Trader data (ignores cache) | False |
+| Argument           | Description                                    | Default               |
+| ------------------ | ---------------------------------------------- | --------------------- |
+| `--tickers`        | Comma-separated ticker list                    | -                     |
+| `--ticker-file`    | File with one ticker per line (or CSV)         | -                     |
+| `--output`         | Output CSV path                                | `source_upload.csv`   |
+| `--no-clickhouse`  | Skip ClickHouse lookups (offline mode)         | False                 |
+| `--us-stocks-path` | Path to US-Stock-Symbols repo                  | `../US-Stock-Symbols` |
+| `--force-refresh`  | Re-download NASDAQ Trader data (ignores cache) | False                 |
 
 ### RIC Resolution Strategy
 
@@ -514,30 +538,30 @@ python generate_ric_mapping.py --ticker AAPL --force-refresh
 
 ### RIC Mapping Arguments
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--ticker` | Ticker(s) to resolve (space-separated) | - |
-| `--ticker-file` | File with tickers (one per line or CSV) | - |
-| `--output` | Output CSV path | `ric_mappings.csv` |
-| `--symbols` | Path to lazer_symbols.json | `lazer_symbols.json` |
-| `--force-refresh` | Re-download NASDAQ Trader data | False |
-| `--append-to` | Append to existing CSV instead of creating new | - |
+| Argument          | Description                                    | Default              |
+| ----------------- | ---------------------------------------------- | -------------------- |
+| `--ticker`        | Ticker(s) to resolve (space-separated)         | -                    |
+| `--ticker-file`   | File with tickers (one per line or CSV)        | -                    |
+| `--output`        | Output CSV path                                | `ric_mappings.csv`   |
+| `--symbols`       | Path to lazer_symbols.json                     | `lazer_symbols.json` |
+| `--force-refresh` | Re-download NASDAQ Trader data                 | False                |
+| `--append-to`     | Append to existing CSV instead of creating new | -                    |
 
 ### RIC Resolution Rules
 
 Rule-based resolution engine — no ClickHouse or API dependencies (except NASDAQ Trader for equity exchange suffixes):
 
-| Asset Class | RIC Pattern | Example |
-|---|---|---|
-| US Equities/ETFs | `TICKER.{EXCHANGE}` via NASDAQ Trader | `AAPL.O`, `JPM.N`, `SPY.P` |
-| FX (USD pairs) | Non-USD currency + `=` | `EUR=`, `JPY=`, `AUD=` |
-| FX (cross, EUR/GBP) | `BASECCY+QUOTECCY+=` | `EURGBP=`, `GBPJPY=` |
-| FX (cross, AUD/NZD/CAD/CHF) | `BASECCY+QUOTECCY+=R` | `AUDCAD=R`, `NZDCHF=R` |
-| FX (Dollar Index) | `.DXY` | `.DXY` |
-| Metals | Fixed lookup | `XAU=`, `XAG=`, `XPT=`, `XPD=` |
-| Rates | `US{TENOR}T=RRPS` | `US10YT=RRPS`, `US3MT=RRPS` |
-| Commodity Futures | Pyth→RIC root mapping | `HGH26` (copper), `CLJ26` (WTI) |
-| Equity Index Futures | EM→ES, NM→NQ, DM→YM | `ESH26`, `NQH26`, `YMH26` |
+| Asset Class                 | RIC Pattern                           | Example                         |
+| --------------------------- | ------------------------------------- | ------------------------------- |
+| US Equities/ETFs            | `TICKER.{EXCHANGE}` via NASDAQ Trader | `AAPL.O`, `JPM.N`, `SPY.P`      |
+| FX (USD pairs)              | Non-USD currency + `=`                | `EUR=`, `JPY=`, `AUD=`          |
+| FX (cross, EUR/GBP)         | `BASECCY+QUOTECCY+=`                  | `EURGBP=`, `GBPJPY=`            |
+| FX (cross, AUD/NZD/CAD/CHF) | `BASECCY+QUOTECCY+=R`                 | `AUDCAD=R`, `NZDCHF=R`          |
+| FX (Dollar Index)           | `.DXY`                                | `.DXY`                          |
+| Metals                      | Fixed lookup                          | `XAU=`, `XAG=`, `XPT=`, `XPD=`  |
+| Rates                       | `US{TENOR}T=RRPS`                     | `US10YT=RRPS`, `US3MT=RRPS`     |
+| Commodity Futures           | Pyth→RIC root mapping                 | `HGH26` (copper), `CLJ26` (WTI) |
+| Equity Index Futures        | EM→ES, NM→NQ, DM→YM                   | `ESH26`, `NQH26`, `YMH26`       |
 
 ### RIC Mapping Output Format
 
@@ -553,18 +577,18 @@ HGH26,RIC,future.cch6,Commodities.CCH6/USD,2931,1970-01-01 00:00:00,,CCH6,COPPER
 - **Dotted tickers** (BRK.B) → RIC uses `BRKb.N` format (lowercase class, no dot)
 - **Duplicate names** in lazer_symbols.json (e.g., AAPL with `.EXT` suffix, AAL as GB and US equity) → prefers US, non-EXT, benchmarkable entries
 - **Non-benchmarkable assets** (crypto, funding-rate, nav, etc.) → skipped with warning
-- **Non-US equities** (Equity.GB.*, Equity.FR.*) → out of scope, skipped with warning
+- **Non-US equities** (Equity.GB._, Equity.FR._) → out of scope, skipped with warning
 - **Unknown tickers** → warning with fuzzy match suggestion
 - **NASDAQ Trader caching** → files cached in `.nasdaq_cache/` with 24h TTL; `--force-refresh` bypasses
 - **Network failures** → gracefully falls back to cached NASDAQ Trader data if available
 
 ### Confidence Levels
 
-| Level | Meaning |
-|-------|---------|
-| `high` | Rule-based derivation (FX, metals, rates, futures) — deterministic |
-| `medium` | NASDAQ Trader lookup (US equities) — correct ~84% of the time |
-| `low` | Fallback to `.N` suffix — needs manual verification |
+| Level    | Meaning                                                            |
+| -------- | ------------------------------------------------------------------ |
+| `high`   | Rule-based derivation (FX, metals, rates, futures) — deterministic |
+| `medium` | NASDAQ Trader lookup (US equities) — correct ~84% of the time      |
+| `low`    | Fallback to `.N` suffix — needs manual verification                |
 
 ### Running Tests
 
@@ -618,15 +642,15 @@ python isin_resolver.py --tickers AAPL -v
 
 ### ISIN Resolver Arguments
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--tickers` | Comma-separated ticker list | - |
-| `--ticker-file` | File with tickers (one per line or CSV) | - |
-| `--ric-csv` | RIC CSV file (extracts tickers, strips suffix) | - |
-| `--output` | Output CSV path | Console only |
-| `--no-yfinance` | Skip yfinance lookups (Tier 1 only) | False |
-| `--force-refresh` | Ignore cache, re-resolve all | False |
-| `--verbose`, `-v` | Enable verbose logging | False |
+| Argument          | Description                                    | Default      |
+| ----------------- | ---------------------------------------------- | ------------ |
+| `--tickers`       | Comma-separated ticker list                    | -            |
+| `--ticker-file`   | File with tickers (one per line or CSV)        | -            |
+| `--ric-csv`       | RIC CSV file (extracts tickers, strips suffix) | -            |
+| `--output`        | Output CSV path                                | Console only |
+| `--no-yfinance`   | Skip yfinance lookups (Tier 1 only)            | False        |
+| `--force-refresh` | Ignore cache, re-resolve all                   | False        |
+| `--verbose`, `-v` | Enable verbose logging                         | False        |
 
 ### Resolution Strategy
 
@@ -643,6 +667,7 @@ Three-tier resolution (ordered by speed):
 Console output includes a resolution summary with per-source counts and ISIN country prefix breakdown.
 
 CSV output (`--output`) contains:
+
 - `ticker`, `isin`, `cusip`, `source`, `company_name`, `exchange`, `warnings`
 
 ### Caching
@@ -685,6 +710,7 @@ python portal/test_api.py
 **Troubleshooting: Server won't start / shuts down immediately**
 
 If you see `[Errno 98] address already in use`, port 8000 is occupied:
+
 ```bash
 # Kill existing process on port 8000
 fuser -k 8000/tcp
@@ -695,21 +721,21 @@ python portal/test_api.py
 
 ### API Endpoints
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /health` | Health check |
-| `GET /docs` | Interactive Swagger docs |
-| `GET /publishers/` | List all publishers with summary stats |
-| `GET /publishers/{id}/summary` | Publisher daily summary |
-| `GET /publishers/{id}/dashboard` | Combined benchmark + uptime dashboard |
-| `GET /publishers/{id}/feeds` | Publisher's feed results (filter with `?passes=false`) |
-| `GET /publishers/{id}/trends` | Time series trend data |
-| `GET /leaderboard/` | Publisher rankings |
-| `GET /feeds/` | List all feeds |
-| `GET /benchmarks/uptime` | Uptime data with session filters |
-| `GET /benchmarks/uptime/summary` | Aggregated uptime by asset class |
-| `GET /benchmarks/trend/benchmark` | Historical benchmark metrics |
-| `GET /benchmarks/trend/uptime` | Historical uptime metrics |
+| Endpoint                          | Description                                            |
+| --------------------------------- | ------------------------------------------------------ |
+| `GET /health`                     | Health check                                           |
+| `GET /docs`                       | Interactive Swagger docs                               |
+| `GET /publishers/`                | List all publishers with summary stats                 |
+| `GET /publishers/{id}/summary`    | Publisher daily summary                                |
+| `GET /publishers/{id}/dashboard`  | Combined benchmark + uptime dashboard                  |
+| `GET /publishers/{id}/feeds`      | Publisher's feed results (filter with `?passes=false`) |
+| `GET /publishers/{id}/trends`     | Time series trend data                                 |
+| `GET /leaderboard/`               | Publisher rankings                                     |
+| `GET /feeds/`                     | List all feeds                                         |
+| `GET /benchmarks/uptime`          | Uptime data with session filters                       |
+| `GET /benchmarks/uptime/summary`  | Aggregated uptime by asset class                       |
+| `GET /benchmarks/trend/benchmark` | Historical benchmark metrics                           |
+| `GET /benchmarks/trend/uptime`    | Historical uptime metrics                              |
 
 ### Publisher Dashboard (Frontend)
 
@@ -724,6 +750,7 @@ open http://localhost:8000/ui/dashboard.html
 ```
 
 **Dashboard Features:**
+
 - Summary cards: Pass rate, median NRMSE, median uptime, total feeds
 - Tabs: Benchmark results, Uptime data, Trends (30-day charts), Alerts
 - Filtering: By publisher, date, asset class, pass/fail status
@@ -734,34 +761,38 @@ open http://localhost:8000/ui/dashboard.html
 
 The portal tracks publisher uptime using session-aware windows:
 
-| Session | Time (EST) | Asset Classes |
-|---------|-----------|---------------|
-| Regular | 9:30 AM - 4:00 PM | US Equities |
-| Premarket | 4:00 AM - 9:30 AM | US Equities |
-| Afterhours | 4:00 PM - 8:00 PM | US Equities |
-| Overnight | 8:00 PM - 4:00 AM | US Equities |
-| Regular | 24 hours (with maintenance) | FX, Metals |
+| Session    | Time (EST)                  | Asset Classes |
+| ---------- | --------------------------- | ------------- |
+| Regular    | 9:30 AM - 4:00 PM           | US Equities   |
+| Premarket  | 4:00 AM - 9:30 AM           | US Equities   |
+| Afterhours | 4:00 PM - 8:00 PM           | US Equities   |
+| Overnight  | 8:00 PM - 4:00 AM           | US Equities   |
+| Regular    | 24 hours (with maintenance) | FX, Metals    |
 
 **Uptime Methodology (200ms Gap-Based):**
 
 The portal uses a **200ms gap-based** calculation method:
+
 - Orders all publisher updates by timestamp
 - Calculates gap between each consecutive update
 - Any gap > 200ms contributes to downtime: `downtime += (gap - 200ms)`
 - Also accounts for gaps at period start (first update) and end (last update)
 
 **Why 200ms threshold?**
+
 - Publishers are expected to send updates frequently (multiple per second)
 - A 200ms gap indicates the publisher missed an update cycle
 - This is more accurate than 1-second window counting, which can show 100% uptime even when publishers have 500ms+ gaps
 
 **UptimeResult fields:**
+
 - `uptime_pct` - Percentage uptime (0-100)
 - `downtime_ms` - Total downtime in milliseconds
 - `max_gap_ms` - Maximum gap between consecutive updates
 - `gaps_over_threshold` - Count of gaps exceeding 200ms
 
 **Configurable threshold:**
+
 ```python
 from portal.batch.uptime_calculator import UptimeCalculator
 
@@ -788,6 +819,7 @@ python verify_uptime.py --publisher-id 55 --date 2026-01-28 --output results.csv
 ```
 
 The script compares:
+
 - **1-second window method** - Counts seconds with at least one update (legacy)
 - **200ms gap-based method** - Measures actual gaps between updates (current)
 
@@ -807,6 +839,7 @@ pytest portal/tests/test_dashboard_api.py -v
 ### Test Data
 
 The test server creates:
+
 - 4 publishers (IDs: 11, 32, 55, 99)
 - 6 feeds (EUR/USD, GBP/USD, XAU/USD, AAPL, MSFT, GOOGL)
 - 7 days of benchmark results
@@ -838,16 +871,18 @@ python -m portal.batch.daily_benchmark_runner --date 2026-01-30 --no-extended-ho
 
 **Performance Optimization Flags:**
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--discovery-workers` | Parallel workers for feed discovery phase | 8 |
-| `--skip-scipy-tests` | Skip statistical tests for faster benchmark execution | False |
+| Flag                  | Description                                           | Default |
+| --------------------- | ----------------------------------------------------- | ------- |
+| `--discovery-workers` | Parallel workers for feed discovery phase             | 8       |
+| `--skip-scipy-tests`  | Skip statistical tests for faster benchmark execution | False   |
 
 **Optimization impact:**
+
 - `--discovery-workers 8`: Parallelizes feed discovery across publishers, reducing discovery time from sequential (~40s per publisher) to parallel (~10s total)
 - `--skip-scipy-tests`: Skips t-test, Wilcoxon, and normality tests, reducing per-feed benchmark time by ~30-50%
 
 **What it does:**
+
 1. Discovers all active publishers from ClickHouse (last 60 minutes of activity via `feed_publisher_junction`)
 2. For each publisher:
    - Generates feed list via `publisher_feeds.py`
@@ -857,16 +892,19 @@ python -m portal.batch.daily_benchmark_runner --date 2026-01-30 --no-extended-ho
    - Computes daily summary aggregates
 
 **Expected duration:**
+
 - Per publisher: 1-10 minutes (depends on feed count)
 - All publishers (~40): 60-120 minutes with 16 workers
 
 **Database tables populated:**
+
 - `benchmark_results` - Individual publisher/feed results (~50 metrics)
 - `publisher_daily_summary` - Aggregated daily stats per publisher
 - `publisher_feed_daily_uptime` - Per-feed uptime by session
 - `publisher_daily_uptime_summary` - Aggregated uptime per publisher
 
 **Known issues:**
+
 - Publisher 71 may fail due to infinite t_statistic values - a numeric precision issue with certain edge cases.
 
 ## NASDAQ LUDP Trading Halt History
@@ -891,11 +929,11 @@ python trading_halt_history.py --delay 0.5
 
 ### Trading Halt Arguments
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--days` | Number of calendar days to look back | 365 |
-| `--output` | Output CSV file path | `ludp_halts.csv` |
-| `--delay` | Delay between requests in seconds | 0.2 |
+| Argument   | Description                          | Default          |
+| ---------- | ------------------------------------ | ---------------- |
+| `--days`   | Number of calendar days to look back | 365              |
+| `--output` | Output CSV file path                 | `ludp_halts.csv` |
+| `--delay`  | Delay between requests in seconds    | 0.2              |
 
 ### Data Source
 
@@ -921,17 +959,18 @@ date,ticker,halt_time,resume_time,market
 2025-02-10,BDRX,09:32:52,09:37:52,Q
 ```
 
-| Column | Description |
-|--------|-------------|
-| `date` | Halt date (YYYY-MM-DD) |
-| `ticker` | Stock symbol |
-| `halt_time` | Time halt began (HH:MM:SS ET) |
-| `resume_time` | Time trading resumed (HH:MM:SS ET) |
-| `market` | Exchange code: Q=NASDAQ, P=NYSE Arca, A=NYSE American, Z=BATS |
+| Column        | Description                                                   |
+| ------------- | ------------------------------------------------------------- |
+| `date`        | Halt date (YYYY-MM-DD)                                        |
+| `ticker`      | Stock symbol                                                  |
+| `halt_time`   | Time halt began (HH:MM:SS ET)                                 |
+| `resume_time` | Time trading resumed (HH:MM:SS ET)                            |
+| `market`      | Exchange code: Q=NASDAQ, P=NYSE Arca, A=NYSE American, Z=BATS |
 
 ### LUDP Halt Reason Codes
 
 The script filters for `LUDP` only. Other common halt reason codes in the feed (excluded):
+
 - `M` — Volatility Trading Pause (Market-Wide Circuit Breaker)
 - `T1` — News Pending
 - `T2` — News Dissemination

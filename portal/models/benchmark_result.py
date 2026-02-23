@@ -30,7 +30,12 @@ class BenchmarkResult(Base):
 
     __tablename__ = "benchmark_results"
     __table_args__ = (
-        UniqueConstraint("publisher_id", "feed_id", "benchmark_date", name="uq_results_publisher_feed_date"),
+        UniqueConstraint(
+            "publisher_id",
+            "feed_id",
+            "benchmark_date",
+            name="uq_results_publisher_feed_date",
+        ),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -242,10 +247,14 @@ class BenchmarkResultDetail(BenchmarkResultResponse):
             "n_observations": obj.n_observations,
             "nrmse": float(obj.nrmse) if obj.nrmse else None,
             "hit_rate": float(obj.hit_rate) if obj.hit_rate else None,
-            "benchmark_price_range": float(obj.benchmark_price_range) if obj.benchmark_price_range else None,
+            "benchmark_price_range": float(obj.benchmark_price_range)
+            if obj.benchmark_price_range
+            else None,
             "rmse": float(obj.rmse) if obj.rmse else None,
             "mean_spread": float(obj.mean_spread) if obj.mean_spread else None,
-            "rmse_over_spread": float(obj.rmse_over_spread) if obj.rmse_over_spread else None,
+            "rmse_over_spread": float(obj.rmse_over_spread)
+            if obj.rmse_over_spread
+            else None,
             "mean_diff": float(obj.mean_diff) if obj.mean_diff else None,
             "std_diff": float(obj.std_diff) if obj.std_diff else None,
             "mean_pct_diff": float(obj.mean_pct_diff) if obj.mean_pct_diff else None,
@@ -253,10 +262,18 @@ class BenchmarkResultDetail(BenchmarkResultResponse):
             "mae": float(obj.mae) if obj.mae else None,
             "t_statistic": float(obj.t_statistic) if obj.t_statistic else None,
             "t_pvalue": float(obj.t_pvalue) if obj.t_pvalue else None,
-            "wilcoxon_statistic": float(obj.wilcoxon_statistic) if obj.wilcoxon_statistic else None,
-            "wilcoxon_pvalue": float(obj.wilcoxon_pvalue) if obj.wilcoxon_pvalue else None,
-            "normality_pvalue": float(obj.normality_pvalue) if obj.normality_pvalue else None,
-            "mean_abs_z_score": float(obj.mean_abs_z_score) if obj.mean_abs_z_score else None,
+            "wilcoxon_statistic": float(obj.wilcoxon_statistic)
+            if obj.wilcoxon_statistic
+            else None,
+            "wilcoxon_pvalue": float(obj.wilcoxon_pvalue)
+            if obj.wilcoxon_pvalue
+            else None,
+            "normality_pvalue": float(obj.normality_pvalue)
+            if obj.normality_pvalue
+            else None,
+            "mean_abs_z_score": float(obj.mean_abs_z_score)
+            if obj.mean_abs_z_score
+            else None,
             "error": obj.error,
             "execution_time_ms": obj.execution_time_ms,
             "created_at": obj.created_at,
@@ -267,7 +284,9 @@ class BenchmarkResultDetail(BenchmarkResultResponse):
             data["premarket"] = ExtendedHoursMetrics(
                 n_observations=obj.premarket_n_observations,
                 nrmse=float(obj.premarket_nrmse) if obj.premarket_nrmse else None,
-                hit_rate=float(obj.premarket_hit_rate) if obj.premarket_hit_rate else None,
+                hit_rate=float(obj.premarket_hit_rate)
+                if obj.premarket_hit_rate
+                else None,
                 passes=obj.premarket_passes,
                 error=obj.premarket_error,
             )
@@ -276,7 +295,9 @@ class BenchmarkResultDetail(BenchmarkResultResponse):
             data["afterhours"] = ExtendedHoursMetrics(
                 n_observations=obj.afterhours_n_observations,
                 nrmse=float(obj.afterhours_nrmse) if obj.afterhours_nrmse else None,
-                hit_rate=float(obj.afterhours_hit_rate) if obj.afterhours_hit_rate else None,
+                hit_rate=float(obj.afterhours_hit_rate)
+                if obj.afterhours_hit_rate
+                else None,
                 passes=obj.afterhours_passes,
                 error=obj.afterhours_error,
             )
@@ -286,7 +307,9 @@ class BenchmarkResultDetail(BenchmarkResultResponse):
                 n_observations=obj.overnight_n_observations,
                 n_reference_observations=obj.overnight_n_reference_observations,
                 nrmse=float(obj.overnight_nrmse) if obj.overnight_nrmse else None,
-                hit_rate=float(obj.overnight_hit_rate) if obj.overnight_hit_rate else None,
+                hit_rate=float(obj.overnight_hit_rate)
+                if obj.overnight_hit_rate
+                else None,
                 passes=obj.overnight_passes,
                 reference_publisher_id=obj.overnight_reference_publisher_id,
                 error=obj.overnight_error,

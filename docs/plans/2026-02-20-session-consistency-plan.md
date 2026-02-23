@@ -13,6 +13,7 @@
 ### Task 1: Test helper factory for `PublisherReadinessDetail` and `FeedReadinessResult`
 
 **Files:**
+
 - Create: `tests/test_feed_readiness.py`
 
 **Step 1: Write helper factories**
@@ -129,6 +130,7 @@ git commit -m "test: add test scaffold with factories for feed_readiness"
 ### Task 2: Test & implement session status extractors
 
 **Files:**
+
 - Modify: `feed_readiness.py:790` (add extractors before `compute_publisher_consistency`)
 - Modify: `tests/test_feed_readiness.py` (add tests)
 
@@ -331,6 +333,7 @@ git commit -m "feat: add session status extractors for consistency computation"
 ### Task 3: Test & generalize `compute_publisher_consistency`
 
 **Files:**
+
 - Modify: `feed_readiness.py:790-846` (refactor function signature)
 - Modify: `tests/test_feed_readiness.py` (add tests)
 
@@ -456,6 +459,7 @@ def compute_publisher_consistency(
 ```
 
 Only two changes:
+
 1. Add `status_extractor` parameter with default `None` → `_regular_status`
 2. Replace the inline `if detail.benchmark_error...` block with `status = status_extractor(detail)` + `if status is None: continue`
 
@@ -476,6 +480,7 @@ git commit -m "feat: generalize compute_publisher_consistency with status_extrac
 ### Task 4: Test & parameterize `write_publisher_consistency_csv`
 
 **Files:**
+
 - Modify: `feed_readiness.py:849-881` (add `session_prefix` parameter)
 - Modify: `tests/test_feed_readiness.py` (add tests)
 
@@ -599,6 +604,7 @@ git commit -m "feat: parameterize write_publisher_consistency_csv with session_p
 ### Task 5: Test & parameterize `print_publisher_consistency`
 
 **Files:**
+
 - Modify: `feed_readiness.py:1297-1318` (add `session_prefix` parameter)
 - Modify: `tests/test_feed_readiness.py` (add tests)
 
@@ -697,6 +703,7 @@ git commit -m "feat: parameterize print_publisher_consistency with session_prefi
 ### Task 6: Wire session consistency into `write_results_csv`
 
 **Files:**
+
 - Modify: `feed_readiness.py:1076-1078` (add session calls after regular-hours call)
 
 **Step 1: Write failing test for CSV integration**
@@ -814,6 +821,7 @@ Expected: FAIL — session sections not being written.
 **Step 3: Add session consistency calls in `write_results_csv` (after line 1078)**
 
 At line 1076-1078 (existing code):
+
 ```python
             consistency = compute_publisher_consistency(results)
             if len(consistency["dates"]) > 1 and consistency["rows"]:
@@ -853,11 +861,13 @@ git commit -m "feat: wire session consistency sections into write_results_csv"
 ### Task 7: Wire session consistency into `main` console output
 
 **Files:**
+
 - Modify: `feed_readiness.py:1564-1567` (add session console prints after regular)
 
 **Step 1: Add session console prints after regular-hours print (line 1567)**
 
 At lines 1564-1567 (existing code):
+
 ```python
     if args.detailed and len({result.date for result in results}) > 1:
         consistency = compute_publisher_consistency(results)
@@ -898,6 +908,7 @@ git commit -m "feat: add session consistency to console output in main"
 ### Task 8: Update documentation
 
 **Files:**
+
 - Modify: `docs/feed_readiness.md:148-157` (extend consistency section docs)
 - Modify: `CLAUDE.md` (update feed readiness detailed output description)
 
@@ -955,12 +966,14 @@ Expected: Output includes all four consistency/classification section pairs (REG
 **Step 2: Verify CSV output**
 
 Check the output CSV contains session sections:
+
 ```bash
 grep "PUBLISHER CONSISTENCY" /tmp/test_3025_sessions.csv
 grep "PUBLISHER CLASSIFICATIONS" /tmp/test_3025_sessions.csv
 ```
 
 Expected output (4 consistency headers, 4 classification headers):
+
 ```
 PUBLISHER CONSISTENCY
 PREMARKET PUBLISHER CONSISTENCY

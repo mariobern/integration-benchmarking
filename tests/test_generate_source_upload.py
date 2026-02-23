@@ -142,13 +142,22 @@ class TestClassifyAsset:
         assert classify_asset("Apple Inc.") == "Equity"
 
     def test_adr_keyword_depositary(self) -> None:
-        assert classify_asset("Taiwan Semiconductor American Depositary Shares") == "American Depositary Shares"
+        assert (
+            classify_asset("Taiwan Semiconductor American Depositary Shares")
+            == "American Depositary Shares"
+        )
 
     def test_adr_keyword_ads(self) -> None:
-        assert classify_asset("Alibaba Group Holding Limited ADS") == "American Depositary Shares"
+        assert (
+            classify_asset("Alibaba Group Holding Limited ADS")
+            == "American Depositary Shares"
+        )
 
     def test_non_us_country(self) -> None:
-        assert classify_asset("Some Company", country="United Kingdom") == "American Depositary Shares"
+        assert (
+            classify_asset("Some Company", country="United Kingdom")
+            == "American Depositary Shares"
+        )
 
     def test_us_country(self) -> None:
         assert classify_asset("Some Company", country="United States") == "Equity"
@@ -157,7 +166,9 @@ class TestClassifyAsset:
         assert classify_asset("Some Company", country="") == "Equity"
 
     def test_case_insensitive_keyword(self) -> None:
-        assert classify_asset("AMERICAN DEPOSITARY SHARES") == "American Depositary Shares"
+        assert (
+            classify_asset("AMERICAN DEPOSITARY SHARES") == "American Depositary Shares"
+        )
 
 
 # --- NasdaqTraderSource ---
@@ -255,7 +266,9 @@ class TestParseTickers:
         result = parse_tickers_from_string(" AAPL , MSFT ")
         assert result == ["AAPL", "MSFT"]
 
-    def test_parse_from_string_skips_invalid(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_parse_from_string_skips_invalid(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         result = parse_tickers_from_string("AAPL,123,MSFT")
         assert result == ["AAPL", "MSFT"]
 
@@ -424,8 +437,11 @@ class TestBuildRows:
     def test_basic_row_building(self) -> None:
         infos = [
             TickerInfo(
-                ticker="AAPL", ric="AAPL.O", name="Apple Inc.",
-                pyth_lazer_id=922, confidence="high",
+                ticker="AAPL",
+                ric="AAPL.O",
+                name="Apple Inc.",
+                pyth_lazer_id=922,
+                confidence="high",
             ),
         ]
         rows = build_rows(infos)

@@ -38,6 +38,7 @@ python3 update_lazer_symbols.py --summary feeds_ready_170226_summary.md --config
 ## Input Format
 
 The markdown table in `feeds_ready_170226_summary.md`:
+
 ```
 | # | Ticker | Consistent Publishers | Count | Additional (some days) |
 |---|--------|----------------------|-------|------------------------|

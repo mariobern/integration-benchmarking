@@ -34,7 +34,9 @@ class SortBy(str, Enum):
 @router.get("/", response_model=LeaderboardResponse)
 async def get_leaderboard(
     db: DbSession,
-    target_date: Optional[date] = Query(None, description="Date for leaderboard (default: latest)"),
+    target_date: Optional[date] = Query(
+        None, description="Date for leaderboard (default: latest)"
+    ),
     asset_class: Optional[str] = Query(None, description="Filter by asset class"),
     sort_by: SortBy = Query(SortBy.PASS_RATE, description="Sort metric"),
     limit: int = Query(50, ge=1, le=100, description="Maximum entries to return"),
@@ -57,9 +59,8 @@ async def get_leaderboard(
             )
 
     # Get all summaries for the date
-    query = (
-        select(PublisherDailySummary)
-        .where(PublisherDailySummary.summary_date == target_date)
+    query = select(PublisherDailySummary).where(
+        PublisherDailySummary.summary_date == target_date
     )
 
     summaries = db.execute(query).scalars().all()
@@ -81,8 +82,12 @@ async def get_leaderboard(
 
     # Get publisher names
     publisher_ids = [s.publisher_id for s in summaries]
-    publishers_query = select(Publisher).where(Publisher.publisher_id.in_(publisher_ids))
-    publishers = {p.publisher_id: p for p in db.execute(publishers_query).scalars().all()}
+    publishers_query = select(Publisher).where(
+        Publisher.publisher_id.in_(publisher_ids)
+    )
+    publishers = {
+        p.publisher_id: p for p in db.execute(publishers_query).scalars().all()
+    }
 
     # Build entries with metrics
     entries = []
@@ -100,21 +105,31 @@ async def get_leaderboard(
             pass_rate = float(summary.pass_rate_pct) if summary.pass_rate_pct else None
             total = summary.total_feeds
 
-        entries.append({
-            "publisher_id": summary.publisher_id,
-            "publisher_name": publisher.name if publisher else f"Publisher {summary.publisher_id}",
-            "pass_rate_pct": pass_rate,
-            "median_nrmse": float(summary.median_nrmse) if summary.median_nrmse else None,
-            "median_hit_rate": float(summary.median_hit_rate) if summary.median_hit_rate else None,
-            "total_feeds": total,
-        })
+        entries.append(
+            {
+                "publisher_id": summary.publisher_id,
+                "publisher_name": publisher.name
+                if publisher
+                else f"Publisher {summary.publisher_id}",
+                "pass_rate_pct": pass_rate,
+                "median_nrmse": float(summary.median_nrmse)
+                if summary.median_nrmse
+                else None,
+                "median_hit_rate": float(summary.median_hit_rate)
+                if summary.median_hit_rate
+                else None,
+                "total_feeds": total,
+            }
+        )
 
     # Sort entries
     if sort_by == SortBy.PASS_RATE:
         entries.sort(key=lambda x: (x["pass_rate_pct"] or 0), reverse=True)
     elif sort_by == SortBy.NRMSE:
         # Lower NRMSE is better, so sort ascending (None values at end)
-        entries.sort(key=lambda x: (x["median_nrmse"] is None, x["median_nrmse"] or float("inf")))
+        entries.sort(
+            key=lambda x: (x["median_nrmse"] is None, x["median_nrmse"] or float("inf"))
+        )
     elif sort_by == SortBy.HIT_RATE:
         entries.sort(key=lambda x: (x["median_hit_rate"] or 0), reverse=True)
     elif sort_by == SortBy.TOTAL_FEEDS:
@@ -124,9 +139,16 @@ async def get_leaderboard(
     entries = entries[:limit]
 
     # Calculate ranks for different metrics
-    pass_rate_sorted = sorted(entries, key=lambda x: (x["pass_rate_pct"] or 0), reverse=True)
-    nrmse_sorted = sorted(entries, key=lambda x: (x["median_nrmse"] is None, x["median_nrmse"] or float("inf")))
-    hit_rate_sorted = sorted(entries, key=lambda x: (x["median_hit_rate"] or 0), reverse=True)
+    pass_rate_sorted = sorted(
+        entries, key=lambda x: (x["pass_rate_pct"] or 0), reverse=True
+    )
+    nrmse_sorted = sorted(
+        entries,
+        key=lambda x: (x["median_nrmse"] is None, x["median_nrmse"] or float("inf")),
+    )
+    hit_rate_sorted = sorted(
+        entries, key=lambda x: (x["median_hit_rate"] or 0), reverse=True
+    )
 
     pass_rate_ranks = {e["publisher_id"]: i + 1 for i, e in enumerate(pass_rate_sorted)}
     nrmse_ranks = {e["publisher_id"]: i + 1 for i, e in enumerate(nrmse_sorted)}
@@ -159,7 +181,9 @@ async def get_leaderboard(
 @router.get("/dates")
 async def get_available_dates(
     db: DbSession,
-    limit: int = Query(30, ge=1, le=100, description="Number of recent dates to return"),
+    limit: int = Query(
+        30, ge=1, le=100, description="Number of recent dates to return"
+    ),
 ):
     """
     Get list of dates with leaderboard data.
@@ -187,7 +211,9 @@ async def get_available_dates(
 async def get_publisher_rank(
     publisher_id: int,
     db: DbSession,
-    target_date: Optional[date] = Query(None, description="Date for ranking (default: latest)"),
+    target_date: Optional[date] = Query(
+        None, description="Date for ranking (default: latest)"
+    ),
 ):
     """
     Get a specific publisher's rank in the leaderboard.
@@ -216,10 +242,15 @@ async def get_publisher_rank(
         )
 
     # Get all summaries for ranking
-    all_summaries = db.execute(
-        select(PublisherDailySummary)
-        .where(PublisherDailySummary.summary_date == target_date)
-    ).scalars().all()
+    all_summaries = (
+        db.execute(
+            select(PublisherDailySummary).where(
+                PublisherDailySummary.summary_date == target_date
+            )
+        )
+        .scalars()
+        .all()
+    )
 
     total_publishers = len(all_summaries)
 
@@ -231,7 +262,10 @@ async def get_publisher_rank(
     )
     nrmse_sorted = sorted(
         all_summaries,
-        key=lambda x: (x.median_nrmse is None, float(x.median_nrmse) if x.median_nrmse else float("inf")),
+        key=lambda x: (
+            x.median_nrmse is None,
+            float(x.median_nrmse) if x.median_nrmse else float("inf"),
+        ),
     )
     hit_rate_sorted = sorted(
         all_summaries,
@@ -240,7 +274,11 @@ async def get_publisher_rank(
     )
 
     rank_by_pass_rate = next(
-        (i + 1 for i, s in enumerate(pass_rate_sorted) if s.publisher_id == publisher_id),
+        (
+            i + 1
+            for i, s in enumerate(pass_rate_sorted)
+            if s.publisher_id == publisher_id
+        ),
         None,
     )
     rank_by_nrmse = next(
@@ -248,7 +286,11 @@ async def get_publisher_rank(
         None,
     )
     rank_by_hit_rate = next(
-        (i + 1 for i, s in enumerate(hit_rate_sorted) if s.publisher_id == publisher_id),
+        (
+            i + 1
+            for i, s in enumerate(hit_rate_sorted)
+            if s.publisher_id == publisher_id
+        ),
         None,
     )
 
@@ -262,14 +304,32 @@ async def get_publisher_rank(
             "by_hit_rate": rank_by_hit_rate,
         },
         "percentiles": {
-            "by_pass_rate": round((total_publishers - rank_by_pass_rate + 1) / total_publishers * 100, 1) if rank_by_pass_rate else None,
-            "by_nrmse": round((total_publishers - rank_by_nrmse + 1) / total_publishers * 100, 1) if rank_by_nrmse else None,
-            "by_hit_rate": round((total_publishers - rank_by_hit_rate + 1) / total_publishers * 100, 1) if rank_by_hit_rate else None,
+            "by_pass_rate": round(
+                (total_publishers - rank_by_pass_rate + 1) / total_publishers * 100, 1
+            )
+            if rank_by_pass_rate
+            else None,
+            "by_nrmse": round(
+                (total_publishers - rank_by_nrmse + 1) / total_publishers * 100, 1
+            )
+            if rank_by_nrmse
+            else None,
+            "by_hit_rate": round(
+                (total_publishers - rank_by_hit_rate + 1) / total_publishers * 100, 1
+            )
+            if rank_by_hit_rate
+            else None,
         },
         "metrics": {
-            "pass_rate_pct": float(publisher_summary.pass_rate_pct) if publisher_summary.pass_rate_pct else None,
-            "median_nrmse": float(publisher_summary.median_nrmse) if publisher_summary.median_nrmse else None,
-            "median_hit_rate": float(publisher_summary.median_hit_rate) if publisher_summary.median_hit_rate else None,
+            "pass_rate_pct": float(publisher_summary.pass_rate_pct)
+            if publisher_summary.pass_rate_pct
+            else None,
+            "median_nrmse": float(publisher_summary.median_nrmse)
+            if publisher_summary.median_nrmse
+            else None,
+            "median_hit_rate": float(publisher_summary.median_hit_rate)
+            if publisher_summary.median_hit_rate
+            else None,
             "total_feeds": publisher_summary.total_feeds,
         },
     }
@@ -300,10 +360,15 @@ async def get_publisher_rank_history(
 
     for target_date in dates:
         # Get all summaries for this date
-        all_summaries = db.execute(
-            select(PublisherDailySummary)
-            .where(PublisherDailySummary.summary_date == target_date)
-        ).scalars().all()
+        all_summaries = (
+            db.execute(
+                select(PublisherDailySummary).where(
+                    PublisherDailySummary.summary_date == target_date
+                )
+            )
+            .scalars()
+            .all()
+        )
 
         # Find publisher's summary
         publisher_summary = next(
@@ -323,17 +388,27 @@ async def get_publisher_rank_history(
             reverse=True,
         )
         rank = next(
-            (i + 1 for i, s in enumerate(pass_rate_sorted) if s.publisher_id == publisher_id),
+            (
+                i + 1
+                for i, s in enumerate(pass_rate_sorted)
+                if s.publisher_id == publisher_id
+            ),
             None,
         )
 
-        history.append({
-            "date": str(target_date),
-            "rank": rank,
-            "total_publishers": total_publishers,
-            "pass_rate_pct": float(publisher_summary.pass_rate_pct) if publisher_summary.pass_rate_pct else None,
-            "median_nrmse": float(publisher_summary.median_nrmse) if publisher_summary.median_nrmse else None,
-        })
+        history.append(
+            {
+                "date": str(target_date),
+                "rank": rank,
+                "total_publishers": total_publishers,
+                "pass_rate_pct": float(publisher_summary.pass_rate_pct)
+                if publisher_summary.pass_rate_pct
+                else None,
+                "median_nrmse": float(publisher_summary.median_nrmse)
+                if publisher_summary.median_nrmse
+                else None,
+            }
+        )
 
     return {
         "publisher_id": publisher_id,

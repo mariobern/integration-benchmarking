@@ -37,7 +37,9 @@ def _local_window_to_utc(
     end_local = datetime.combine(target_date, end_t, tzinfo=tz)
     if end_local <= start_local:
         end_local = end_local + timedelta(days=1)
-    return start_local.astimezone(ZoneInfo("UTC")), end_local.astimezone(ZoneInfo("UTC"))
+    return start_local.astimezone(ZoneInfo("UTC")), end_local.astimezone(
+        ZoneInfo("UTC")
+    )
 
 
 def _weekday(d: date) -> int:
@@ -60,7 +62,9 @@ def _sessions_for_us_equities(target_date: date) -> list[SessionWindow]:
 
     # Overnight: Sunday-Thursday 8PM to 4AM (next day)
     if weekday in {6, 0, 1, 2, 3}:  # Sun-Thu
-        start_utc, end_utc = _local_window_to_utc(target_date, et, time(20, 0), time(4, 0))
+        start_utc, end_utc = _local_window_to_utc(
+            target_date, et, time(20, 0), time(4, 0)
+        )
         windows.append(SessionWindow("overnight", start_utc, end_utc))
 
     return windows
@@ -83,7 +87,10 @@ def _sessions_for_uk_equities(target_date: date) -> list[SessionWindow]:
 
 
 def _sessions_for_asia_equities(
-    target_date: date, tz_name: str, morning: tuple[time, time], afternoon: tuple[time, time]
+    target_date: date,
+    tz_name: str,
+    morning: tuple[time, time],
+    afternoon: tuple[time, time],
 ) -> list[SessionWindow]:
     tz = ZoneInfo(tz_name)
     if _weekday(target_date) > 4:
@@ -103,11 +110,15 @@ def _sessions_for_fx(target_date: date) -> list[SessionWindow]:
     if weekday == 5:  # Saturday
         return windows
     if weekday == 6:  # Sunday: 5PM -> midnight
-        start_utc, end_utc = _local_window_to_utc(target_date, et, time(17, 0), time(0, 0))
+        start_utc, end_utc = _local_window_to_utc(
+            target_date, et, time(17, 0), time(0, 0)
+        )
         windows.append(SessionWindow("regular", start_utc, end_utc))
         return windows
     if weekday == 4:  # Friday: midnight -> 5PM
-        start_utc, end_utc = _local_window_to_utc(target_date, et, time(0, 0), time(17, 0))
+        start_utc, end_utc = _local_window_to_utc(
+            target_date, et, time(0, 0), time(17, 0)
+        )
         windows.append(SessionWindow("regular", start_utc, end_utc))
         return windows
 
@@ -125,11 +136,15 @@ def _sessions_for_metals(target_date: date) -> list[SessionWindow]:
     if weekday == 5:  # Saturday
         return windows
     if weekday == 6:  # Sunday: 5PM -> midnight
-        start_utc, end_utc = _local_window_to_utc(target_date, et, time(17, 0), time(0, 0))
+        start_utc, end_utc = _local_window_to_utc(
+            target_date, et, time(17, 0), time(0, 0)
+        )
         windows.append(SessionWindow("regular", start_utc, end_utc))
         return windows
     if weekday == 4:  # Friday: midnight -> 5PM
-        start_utc, end_utc = _local_window_to_utc(target_date, et, time(0, 0), time(17, 0))
+        start_utc, end_utc = _local_window_to_utc(
+            target_date, et, time(0, 0), time(17, 0)
+        )
         windows.append(SessionWindow("regular", start_utc, end_utc))
         return windows
 
@@ -163,11 +178,15 @@ def _sessions_for_commodity(target_date: date) -> list[SessionWindow]:
     if weekday == 5:  # Saturday
         return windows
     if weekday == 6:  # Sunday: 6PM -> midnight
-        start_utc, end_utc = _local_window_to_utc(target_date, et, time(18, 0), time(0, 0))
+        start_utc, end_utc = _local_window_to_utc(
+            target_date, et, time(18, 0), time(0, 0)
+        )
         windows.append(SessionWindow("regular", start_utc, end_utc))
         return windows
     if weekday == 4:  # Friday: midnight -> 5PM
-        start_utc, end_utc = _local_window_to_utc(target_date, et, time(0, 0), time(17, 0))
+        start_utc, end_utc = _local_window_to_utc(
+            target_date, et, time(0, 0), time(17, 0)
+        )
         windows.append(SessionWindow("regular", start_utc, end_utc))
         return windows
 
@@ -259,7 +278,9 @@ def get_session_windows(asset_class: str, target_date: date) -> list[SessionWind
     return []
 
 
-def combine_session_windows(windows: Iterable[SessionWindow], session_name: str) -> list[SessionWindow]:
+def combine_session_windows(
+    windows: Iterable[SessionWindow], session_name: str
+) -> list[SessionWindow]:
     combined: list[SessionWindow] = []
     for window in windows:
         if window.session != session_name:

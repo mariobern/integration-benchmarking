@@ -52,7 +52,9 @@ def upgrade() -> None:
         # Asset class breakdown (JSON)
         sa.Column("asset_class_uptime", JSONB(), nullable=True),
         # Metadata
-        sa.Column("created_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
             "publisher_id",

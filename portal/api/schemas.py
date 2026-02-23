@@ -45,8 +45,12 @@ class MetricsSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     pass_rate_pct: Optional[float] = Field(None, description="Pass rate percentage")
-    median_nrmse: Optional[float] = Field(None, description="Median NRMSE (lower is better)")
-    median_hit_rate: Optional[float] = Field(None, description="Median hit rate percentage")
+    median_nrmse: Optional[float] = Field(
+        None, description="Median NRMSE (lower is better)"
+    )
+    median_hit_rate: Optional[float] = Field(
+        None, description="Median hit rate percentage"
+    )
     total_feeds: int = Field(0, description="Total number of feeds")
     total_observations: Optional[int] = Field(None, description="Total observations")
 
@@ -105,7 +109,9 @@ class BenchmarkMetrics(BaseModel):
 
     pass_rate_pct: Optional[float] = Field(None, description="Pass rate percentage")
     median_nrmse: Optional[float] = Field(None, description="Median NRMSE")
-    median_hit_rate: Optional[float] = Field(None, description="Median hit rate percentage")
+    median_hit_rate: Optional[float] = Field(
+        None, description="Median hit rate percentage"
+    )
     total_feeds: int = Field(0, description="Total number of feeds")
     pass_count: int = Field(0, description="Number of passing feeds")
     fail_count: int = Field(0, description="Number of failing feeds")
@@ -115,11 +121,21 @@ class BenchmarkMetrics(BaseModel):
 class UptimeMetrics(BaseModel):
     """Uptime metrics for dashboard display."""
 
-    overall_median_uptime_pct: Optional[float] = Field(None, description="Overall median uptime %")
-    regular_median_uptime_pct: Optional[float] = Field(None, description="Regular hours median uptime %")
-    premarket_median_uptime_pct: Optional[float] = Field(None, description="Pre-market median uptime %")
-    afterhours_median_uptime_pct: Optional[float] = Field(None, description="After-hours median uptime %")
-    overnight_median_uptime_pct: Optional[float] = Field(None, description="Overnight median uptime %")
+    overall_median_uptime_pct: Optional[float] = Field(
+        None, description="Overall median uptime %"
+    )
+    regular_median_uptime_pct: Optional[float] = Field(
+        None, description="Regular hours median uptime %"
+    )
+    premarket_median_uptime_pct: Optional[float] = Field(
+        None, description="Pre-market median uptime %"
+    )
+    afterhours_median_uptime_pct: Optional[float] = Field(
+        None, description="After-hours median uptime %"
+    )
+    overnight_median_uptime_pct: Optional[float] = Field(
+        None, description="Overnight median uptime %"
+    )
 
 
 class AlertItem(BaseModel):
@@ -135,8 +151,12 @@ class DashboardAlerts(BaseModel):
     """Alerts summary for dashboard."""
 
     failing_feeds_count: int = Field(0, description="Number of failing feeds")
-    low_uptime_feeds_count: int = Field(0, description="Number of feeds with low uptime")
-    top_issues: list[AlertItem] = Field(default_factory=list, description="Top issues to address")
+    low_uptime_feeds_count: int = Field(
+        0, description="Number of feeds with low uptime"
+    )
+    top_issues: list[AlertItem] = Field(
+        default_factory=list, description="Top issues to address"
+    )
 
 
 class PublisherDashboardResponse(BaseModel):

@@ -346,7 +346,11 @@ def generate_summary_markdown(
 
         if metals:
             metal_names = extract_metal_names(
-                [i for i in fx.instruments if any(m in i.ric for m in ["XAU", "XAG", "XPT", "XPD"])]
+                [
+                    i
+                    for i in fx.instruments
+                    if any(m in i.ric for m in ["XAU", "XAG", "XPT", "XPD"])
+                ]
             )
             lines.append(f"## Metals ({len(metal_names)})")
             lines.append("")

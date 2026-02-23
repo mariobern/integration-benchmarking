@@ -6,11 +6,11 @@
 
 Each feed is classified based on benchmark pass/fail and uptime:
 
-| Status | Condition | Meaning |
-|--------|-----------|---------|
-| **HEALTHY** | Benchmark passes AND uptime >= threshold | Feed is production-ready |
-| **DEGRADED** | One of benchmark or uptime fails, but not both | Feed needs attention |
-| **FAILING** | Benchmark fails AND uptime < threshold | Feed has serious issues |
+| Status       | Condition                                      | Meaning                  |
+| ------------ | ---------------------------------------------- | ------------------------ |
+| **HEALTHY**  | Benchmark passes AND uptime >= threshold       | Feed is production-ready |
+| **DEGRADED** | One of benchmark or uptime fails, but not both | Feed needs attention     |
+| **FAILING**  | Benchmark fails AND uptime < threshold         | Feed has serious issues  |
 
 Default uptime threshold: 95%.
 
@@ -41,23 +41,23 @@ python publisher_report.py --csv publisher_55_feeds.csv --skip-scipy-tests
 
 ## Arguments
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--csv` | CSV with `feed_id,date,mode` columns | - |
-| `--publisher-id` | Publisher ID (required in single-feed mode) | - |
-| `--feed-id` | Feed ID(s) to filter | - |
-| `--date` | Date(s) `YYYY-MM-DD` | - |
-| `--start-date` / `--end-date` | Inclusive date range | - |
-| `--mode` | Asset class (single-feed mode) | - |
-| `--output` | Output CSV path | Auto-generated |
-| `--workers` | Parallel workers | `4` |
-| `--uptime-threshold` | Minimum uptime % for HEALTHY | `95.0` |
-| `--extended-hours` | Include premarket + afterhours (US equities) | Off |
-| `--overnight` | Include overnight session (US equities) | Off |
-| `--skip-scipy-tests` | Skip statistical tests for faster runs | Off |
-| `--include-asset-class` | Only these classes (CSV mode) | All |
-| `--exclude-asset-class` | Exclude these classes (CSV mode) | None |
-| `--list-asset-classes` | List asset classes in CSV and exit | Off |
+| Argument                      | Description                                  | Default        |
+| ----------------------------- | -------------------------------------------- | -------------- |
+| `--csv`                       | CSV with `feed_id,date,mode` columns         | -              |
+| `--publisher-id`              | Publisher ID (required in single-feed mode)  | -              |
+| `--feed-id`                   | Feed ID(s) to filter                         | -              |
+| `--date`                      | Date(s) `YYYY-MM-DD`                         | -              |
+| `--start-date` / `--end-date` | Inclusive date range                         | -              |
+| `--mode`                      | Asset class (single-feed mode)               | -              |
+| `--output`                    | Output CSV path                              | Auto-generated |
+| `--workers`                   | Parallel workers                             | `4`            |
+| `--uptime-threshold`          | Minimum uptime % for HEALTHY                 | `95.0`         |
+| `--extended-hours`            | Include premarket + afterhours (US equities) | Off            |
+| `--overnight`                 | Include overnight session (US equities)      | Off            |
+| `--skip-scipy-tests`          | Skip statistical tests for faster runs       | Off            |
+| `--include-asset-class`       | Only these classes (CSV mode)                | All            |
+| `--exclude-asset-class`       | Exclude these classes (CSV mode)             | None           |
+| `--list-asset-classes`        | List asset classes in CSV and exit           | Off            |
 
 ## How It Works
 
@@ -76,6 +76,7 @@ python publisher_report.py --csv publisher_55_feeds.csv --skip-scipy-tests
 ## CSV Output
 
 Per-feed columns:
+
 - `publisher_id`, `feed_id`, `date`, `mode`, `symbol`
 - `health_status` (HEALTHY / DEGRADED / FAILING)
 - `passes` (benchmark), `nrmse`, `hit_rate`, `n_observations`
@@ -92,12 +93,12 @@ Uses the **1-second window** method: counts seconds with at least one publisher 
 
 Trading sessions (US equities):
 
-| Session | Time (EST) | Flag |
-|---------|-----------|------|
-| Regular | 9:30 AM - 4:00 PM | Always |
-| Premarket | 4:00 AM - 9:30 AM | `--extended-hours` |
+| Session    | Time (EST)        | Flag               |
+| ---------- | ----------------- | ------------------ |
+| Regular    | 9:30 AM - 4:00 PM | Always             |
+| Premarket  | 4:00 AM - 9:30 AM | `--extended-hours` |
 | Afterhours | 4:00 PM - 8:00 PM | `--extended-hours` |
-| Overnight | 8:00 PM - 4:00 AM | `--overnight` |
+| Overnight  | 8:00 PM - 4:00 AM | `--overnight`      |
 
 FX, metals, commodity, and us-treasuries use a 24-hour regular session.
 

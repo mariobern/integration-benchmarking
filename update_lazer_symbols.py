@@ -19,13 +19,13 @@ def parse_summary_markdown(text: str) -> dict[str, list[int]]:
     """
     result = {}
     pattern = re.compile(
-        r'\|\s*\d+\s*\|\s*\*\*([\w./-]+)\*\*\s*\|\s*([^|]*)\|\s*\d+\s*\|'
+        r"\|\s*\d+\s*\|\s*\*\*([\w./-]+)\*\*\s*\|\s*([^|]*)\|\s*\d+\s*\|"
     )
     for match in pattern.finditer(text):
         ticker = match.group(1)
         pubs_str = match.group(2).strip()
         if pubs_str:
-            pubs = sorted(int(p.strip()) for p in pubs_str.split(',') if p.strip())
+            pubs = sorted(int(p.strip()) for p in pubs_str.split(",") if p.strip())
         else:
             pubs = []
         result[ticker] = pubs
@@ -49,12 +49,12 @@ def _find_feed_block(raw: str, feed_id: int) -> tuple[int, int] | None:
         if c == '"':
             start -= 1
             while start >= 0 and raw[start] != '"':
-                if raw[start] == '\\' and start > 0:
+                if raw[start] == "\\" and start > 0:
                     start -= 1
                 start -= 1
-        elif c == '}':
+        elif c == "}":
             depth += 1
-        elif c == '{':
+        elif c == "{":
             if depth == 0:
                 break
             depth -= 1
@@ -66,12 +66,12 @@ def _find_feed_block(raw: str, feed_id: int) -> tuple[int, int] | None:
     in_string = False
     while end < len(raw) and depth > 0:
         c = raw[end]
-        if c == '"' and (end == 0 or raw[end - 1] != '\\'):
+        if c == '"' and (end == 0 or raw[end - 1] != "\\"):
             in_string = not in_string
         elif not in_string:
-            if c == '{':
+            if c == "{":
                 depth += 1
-            elif c == '}':
+            elif c == "}":
                 depth -= 1
         end += 1
 
@@ -123,16 +123,16 @@ def modify_config(
         bounds = _find_feed_block(raw, info["feedId"])
         if not bounds:
             not_found.append(ticker)
-            print(f"  WARNING: {ticker} feedId={info['feedId']} block not found in raw text")
+            print(
+                f"  WARNING: {ticker} feedId={info['feedId']} block not found in raw text"
+            )
             continue
 
         start, end = bounds
         block = raw[start:end]
 
         # Surgical replacements
-        new_block = re.sub(
-            r'"state": "COMING_SOON"', '"state": "STABLE"', block
-        )
+        new_block = re.sub(r'"state": "COMING_SOON"', '"state": "STABLE"', block)
         pub_str = "[ " + ", ".join(str(p) for p in sorted(pubs)) + " ]"
         if re.search(r'"allowedPublisherIds":', new_block):
             new_block = re.sub(
@@ -142,16 +142,16 @@ def modify_config(
             )
         else:
             # Field doesn't exist yet — insert after opening {
-            newline_pos = new_block.index('\n')
+            newline_pos = new_block.index("\n")
             insert_line = f'\n      "allowedPublisherIds": {pub_str},'
             new_block = new_block[:newline_pos] + insert_line + new_block[newline_pos:]
-        new_block = re.sub(
-            r'"minPublishers": \d+', '"minPublishers": 2', new_block
-        )
+        new_block = re.sub(r'"minPublishers": \d+', '"minPublishers": 2', new_block)
 
         raw = raw[:start] + new_block + raw[end:]
         modified += 1
-        print(f"  OK: {ticker} (feedId={info['feedId']}) -> STABLE, pubs={sorted(pubs)}, minPub=2")
+        print(
+            f"  OK: {ticker} (feedId={info['feedId']}) -> STABLE, pubs={sorted(pubs)}, minPub=2"
+        )
 
     if not dry_run and modified > 0:
         backup_path = config_path + ".bak"
@@ -173,16 +173,13 @@ def main() -> None:
         description="Promote ready feeds from COMING_SOON to STABLE in after.json"
     )
     parser.add_argument(
-        "--summary", required=True,
-        help="Path to feeds_ready summary markdown file"
+        "--summary", required=True, help="Path to feeds_ready summary markdown file"
     )
     parser.add_argument(
-        "--config", required=True,
-        help="Path to after.json config file"
+        "--config", required=True, help="Path to after.json config file"
     )
     parser.add_argument(
-        "--dry-run", action="store_true",
-        help="Print changes without writing to file"
+        "--dry-run", action="store_true", help="Print changes without writing to file"
     )
     args = parser.parse_args()
 
@@ -214,7 +211,11 @@ def main() -> None:
     print(f"  Not found in config:  {len(result['not_found'])}")
     if result["not_found"]:
         print(f"  Missing tickers: {', '.join(result['not_found'])}")
-    total = result["modified"] + result["skipped_not_coming_soon"] + len(result["not_found"])
+    total = (
+        result["modified"]
+        + result["skipped_not_coming_soon"]
+        + len(result["not_found"])
+    )
     print(f"  Total processed:      {total}/{len(ticker_pubs)}")
 
 

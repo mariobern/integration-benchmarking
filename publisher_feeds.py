@@ -38,46 +38,46 @@ class FeedInfo:
 # Symbol suffix to ISO country code mapping for equities
 EQUITY_COUNTRY_MAP = {
     # US exchanges (typically no suffix, but some may have these)
-    ".N": "us",    # NYSE
-    ".OQ": "us",   # NASDAQ
-    ".A": "us",    # AMEX
+    ".N": "us",  # NYSE
+    ".OQ": "us",  # NASDAQ
+    ".A": "us",  # AMEX
     # European exchanges
-    ".L": "gb",    # London Stock Exchange
-    ".PA": "fr",   # Euronext Paris
-    ".DE": "de",   # Deutsche Börse (Xetra)
-    ".AS": "nl",   # Euronext Amsterdam
-    ".MI": "it",   # Borsa Italiana (Milan)
-    ".MC": "es",   # Bolsa de Madrid
-    ".SW": "ch",   # SIX Swiss Exchange
-    ".BR": "be",   # Euronext Brussels
-    ".VI": "at",   # Vienna Stock Exchange
-    ".ST": "se",   # Nasdaq Stockholm
-    ".HE": "fi",   # Nasdaq Helsinki
-    ".CO": "dk",   # Nasdaq Copenhagen
-    ".OL": "no",   # Oslo Stock Exchange
-    ".LS": "pt",   # Euronext Lisbon
-    ".IR": "ie",   # Euronext Dublin
-    ".WA": "pl",   # Warsaw Stock Exchange
+    ".L": "gb",  # London Stock Exchange
+    ".PA": "fr",  # Euronext Paris
+    ".DE": "de",  # Deutsche Börse (Xetra)
+    ".AS": "nl",  # Euronext Amsterdam
+    ".MI": "it",  # Borsa Italiana (Milan)
+    ".MC": "es",  # Bolsa de Madrid
+    ".SW": "ch",  # SIX Swiss Exchange
+    ".BR": "be",  # Euronext Brussels
+    ".VI": "at",  # Vienna Stock Exchange
+    ".ST": "se",  # Nasdaq Stockholm
+    ".HE": "fi",  # Nasdaq Helsinki
+    ".CO": "dk",  # Nasdaq Copenhagen
+    ".OL": "no",  # Oslo Stock Exchange
+    ".LS": "pt",  # Euronext Lisbon
+    ".IR": "ie",  # Euronext Dublin
+    ".WA": "pl",  # Warsaw Stock Exchange
     # Asia-Pacific exchanges
-    ".HK": "hk",   # Hong Kong Stock Exchange
-    ".T": "jp",    # Tokyo Stock Exchange
-    ".SS": "cn",   # Shanghai Stock Exchange
-    ".SZ": "cn",   # Shenzhen Stock Exchange
-    ".KS": "kr",   # Korea Stock Exchange
-    ".KQ": "kr",   # KOSDAQ
-    ".TW": "tw",   # Taiwan Stock Exchange
-    ".SI": "sg",   # Singapore Exchange
-    ".AX": "au",   # Australian Securities Exchange
-    ".NZ": "nz",   # New Zealand Exchange
-    ".BO": "in",   # Bombay Stock Exchange
-    ".NS": "in",   # National Stock Exchange of India
-    ".BK": "th",   # Stock Exchange of Thailand
-    ".JK": "id",   # Indonesia Stock Exchange
-    ".KL": "my",   # Bursa Malaysia
+    ".HK": "hk",  # Hong Kong Stock Exchange
+    ".T": "jp",  # Tokyo Stock Exchange
+    ".SS": "cn",  # Shanghai Stock Exchange
+    ".SZ": "cn",  # Shenzhen Stock Exchange
+    ".KS": "kr",  # Korea Stock Exchange
+    ".KQ": "kr",  # KOSDAQ
+    ".TW": "tw",  # Taiwan Stock Exchange
+    ".SI": "sg",  # Singapore Exchange
+    ".AX": "au",  # Australian Securities Exchange
+    ".NZ": "nz",  # New Zealand Exchange
+    ".BO": "in",  # Bombay Stock Exchange
+    ".NS": "in",  # National Stock Exchange of India
+    ".BK": "th",  # Stock Exchange of Thailand
+    ".JK": "id",  # Indonesia Stock Exchange
+    ".KL": "my",  # Bursa Malaysia
     # Other regions
-    ".SA": "br",   # B3 (Brazil)
-    ".MX": "mx",   # Mexican Stock Exchange
-    ".J": "za",    # Johannesburg Stock Exchange
+    ".SA": "br",  # B3 (Brazil)
+    ".MX": "mx",  # Mexican Stock Exchange
+    ".J": "za",  # Johannesburg Stock Exchange
 }
 
 
@@ -411,7 +411,11 @@ Note: Equities are categorized by country code (ISO 3166-1 alpha-2) based on
         feeds = discovered_feeds
         if dates:
             feeds = [
-                FeedInfo(price_id=feed.price_id, date=date_value, asset_class=feed.asset_class)
+                FeedInfo(
+                    price_id=feed.price_id,
+                    date=date_value,
+                    asset_class=feed.asset_class,
+                )
                 for feed in discovered_feeds
                 for date_value in dates
             ]
@@ -427,7 +431,9 @@ Note: Equities are categorized by country code (ISO 3166-1 alpha-2) based on
         print(f"Unique feeds: {unique_feed_count}")
         unique_dates = sorted({feed.date for feed in feeds})
         if unique_dates:
-            print(f"Date range: {unique_dates[0]} to {unique_dates[-1]} ({len(unique_dates)} date(s))")
+            print(
+                f"Date range: {unique_dates[0]} to {unique_dates[-1]} ({len(unique_dates)} date(s))"
+            )
         print(f"Total output rows: {len(feeds)}")
 
         summary = get_asset_class_summary(discovered_feeds)

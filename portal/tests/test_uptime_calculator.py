@@ -107,9 +107,7 @@ class TestUptimeCalculator:
         # Columns: updates_total, max_gap_ms, gaps_over_threshold, consecutive_downtime,
         #          start_gap_ms, end_gap_ms, total_time_ms, total_downtime_ms
         gap_result = MagicMock()
-        gap_result.result_rows = [
-            (35000, 450, 125, 50000, 0, 0, 21600000, 50000)
-        ]
+        gap_result.result_rows = [(35000, 450, 125, 50000, 0, 0, 21600000, 50000)]
         mock_client.query.return_value = gap_result
 
         start = datetime(2026, 1, 28, 14, 30, 0)
@@ -240,9 +238,7 @@ class TestUptimeCalculatorIntegration:
 
         # Mock gap-based query result
         gap_result = MagicMock()
-        gap_result.result_rows = [
-            (25000, 500, 150, 75000, 100, 200, 21600000, 75300)
-        ]
+        gap_result.result_rows = [(25000, 500, 150, 75000, 100, 200, 21600000, 75300)]
         mock_client.query.return_value = gap_result
 
         start = datetime(2026, 1, 28, 14, 30, 0)
@@ -269,9 +265,7 @@ class TestUptimeCalculatorIntegration:
 
         # Very few gaps over threshold, minimal downtime
         gap_result = MagicMock()
-        gap_result.result_rows = [
-            (100000, 180, 5, 500, 0, 0, 21600000, 500)
-        ]
+        gap_result.result_rows = [(100000, 180, 5, 500, 0, 0, 21600000, 500)]
         mock_client.query.return_value = gap_result
 
         start = datetime(2026, 1, 28, 14, 30, 0)

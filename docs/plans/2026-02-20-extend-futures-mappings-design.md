@@ -8,13 +8,13 @@
 
 Add to `FUTURES_PYTH_TO_RIC`:
 
-| Pyth Root | RIC Root | Commodity | Exchange | Source |
-|-----------|----------|-----------|----------|--------|
-| NL | MNI | Nickel | LME | Refinitiv RIC symbology card |
-| LE | MPB | Lead (Refined) | LME | Refinitiv RIC symbology card |
-| TI | MSN | Tin | LME | Refinitiv RIC symbology card |
-| RS | SB | Raw Sugar No. 11 | ICE US | SIRCA listing |
-| GO | LGO | Low Sulphur Gasoil | ICE Europe | ICE on Reuters docs |
+| Pyth Root | RIC Root | Commodity          | Exchange   | Source                       |
+| --------- | -------- | ------------------ | ---------- | ---------------------------- |
+| NL        | MNI      | Nickel             | LME        | Refinitiv RIC symbology card |
+| LE        | MPB      | Lead (Refined)     | LME        | Refinitiv RIC symbology card |
+| TI        | MSN      | Tin                | LME        | Refinitiv RIC symbology card |
+| RS        | SB       | Raw Sugar No. 11   | ICE US     | SIRCA listing                |
+| GO        | LGO      | Low Sulphur Gasoil | ICE Europe | ICE on Reuters docs          |
 
 Examples: `Commodities.NLH6/USD` -> `MNIH26`, `Commodities.RSK6/USD` -> `SBK26`
 
@@ -22,22 +22,24 @@ Examples: `Commodities.NLH6/USD` -> `MNIH26`, `Commodities.RSK6/USD` -> `SBK26`
 
 Add to `INDEX_FUTURES_PYTH_TO_RIC`:
 
-| Pyth Root | RIC Root | Index | Notes |
-|-----------|----------|-------|-------|
-| US500 | ES | S&P 500 E-mini | Alias for EM (same pyth_mappings description) |
-| US100 | NQ | Nasdaq 100 E-mini | Alias for NM |
-| US30 | YM | Dow Jones E-mini | Alias for DM |
+| Pyth Root | RIC Root | Index             | Notes                                         |
+| --------- | -------- | ----------------- | --------------------------------------------- |
+| US500     | ES       | S&P 500 E-mini    | Alias for EM (same pyth_mappings description) |
+| US100     | NQ       | Nasdaq 100 E-mini | Alias for NM                                  |
+| US30      | YM       | Dow Jones E-mini  | Alias for DM                                  |
 
 FCD (Financial CDX) skipped -- no standard Datascope RIC found.
 
 ## Regex Fix
 
 Current `_INDEX_FUTURES_PATTERN`:
+
 ```
 ^Equity\.US\.([A-Z]{2})([FGHJKMNQUVXZ])(\d)/USD$
 ```
 
 Change to:
+
 ```
 ^Equity\.US\.([A-Z][A-Z0-9]*)([FGHJKMNQUVXZ])(\d)/USD$
 ```
@@ -49,6 +51,7 @@ Allows codes like US30, US100, US500 (contain digits, >2 chars). False positives
 After these changes, all 14 commodity roots and all 8 equity index roots in lazer_symbols.json will have deterministic RIC mappings (100% coverage).
 
 `commodities_futures.txt` lists 25 additional commodities (RBOB, Heating Oil, Wheat, Soybeans, Cattle, Cocoa, Coffee, Cotton, etc.) not yet in lazer_symbols.json. These are deferred because:
+
 - Pyth root codes are unpredictable (e.g., CC=Copper in Pyth but Cocoa in standard futures)
 - Naming conflicts exist (LE=Lead in Pyth vs Live Cattle in standard futures)
 - Some Datascope RICs in the file differ from actual Datascope usage (ZW vs W, ZS vs S)

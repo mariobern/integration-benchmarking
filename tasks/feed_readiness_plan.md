@@ -3,6 +3,7 @@
 ## Context
 
 Currently, evaluating whether a feed is production-ready requires running two scripts separately:
+
 - `quick_benchmark_95.py` — benchmark quality (NRMSE, hit rate against Datascope)
 - `feed_uptime.py` — publisher uptime (data availability/gaps)
 
@@ -14,12 +15,12 @@ New file `feed_readiness.py` imports evaluation functions from existing scripts 
 
 ## Files
 
-| File | Action |
-|------|--------|
-| `feed_readiness.py` | **Create** — new combined script |
-| `quick_benchmark_95.py` | Read-only import source |
-| `feed_uptime.py` | Read-only import source |
-| `date_utils.py` | Read-only import (shared date parsing) |
+| File                    | Action                                 |
+| ----------------------- | -------------------------------------- |
+| `feed_readiness.py`     | **Create** — new combined script       |
+| `quick_benchmark_95.py` | Read-only import source                |
+| `feed_uptime.py`        | Read-only import source                |
+| `date_utils.py`         | Read-only import (shared date parsing) |
 
 ## Key Imports
 
@@ -66,6 +67,7 @@ Publishers are matched by ID across both evaluations. A publisher missing from o
 ## New Dataclasses
 
 ### `PublisherReadinessDetail`
+
 ```
 publisher_id: int
 benchmark_passes: bool
@@ -82,6 +84,7 @@ uptime_sessions: Optional[list[PublisherSessionUptime]]  # for --detailed CSV
 ```
 
 ### `FeedReadinessResult`
+
 ```
 feed_id, date, mode, symbol
 ready: bool                      # combined verdict
@@ -150,14 +153,14 @@ def evaluate_feed_readiness(client_lazer, client_analytics, feed_id, date, mode,
 
 ## Error Handling
 
-| Scenario | Behavior |
-|----------|----------|
-| Benchmark errors, uptime succeeds | `benchmark_ready=False`, `uptime_ready` computed, `ready=False` |
-| Benchmark succeeds, uptime errors | `uptime_ready=False`, `benchmark_ready` computed, `ready=False` |
-| Both error | `ready=False`, both error fields populated |
-| Non-benchmarkable asset class | `benchmark_error="Asset class not benchmarkable"`, uptime still evaluated |
-| Publisher in benchmark but not uptime | `uptime_passes=False` for that publisher |
-| Publisher in uptime but not benchmark | `benchmark_passes=False` for that publisher |
+| Scenario                              | Behavior                                                                  |
+| ------------------------------------- | ------------------------------------------------------------------------- |
+| Benchmark errors, uptime succeeds     | `benchmark_ready=False`, `uptime_ready` computed, `ready=False`           |
+| Benchmark succeeds, uptime errors     | `uptime_ready=False`, `benchmark_ready` computed, `ready=False`           |
+| Both error                            | `ready=False`, both error fields populated                                |
+| Non-benchmarkable asset class         | `benchmark_error="Asset class not benchmarkable"`, uptime still evaluated |
+| Publisher in benchmark but not uptime | `uptime_passes=False` for that publisher                                  |
+| Publisher in uptime but not benchmark | `benchmark_passes=False` for that publisher                               |
 
 ## CLI Interface
 
@@ -268,6 +271,7 @@ python3 feed_readiness.py --feed-id 327 --date 2026-02-10 --mode fx --detailed
 ```
 
 Check:
+
 - CSV has combined readiness columns (ready, benchmark_ready, uptime_ready)
 - Publisher lists are correctly classified into 4 buckets
 - Console shows combined summary with both benchmark and uptime stats

@@ -32,6 +32,7 @@ CONFIG_FILE = Path("config.yaml")
 @dataclass(frozen=True)
 class UptimeComparison:
     """Comparison of uptime using different calculation methods."""
+
     feed_id: int
     symbol: str
     session: str
@@ -98,7 +99,9 @@ def get_publisher_feeds(
     """
     result = client.query(query)
 
-    feeds = [{"feed_id": row[0], "symbol": f"feed_{row[0]}"} for row in result.result_rows]
+    feeds = [
+        {"feed_id": row[0], "symbol": f"feed_{row[0]}"} for row in result.result_rows
+    ]
 
     # Try to get symbols from price_feeds if it exists
     if feeds:
@@ -290,7 +293,11 @@ def compute_uptime_200ms_gap(
     total_time_ms = int(row[8] or 0)
     total_downtime_ms = int(row[9] or 0)
 
-    uptime_pct = ((total_time_ms - total_downtime_ms) / total_time_ms * 100) if total_time_ms > 0 else 0.0
+    uptime_pct = (
+        ((total_time_ms - total_downtime_ms) / total_time_ms * 100)
+        if total_time_ms > 0
+        else 0.0
+    )
 
     return {
         "uptime_pct": uptime_pct,
@@ -302,46 +309,77 @@ def compute_uptime_200ms_gap(
     }
 
 
-def get_trading_sessions(target_date: date, asset_class: str = "us-equities") -> list[dict]:
+def get_trading_sessions(
+    target_date: date, asset_class: str = "us-equities"
+) -> list[dict]:
     """Get trading sessions for a given date and asset class."""
     sessions = []
 
     if asset_class in ("fx", "metals"):
         # 24-hour trading with maintenance window
-        sessions.append({
-            "name": "regular",
-            "start": datetime.combine(target_date, datetime.min.time()),
-            "end": datetime.combine(target_date + timedelta(days=1), datetime.min.time()),
-        })
+        sessions.append(
+            {
+                "name": "regular",
+                "start": datetime.combine(target_date, datetime.min.time()),
+                "end": datetime.combine(
+                    target_date + timedelta(days=1), datetime.min.time()
+                ),
+            }
+        )
     else:
         # US Equities sessions (times in UTC, adjust from EST)
         # Regular: 9:30 AM - 4:00 PM EST = 14:30 - 21:00 UTC
-        sessions.append({
-            "name": "regular",
-            "start": datetime.combine(target_date, datetime.min.time().replace(hour=14, minute=30)),
-            "end": datetime.combine(target_date, datetime.min.time().replace(hour=21, minute=0)),
-        })
+        sessions.append(
+            {
+                "name": "regular",
+                "start": datetime.combine(
+                    target_date, datetime.min.time().replace(hour=14, minute=30)
+                ),
+                "end": datetime.combine(
+                    target_date, datetime.min.time().replace(hour=21, minute=0)
+                ),
+            }
+        )
 
         # Pre-market: 4:00 AM - 9:30 AM EST = 09:00 - 14:30 UTC
-        sessions.append({
-            "name": "premarket",
-            "start": datetime.combine(target_date, datetime.min.time().replace(hour=9, minute=0)),
-            "end": datetime.combine(target_date, datetime.min.time().replace(hour=14, minute=30)),
-        })
+        sessions.append(
+            {
+                "name": "premarket",
+                "start": datetime.combine(
+                    target_date, datetime.min.time().replace(hour=9, minute=0)
+                ),
+                "end": datetime.combine(
+                    target_date, datetime.min.time().replace(hour=14, minute=30)
+                ),
+            }
+        )
 
         # After-hours: 4:00 PM - 8:00 PM EST = 21:00 - 01:00 UTC (next day)
-        sessions.append({
-            "name": "afterhours",
-            "start": datetime.combine(target_date, datetime.min.time().replace(hour=21, minute=0)),
-            "end": datetime.combine(target_date + timedelta(days=1), datetime.min.time().replace(hour=1, minute=0)),
-        })
+        sessions.append(
+            {
+                "name": "afterhours",
+                "start": datetime.combine(
+                    target_date, datetime.min.time().replace(hour=21, minute=0)
+                ),
+                "end": datetime.combine(
+                    target_date + timedelta(days=1),
+                    datetime.min.time().replace(hour=1, minute=0),
+                ),
+            }
+        )
 
         # Overnight: 8:00 PM - 4:00 AM EST = 01:00 - 09:00 UTC
-        sessions.append({
-            "name": "overnight",
-            "start": datetime.combine(target_date, datetime.min.time().replace(hour=1, minute=0)),
-            "end": datetime.combine(target_date, datetime.min.time().replace(hour=9, minute=0)),
-        })
+        sessions.append(
+            {
+                "name": "overnight",
+                "start": datetime.combine(
+                    target_date, datetime.min.time().replace(hour=1, minute=0)
+                ),
+                "end": datetime.combine(
+                    target_date, datetime.min.time().replace(hour=9, minute=0)
+                ),
+            }
+        )
 
     return sessions
 
@@ -390,31 +428,33 @@ def verify_uptime(
                 session["end"],
             )
 
-            results.append(UptimeComparison(
-                feed_id=feed["feed_id"],
-                symbol=feed["symbol"],
-                session=session["name"],
-                start_time=session["start"],
-                end_time=session["end"],
-
-                uptime_1s_pct=uptime_1s["uptime_pct"],
-                seconds_with_data=uptime_1s["seconds_with_data"],
-                total_seconds=uptime_1s["total_seconds"],
-                updates_total=uptime_1s["updates_total"],
-                updates_per_second=uptime_1s["updates_per_second"],
-
-                uptime_200ms_pct=uptime_200ms["uptime_pct"],
-                total_downtime_ms=uptime_200ms["total_downtime_ms"],
-                max_gap_ms=uptime_200ms["max_gap_ms"],
-                gaps_over_threshold=uptime_200ms["gaps_over_threshold"],
-                gaps_over_500ms=uptime_200ms["gaps_over_500ms"],
-                gaps_over_1000ms=uptime_200ms["gaps_over_1000ms"],
-            ))
+            results.append(
+                UptimeComparison(
+                    feed_id=feed["feed_id"],
+                    symbol=feed["symbol"],
+                    session=session["name"],
+                    start_time=session["start"],
+                    end_time=session["end"],
+                    uptime_1s_pct=uptime_1s["uptime_pct"],
+                    seconds_with_data=uptime_1s["seconds_with_data"],
+                    total_seconds=uptime_1s["total_seconds"],
+                    updates_total=uptime_1s["updates_total"],
+                    updates_per_second=uptime_1s["updates_per_second"],
+                    uptime_200ms_pct=uptime_200ms["uptime_pct"],
+                    total_downtime_ms=uptime_200ms["total_downtime_ms"],
+                    max_gap_ms=uptime_200ms["max_gap_ms"],
+                    gaps_over_threshold=uptime_200ms["gaps_over_threshold"],
+                    gaps_over_500ms=uptime_200ms["gaps_over_500ms"],
+                    gaps_over_1000ms=uptime_200ms["gaps_over_1000ms"],
+                )
+            )
 
     return results
 
 
-def print_comparison_report(results: list[UptimeComparison], publisher_id: int, target_date: date):
+def print_comparison_report(
+    results: list[UptimeComparison], publisher_id: int, target_date: date
+):
     """Print a comparison report."""
     print()
     print("=" * 100)
@@ -424,7 +464,11 @@ def print_comparison_report(results: list[UptimeComparison], publisher_id: int, 
 
     # Summary statistics
     uptime_1s_values = [r.uptime_1s_pct for r in results if r.uptime_1s_pct > 0]
-    uptime_200ms_values = [r.uptime_200ms_pct for r in results if r.uptime_200ms_pct and r.uptime_200ms_pct > 0]
+    uptime_200ms_values = [
+        r.uptime_200ms_pct
+        for r in results
+        if r.uptime_200ms_pct and r.uptime_200ms_pct > 0
+    ]
 
     if uptime_1s_values:
         print("SUMMARY (across all feeds/sessions with data):")
@@ -439,14 +483,17 @@ def print_comparison_report(results: list[UptimeComparison], publisher_id: int, 
     if uptime_200ms_values:
         print(f"  200ms gap-based method (accurate):")
         print(f"    Mean:   {sum(uptime_200ms_values) / len(uptime_200ms_values):.2f}%")
-        print(f"    Median: {sorted(uptime_200ms_values)[len(uptime_200ms_values)//2]:.2f}%")
+        print(
+            f"    Median: {sorted(uptime_200ms_values)[len(uptime_200ms_values)//2]:.2f}%"
+        )
         print(f"    Min:    {min(uptime_200ms_values):.2f}%")
         print(f"    Max:    {max(uptime_200ms_values):.2f}%")
         print()
 
     # Find significant discrepancies
     discrepancies = [
-        r for r in results
+        r
+        for r in results
         if r.uptime_200ms_pct and abs(r.uptime_1s_pct - r.uptime_200ms_pct) > 1.0
     ]
 
@@ -454,19 +501,29 @@ def print_comparison_report(results: list[UptimeComparison], publisher_id: int, 
         print()
         print("SIGNIFICANT DISCREPANCIES (>1% difference):")
         print("-" * 100)
-        print(f"{'Feed':<10} {'Symbol':<20} {'Session':<12} {'1s Window':<12} {'200ms Gap':<12} {'Diff':<10} {'Max Gap':<12}")
+        print(
+            f"{'Feed':<10} {'Symbol':<20} {'Session':<12} {'1s Window':<12} {'200ms Gap':<12} {'Diff':<10} {'Max Gap':<12}"
+        )
         print("-" * 100)
 
-        for r in sorted(discrepancies, key=lambda x: (x.uptime_1s_pct - x.uptime_200ms_pct), reverse=True):
+        for r in sorted(
+            discrepancies,
+            key=lambda x: (x.uptime_1s_pct - x.uptime_200ms_pct),
+            reverse=True,
+        ):
             diff = r.uptime_1s_pct - r.uptime_200ms_pct
             max_gap_str = f"{r.max_gap_ms}ms" if r.max_gap_ms else "N/A"
-            print(f"{r.feed_id:<10} {r.symbol[:20]:<20} {r.session:<12} {r.uptime_1s_pct:>10.2f}% {r.uptime_200ms_pct:>10.2f}% {diff:>+8.2f}% {max_gap_str:>12}")
+            print(
+                f"{r.feed_id:<10} {r.symbol[:20]:<20} {r.session:<12} {r.uptime_1s_pct:>10.2f}% {r.uptime_200ms_pct:>10.2f}% {diff:>+8.2f}% {max_gap_str:>12}"
+            )
 
     print()
     print()
     print("DETAILED RESULTS:")
     print("-" * 130)
-    print(f"{'Feed':<8} {'Symbol':<18} {'Session':<10} {'1s %':<8} {'200ms %':<8} {'Upd/sec':<8} {'Max Gap':<10} {'Gaps>200ms':<10} {'Gaps>1s':<8}")
+    print(
+        f"{'Feed':<8} {'Symbol':<18} {'Session':<10} {'1s %':<8} {'200ms %':<8} {'Upd/sec':<8} {'Max Gap':<10} {'Gaps>200ms':<10} {'Gaps>1s':<8}"
+    )
     print("-" * 130)
 
     for r in results:
@@ -482,7 +539,9 @@ def print_comparison_report(results: list[UptimeComparison], publisher_id: int, 
         elif r.max_gap_ms and r.max_gap_ms > 500:
             flag = " * HIGH MAX GAP"
 
-        print(f"{r.feed_id:<8} {r.symbol[:18]:<18} {r.session:<10} {r.uptime_1s_pct:>6.2f}% {uptime_200ms_str:>8} {r.updates_per_second:>7.1f} {max_gap_str:>10} {r.gaps_over_threshold or 0:>10} {r.gaps_over_1000ms or 0:>8}{flag}")
+        print(
+            f"{r.feed_id:<8} {r.symbol[:18]:<18} {r.session:<10} {r.uptime_1s_pct:>6.2f}% {uptime_200ms_str:>8} {r.updates_per_second:>7.1f} {max_gap_str:>10} {r.gaps_over_threshold or 0:>10} {r.gaps_over_1000ms or 0:>8}{flag}"
+        )
 
     print()
     print()
@@ -577,22 +636,48 @@ def main():
 
         with open(args.output, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow([
-                "feed_id", "symbol", "session", "start_time", "end_time",
-                "uptime_1s_pct", "seconds_with_data", "total_seconds",
-                "updates_total", "updates_per_second",
-                "uptime_200ms_pct", "total_downtime_ms", "max_gap_ms",
-                "gaps_over_threshold", "gaps_over_500ms", "gaps_over_1000ms",
-            ])
+            writer.writerow(
+                [
+                    "feed_id",
+                    "symbol",
+                    "session",
+                    "start_time",
+                    "end_time",
+                    "uptime_1s_pct",
+                    "seconds_with_data",
+                    "total_seconds",
+                    "updates_total",
+                    "updates_per_second",
+                    "uptime_200ms_pct",
+                    "total_downtime_ms",
+                    "max_gap_ms",
+                    "gaps_over_threshold",
+                    "gaps_over_500ms",
+                    "gaps_over_1000ms",
+                ]
+            )
 
             for r in results:
-                writer.writerow([
-                    r.feed_id, r.symbol, r.session, r.start_time, r.end_time,
-                    r.uptime_1s_pct, r.seconds_with_data, r.total_seconds,
-                    r.updates_total, r.updates_per_second,
-                    r.uptime_200ms_pct, r.total_downtime_ms, r.max_gap_ms,
-                    r.gaps_over_threshold, r.gaps_over_500ms, r.gaps_over_1000ms,
-                ])
+                writer.writerow(
+                    [
+                        r.feed_id,
+                        r.symbol,
+                        r.session,
+                        r.start_time,
+                        r.end_time,
+                        r.uptime_1s_pct,
+                        r.seconds_with_data,
+                        r.total_seconds,
+                        r.updates_total,
+                        r.updates_per_second,
+                        r.uptime_200ms_pct,
+                        r.total_downtime_ms,
+                        r.max_gap_ms,
+                        r.gaps_over_threshold,
+                        r.gaps_over_500ms,
+                        r.gaps_over_1000ms,
+                    ]
+                )
 
         print(f"Results exported to {args.output}")
 

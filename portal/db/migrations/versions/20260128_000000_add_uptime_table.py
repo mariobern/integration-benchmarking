@@ -31,7 +31,9 @@ def upgrade() -> None:
         sa.Column("downtime_ms", sa.BigInteger(), nullable=False),
         sa.Column("period_length_ms", sa.BigInteger(), nullable=False),
         # Metadata
-        sa.Column("created_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(), server_default=sa.text("NOW()"), nullable=False
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
             "publisher_id",
