@@ -114,6 +114,10 @@ pytest portal/tests/ -v
 
 `docs/benchmark_results_guide.md` is a standalone guide for publishers explaining how to read benchmark CSV output. Covers pass/fail criteria, core quality metrics, session breakdowns, and advanced statistical tests.
 
+## Pre-commit
+
+Always run `pre-commit run --files <changed files>` before committing. Hooks: black (Python), prettier (Markdown/YAML), trailing whitespace, end-of-file fixer.
+
 ## Key Gotchas
 
 - **Dotted tickers** (BRK.B) use `BRKb.N` RIC format (lowercase class, no dot)
