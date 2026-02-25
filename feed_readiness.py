@@ -3,7 +3,7 @@
 Combined feed readiness evaluator (benchmark quality + publisher uptime).
 
 A feed is READY only when at least target publisher count pass both:
-- benchmark quality (quick_benchmark_95 rules)
+- benchmark quality (quick_benchmark rules)
 - regular-session uptime threshold (feed_uptime rules)
 """
 
@@ -39,7 +39,7 @@ from lib.models import (
     PublisherFeedMetrics,
     PublisherSessionUptime,
 )
-from quick_benchmark_95 import (
+from lib.benchmark_core import (
     evaluate_feed_two_queries,
     list_asset_classes_in_csv,
 )
