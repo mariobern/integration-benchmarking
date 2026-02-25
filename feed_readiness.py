@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Callable, Optional, TypedDict
 
 from date_utils import expand_date_args, validate_date_args
-from feed_uptime import (
+from lib.uptime_core import (
     DEFAULT_GAP_THRESHOLD_MS,
     DEFAULT_UPTIME_THRESHOLD_PCT,
     evaluate_feed_uptime,
