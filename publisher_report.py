@@ -48,7 +48,7 @@ from lib.publisher_health import (
     merge_benchmark_and_uptime,
     run_report,
 )
-from publisher_benchmark import print_interpretation_guide
+from lib.publisher_output import print_interpretation_guide
 
 
 def format_diagnostics(
