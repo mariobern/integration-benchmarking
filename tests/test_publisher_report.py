@@ -235,7 +235,7 @@ def test_compute_feed_uptime_no_data():
 def test_merge_creates_healthy_result():
     """Merging a passing benchmark with good uptime creates HEALTHY result."""
     from publisher_report import merge_benchmark_and_uptime, FeedHealthResult
-    from publisher_benchmark_95 import PublisherBenchmarkResult
+    from publisher_benchmark import PublisherBenchmarkResult
 
     benchmark = PublisherBenchmarkResult(
         publisher_id=55,
@@ -275,7 +275,7 @@ def test_merge_creates_healthy_result():
 def test_merge_creates_failing_result():
     """Merging a failing benchmark with low uptime creates FAILING result."""
     from publisher_report import merge_benchmark_and_uptime
-    from publisher_benchmark_95 import PublisherBenchmarkResult
+    from publisher_benchmark import PublisherBenchmarkResult
 
     benchmark = PublisherBenchmarkResult(
         publisher_id=55,
@@ -309,7 +309,7 @@ def test_merge_creates_failing_result():
 def test_merge_with_error():
     """Merging an errored benchmark result still includes uptime."""
     from publisher_report import merge_benchmark_and_uptime
-    from publisher_benchmark_95 import PublisherBenchmarkResult
+    from publisher_benchmark import PublisherBenchmarkResult
 
     benchmark = PublisherBenchmarkResult(
         publisher_id=55,
@@ -558,7 +558,7 @@ def test_write_health_csv_includes_summary():
 def test_full_pipeline_mock():
     """Full pipeline: benchmark results + uptime -> health report."""
     from publisher_report import merge_benchmark_and_uptime, FeedHealthResult
-    from publisher_benchmark_95 import PublisherBenchmarkResult
+    from publisher_benchmark import PublisherBenchmarkResult
 
     benchmarks = [
         PublisherBenchmarkResult(
