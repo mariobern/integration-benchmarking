@@ -30,185 +30,37 @@ import sys
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
-from datetime import datetime, timedelta
-from enum import Enum
-from functools import lru_cache
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from zoneinfo import ZoneInfo
-
-import clickhouse_connect
-import yaml
 
 from date_utils import expand_date_args, validate_date_args
-
-
-class TradingSession(Enum):
-    """Trading session types for US equities."""
-
-    REGULAR = "regular"
-    PREMARKET = "premarket"
-    AFTERHOURS = "afterhours"
-    OVERNIGHT = "overnight"
-
-
-# Asset class normalization mapping (CSV value -> canonical value)
-ASSET_CLASS_ALIASES = {
-    "metal": "metals",
-    "metals": "metals",
-    "equity-us": "us-equities",
-    "us-equities": "us-equities",
-    "fx": "fx",
-    "commodity": "commodity",
-    "crypto": "crypto",
-    "crypto-redemption-rate": "crypto-redemption-rate",
-    "funding-rate": "funding-rate",
-    "rates": "us-treasuries",
-    "nav": "nav",
-    "us-treasuries": "us-treasuries",
-    "treasuries": "us-treasuries",
-}
-
-# Asset classes that have benchmark data available
-BENCHMARKABLE_ASSET_CLASSES = {
-    "fx",
-    "metals",
-    "us-equities",
-    "commodity",
-    "us-treasuries",
-}
-
-# Futures contract month codes
-FUTURES_MONTH_CODES = "FGHJKMNQUVXZ"
-
-# US Equities market hours (EST/EDT) - Regular trading session only
-US_EQUITY_MARKET_OPEN_HOUR = 9
-US_EQUITY_MARKET_OPEN_MINUTE = 30
-US_EQUITY_MARKET_CLOSE_HOUR = 16
-US_EQUITY_MARKET_CLOSE_MINUTE = 0
-
-# US Equities extended hours (EST/EDT)
-US_EQUITY_PREMARKET_OPEN_HOUR = 4
-US_EQUITY_PREMARKET_OPEN_MINUTE = 0
-US_EQUITY_AFTERHOURS_CLOSE_HOUR = 20
-US_EQUITY_AFTERHOURS_CLOSE_MINUTE = 0
-
-# Overnight: 8:00 PM - 4:00 AM EST (next day)
-US_EQUITY_OVERNIGHT_START_HOUR = 20
-US_EQUITY_OVERNIGHT_START_MINUTE = 0
-US_EQUITY_OVERNIGHT_END_HOUR = 4
-US_EQUITY_OVERNIGHT_END_MINUTE = 0
-
-# Reference publisher for overnight benchmark (Blue Ocean ATS)
-OVERNIGHT_REFERENCE_PUBLISHER_ID = 32
-
-# Observation thresholds
-REGULAR_MIN_OBSERVATIONS = 100
-SESSION_MIN_OBSERVATIONS = 50
-
-
-@dataclass
-class ExtendedHoursMetrics:
-    """Metrics for a single extended hours session (pre-market or after-hours)."""
-
-    session: TradingSession
-    n_observations: int
-    rmse: Optional[float]
-    mean_spread: Optional[float]
-    rmse_over_spread: Optional[float]
-    nrmse: Optional[float]
-    hit_rate: Optional[float]
-    benchmark_price_range: Optional[float]
-    passes: bool
-    error: Optional[str] = None
-
-
-@dataclass
-class OvernightMetrics:
-    """Metrics for overnight session using publisher 32 as benchmark."""
-
-    n_observations: int
-    n_reference_observations: int
-    rmse: Optional[float]
-    mean_spread: Optional[float]
-    rmse_over_spread: Optional[float]
-    nrmse: Optional[float]
-    hit_rate: Optional[float]
-    reference_price_range: Optional[float]
-    passes: bool
-    reference_publisher_id: int = OVERNIGHT_REFERENCE_PUBLISHER_ID
-    error: Optional[str] = None
-
-
-@dataclass
-class PublisherFeedMetrics:
-    """Per-publisher metrics within a feed evaluation."""
-
-    publisher_id: int
-    n_observations: int
-    passes: bool
-    nrmse: Optional[float] = None
-    hit_rate: Optional[float] = None
-    rmse: Optional[float] = None
-    mean_spread: Optional[float] = None
-    rmse_over_spread: Optional[float] = None
-    benchmark_price_range: Optional[float] = None
-    mean_diff: Optional[float] = None
-    std_diff: Optional[float] = None
-    mean_pct_diff: Optional[float] = None
-    std_pct_diff: Optional[float] = None
-    mae: Optional[float] = None
-    t_statistic: Optional[float] = None
-    t_pvalue: Optional[float] = None
-    wilcoxon_statistic: Optional[float] = None
-    wilcoxon_pvalue: Optional[float] = None
-    normality_pvalue: Optional[float] = None
-    mean_abs_z_score: Optional[float] = None
-    premarket_metrics: Optional[ExtendedHoursMetrics] = None
-    afterhours_metrics: Optional[ExtendedHoursMetrics] = None
-    overnight_metrics: Optional[OvernightMetrics] = None
-    error: Optional[str] = None
-
-
-@dataclass
-class BenchmarkResult:
-    """Result of a single feed benchmark evaluation."""
-
-    feed_id: int
-    date: str
-    mode: str
-    symbol: Optional[str]
-    ready: bool
-    target_pub_count: int
-    passing_pub_count: int
-    failing_pub_count: int
-    passing_publishers: list[int]
-    failing_publishers: list[int]
-    median_nrmse: Optional[float] = None
-    median_hit_rate: Optional[float] = None
-    publisher_details: Optional[list[PublisherFeedMetrics]] = None
-    premarket_passing_count: Optional[int] = None
-    premarket_failing_count: Optional[int] = None
-    afterhours_passing_count: Optional[int] = None
-    afterhours_failing_count: Optional[int] = None
-    overnight_passing_count: Optional[int] = None
-    overnight_failing_count: Optional[int] = None
-    overnight_reference_publisher_id: Optional[int] = None
-    error: Optional[str] = None
-    execution_time_ms: int = 0
-
-
-def load_config() -> dict:
-    """Load database configuration from config.yaml."""
-
-    config_path = Path("config.yaml")
-    if not config_path.exists():
-        raise FileNotFoundError(
-            "config.yaml not found. Copy config.yaml.sample to config.yaml and fill in credentials."
-        )
-    with open(config_path) as f:
-        return yaml.safe_load(f)
+from lib.config import (
+    ASSET_CLASS_ALIASES,
+    BENCHMARKABLE_ASSET_CLASSES,
+    get_clients,
+    load_config,
+    normalize_asset_class,
+)
+from lib.models import (
+    BenchmarkResult,
+    ExtendedHoursMetrics,
+    OvernightMetrics,
+    OVERNIGHT_REFERENCE_PUBLISHER_ID,
+    PublisherFeedMetrics,
+    TradingSession,
+)
+from lib.sql_filters import (
+    FUTURES_MONTH_CODES,
+    REGULAR_MIN_OBSERVATIONS,
+    SESSION_MIN_OBSERVATIONS,
+    get_benchmark_columns,
+    get_benchmark_table,
+    get_extended_hours_filter_sql,
+    get_market_hours_filter_sql,
+    get_overnight_hours_filter_sql,
+    is_futures_symbol,
+)
 
 
 def list_asset_classes_in_csv(csv_path: Path) -> dict[str, int]:
@@ -225,42 +77,6 @@ def list_asset_classes_in_csv(csv_path: Path) -> dict[str, int]:
             mode = row[2].strip()
             asset_class_counts[mode] += 1
     return dict(asset_class_counts)
-
-
-def normalize_asset_class(asset_class: str) -> str:
-    """Normalize asset class name to canonical form."""
-
-    return ASSET_CLASS_ALIASES.get(asset_class.lower(), asset_class.lower())
-
-
-def get_clients(config: dict) -> tuple:
-    """Create ClickHouse clients for Lazer and Analytics databases."""
-
-    lazer_cfg = config["lazer_clickhouse_prod"]
-    analytics_cfg = config["analytics_clickhouse"]
-
-    connect_timeout = 60
-    send_receive_timeout = 300
-
-    client_lazer = clickhouse_connect.get_client(
-        host=lazer_cfg["host"],
-        username=lazer_cfg["user"],
-        password=lazer_cfg["password"],
-        secure=True,
-        connect_timeout=connect_timeout,
-        send_receive_timeout=send_receive_timeout,
-    )
-
-    client_analytics = clickhouse_connect.get_client(
-        host=analytics_cfg["host"],
-        username=analytics_cfg["user"],
-        password=analytics_cfg["password"],
-        secure=True,
-        connect_timeout=connect_timeout,
-        send_receive_timeout=send_receive_timeout,
-    )
-
-    return client_lazer, client_analytics
 
 
 def get_feed_metadata(
@@ -281,155 +97,6 @@ def get_feed_metadata(
     if result.result_rows:
         return result.result_rows[0][0], result.result_rows[0][1]
     return None, None
-
-
-def is_futures_symbol(symbol: str) -> bool:
-    """Detect if a symbol represents a futures contract."""
-
-    if not symbol:
-        return False
-
-    base = symbol.split("/")[0] if "/" in symbol else symbol
-    parts = base.split(".")
-    if len(parts) < 2:
-        return False
-
-    ticker = parts[-1]
-    if len(ticker) < 2:
-        return False
-
-    month_code = ticker[-2].upper()
-    year_digit = ticker[-1]
-
-    return month_code in FUTURES_MONTH_CODES and year_digit.isdigit()
-
-
-@lru_cache(maxsize=128)
-def get_market_hours_filter_sql(
-    mode: str, date: str, column_name: str = "publish_time"
-) -> str:
-    """Generate SQL WHERE clause for regular market hours filtering."""
-
-    if mode not in ("us-equities", "equity-us"):
-        return ""
-
-    dt = datetime.strptime(date, "%Y-%m-%d")
-    est = ZoneInfo("America/New_York")
-    utc = ZoneInfo("UTC")
-
-    market_open_est = dt.replace(
-        hour=US_EQUITY_MARKET_OPEN_HOUR,
-        minute=US_EQUITY_MARKET_OPEN_MINUTE,
-        tzinfo=est,
-    )
-    market_close_est = dt.replace(
-        hour=US_EQUITY_MARKET_CLOSE_HOUR,
-        minute=US_EQUITY_MARKET_CLOSE_MINUTE,
-        tzinfo=est,
-    )
-
-    market_open_utc = market_open_est.astimezone(utc)
-    market_close_utc = market_close_est.astimezone(utc)
-
-    return f"""
-        AND {column_name} >= '{market_open_utc.strftime('%Y-%m-%d %H:%M:%S')}'
-        AND {column_name} < '{market_close_utc.strftime('%Y-%m-%d %H:%M:%S')}'
-    """
-
-
-@lru_cache(maxsize=128)
-def get_extended_hours_filter_sql(
-    session: TradingSession,
-    date: str,
-    column_name: str = "publish_time",
-) -> str:
-    """Generate SQL WHERE clause for pre-market or after-hours filtering."""
-
-    dt = datetime.strptime(date, "%Y-%m-%d")
-    est = ZoneInfo("America/New_York")
-    utc = ZoneInfo("UTC")
-
-    if session == TradingSession.PREMARKET:
-        start_est = dt.replace(
-            hour=US_EQUITY_PREMARKET_OPEN_HOUR,
-            minute=US_EQUITY_PREMARKET_OPEN_MINUTE,
-            tzinfo=est,
-        )
-        end_est = dt.replace(
-            hour=US_EQUITY_MARKET_OPEN_HOUR,
-            minute=US_EQUITY_MARKET_OPEN_MINUTE,
-            tzinfo=est,
-        )
-    elif session == TradingSession.AFTERHOURS:
-        start_est = dt.replace(
-            hour=US_EQUITY_MARKET_CLOSE_HOUR,
-            minute=US_EQUITY_MARKET_CLOSE_MINUTE,
-            tzinfo=est,
-        )
-        end_est = dt.replace(
-            hour=US_EQUITY_AFTERHOURS_CLOSE_HOUR,
-            minute=US_EQUITY_AFTERHOURS_CLOSE_MINUTE,
-            tzinfo=est,
-        )
-    else:
-        return ""
-
-    start_utc = start_est.astimezone(utc)
-    end_utc = end_est.astimezone(utc)
-
-    return f"""
-        AND {column_name} >= '{start_utc.strftime('%Y-%m-%d %H:%M:%S')}'
-        AND {column_name} < '{end_utc.strftime('%Y-%m-%d %H:%M:%S')}'
-    """
-
-
-@lru_cache(maxsize=128)
-def get_overnight_hours_filter_sql(date: str, column_name: str = "publish_time") -> str:
-    """Generate SQL WHERE clause for overnight session filtering (8 PM - 4 AM ET)."""
-
-    dt = datetime.strptime(date, "%Y-%m-%d")
-    est = ZoneInfo("America/New_York")
-    utc = ZoneInfo("UTC")
-
-    overnight_start_est = dt.replace(
-        hour=US_EQUITY_OVERNIGHT_START_HOUR,
-        minute=US_EQUITY_OVERNIGHT_START_MINUTE,
-        tzinfo=est,
-    )
-    overnight_end_est = (dt + timedelta(days=1)).replace(
-        hour=US_EQUITY_OVERNIGHT_END_HOUR,
-        minute=US_EQUITY_OVERNIGHT_END_MINUTE,
-        tzinfo=est,
-    )
-
-    overnight_start_utc = overnight_start_est.astimezone(utc)
-    overnight_end_utc = overnight_end_est.astimezone(utc)
-
-    return f"""
-        AND {column_name} >= '{overnight_start_utc.strftime('%Y-%m-%d %H:%M:%S')}'
-        AND {column_name} < '{overnight_end_utc.strftime('%Y-%m-%d %H:%M:%S')}'
-    """
-
-
-def get_benchmark_table(mode: str, symbol: Optional[str]) -> str:
-    """Determine which benchmark table to use based on mode and symbol."""
-
-    if symbol and is_futures_symbol(symbol):
-        return "datascope_futures_benchmark_data"
-
-    if mode in ("fx", "metals"):
-        return "datascope_fx_benchmark_data"
-    if mode == "us-treasuries":
-        return "datascope_us_treasury_benchmark_data"
-    return "datascope_global_equities_benchmark_data"
-
-
-def get_benchmark_columns(mode: str) -> tuple[str, str, str]:
-    """Get benchmark columns by mode (treasuries use yield columns)."""
-
-    if mode == "us-treasuries":
-        return ("yield", "bid_yield", "ask_yield")
-    return ("price", "bid_price", "ask_price")
 
 
 def compute_statistical_metrics(

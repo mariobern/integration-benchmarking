@@ -13,101 +13,23 @@ import sys
 import time
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-import clickhouse_connect
-import yaml
-
 from date_utils import expand_date_args, validate_date_args
+from lib.config import (
+    ASSET_CLASS_ALIASES,
+    get_lazer_client,
+    load_config,
+    normalize_asset_class,
+)
+from lib.models import FeedUptimeResult, PublisherSessionUptime
 from portal.batch.uptime_sessions import SessionWindow, get_session_windows
-
-
-# Asset class normalization mapping (CSV value -> canonical value)
-ASSET_CLASS_ALIASES = {
-    "metal": "metals",
-    "metals": "metals",
-    "equity-us": "us-equities",
-    "us-equities": "us-equities",
-    "fx": "fx",
-    "commodity": "commodity",
-    "crypto": "crypto",
-    "crypto-redemption-rate": "crypto-redemption-rate",
-    "funding-rate": "funding-rate",
-    "rates": "us-treasuries",
-    "nav": "nav",
-    "us-treasuries": "us-treasuries",
-    "treasuries": "us-treasuries",
-}
 
 DEFAULT_GAP_THRESHOLD_MS = 200
 DEFAULT_UPTIME_THRESHOLD_PCT = 95.0
 SESSION_ORDER = ["regular", "premarket", "afterhours", "overnight"]
-
-
-@dataclass(frozen=True)
-class PublisherSessionUptime:
-    publisher_id: int
-    session: str
-    uptime_pct: float
-    passes: bool
-    seconds_with_data: int
-    total_seconds: int
-    updates_total: int
-    updates_per_second: float
-    downtime_ms: Optional[int]
-    period_length_ms: Optional[int]
-    max_gap_ms: Optional[int]
-    gaps_over_threshold: Optional[int]
-
-
-@dataclass(frozen=True)
-class FeedUptimeResult:
-    feed_id: int
-    date: str
-    mode: str
-    symbol: Optional[str]
-    publisher_count: int
-    publisher_uptimes: list[PublisherSessionUptime]
-    error: Optional[str]
-    execution_time_ms: int
-
-
-def load_config() -> dict:
-    """Load database configuration from config.yaml."""
-
-    config_path = Path("config.yaml")
-    if not config_path.exists():
-        raise FileNotFoundError(
-            "config.yaml not found. Copy config.yaml.sample to config.yaml and fill in credentials."
-        )
-    with open(config_path) as f:
-        return yaml.safe_load(f)
-
-
-def get_lazer_client(config: dict):
-    """Create ClickHouse client for Lazer database."""
-
-    lazer_cfg = config["lazer_clickhouse_prod"]
-    connect_timeout = 60
-    send_receive_timeout = 300
-
-    return clickhouse_connect.get_client(
-        host=lazer_cfg["host"],
-        username=lazer_cfg["user"],
-        password=lazer_cfg["password"],
-        secure=True,
-        connect_timeout=connect_timeout,
-        send_receive_timeout=send_receive_timeout,
-    )
-
-
-def normalize_asset_class(asset_class: str) -> str:
-    """Normalize asset class name to canonical form."""
-
-    return ASSET_CLASS_ALIASES.get(asset_class.lower(), asset_class.lower())
 
 
 def list_asset_classes_in_csv(csv_path: Path) -> dict[str, int]:
