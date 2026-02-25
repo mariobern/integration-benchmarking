@@ -2,14 +2,30 @@
 
 Extracted from feed_uptime.py to enable reuse across scripts
 (feed_uptime.py, feed_readiness.py) without circular imports.
+
+Functions:
+    discover_publishers_for_feed  - Find publishers for a feed on a date
+    get_feed_symbol               - Lookup feed symbol from metadata
+    compute_uptime_1s_window      - 1-second window uptime calculation
+    compute_uptime_200ms_gap      - Gap-based uptime calculation
+    filter_sessions               - Filter session windows by CLI flags
+    evaluate_feed_uptime          - Per-publisher uptime for one feed/date/mode
+    process_work_items            - Parallel execution of feed/date/mode tuples
+    process_csv                   - CSV parsing + parallel execution
+    compute_publisher_summary     - Cross-date publisher consistency summary
 """
 
 from __future__ import annotations
 
+import csv
 import time
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
+from lib.config import get_lazer_client, load_config, normalize_asset_class
 from lib.models import FeedUptimeResult, PublisherSessionUptime
 from portal.batch.uptime_sessions import SessionWindow, get_session_windows
 
@@ -393,3 +409,246 @@ def evaluate_feed_uptime(
             error=str(e),
             execution_time_ms=int((time.time() - start_time) * 1000),
         )
+
+
+def process_work_items(
+    work_items: list[tuple[int, str, str]],
+    max_workers: int,
+    include_extended_hours: bool = False,
+    include_overnight: bool = False,
+    precise: bool = False,
+    gap_threshold_ms: int = DEFAULT_GAP_THRESHOLD_MS,
+    uptime_threshold_pct: float = DEFAULT_UPTIME_THRESHOLD_PCT,
+) -> list[FeedUptimeResult]:
+    """Evaluate a list of feed/date/mode tuples in parallel."""
+
+    if not work_items:
+        print("Warning: No feeds to process")
+        return []
+
+    config = load_config()
+    worker_count = max(1, min(max_workers, len(work_items)))
+    print(f"Processing {len(work_items)} feeds with {worker_count} workers...")
+
+    def evaluate_single(item: tuple[int, str, str]) -> FeedUptimeResult:
+        feed_id, date, mode = item
+        start_time_ts = time.time()
+        try:
+            client = get_lazer_client(config)
+            return evaluate_feed_uptime(
+                client=client,
+                feed_id=feed_id,
+                date=date,
+                mode=mode,
+                include_extended_hours=include_extended_hours,
+                include_overnight=include_overnight,
+                precise=precise,
+                gap_threshold_ms=gap_threshold_ms,
+                uptime_threshold_pct=uptime_threshold_pct,
+            )
+        except Exception as e:
+            return FeedUptimeResult(
+                feed_id=feed_id,
+                date=date,
+                mode=mode,
+                symbol=None,
+                publisher_count=0,
+                publisher_uptimes=[],
+                error=str(e),
+                execution_time_ms=int((time.time() - start_time_ts) * 1000),
+            )
+
+    results: list[FeedUptimeResult] = []
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        futures = {executor.submit(evaluate_single, item): item for item in work_items}
+
+        for future in as_completed(futures):
+            feed_id, date, mode = futures[future]
+            try:
+                result = future.result()
+            except Exception as e:
+                result = FeedUptimeResult(
+                    feed_id=feed_id,
+                    date=date,
+                    mode=mode,
+                    symbol=None,
+                    publisher_count=0,
+                    publisher_uptimes=[],
+                    error=str(e),
+                    execution_time_ms=0,
+                )
+            results.append(result)
+
+            if result.error:
+                print(
+                    f"  [{result.execution_time_ms:>5}ms] Feed {result.feed_id} "
+                    f"({result.date}, {result.mode}): ERROR - {result.error[:80]}"
+                )
+                continue
+
+            pass_count = sum(1 for u in result.publisher_uptimes if u.passes)
+            fail_count = len(result.publisher_uptimes) - pass_count
+            print(
+                f"  [{result.execution_time_ms:>5}ms] Feed {result.feed_id} "
+                f"({result.date}, {result.mode}): {result.publisher_count} publishers, "
+                f"{pass_count} pass rows, {fail_count} fail rows"
+            )
+
+    return sorted(
+        results, key=lambda r: (r.date, r.feed_id, normalize_asset_class(r.mode))
+    )
+
+
+def process_csv(
+    csv_path: Path,
+    max_workers: int,
+    include_asset_classes: Optional[list[str]] = None,
+    exclude_asset_classes: Optional[list[str]] = None,
+    include_extended_hours: bool = False,
+    include_overnight: bool = False,
+    feed_id_filter: Optional[set[int]] = None,
+    precise: bool = False,
+    gap_threshold_ms: int = DEFAULT_GAP_THRESHOLD_MS,
+    uptime_threshold_pct: float = DEFAULT_UPTIME_THRESHOLD_PCT,
+) -> list[FeedUptimeResult]:
+    """Process feed/date/mode tuples from CSV with parallel execution."""
+
+    include_normalized = None
+    if include_asset_classes:
+        include_normalized = {normalize_asset_class(ac) for ac in include_asset_classes}
+
+    exclude_normalized: set[str] = set()
+    if exclude_asset_classes:
+        exclude_normalized = {normalize_asset_class(ac) for ac in exclude_asset_classes}
+
+    work_items: list[tuple[int, str, str]] = []
+    skipped_by_asset_class = 0
+    with open(csv_path) as f:
+        reader = csv.reader(f)
+        for row in reader:
+            if not row or not row[0].strip():
+                continue
+            if len(row) < 3:
+                print(f"Warning: Skipping incomplete row: {row}")
+                continue
+
+            feed_id_str, date, mode = row[0].strip(), row[1].strip(), row[2].strip()
+            normalized_mode = normalize_asset_class(mode)
+
+            if include_normalized and normalized_mode not in include_normalized:
+                skipped_by_asset_class += 1
+                continue
+            if normalized_mode in exclude_normalized:
+                skipped_by_asset_class += 1
+                continue
+
+            try:
+                feed_id = int(feed_id_str)
+                datetime.strptime(date, "%Y-%m-%d")
+            except ValueError:
+                print(f"Warning: Skipping invalid row: {row}")
+                continue
+
+            work_items.append((feed_id, date, mode))
+
+    if skipped_by_asset_class > 0:
+        print(f"Filtered out {skipped_by_asset_class} feeds by asset class")
+
+    skipped_by_feed_id = 0
+    if feed_id_filter is not None:
+        filtered_work_items = []
+        for feed_id, date, mode in work_items:
+            if feed_id in feed_id_filter:
+                filtered_work_items.append((feed_id, date, mode))
+            else:
+                skipped_by_feed_id += 1
+        work_items = filtered_work_items
+
+    if skipped_by_feed_id > 0:
+        keep_ids = ", ".join(str(x) for x in sorted(feed_id_filter))
+        print(
+            f"Filtered out {skipped_by_feed_id} feeds by feed ID "
+            f"(kept {len(work_items)} matching: {keep_ids})"
+        )
+
+    return process_work_items(
+        work_items=work_items,
+        max_workers=max_workers,
+        include_extended_hours=include_extended_hours,
+        include_overnight=include_overnight,
+        precise=precise,
+        gap_threshold_ms=gap_threshold_ms,
+        uptime_threshold_pct=uptime_threshold_pct,
+    )
+
+
+def compute_publisher_summary(
+    results: list[FeedUptimeResult],
+) -> tuple[list[str], list[str], list[dict[str, object]]]:
+    """Compute publisher pass/fail consistency summary across dates."""
+
+    unique_dates = sorted({result.date for result in results})
+    if not unique_dates:
+        return [], [], []
+
+    publisher_dates: dict[int, set[str]] = defaultdict(set)
+    publisher_session_date_statuses: dict[
+        int, dict[str, dict[str, list[bool]]]
+    ] = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+
+    for result in results:
+        for uptime in result.publisher_uptimes:
+            publisher_dates[uptime.publisher_id].add(result.date)
+            publisher_session_date_statuses[uptime.publisher_id][uptime.session][
+                result.date
+            ].append(uptime.passes)
+
+    all_sessions = set()
+    for session_map in publisher_session_date_statuses.values():
+        all_sessions.update(session_map.keys())
+    session_names = [session for session in SESSION_ORDER if session in all_sessions]
+    session_names.extend(
+        sorted(session for session in all_sessions if session not in SESSION_ORDER)
+    )
+
+    summary_rows: list[dict[str, object]] = []
+    for publisher_id in sorted(publisher_session_date_statuses):
+        session_summary: dict[str, dict[str, object]] = {}
+        for session_name in session_names:
+            date_map = publisher_session_date_statuses[publisher_id].get(
+                session_name, {}
+            )
+            statuses_by_date: list[tuple[str, bool]] = []
+            for date_str in unique_dates:
+                statuses = date_map.get(date_str)
+                if not statuses:
+                    continue
+                statuses_by_date.append((date_str, all(statuses)))
+
+            pass_dates = sum(1 for _, status in statuses_by_date if status)
+            fail_dates = sum(1 for _, status in statuses_by_date if not status)
+            evaluated_dates = pass_dates + fail_dates
+            pass_rate = (
+                (pass_dates * 100.0 / evaluated_dates) if evaluated_dates > 0 else None
+            )
+            results_str = ";".join(
+                f"{date_str[5:]}:{'PASS' if status else 'FAIL'}"
+                for date_str, status in statuses_by_date
+            )
+            session_summary[session_name] = {
+                "pass_dates": pass_dates,
+                "fail_dates": fail_dates,
+                "evaluated_dates": evaluated_dates,
+                "pass_rate": pass_rate,
+                "results": results_str,
+            }
+
+        summary_rows.append(
+            {
+                "publisher_id": publisher_id,
+                "dates_seen": len(publisher_dates[publisher_id]),
+                "sessions": session_summary,
+            }
+        )
+
+    return unique_dates, session_names, summary_rows
