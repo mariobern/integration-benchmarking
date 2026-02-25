@@ -20,7 +20,7 @@ class TestLRUCacheOnFilterFunctions:
 
     def test_market_hours_filter_returns_consistent_output(self):
         """Test that get_market_hours_filter_sql returns same output for same inputs."""
-        from publisher_benchmark import get_market_hours_filter_sql
+        from lib.sql_filters import get_market_hours_filter_sql
 
         # Call with same parameters multiple times
         result1 = get_market_hours_filter_sql(
@@ -43,7 +43,7 @@ class TestLRUCacheOnFilterFunctions:
 
     def test_market_hours_filter_returns_empty_for_non_equity(self):
         """Test that non-equity modes return empty string."""
-        from publisher_benchmark import get_market_hours_filter_sql
+        from lib.sql_filters import get_market_hours_filter_sql
 
         assert get_market_hours_filter_sql("fx", "2025-10-06", "publish_time") == ""
         assert get_market_hours_filter_sql("metals", "2025-10-06", "publish_time") == ""
@@ -51,7 +51,7 @@ class TestLRUCacheOnFilterFunctions:
 
     def test_market_hours_filter_cache_info(self):
         """Test that LRU cache is being used."""
-        from publisher_benchmark import get_market_hours_filter_sql
+        from lib.sql_filters import get_market_hours_filter_sql
 
         # Clear any existing cache
         get_market_hours_filter_sql.cache_clear()
@@ -68,7 +68,8 @@ class TestLRUCacheOnFilterFunctions:
 
     def test_extended_hours_filter_cache_info(self):
         """Test that extended hours filter function uses LRU cache."""
-        from publisher_benchmark import TradingSession, get_extended_hours_filter_sql
+        from lib.models import TradingSession
+        from lib.sql_filters import get_extended_hours_filter_sql
 
         # Clear any existing cache
         get_extended_hours_filter_sql.cache_clear()
@@ -91,7 +92,7 @@ class TestLRUCacheOnFilterFunctions:
 
     def test_overnight_hours_filter_cache_info(self):
         """Test that overnight hours filter function uses LRU cache."""
-        from publisher_benchmark import get_overnight_hours_filter_sql
+        from lib.sql_filters import get_overnight_hours_filter_sql
 
         # Clear any existing cache
         get_overnight_hours_filter_sql.cache_clear()
@@ -112,7 +113,7 @@ class TestSkipScipyTestsFlag:
 
     def test_compute_statistical_metrics_returns_all_keys(self):
         """Test that compute_statistical_metrics returns all expected keys."""
-        from publisher_benchmark import compute_statistical_metrics
+        from lib.statistics import compute_statistical_metrics
 
         diffs = [0.01, -0.02, 0.015, -0.005, 0.01] * 10  # 50 values
         pct_diffs = [0.1, -0.2, 0.15, -0.05, 0.1] * 10

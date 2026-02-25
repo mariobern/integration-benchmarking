@@ -25,7 +25,6 @@ Supported features:
 
 import argparse
 import csv
-import statistics
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -54,6 +53,7 @@ from lib.models import (
     PublisherFeedMetrics,
     TradingSession,
 )
+from lib.statistics import distribution_stats
 
 
 def compute_publisher_summary(
@@ -616,43 +616,6 @@ def write_results_csv(
     print(f"\nResults written to: {output_path}")
 
 
-def _distribution_stats(values: list[float]) -> dict:
-    """Compute summary distribution stats including p90/p95."""
-
-    if not values:
-        return {
-            "median": None,
-            "mean": None,
-            "min": None,
-            "max": None,
-            "p90": None,
-            "p95": None,
-        }
-
-    sorted_values = sorted(values)
-    n = len(sorted_values)
-
-    if n >= 2:
-        try:
-            q = statistics.quantiles(sorted_values, n=100)
-            p90 = q[89]
-            p95 = q[94]
-        except statistics.StatisticsError:
-            p90 = sorted_values[min(int(n * 0.90), n - 1)]
-            p95 = sorted_values[min(int(n * 0.95), n - 1)]
-    else:
-        p90 = p95 = sorted_values[0]
-
-    return {
-        "median": statistics.median(sorted_values),
-        "mean": statistics.mean(sorted_values),
-        "min": min(sorted_values),
-        "max": max(sorted_values),
-        "p90": p90,
-        "p95": p95,
-    }
-
-
 def compute_summary_stats(
     results: list[BenchmarkResult],
     total_time: float,
@@ -675,8 +638,8 @@ def compute_summary_stats(
         if r.median_hit_rate is not None and not r.error
     ]
 
-    nrmse_stats = _distribution_stats(nrmse_values)
-    hit_rate_stats = _distribution_stats(hit_rate_values)
+    nrmse_stats = distribution_stats(nrmse_values)
+    hit_rate_stats = distribution_stats(hit_rate_values)
 
     mode_stats: dict[str, dict[str, int]] = {}
     for r in results:

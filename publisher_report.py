@@ -2,7 +2,7 @@
 """
 Combined publisher health report: benchmark quality + uptime in one script.
 
-Combines data quality evaluation (from publisher_benchmark_95.py) with
+Combines data quality evaluation (from publisher_benchmark.py) with
 uptime measurement (1s window method) to give publishers a unified health
 view per feed.
 
@@ -36,13 +36,13 @@ from lib.config import (
     normalize_asset_class,
 )
 from lib.models import PublisherBenchmarkResult
-from publisher_benchmark_95 import (
+from lib.publisher_eval import (
     evaluate_publisher_feed,
     extract_publisher_id_from_filename,
-    list_asset_classes_in_csv,
-    print_interpretation_guide,
     process_csv,
 )
+from lib.benchmark_core import list_asset_classes_in_csv
+from publisher_benchmark import print_interpretation_guide
 
 
 @dataclass
@@ -995,7 +995,7 @@ Examples:
 
     args = parser.parse_args()
 
-    # Validation (same as publisher_benchmark_95.py)
+    # Validation (same as publisher_benchmark.py)
     if args.list_asset_classes and not args.csv:
         parser.error("--list-asset-classes requires --csv")
 
