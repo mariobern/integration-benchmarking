@@ -21,7 +21,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
 
-from lib.benchmark_core import get_feed_metadata, list_asset_classes_in_csv
+from lib.benchmark_core import get_feed_metadata
 from lib.config import (
     get_clients,
     load_config,

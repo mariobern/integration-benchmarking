@@ -8,7 +8,6 @@ Functions:
     evaluate_session_for_all_publishers - Extended-hours session evaluation
     evaluate_overnight_for_all_publishers - Overnight (publisher 32) eval
     evaluate_feed_two_queries  - Main entry point for feed-level evaluation
-    evaluate_feed_fast         - Deprecated alias for evaluate_feed_two_queries
     list_asset_classes_in_csv  - Scan CSV for asset class counts
     process_csv                - CSV batch processor with parallel execution
 """
@@ -506,32 +505,6 @@ def evaluate_overnight_for_all_publishers(
             if "all_publishers" in locals()
             else {}
         )
-
-
-def evaluate_feed_fast(
-    client_lazer,
-    client_analytics,
-    feed_id: int,
-    date: str,
-    mode: str,
-    target_pub_count: int = 4,
-    tolerance_seconds: int = 60,
-) -> BenchmarkResult:
-    """
-    Deprecated: retained for compatibility.
-
-    quick_benchmark.py now uses the two-query implementation for all evaluations.
-    """
-
-    return evaluate_feed_two_queries(
-        client_lazer,
-        client_analytics,
-        feed_id,
-        date,
-        mode,
-        target_pub_count=target_pub_count,
-        tolerance_seconds=tolerance_seconds,
-    )
 
 
 def evaluate_feed_two_queries(

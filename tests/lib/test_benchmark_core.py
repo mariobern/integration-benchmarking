@@ -463,36 +463,7 @@ class TestEvaluateOvernightForAllPublishers:
 
 
 # ---------------------------------------------------------------------------
-# 7. evaluate_feed_fast — deprecated wrapper
-# ---------------------------------------------------------------------------
-class TestEvaluateFeedFast:
-    def test_delegates_to_evaluate_feed_two_queries(self) -> None:
-        from lib.benchmark_core import evaluate_feed_fast
-
-        with patch("lib.benchmark_core.evaluate_feed_two_queries") as mock_eval:
-            mock_eval.return_value = BenchmarkResult(
-                feed_id=327,
-                date="2025-10-06",
-                mode="fx",
-                symbol="FX.EURUSD/USD",
-                ready=True,
-                target_pub_count=4,
-                passing_pub_count=4,
-                failing_pub_count=0,
-                passing_publishers=[55, 56, 57, 58],
-                failing_publishers=[],
-            )
-
-            result = evaluate_feed_fast(
-                MagicMock(), MagicMock(), 327, "2025-10-06", "fx"
-            )
-
-            mock_eval.assert_called_once()
-            assert result.ready is True
-
-
-# ---------------------------------------------------------------------------
-# 8. Edge cases
+# 7. Edge cases
 # ---------------------------------------------------------------------------
 class TestEdgeCases:
     def test_all_none_benchmark_prices_handled(self) -> None:
