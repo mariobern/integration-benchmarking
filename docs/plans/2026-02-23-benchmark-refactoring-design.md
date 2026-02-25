@@ -1,7 +1,7 @@
 # Benchmark Scripts Refactoring — Design Document
 
-**Date:** 2026-02-23
-**Goal:** Improve auditability by reducing file sizes to <400 lines, eliminating code duplication, and extracting shared logic into a `lib/` package.
+**Date:** 2026-02-23 (updated 2026-02-25)
+**Goal:** Improve auditability by reducing file sizes to <400 lines, eliminating code duplication, extracting shared logic into a `lib/` package, and adding per-session pass/fail thresholds for US Equities extended hours.
 
 ## Problem
 
@@ -43,6 +43,29 @@ Extract shared code into a `lib/` package. Scripts become thin CLI wrappers. Mer
 
 - `quick_benchmark_95.py` — replaced by `--hit-rate-threshold 95`
 - `publisher_benchmark_95.py` — replaced by `--hit-rate-threshold 95`
+
+## Per-Session Thresholds (US Equities)
+
+Currently all sessions use identical pass/fail thresholds. Extended hours (pre-market, after-hours, overnight) have less liquidity, wider spreads, and fewer participants — publisher data is naturally noisier. Relaxed thresholds for these sessions prevent false failures.
+
+### Threshold Table
+
+| Session                             | Auto-Pass (NRMSE) | Conditional NRMSE | Hit Rate |
+| ----------------------------------- | ----------------- | ----------------- | -------- |
+| **Regular** (9:30 AM – 4:00 PM)     | < 0.01            | < 0.05            | >= 95%   |
+| **Pre-Market** (4:00 AM – 9:30 AM)  | < 0.05            | < 0.15            | >= 85%   |
+| **After-Hours** (4:00 PM – 8:00 PM) | < 0.05            | < 0.15            | >= 85%   |
+| **Overnight** (8:00 PM – 4:00 AM)   | < 0.05            | < 0.15            | >= 85%   |
+
+### Scope
+
+- **US Equities only** — FX, metals, commodities, treasuries keep existing thresholds (24-hour markets, no session concept)
+- Applies across all scripts: quick_benchmark, publisher_benchmark, feed_readiness, publisher_report
+- No new CLI flags needed — the system picks thresholds automatically based on which session is being evaluated
+
+### Implementation in `lib/`
+
+Thresholds are defined as a data structure in `lib/benchmark_core.py` (or `lib/thresholds.py` if it improves clarity). The pass/fail function accepts a session type and looks up the correct thresholds. Non-US-equity asset classes always use regular thresholds.
 
 ## \_95 Variant Consolidation
 
@@ -137,6 +160,12 @@ Each `lib/` module gets a corresponding test file in `tests/lib/`:
 | `tests/lib/test_csv_output.py`     | CSV format correctness                                     |
 
 Tests are written in the same phase as module extraction.
+
+### Per-session threshold tests
+
+- Unit tests for threshold lookup: regular vs extended sessions, US equities vs other asset classes
+- Edge cases: NRMSE exactly at boundary (0.05, 0.15), hit rate exactly at boundary (85%, 95%)
+- Integration: US equity feed with `--extended-hours` produces different pass/fail than regular-only run
 
 ### Additional checks
 
