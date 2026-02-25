@@ -816,3 +816,130 @@ def print_publisher_summary(
 
     if include_overnight:
         _print_session_block("OVERNIGHT", TradingSession.OVERNIGHT.value)
+
+
+def print_console_summary(
+    results: list[BenchmarkResult],
+    total_time: float,
+    *,
+    include_extended_hours: bool = False,
+    include_overnight: bool = False,
+    hit_rate_threshold: float = 95.0,
+) -> None:
+    """Print full console summary including criteria, stats, and publisher consistency."""
+    summary = compute_summary_stats(
+        results,
+        total_time,
+        include_extended_hours=include_extended_hours,
+        include_overnight=include_overnight,
+    )
+
+    print(f"\n{'='*70}")
+    print("PASS/FAIL CRITERIA")
+    print(f"{'='*70}")
+    print(
+        f"Publisher passes if: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= {hit_rate_threshold}%)"
+    )
+    print("Feed is READY if passing publishers >= target publisher count")
+
+    print(f"\n{'='*70}")
+    print("SUMMARY")
+    print(f"{'='*70}")
+    print(f"Total feeds evaluated: {summary['total_feeds']}")
+    print(f"Ready (PASS): {summary['ready_count']}")
+    print(f"Not Ready (FAIL): {summary['not_ready_count']}")
+    print(f"Errors: {summary['error_count']}")
+
+    nrmse_stats = summary["nrmse"]
+    if nrmse_stats["median"] is not None:
+        print(
+            "NRMSE distribution (feed medians): "
+            f"median={nrmse_stats['median']:.6f}, mean={nrmse_stats['mean']:.6f}, "
+            f"p90={nrmse_stats['p90']:.6f}, p95={nrmse_stats['p95']:.6f}"
+        )
+    else:
+        print("NRMSE distribution (feed medians): no data")
+
+    hit_rate_stats = summary["hit_rate"]
+    if hit_rate_stats["median"] is not None:
+        print(
+            "Hit rate distribution (feed medians): "
+            f"median={hit_rate_stats['median']:.2f}%, mean={hit_rate_stats['mean']:.2f}%, "
+            f"min={hit_rate_stats['min']:.2f}%, max={hit_rate_stats['max']:.2f}%"
+        )
+    else:
+        print("Hit rate distribution (feed medians): no data")
+
+    print("\nPer-asset-class breakdown:")
+    mode_stats = summary["mode_stats"]
+    if mode_stats:
+        for mode in sorted(mode_stats):
+            stats = mode_stats[mode]
+            print(
+                f"  {mode:<15} ready={stats['ready']:<4} "
+                f"not_ready={stats['not_ready']:<4} error={stats['error']:<4}"
+            )
+    else:
+        print("  No feeds processed")
+
+    per_date_stats = summary.get("per_date_stats", {})
+    if len(per_date_stats) > 1:
+        print("\nPer-date breakdown:")
+        for date_value in sorted(per_date_stats):
+            stats = per_date_stats[date_value]
+            print(
+                f"  {date_value:<12} ready={stats['ready']:<4} "
+                f"not_ready={stats['not_ready']:<4} error={stats['error']:<4}"
+            )
+
+    if include_extended_hours:
+        ext = summary["extended_hours"]
+        print("\nExtended hours summary:")
+        if ext.get("premarket_total", 0) > 0:
+            print(
+                f"  Pre-market: pass={ext['premarket_pass']} fail={ext['premarket_fail']} "
+                f"pass_rate={ext['premarket_pass_rate']:.2f}%"
+            )
+        else:
+            print("  Pre-market: no evaluable session data")
+
+        if ext.get("afterhours_total", 0) > 0:
+            print(
+                f"  After-hours: pass={ext['afterhours_pass']} fail={ext['afterhours_fail']} "
+                f"pass_rate={ext['afterhours_pass_rate']:.2f}%"
+            )
+        else:
+            print("  After-hours: no evaluable session data")
+
+    if include_overnight:
+        overnight = summary["overnight"]
+        print("\nOvernight summary:")
+        if overnight.get("total", 0) > 0:
+            print(
+                f"  Reference publisher: {overnight['reference_publisher_id']}\n"
+                f"  pass={overnight['pass']} fail={overnight['fail']} "
+                f"pass_rate={overnight['pass_rate']:.2f}%"
+            )
+        else:
+            print(
+                f"  Reference publisher: {overnight.get('reference_publisher_id', OVERNIGHT_REFERENCE_PUBLISHER_ID)}\n"
+                "  no evaluable overnight data"
+            )
+
+    print(
+        f"\nTiming: total={summary['total_time_sec']:.2f}s, avg_per_feed={summary['avg_time_ms']:.0f}ms"
+    )
+
+    print_interpretation_guide(summary, hit_rate_threshold=hit_rate_threshold)
+
+    if len({r.date for r in results}) > 1:
+        publisher_summary = compute_publisher_summary(
+            results,
+            include_extended_hours=include_extended_hours,
+            include_overnight=include_overnight,
+        )
+        print_publisher_summary(
+            publisher_summary,
+            include_extended_hours=include_extended_hours,
+            include_overnight=include_overnight,
+        )
