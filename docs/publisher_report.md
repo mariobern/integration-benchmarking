@@ -61,7 +61,7 @@ python publisher_report.py --csv publisher_55_feeds.csv --skip-scipy-tests
 
 ## How It Works
 
-1. Runs benchmark evaluation (via `publisher_benchmark_95.py`) for each feed
+1. Runs benchmark evaluation (via `lib/publisher_eval.py`) for each feed
 2. Computes uptime using 1-second window method per trading session
 3. Merges results into `FeedHealthResult` with health classification
 4. Outputs console report + CSV

@@ -15,8 +15,17 @@ cp config.yaml.sample config.yaml  # then fill in ClickHouse credentials
 
 ## Pass/Fail Criteria
 
-- **Publisher PASSES** if: `rmse_over_spread <= 1.0`
+- **Publisher PASSES** if: `nrmse < nrmse_auto_pass` OR (`nrmse < nrmse_conditional` AND `hit_rate >= hit_rate_threshold`)
 - **Feed is READY** if: `passing_publisher_count >= target_publisher_count`
+
+### Per-Session Thresholds
+
+| Session                                    | nrmse_auto_pass | nrmse_conditional | hit_rate_threshold |
+| ------------------------------------------ | --------------- | ----------------- | ------------------ |
+| Regular (all asset classes)                | 0.01            | 0.05              | 95%                |
+| Extended (US equities pre/after/overnight) | 0.05            | 0.15              | 85%                |
+
+Thresholds are defined in `lib/thresholds.py`. The `--hit-rate-threshold` CLI flag overrides the regular session hit rate only; extended session thresholds are fixed.
 
 ## Database Configuration
 
@@ -109,6 +118,30 @@ pytest portal/tests/ -v
 ### Feed Readiness (Primary Readiness Tool)
 
 `feed_readiness.py` is the primary tool for assessing production readiness. A feed is **READY** only if enough publishers pass **both** benchmark quality and uptime checks. Per-publisher: `fully_passes = benchmark_passes AND uptime_passes`. Publisher buckets: `fully_passing`, `benchmark_only`, `uptime_only`, `both_failing`. See [docs/feed_readiness.md](docs/feed_readiness.md) for full output schema and per-session readiness details.
+
+## lib/ Package Structure
+
+Shared logic extracted from scripts into `lib/`:
+
+| Module                      | Purpose                                                       |
+| --------------------------- | ------------------------------------------------------------- |
+| `config.py`                 | Config loading, ClickHouse clients, asset class normalization |
+| `models.py`                 | Shared dataclasses (BenchmarkResult, FeedUptimeResult, etc.)  |
+| `sql_filters.py`            | SQL WHERE clause builders for trading sessions                |
+| `statistics.py`             | Statistical computations (t-test, Wilcoxon, normality)        |
+| `thresholds.py`             | Per-session pass/fail thresholds (SessionThresholds)          |
+| `benchmark_core.py`         | Core feed-level benchmark evaluation engine                   |
+| `uptime_core.py`            | Uptime calculation (1s window and gap-based)                  |
+| `publisher_eval.py`         | Single-publisher benchmark evaluation                         |
+| `publisher_health.py`       | Publisher health classification (HEALTHY/DEGRADED/FAILING)    |
+| `publisher_output.py`       | Console and CSV output for publisher_benchmark                |
+| `quick_benchmark_output.py` | Console and CSV output for quick_benchmark                    |
+| `readiness_core.py`         | Feed readiness evaluation (benchmark + uptime)                |
+| `readiness_output.py`       | Console and CSV output for feed_readiness                     |
+| `report_output.py`          | Console and CSV output for publisher_report                   |
+| `uptime_output.py`          | Console and CSV output for feed_uptime                        |
+
+Scripts are thin CLI wrappers that parse arguments and delegate to `lib/`.
 
 ## Benchmark Results Interpretation
 

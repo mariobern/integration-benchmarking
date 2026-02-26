@@ -1,5 +1,40 @@
 # Changelog
 
+## 2026-02-25
+
+### Added
+
+- **`lib/` package** — 16 shared modules extracted from benchmark scripts, replacing ~11,000 lines of duplicated code:
+  - `lib/config.py` — config loading, ClickHouse clients, asset class normalization
+  - `lib/models.py` — shared dataclasses (BenchmarkResult, FeedUptimeResult, etc.)
+  - `lib/sql_filters.py` — SQL WHERE clause builders for trading sessions
+  - `lib/statistics.py` — statistical computations (t-test, Wilcoxon, normality)
+  - `lib/thresholds.py` — per-session pass/fail thresholds (SessionThresholds)
+  - `lib/benchmark_core.py` — core feed-level benchmark evaluation engine
+  - `lib/uptime_core.py` — uptime calculation (1s window and gap-based)
+  - `lib/publisher_eval.py` — single-publisher benchmark evaluation
+  - `lib/publisher_health.py` — publisher health classification (HEALTHY/DEGRADED/FAILING)
+  - `lib/publisher_output.py` — console and CSV output for publisher_benchmark
+  - `lib/quick_benchmark_output.py` — console and CSV output for quick_benchmark
+  - `lib/readiness_core.py` — feed readiness evaluation (benchmark + uptime)
+  - `lib/readiness_output.py` — console and CSV output for feed_readiness
+  - `lib/report_output.py` — console and CSV output for publisher_report
+  - `lib/uptime_output.py` — console and CSV output for feed_uptime
+- **Per-session pass/fail thresholds** for US equities extended hours (pre-market, after-hours, overnight): NRMSE auto-pass 0.05, conditional 0.15, hit rate 85%. Regular session and non-US-equity asset classes unchanged at 0.01 / 0.05 / 95%.
+- **`--hit-rate-threshold` CLI flag** on `quick_benchmark.py` and `publisher_benchmark.py` — overrides regular session hit rate threshold (default 95%).
+- **550 unit tests** across 7 new test modules covering all `lib/` modules.
+
+### Changed
+
+- **Scripts are now thin CLI wrappers** — largest script reduced from 2,985 to 496 lines. All core logic lives in `lib/`.
+- **Documentation updated** — `CLAUDE.md`, `docs/quick_benchmark.md`, `docs/publisher_benchmark.md`, `docs/feed_readiness.md`, `docs/publisher_report.md`, and `docs/benchmark_results_guide.md` now reflect per-session thresholds and `--hit-rate-threshold` flag.
+
+### Removed
+
+- **`quick_benchmark_95.py`** — replaced by `quick_benchmark.py --hit-rate-threshold 95` (now the default).
+- **`publisher_benchmark_95.py`** — replaced by `publisher_benchmark.py --hit-rate-threshold 95` (now the default).
+- 5,668 lines of duplicate `_95` variant code eliminated.
+
 ## 2026-02-14
 
 ### Added

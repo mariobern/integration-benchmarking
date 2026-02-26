@@ -20,8 +20,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-import clickhouse_connect
-import yaml
+
+from lib.config import get_analytics_client, load_config
 
 
 # Benchmark tables and their asset class mappings
@@ -56,30 +56,6 @@ class AssetClassSummary:
     earliest_date: str
     latest_date: str
     instruments: list[InstrumentInfo]
-
-
-def load_config() -> dict:
-    """Load database configuration from config.yaml."""
-    config_path = Path("config.yaml")
-    if not config_path.exists():
-        raise FileNotFoundError(
-            "config.yaml not found. Copy config.yaml.sample to config.yaml and fill in credentials."
-        )
-    with open(config_path) as f:
-        return yaml.safe_load(f)
-
-
-def get_analytics_client(config: dict):
-    """Create ClickHouse client for Analytics database (Datascope benchmark data)."""
-    analytics_cfg = config["analytics_clickhouse"]
-    return clickhouse_connect.get_client(
-        host=analytics_cfg["host"],
-        username=analytics_cfg["user"],
-        password=analytics_cfg["password"],
-        secure=True,
-        connect_timeout=60,
-        send_receive_timeout=300,
-    )
 
 
 def query_table_instruments(

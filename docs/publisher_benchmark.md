@@ -51,6 +51,7 @@ python publisher_benchmark.py --csv publisher_55_feeds.csv --publisher-id 55 \
 | `--list-asset-classes`  | List asset classes in CSV and exit                            | -                                      |
 | `--extended-hours`      | Include pre-market and after-hours evaluation for US equities | Disabled                               |
 | `--overnight`           | Include overnight session evaluation for US equities          | Disabled                               |
+| `--hit-rate-threshold`  | Hit rate threshold for conditional pass                       | `95`                                   |
 | `--skip-scipy-tests`    | Skip t-test/Wilcoxon/normality metrics for speed              | Disabled                               |
 
 ## Date Override Behavior
@@ -80,10 +81,22 @@ Results CSV contains:
 
 ## Pass/Fail Criteria
 
-- **Publisher PASSES** if: `nrmse < 0.01` OR (`nrmse < 0.05` AND `hit_rate >= 98%`)
+- **Publisher PASSES** if: `nrmse < 0.01` OR (`nrmse < 0.05` AND `hit_rate >= 95%`)
 - `nrmse` = RMSE normalized by benchmark price range (lower is better)
 - `hit_rate` = % of prices within 10 basis points of benchmark (higher is better)
 - Minimum 100 observations required for valid evaluation
+- Use `--hit-rate-threshold` to override the default 95% (e.g., `--hit-rate-threshold 98`)
+
+### Per-Session Thresholds (US Equities)
+
+Extended hours use relaxed thresholds:
+
+| Session                              | nrmse_auto_pass | nrmse_conditional | hit_rate_threshold |
+| ------------------------------------ | --------------- | ----------------- | ------------------ |
+| Regular (all asset classes)          | 0.01            | 0.05              | 95%                |
+| Pre-Market / After-Hours / Overnight | 0.05            | 0.15              | 85%                |
+
+Thresholds are defined in `lib/thresholds.py`. The `--hit-rate-threshold` override only affects the regular session.
 
 ## Summary Statistics
 
@@ -158,7 +171,7 @@ Example console output:
 ============================================================
 SUMMARY - Publisher 55
 ============================================================
-Pass criteria: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 98%)
+Pass criteria: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 95%)
 ============================================================
 Total feeds evaluated: 92
 PASS: 67

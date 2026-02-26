@@ -71,6 +71,7 @@ python quick_benchmark.py --csv price_id_list.csv --filter-feed-id 327 1163
 | `--skip-scipy-tests`    | Skip t-test / Wilcoxon / normality metrics                                                           | Off                           |
 | `--detailed`            | Append per-publisher detail rows to CSV                                                              | Off                           |
 | `--filter-feed-id`      | Only process these feed IDs (CSV mode only)                                                          | All                           |
+| `--hit-rate-threshold`  | Hit rate threshold for conditional pass (Path 2)                                                     | `95`                          |
 | `--list-asset-classes`  | List unique asset classes in CSV and exit                                                            | Off                           |
 
 ## Input Mode Rules
@@ -83,11 +84,23 @@ python quick_benchmark.py --csv price_id_list.csv --filter-feed-id 327 1163
 ## Pass/Fail Criteria
 
 - Publisher **passes** if:
-  - `nrmse < 0.01`, or
-  - `nrmse < 0.05` and `hit_rate >= 98`
+  - `nrmse < 0.01` (auto-pass), or
+  - `nrmse < 0.05` and `hit_rate >= 95%` (conditional pass, default threshold)
 - `nrmse = RMSE / (max_benchmark_price - min_benchmark_price)`
 - `hit_rate = percent of matched observations within 10 bps (0.1%) of benchmark`
 - Feed is **READY** if `passing_pub_count >= target_pub_count`.
+- Use `--hit-rate-threshold` to override the regular session hit rate (e.g., `--hit-rate-threshold 98`).
+
+### Per-Session Thresholds (US Equities)
+
+US equities extended hours use relaxed thresholds due to lower liquidity and wider spreads:
+
+| Session                              | nrmse_auto_pass | nrmse_conditional | hit_rate_threshold |
+| ------------------------------------ | --------------- | ----------------- | ------------------ |
+| Regular (all asset classes)          | 0.01            | 0.05              | 95%                |
+| Pre-Market / After-Hours / Overnight | 0.05            | 0.15              | 85%                |
+
+Non-US-equity asset classes (FX, metals, commodities, treasuries) always use regular thresholds. Thresholds are defined in `lib/thresholds.py`.
 
 ## Session Behavior
 

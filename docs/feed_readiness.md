@@ -2,19 +2,19 @@
 
 Evaluates **combined feed readiness** by running both:
 
-- benchmark quality (`quick_benchmark_95.py` logic)
-- publisher uptime (`feed_uptime.py` logic)
+- benchmark quality (`quick_benchmark.py` logic via `lib/benchmark_core.py`)
+- publisher uptime (`feed_uptime.py` logic via `lib/uptime_core.py`)
 
 A feed is marked **READY** only if enough publishers pass **both** checks.
 
 ## When to Use
 
-| Scenario                                        | Use This Tool                                      |
-| ----------------------------------------------- | -------------------------------------------------- |
-| Single verdict that combines benchmark + uptime | Yes                                                |
-| Batch readiness checks across many feeds/dates  | Yes                                                |
-| Benchmark-only analysis                         | Use `quick_benchmark.py` / `quick_benchmark_95.py` |
-| Uptime-only analysis                            | Use `feed_uptime.py`                               |
+| Scenario                                        | Use This Tool            |
+| ----------------------------------------------- | ------------------------ |
+| Single verdict that combines benchmark + uptime | Yes                      |
+| Batch readiness checks across many feeds/dates  | Yes                      |
+| Benchmark-only analysis                         | Use `quick_benchmark.py` |
+| Uptime-only analysis                            | Use `feed_uptime.py`     |
 
 ## Usage
 

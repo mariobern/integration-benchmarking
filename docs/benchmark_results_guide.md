@@ -217,22 +217,35 @@ For US equities, your results may include metrics for additional trading session
 
 Each session adds these columns (with the appropriate prefix):
 
-| Column                     | Description                                                 |
-| -------------------------- | ----------------------------------------------------------- |
-| `{session}_n_observations` | Data points matched in this session                         |
-| `{session}_nrmse`          | Normalized RMSE for this session                            |
-| `{session}_hit_rate`       | Hit rate for this session                                   |
-| `{session}_passes`         | Pass/fail for this session (same criteria as regular hours) |
-| `{session}_error`          | Error message if session evaluation failed                  |
+| Column                     | Description                                                                |
+| -------------------------- | -------------------------------------------------------------------------- |
+| `{session}_n_observations` | Data points matched in this session                                        |
+| `{session}_nrmse`          | Normalized RMSE for this session                                           |
+| `{session}_hit_rate`       | Hit rate for this session                                                  |
+| `{session}_passes`         | Pass/fail for this session (uses relaxed thresholds for extended sessions) |
+| `{session}_error`          | Error message if session evaluation failed                                 |
 
 The overnight session also includes:
 
 - `overnight_n_reference_observations` — data points from the reference publisher
 - `overnight_reference_publisher_id` — which publisher is used as the overnight benchmark
 
+### Per-Session Thresholds
+
+Extended sessions use **relaxed thresholds** to account for lower liquidity and wider spreads:
+
+| Session                     | Auto-Pass (NRMSE) | Conditional NRMSE | Hit Rate |
+| --------------------------- | ----------------- | ----------------- | -------- |
+| Regular (all asset classes) | < 0.01            | < 0.05            | >= 95%   |
+| Pre-Market (US equities)    | < 0.05            | < 0.15            | >= 85%   |
+| After-Hours (US equities)   | < 0.05            | < 0.15            | >= 85%   |
+| Overnight (US equities)     | < 0.05            | < 0.15            | >= 85%   |
+
+Non-US-equity asset classes (FX, metals, commodities, treasuries) always use regular thresholds regardless of session. Thresholds are defined in `lib/thresholds.py`.
+
 ### Key Points
 
-**Same pass/fail criteria per session:** Each session is evaluated independently. A feed can pass during regular hours but fail during pre-market, or vice versa.
+**Different thresholds per session:** Extended sessions are evaluated with relaxed criteria. A feed can pass regular hours (nrmse < 0.01 auto-pass) but still fail pre-market if its nrmse exceeds 0.05. Conversely, a feed with nrmse = 0.03 would fail regular hours Path 1 but auto-pass any extended session.
 
 **Overnight is a peer comparison, not an official benchmark.** The overnight session uses Blue Ocean ATS as the reference because Datascope does not provide data during overnight hours. This means:
 
@@ -482,19 +495,19 @@ Quick-reference table for every column in the CSV.
 | `normality_pvalue`                   | float  | D'Agostino-Pearson normality test p-value                       | > 0.05  |
 | `mean_abs_z_score`                   | float  | Mean absolute z-score of price differences                      | ~0.8    |
 | `premarket_n_observations`           | int    | Pre-market matched data points                                  | > 50    |
-| `premarket_nrmse`                    | float  | Pre-market normalized RMSE                                      | < 0.01  |
-| `premarket_hit_rate`                 | float  | Pre-market hit rate                                             | >= 95%  |
+| `premarket_nrmse`                    | float  | Pre-market normalized RMSE                                      | < 0.05  |
+| `premarket_hit_rate`                 | float  | Pre-market hit rate                                             | >= 85%  |
 | `premarket_passes`                   | bool   | Pre-market pass/fail                                            | True    |
 | `premarket_error`                    | string | Pre-market evaluation error (if any)                            | Empty   |
 | `afterhours_n_observations`          | int    | After-hours matched data points                                 | > 50    |
-| `afterhours_nrmse`                   | float  | After-hours normalized RMSE                                     | < 0.01  |
-| `afterhours_hit_rate`                | float  | After-hours hit rate                                            | >= 95%  |
+| `afterhours_nrmse`                   | float  | After-hours normalized RMSE                                     | < 0.05  |
+| `afterhours_hit_rate`                | float  | After-hours hit rate                                            | >= 85%  |
 | `afterhours_passes`                  | bool   | After-hours pass/fail                                           | True    |
 | `afterhours_error`                   | string | After-hours evaluation error (if any)                           | Empty   |
 | `overnight_n_observations`           | int    | Overnight matched data points                                   | > 50    |
 | `overnight_n_reference_observations` | int    | Data points from reference publisher                            | > 50    |
-| `overnight_nrmse`                    | float  | Overnight normalized RMSE (vs Blue Ocean ATS)                   | < 0.01  |
-| `overnight_hit_rate`                 | float  | Overnight hit rate (vs Blue Ocean ATS)                          | >= 95%  |
+| `overnight_nrmse`                    | float  | Overnight normalized RMSE (vs Blue Ocean ATS)                   | < 0.05  |
+| `overnight_hit_rate`                 | float  | Overnight hit rate (vs Blue Ocean ATS)                          | >= 85%  |
 | `overnight_passes`                   | bool   | Overnight pass/fail                                             | True    |
 | `overnight_reference_publisher_id`   | int    | Reference publisher for overnight (currently 32)                | —       |
 | `overnight_error`                    | string | Overnight evaluation error (if any)                             | Empty   |
