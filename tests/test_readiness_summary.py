@@ -1,10 +1,7 @@
 """Tests for write_summary_csv() in lib/readiness_output.py."""
 import csv
-import tempfile
 from pathlib import Path
 from typing import Optional
-
-import pytest
 
 from lib.readiness_core import FeedReadinessResult
 from lib.readiness_output import write_summary_csv

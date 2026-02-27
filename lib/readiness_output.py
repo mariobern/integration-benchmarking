@@ -11,6 +11,7 @@ Functions:
     compute_publisher_consistency -- Cross-date publisher pass/fail matrix
     write_publisher_consistency_csv -- Write PUBLISHER CONSISTENCY section to CSV
     write_results_csv        -- Write full results CSV with optional detail/consistency sections
+    write_summary_csv        -- Write curated summary CSV containing only ready feeds
     compute_summary_stats    -- Compute aggregate statistics for console summary
     print_console_summary    -- Print FEED READINESS REPORT to console
     print_publisher_consistency -- Print PUBLISHER CONSISTENCY to console
