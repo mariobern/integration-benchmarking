@@ -11,6 +11,7 @@ from generate_price_list import (
     build_lookup,
     expand_dates,
     load_symbols,
+    parse_feed_ids_file,
     resolve_feed_mode,
     resolve_feeds,
     write_csv,
@@ -189,3 +190,32 @@ class TestWriteCsv:
         output = tmp_path / "sub" / "dir" / "out.csv"
         write_csv({327: "fx"}, [date(2026, 2, 27)], output)
         assert output.exists()
+
+
+# -- parse_feed_ids_file -------------------------------------------------------
+
+
+class TestParseFeedIdsFile:
+    def test_one_per_line(self, tmp_path: Path):
+        f = tmp_path / "feeds.txt"
+        f.write_text("327\n340\n346\n")
+        assert parse_feed_ids_file(f) == [327, 340, 346]
+
+    def test_ignores_blank_lines(self, tmp_path: Path):
+        f = tmp_path / "feeds.txt"
+        f.write_text("327\n\n340\n\n")
+        assert parse_feed_ids_file(f) == [327, 340]
+
+    def test_ignores_comments(self, tmp_path: Path):
+        f = tmp_path / "feeds.txt"
+        f.write_text("# header\n327\n# skip\n340\n")
+        assert parse_feed_ids_file(f) == [327, 340]
+
+    def test_strips_whitespace(self, tmp_path: Path):
+        f = tmp_path / "feeds.txt"
+        f.write_text("  327  \n  340  \n")
+        assert parse_feed_ids_file(f) == [327, 340]
+
+    def test_file_not_found(self, tmp_path: Path):
+        with pytest.raises(FileNotFoundError):
+            parse_feed_ids_file(tmp_path / "missing.txt")

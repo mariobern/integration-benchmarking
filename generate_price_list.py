@@ -114,3 +114,17 @@ def write_csv(resolved: dict[int, str], dates: list[date], output: Path) -> int:
                 writer.writerow([feed_id, d.isoformat(), mode])
                 row_count += 1
     return row_count
+
+
+def parse_feed_ids_file(path: Path) -> list[int]:
+    """Parse feed IDs from a text file (one per line, # comments allowed)."""
+    if not path.exists():
+        raise FileNotFoundError(f"Feed IDs file not found: {path}")
+    feed_ids = []
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            feed_ids.append(int(line))
+    return feed_ids
