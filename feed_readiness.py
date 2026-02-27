@@ -43,6 +43,7 @@ from lib.readiness_output import (
     print_publisher_consistency,
     write_publisher_consistency_csv,
     write_results_csv,
+    write_summary_csv,
 )
 from lib.uptime_core import (
     DEFAULT_GAP_THRESHOLD_MS,
@@ -160,6 +161,11 @@ Examples:
         nargs="+",
         metavar="ID",
         help="Only process these feed IDs when using --csv",
+    )
+    parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Write a summary CSV of READY feeds only (feed_readiness_summary.csv)",
     )
     parser.add_argument(
         "--list-asset-classes",
@@ -310,6 +316,21 @@ Examples:
         include_overnight=args.overnight,
         include_detailed=args.detailed,
     )
+
+    if args.summary:
+        stem = args.output.stem
+        if "_results" in stem:
+            summary_stem = stem.replace("_results", "_summary")
+        else:
+            summary_stem = f"{stem}_summary"
+        summary_path = args.output.with_stem(summary_stem)
+        ready_count = write_summary_csv(
+            results=results,
+            output_path=summary_path,
+            include_extended_hours=args.extended_hours,
+            include_overnight=args.overnight,
+        )
+        print(f"Summary written to: {summary_path} ({ready_count} ready feeds)")
 
     total_time = time.time() - total_start
     print_console_summary(
