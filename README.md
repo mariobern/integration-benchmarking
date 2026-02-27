@@ -37,6 +37,7 @@ python quick_benchmark.py --csv price_id_list.csv
 | `verify_uptime.py`                | Compare uptime calculation methods                     | [Details](docs/portal_usage.md)                 |
 | `check_benchmark_availability.py` | Audit Datascope instrument coverage                    | [Details](docs/check_benchmark_availability.md) |
 | `generate_source_upload.py`       | Generate CSVs for Datascope instrument onboarding      | [Details](docs/generate_source_upload.md)       |
+| `generate_price_list.py`          | Generate price_id_list.csv from feed IDs               | See below                                       |
 | `isin_resolver_v2.py`             | Resolve tickers to ISINs (multi-tier)                  | [Details](docs/isin_resolver_v2.md)             |
 | `portal/`                         | Self-service FastAPI dashboard + daily batch runner    | [Details](docs/portal_usage.md)                 |
 
@@ -221,6 +222,36 @@ python verify_uptime.py --publisher-id 55 --date 2026-01-28 --extended-hours
 # 4. Run daily batch to populate portal (production)
 python -m portal.batch.daily_benchmark_runner --date 2026-01-28 --overnight --workers 16
 ```
+
+## Generating Input CSVs (`generate_price_list.py`)
+
+Generates `price_id_list.csv` from feed IDs by resolving each feed's asset class from `lazer_symbols.json`. No ClickHouse connection needed.
+
+```bash
+# Single date
+python3 generate_price_list.py --feed-id 327 340 346 --date 2026-02-27
+
+# Date range (one row per feed per date)
+python3 generate_price_list.py --feed-id 327 340 --start-date 2026-02-24 --end-date 2026-02-27
+
+# Feed IDs from file
+python3 generate_price_list.py --feed-ids-file feeds.txt --date 2026-02-27
+
+# Custom output and symbols paths
+python3 generate_price_list.py --feed-id 327 --date 2026-02-27 --output my_batch.csv --symbols lazer_symbols1.json
+```
+
+| Argument          | Description                               | Default              |
+| ----------------- | ----------------------------------------- | -------------------- |
+| `--feed-id`       | Space-separated feed IDs                  | -                    |
+| `--feed-ids-file` | Text file with one feed ID per line       | -                    |
+| `--date`          | Single date (YYYY-MM-DD)                  | -                    |
+| `--start-date`    | Start of date range (requires --end-date) | -                    |
+| `--end-date`      | End of date range (requires --start-date) | -                    |
+| `--output`        | Output CSV path                           | `price_id_list.csv`  |
+| `--symbols`       | Path to lazer_symbols.json                | `lazer_symbols.json` |
+
+Non-benchmarkable feeds (crypto, nav, etc.) and non-US equities are automatically skipped with warnings.
 
 ## Input CSV Format
 
