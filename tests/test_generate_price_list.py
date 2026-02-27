@@ -5,11 +5,15 @@ from pathlib import Path
 
 import pytest
 
+from datetime import date
+
 from generate_price_list import (
     build_lookup,
+    expand_dates,
     load_symbols,
     resolve_feed_mode,
     resolve_feeds,
+    write_csv,
 )
 
 
@@ -131,3 +135,57 @@ class TestResolveFeeds:
         assert len(resolved) == 1
         assert 327 in resolved
         assert len(skipped) == 2
+
+
+# -- expand_dates + write_csv --------------------------------------------------
+
+
+class TestExpandDates:
+    def test_single_date(self):
+        dates = expand_dates(date(2026, 2, 27), date(2026, 2, 27))
+        assert dates == [date(2026, 2, 27)]
+
+    def test_date_range(self):
+        dates = expand_dates(date(2026, 2, 24), date(2026, 2, 27))
+        assert len(dates) == 4
+        assert dates[0] == date(2026, 2, 24)
+        assert dates[-1] == date(2026, 2, 27)
+
+    def test_start_after_end_raises(self):
+        with pytest.raises(ValueError, match="start.*after.*end"):
+            expand_dates(date(2026, 2, 28), date(2026, 2, 27))
+
+
+class TestWriteCsv:
+    def test_writes_correct_format(self, tmp_path: Path):
+        output = tmp_path / "out.csv"
+        resolved = {327: "fx", 345: "metals"}
+        dates = [date(2026, 2, 27)]
+        write_csv(resolved, dates, output)
+
+        lines = output.read_text().strip().split("\n")
+        assert len(lines) == 2
+        assert lines[0] == "327,2026-02-27,fx"
+        assert lines[1] == "345,2026-02-27,metals"
+
+    def test_expands_dates_per_feed(self, tmp_path: Path):
+        output = tmp_path / "out.csv"
+        resolved = {327: "fx"}
+        dates = [date(2026, 2, 24), date(2026, 2, 25)]
+        write_csv(resolved, dates, output)
+
+        lines = output.read_text().strip().split("\n")
+        assert len(lines) == 2
+        assert lines[0] == "327,2026-02-24,fx"
+        assert lines[1] == "327,2026-02-25,fx"
+
+    def test_no_header(self, tmp_path: Path):
+        output = tmp_path / "out.csv"
+        write_csv({327: "fx"}, [date(2026, 2, 27)], output)
+        content = output.read_text()
+        assert not content.startswith("feed_id")
+
+    def test_creates_parent_dirs(self, tmp_path: Path):
+        output = tmp_path / "sub" / "dir" / "out.csv"
+        write_csv({327: "fx"}, [date(2026, 2, 27)], output)
+        assert output.exists()

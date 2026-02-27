@@ -11,7 +11,9 @@ Usage:
 
 from __future__ import annotations
 
+import csv
 import json
+from datetime import date, timedelta
 from pathlib import Path
 
 from lib.config import BENCHMARKABLE_ASSET_CLASSES, normalize_asset_class
@@ -86,3 +88,29 @@ def resolve_feeds(
         resolved[fid] = mode
 
     return resolved, skipped
+
+
+def expand_dates(start: date, end: date) -> list[date]:
+    """Expand a date range into a list of individual dates (inclusive)."""
+    if start > end:
+        raise ValueError(f"start date {start} is after end date {end}")
+    dates = []
+    current = start
+    while current <= end:
+        dates.append(current)
+        current += timedelta(days=1)
+    return dates
+
+
+def write_csv(resolved: dict[int, str], dates: list[date], output: Path) -> int:
+    """Write price_id_list CSV (no header). Returns row count."""
+    output.parent.mkdir(parents=True, exist_ok=True)
+    row_count = 0
+    with open(output, "w", newline="") as f:
+        writer = csv.writer(f)
+        for feed_id in sorted(resolved):
+            mode = resolved[feed_id]
+            for d in dates:
+                writer.writerow([feed_id, d.isoformat(), mode])
+                row_count += 1
+    return row_count
