@@ -11,6 +11,9 @@ Usage:
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from lib.config import BENCHMARKABLE_ASSET_CLASSES, normalize_asset_class
 
 
@@ -32,3 +35,16 @@ def resolve_feed_mode(entry: dict) -> str | None:
     if mode not in BENCHMARKABLE_ASSET_CLASSES:
         return None
     return mode
+
+
+def load_symbols(path: Path) -> list[dict]:
+    """Load symbols from a lazer_symbols.json file."""
+    if not path.exists():
+        raise FileNotFoundError(f"Symbols file not found: {path}")
+    with open(path) as f:
+        return json.load(f)
+
+
+def build_lookup(symbols: list[dict]) -> dict[int, dict]:
+    """Build a {pyth_lazer_id: entry} lookup dict."""
+    return {entry["pyth_lazer_id"]: entry for entry in symbols}
