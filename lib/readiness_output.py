@@ -604,6 +604,107 @@ def write_results_csv(
                     )
 
 
+def write_summary_csv(
+    results: list[FeedReadinessResult],
+    output_path: Path,
+    include_extended_hours: bool = False,
+    include_overnight: bool = False,
+) -> int:
+    """Write a curated summary CSV containing only ready feeds.
+
+    Returns the number of ready feeds written.
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    header = [
+        "feed_id",
+        "symbol",
+        "date",
+        "mode",
+        "fully_passing_count",
+        "target_pub_count",
+        "median_nrmse",
+        "median_hit_rate",
+        "median_uptime_pct",
+        "fully_passing_publishers",
+    ]
+
+    if include_extended_hours:
+        header.extend(
+            [
+                "premarket_fully_passing_count",
+                "premarket_median_uptime_pct",
+                "afterhours_fully_passing_count",
+                "afterhours_median_uptime_pct",
+            ]
+        )
+    if include_overnight:
+        header.extend(
+            [
+                "overnight_fully_passing_count",
+                "overnight_median_uptime_pct",
+            ]
+        )
+
+    ready_results = [r for r in results if r.ready]
+    ready_results.sort(key=lambda r: (r.date, r.feed_id, normalize_asset_class(r.mode)))
+
+    with open(output_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+
+        for result in ready_results:
+            row = [
+                result.feed_id,
+                result.symbol or "",
+                result.date,
+                result.mode,
+                result.fully_passing_count,
+                result.target_pub_count,
+                f"{result.median_nrmse:.6f}" if result.median_nrmse is not None else "",
+                f"{result.median_hit_rate:.2f}"
+                if result.median_hit_rate is not None
+                else "",
+                f"{result.median_uptime_pct:.4f}"
+                if result.median_uptime_pct is not None
+                else "",
+                ";".join(str(pid) for pid in result.fully_passing_publishers),
+            ]
+
+            if include_extended_hours:
+                row.extend(
+                    [
+                        result.premarket_fully_passing_count
+                        if result.premarket_fully_passing_count is not None
+                        else "",
+                        f"{result.premarket_median_uptime_pct:.4f}"
+                        if result.premarket_median_uptime_pct is not None
+                        else "",
+                        result.afterhours_fully_passing_count
+                        if result.afterhours_fully_passing_count is not None
+                        else "",
+                        f"{result.afterhours_median_uptime_pct:.4f}"
+                        if result.afterhours_median_uptime_pct is not None
+                        else "",
+                    ]
+                )
+            if include_overnight:
+                row.extend(
+                    [
+                        result.overnight_fully_passing_count
+                        if result.overnight_fully_passing_count is not None
+                        else "",
+                        f"{result.overnight_median_uptime_pct:.4f}"
+                        if result.overnight_median_uptime_pct is not None
+                        else "",
+                    ]
+                )
+
+            writer.writerow(row)
+
+    return len(ready_results)
+
+
 # ---------------------------------------------------------------------------
 # Summary statistics
 # ---------------------------------------------------------------------------
