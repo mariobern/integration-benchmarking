@@ -11,8 +11,10 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
 import csv
 import json
+import sys
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -128,3 +130,117 @@ def parse_feed_ids_file(path: Path) -> list[int]:
                 continue
             feed_ids.append(int(line))
     return feed_ids
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Generate price_id_list.csv from feed IDs and lazer_symbols.json",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Inline feed IDs with single date
+  python3 generate_price_list.py --feed-id 327 340 346 --date 2026-02-27
+
+  # Feed IDs with date range
+  python3 generate_price_list.py --feed-id 327 340 --start-date 2026-02-24 --end-date 2026-02-27
+
+  # Feed IDs from file
+  python3 generate_price_list.py --feed-ids-file feeds.txt --date 2026-02-27
+
+  # Custom output and symbols paths
+  python3 generate_price_list.py --feed-id 327 --date 2026-02-27 --output my_batch.csv --symbols lazer_symbols1.json
+""",
+    )
+
+    # Feed ID input (mutually exclusive)
+    feed_group = parser.add_mutually_exclusive_group(required=True)
+    feed_group.add_argument(
+        "--feed-id",
+        nargs="+",
+        type=int,
+        help="Space-separated feed IDs",
+    )
+    feed_group.add_argument(
+        "--feed-ids-file",
+        type=Path,
+        help="Text file with one feed ID per line",
+    )
+
+    # Date input (mutually exclusive)
+    date_group = parser.add_mutually_exclusive_group(required=True)
+    date_group.add_argument(
+        "--date",
+        type=date.fromisoformat,
+        help="Single date (YYYY-MM-DD)",
+    )
+    date_group.add_argument(
+        "--start-date",
+        type=date.fromisoformat,
+        help="Start of date range (requires --end-date)",
+    )
+
+    parser.add_argument(
+        "--end-date",
+        type=date.fromisoformat,
+        help="End of date range (requires --start-date)",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("price_id_list.csv"),
+        help="Output CSV path (default: price_id_list.csv)",
+    )
+    parser.add_argument(
+        "--symbols",
+        type=Path,
+        default=Path("lazer_symbols.json"),
+        help="Path to lazer_symbols.json (default: lazer_symbols.json)",
+    )
+
+    args = parser.parse_args()
+
+    # Validate date range
+    if args.start_date and not args.end_date:
+        parser.error("--start-date requires --end-date")
+    if args.end_date and not args.start_date:
+        parser.error("--end-date requires --start-date")
+
+    # Determine dates
+    if args.date:
+        start, end = args.date, args.date
+    else:
+        start, end = args.start_date, args.end_date
+    dates = expand_dates(start, end)
+
+    # Collect feed IDs
+    if args.feed_id:
+        feed_ids = args.feed_id
+    else:
+        feed_ids = parse_feed_ids_file(args.feed_ids_file)
+
+    # Load symbols and resolve
+    symbols = load_symbols(args.symbols)
+    print(f"Loaded {len(symbols)} symbols from {args.symbols}", file=sys.stderr)
+
+    lookup = build_lookup(symbols)
+    resolved, skipped = resolve_feeds(feed_ids, lookup)
+
+    # Print summary to stderr
+    print(
+        f"Resolved {len(resolved)} feed(s), skipped {len(skipped)}:",
+        file=sys.stderr,
+    )
+    for msg in skipped:
+        print(f"  {msg}", file=sys.stderr)
+
+    if not resolved:
+        print("No benchmarkable feeds to write.", file=sys.stderr)
+        sys.exit(1)
+
+    # Write CSV
+    row_count = write_csv(resolved, dates, args.output)
+    print(f"Wrote {row_count} rows to {args.output}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()
