@@ -48,3 +48,41 @@ def load_symbols(path: Path) -> list[dict]:
 def build_lookup(symbols: list[dict]) -> dict[int, dict]:
     """Build a {pyth_lazer_id: entry} lookup dict."""
     return {entry["pyth_lazer_id"]: entry for entry in symbols}
+
+
+def resolve_feeds(
+    feed_ids: list[int], lookup: dict[int, dict]
+) -> tuple[dict[int, str], list[str]]:
+    """Resolve feed IDs to their CSV mode values.
+
+    Returns:
+        resolved: {feed_id: mode} for benchmarkable feeds
+        skipped: list of warning messages for skipped feeds
+    """
+    resolved: dict[int, str] = {}
+    skipped: list[str] = []
+
+    for fid in feed_ids:
+        if fid not in lookup:
+            skipped.append(f"Feed {fid}: not found in symbols file")
+            continue
+
+        entry = lookup[fid]
+        mode = resolve_feed_mode(entry)
+
+        if mode is None:
+            asset_type = entry.get("asset_type", "unknown")
+            symbol = entry.get("symbol", "")
+            if asset_type == "equity":
+                skipped.append(
+                    f"Feed {fid} ({symbol}): non-US equity, not benchmarkable"
+                )
+            else:
+                skipped.append(
+                    f"Feed {fid} ({symbol}): {asset_type} is not benchmarkable"
+                )
+            continue
+
+        resolved[fid] = mode
+
+    return resolved, skipped
