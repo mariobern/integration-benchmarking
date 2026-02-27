@@ -33,6 +33,9 @@ python feed_readiness.py --feed-id 922 --date 2026-02-10 --mode us-equities --pr
 
 # Detailed output (publisher rows + consistency section)
 python feed_readiness.py --feed-id 327 --date 2026-02-10 --mode fx --detailed
+
+# CSV batch with READY-only summary
+python feed_readiness.py --csv price_id_list.csv --summary
 ```
 
 ## Arguments
@@ -57,6 +60,7 @@ python feed_readiness.py --feed-id 327 --date 2026-02-10 --mode fx --detailed
 | `--include-asset-class`       | Only these classes (CSV mode)                          | All                          |
 | `--exclude-asset-class`       | Exclude these classes (CSV mode)                       | None                         |
 | `--filter-feed-id`            | Only these feed IDs (CSV mode)                         | All                          |
+| `--summary`                   | Write a summary CSV of READY feeds only                | Off                          |
 | `--list-asset-classes`        | List asset classes in CSV and exit                     | Off                          |
 
 ## Input Mode Rules
@@ -193,3 +197,41 @@ overnight    1/5    1           2            91.40%
 ```
 
 With multi-date and `--detailed`, a `PUBLISHER CONSISTENCY` report is also printed.
+
+## Summary CSV (`--summary`)
+
+When `--summary` is used, a second CSV is written containing only feeds with `ready=True`.
+The file uses a curated subset of columns for quick readability and sharing.
+
+**Default filename:** `feed_readiness_summary.csv` (or `<stem>_summary.csv` if `--output` is customized).
+
+### Columns (always present)
+
+| Column                     | Description                                            |
+| -------------------------- | ------------------------------------------------------ |
+| `feed_id`                  | Feed identifier                                        |
+| `symbol`                   | Human-readable symbol name                             |
+| `date`                     | Evaluation date                                        |
+| `mode`                     | Asset class                                            |
+| `fully_passing_count`      | Number of publishers passing both benchmark and uptime |
+| `target_pub_count`         | Required publisher threshold                           |
+| `median_nrmse`             | Median NRMSE across publishers                         |
+| `median_hit_rate`          | Median hit rate (%) across publishers                  |
+| `median_uptime_pct`        | Median uptime (%) for regular session                  |
+| `fully_passing_publishers` | Semicolon-separated publisher IDs                      |
+
+### Extended session columns (with `--extended-hours`)
+
+| Column                           | Description                    |
+| -------------------------------- | ------------------------------ |
+| `premarket_ready`                | Pre-market session readiness   |
+| `premarket_fully_passing_count`  | Publishers passing pre-market  |
+| `afterhours_ready`               | After-hours session readiness  |
+| `afterhours_fully_passing_count` | Publishers passing after-hours |
+
+### Overnight columns (with `--overnight`)
+
+| Column                          | Description                  |
+| ------------------------------- | ---------------------------- |
+| `overnight_ready`               | Overnight session readiness  |
+| `overnight_fully_passing_count` | Publishers passing overnight |
