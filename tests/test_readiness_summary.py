@@ -218,20 +218,20 @@ class TestWriteSummaryCsv:
         header, rows = _read_csv(out)
         # 10 base + 4 extended = 14
         assert len(header) == 14
+        assert "premarket_ready" in header
         assert "premarket_fully_passing_count" in header
-        assert "premarket_median_uptime_pct" in header
+        assert "afterhours_ready" in header
         assert "afterhours_fully_passing_count" in header
-        assert "afterhours_median_uptime_pct" in header
 
         row = rows[0]
+        pm_rd_idx = header.index("premarket_ready")
         pm_fp_idx = header.index("premarket_fully_passing_count")
-        pm_up_idx = header.index("premarket_median_uptime_pct")
+        ah_rd_idx = header.index("afterhours_ready")
         ah_fp_idx = header.index("afterhours_fully_passing_count")
-        ah_up_idx = header.index("afterhours_median_uptime_pct")
+        assert row[pm_rd_idx] == "True"
         assert row[pm_fp_idx] == "4"
-        assert row[pm_up_idx] == "98.5432"
+        assert row[ah_rd_idx] == "False"
         assert row[ah_fp_idx] == "2"
-        assert row[ah_up_idx] == "95.1234"
 
     def test_overnight_columns(self, tmp_path):
         """With include_overnight=True, verify 2 extra columns."""
@@ -249,14 +249,14 @@ class TestWriteSummaryCsv:
         header, rows = _read_csv(out)
         # 10 base + 2 overnight = 12
         assert len(header) == 12
+        assert "overnight_ready" in header
         assert "overnight_fully_passing_count" in header
-        assert "overnight_median_uptime_pct" in header
 
         row = rows[0]
+        on_rd_idx = header.index("overnight_ready")
         on_fp_idx = header.index("overnight_fully_passing_count")
-        on_up_idx = header.index("overnight_median_uptime_pct")
+        assert row[on_rd_idx] == "True"
         assert row[on_fp_idx] == "5"
-        assert row[on_up_idx] == "97.6543"
 
     def test_no_extended_columns_by_default(self, tmp_path):
         """Verify extended columns absent without flags."""
@@ -267,12 +267,12 @@ class TestWriteSummaryCsv:
         header, _ = _read_csv(out)
         assert len(header) == 10
         for col in [
+            "premarket_ready",
             "premarket_fully_passing_count",
-            "premarket_median_uptime_pct",
+            "afterhours_ready",
             "afterhours_fully_passing_count",
-            "afterhours_median_uptime_pct",
+            "overnight_ready",
             "overnight_fully_passing_count",
-            "overnight_median_uptime_pct",
         ]:
             assert col not in header
 

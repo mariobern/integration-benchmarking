@@ -632,17 +632,17 @@ def write_summary_csv(
     if include_extended_hours:
         header.extend(
             [
+                "premarket_ready",
                 "premarket_fully_passing_count",
-                "premarket_median_uptime_pct",
+                "afterhours_ready",
                 "afterhours_fully_passing_count",
-                "afterhours_median_uptime_pct",
             ]
         )
     if include_overnight:
         header.extend(
             [
+                "overnight_ready",
                 "overnight_fully_passing_count",
-                "overnight_median_uptime_pct",
             ]
         )
 
@@ -674,28 +674,28 @@ def write_summary_csv(
             if include_extended_hours:
                 row.extend(
                     [
+                        result.premarket_ready
+                        if result.premarket_ready is not None
+                        else "",
                         result.premarket_fully_passing_count
                         if result.premarket_fully_passing_count is not None
                         else "",
-                        f"{result.premarket_median_uptime_pct:.4f}"
-                        if result.premarket_median_uptime_pct is not None
+                        result.afterhours_ready
+                        if result.afterhours_ready is not None
                         else "",
                         result.afterhours_fully_passing_count
                         if result.afterhours_fully_passing_count is not None
-                        else "",
-                        f"{result.afterhours_median_uptime_pct:.4f}"
-                        if result.afterhours_median_uptime_pct is not None
                         else "",
                     ]
                 )
             if include_overnight:
                 row.extend(
                     [
+                        result.overnight_ready
+                        if result.overnight_ready is not None
+                        else "",
                         result.overnight_fully_passing_count
                         if result.overnight_fully_passing_count is not None
-                        else "",
-                        f"{result.overnight_median_uptime_pct:.4f}"
-                        if result.overnight_median_uptime_pct is not None
                         else "",
                     ]
                 )
