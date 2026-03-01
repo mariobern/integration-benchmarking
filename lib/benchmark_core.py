@@ -819,6 +819,7 @@ def evaluate_feed_two_queries(
                 session=TradingSession.PREMARKET,
                 min_observations=SESSION_MIN_OBSERVATIONS,
                 hit_rate_threshold=hit_rate_threshold,
+                tolerance_seconds=tolerance_seconds,
             )
             afterhours_results = evaluate_session_for_all_publishers(
                 client_lazer,
@@ -831,6 +832,7 @@ def evaluate_feed_two_queries(
                 session=TradingSession.AFTERHOURS,
                 min_observations=SESSION_MIN_OBSERVATIONS,
                 hit_rate_threshold=hit_rate_threshold,
+                tolerance_seconds=tolerance_seconds,
             )
 
             premarket_passing_count = sum(
@@ -865,6 +867,7 @@ def evaluate_feed_two_queries(
                 min_observations=SESSION_MIN_OBSERVATIONS,
                 reference_publisher_id=OVERNIGHT_REFERENCE_PUBLISHER_ID,
                 hit_rate_threshold=hit_rate_threshold,
+                tolerance_seconds=tolerance_seconds,
             )
 
             overnight_passing_count = sum(
