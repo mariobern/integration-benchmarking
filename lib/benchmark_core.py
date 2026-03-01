@@ -550,9 +550,6 @@ def evaluate_feed_two_queries(
     start_time = time.time()
     mode = normalize_asset_class(mode)
 
-    # Kept for signature compatibility; current implementation aligns by 1-second buckets.
-    _ = tolerance_seconds
-
     symbol, exponent = get_feed_metadata(client_lazer, feed_id)
     if exponent is None:
         return BenchmarkResult(
@@ -650,6 +647,7 @@ def evaluate_feed_two_queries(
             for row in bench_result.result_rows
             if row[1] is not None
         }
+        sorted_bench_ts = sorted(benchmark_by_ts.keys())
 
         all_publishers = {row[0] for row in pub_result.result_rows}
         publisher_metrics: dict[int, dict[str, list[float]]] = {
@@ -665,10 +663,13 @@ def evaluate_feed_two_queries(
         }
 
         for pub_id, ts, pub_price, _ in pub_result.result_rows:
-            if ts not in benchmark_by_ts:
+            match = find_nearest_benchmark(
+                sorted_bench_ts, benchmark_by_ts, ts, tolerance_seconds
+            )
+            if match is None:
                 continue
 
-            bench_price, spread = benchmark_by_ts[ts]
+            bench_price, spread = match
             diff = pub_price - bench_price
 
             pct_diff = abs(diff / bench_price) * 100 if bench_price else 0
