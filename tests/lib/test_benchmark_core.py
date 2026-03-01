@@ -293,6 +293,84 @@ class TestEvaluateFeedTwoQueries:
                     len(call.args) >= 3 and call.args[2] == "regular"
                 )
 
+    def test_tolerance_matching_finds_nearby_benchmark(self) -> None:
+        """Publisher timestamps offset by 30s from benchmark should still match."""
+        from lib.benchmark_core import evaluate_feed_two_queries
+        from datetime import datetime, timedelta
+
+        # 200 benchmark timestamps spaced 60s apart so each pub ts matches exactly one
+        base = datetime(2025, 10, 6, 14, 0, 0)
+        bench_ts = [base + timedelta(seconds=i * 60) for i in range(200)]
+        # Publisher timestamps offset by 30s from each benchmark
+        pub_ts = [t + timedelta(seconds=30) for t in bench_ts]
+
+        # Same price at position i for both publisher and benchmark so NRMSE ~ 0
+        pub_rows = [(55, ts, 1.08 + i * 0.0001, 5) for i, ts in enumerate(pub_ts)]
+        bench_rows = [(ts, 1.08 + i * 0.0001, 0.0001) for i, ts in enumerate(bench_ts)]
+
+        client_lazer = MagicMock()
+        client_lazer.query.side_effect = [
+            MockQueryResult(result_rows=[("FX.EURUSD/USD", -8)]),
+            MockQueryResult(result_rows=pub_rows),
+        ]
+
+        client_analytics = MagicMock()
+        client_analytics.query.return_value = MockQueryResult(result_rows=bench_rows)
+
+        result = evaluate_feed_two_queries(
+            client_lazer,
+            client_analytics,
+            327,
+            "2025-10-06",
+            "fx",
+            target_pub_count=1,
+            tolerance_seconds=60,
+            skip_scipy_tests=True,
+        )
+
+        # With 60s tolerance, all 200 pub timestamps should match benchmarks 30s away
+        assert result.ready is True
+        assert result.passing_pub_count == 1
+        details = result.publisher_details
+        assert details is not None
+        assert details[0].n_observations == 200
+
+    def test_tolerance_zero_is_exact_match(self) -> None:
+        """tolerance_seconds=0 should behave like exact matching."""
+        from lib.benchmark_core import evaluate_feed_two_queries
+        from datetime import datetime, timedelta
+
+        base = datetime(2025, 10, 6, 14, 0, 0)
+        bench_ts = [base + timedelta(seconds=i) for i in range(200)]
+        # Publisher timestamps offset by 1s — should NOT match with tolerance=0
+        pub_ts = [t + timedelta(seconds=1) for t in bench_ts]
+
+        pub_rows = [(55, ts, 1.08, 5) for ts in pub_ts]
+        bench_rows = [(ts, 1.08, 0.0001) for ts in bench_ts]
+
+        client_lazer = MagicMock()
+        client_lazer.query.side_effect = [
+            MockQueryResult(result_rows=[("FX.EURUSD/USD", -8)]),
+            MockQueryResult(result_rows=pub_rows),
+        ]
+
+        client_analytics = MagicMock()
+        client_analytics.query.return_value = MockQueryResult(result_rows=bench_rows)
+
+        result = evaluate_feed_two_queries(
+            client_lazer,
+            client_analytics,
+            327,
+            "2025-10-06",
+            "fx",
+            target_pub_count=1,
+            tolerance_seconds=0,
+            skip_scipy_tests=True,
+        )
+
+        # With tolerance=0, offset timestamps should not match
+        assert result.ready is False
+
 
 # ---------------------------------------------------------------------------
 # 5. evaluate_session_for_all_publishers — session parameter
@@ -381,6 +459,38 @@ class TestEvaluateSessionForAllPublishers:
 
         assert results == {}
 
+    def test_tolerance_matching_in_session(self) -> None:
+        from lib.benchmark_core import evaluate_session_for_all_publishers
+        from datetime import datetime, timedelta
+
+        # 100 benchmark timestamps spaced 60s apart
+        base = datetime(2025, 10, 6, 8, 0, 0)
+        bench_ts = [base + timedelta(seconds=i * 60) for i in range(100)]
+        # Publisher timestamps offset by 20s
+        pub_ts = [t + timedelta(seconds=20) for t in bench_ts]
+
+        pub_rows = [(55, ts, 100.0, 5) for ts in pub_ts]
+        bench_rows = [(ts, 100.0, 0.5) for ts in bench_ts]
+
+        client_lazer = _make_client(pub_rows)
+        client_analytics = _make_client(bench_rows)
+
+        results = evaluate_session_for_all_publishers(
+            client_lazer,
+            client_analytics,
+            feed_id=1163,
+            date="2025-10-06",
+            mode="us-equities",
+            divisor=1e8,
+            benchmark_table="datascope_global_equities_benchmark_data",
+            session=TradingSession.PREMARKET,
+            tolerance_seconds=60,
+        )
+
+        assert 55 in results
+        assert results[55].n_observations == 100
+        assert results[55].error is None
+
 
 # ---------------------------------------------------------------------------
 # 6. evaluate_overnight_for_all_publishers — overnight session
@@ -434,6 +544,39 @@ class TestEvaluateOvernightForAllPublishers:
         )
 
         assert results == {}
+
+    def test_tolerance_matching_overnight(self) -> None:
+        from lib.benchmark_core import evaluate_overnight_for_all_publishers
+        from datetime import datetime, timedelta
+
+        base = datetime(2025, 10, 6, 1, 0, 0)
+        # Reference publisher 32 timestamps spaced 60s apart
+        ref_ts = [base + timedelta(seconds=i * 60) for i in range(100)]
+        # Publisher 55 offset by 25s
+        pub_ts = [t + timedelta(seconds=25) for t in ref_ts]
+
+        pub_rows = [(55, ts, 100.0, 5) for ts in pub_ts] + [
+            (32, ts, 100.0, 5) for ts in ref_ts
+        ]
+        ref_rows = [(ts, 100.0, 0.5, 5) for ts in ref_ts]
+
+        client_lazer = MagicMock()
+        client_lazer.query.side_effect = [
+            MockQueryResult(result_rows=pub_rows),
+            MockQueryResult(result_rows=ref_rows),
+        ]
+
+        results = evaluate_overnight_for_all_publishers(
+            client_lazer,
+            feed_id=1163,
+            date="2025-10-06",
+            divisor=1e8,
+            tolerance_seconds=60,
+        )
+
+        assert 55 in results
+        assert results[55].n_observations == 100
+        assert results[55].error is None
 
     def test_reference_publisher_excluded_from_evaluation(self) -> None:
         from lib.benchmark_core import evaluate_overnight_for_all_publishers
@@ -520,3 +663,115 @@ class TestEdgeCases:
 
         assert result.ready is False
         assert "Connection refused" in (result.error or "")
+
+
+# ---------------------------------------------------------------------------
+# 8. find_nearest_benchmark — tolerance matching helper
+# ---------------------------------------------------------------------------
+class TestFindNearestBenchmark:
+    """Tests for bisect-based nearest benchmark lookup."""
+
+    def test_exact_match_returns_value(self) -> None:
+        from datetime import datetime
+
+        from lib.benchmark_core import find_nearest_benchmark
+
+        ts = datetime(2025, 10, 6, 14, 0, 0)
+        benchmark_by_ts = {ts: (1.08, 0.0001)}
+        sorted_ts = [ts]
+
+        result = find_nearest_benchmark(
+            sorted_ts, benchmark_by_ts, ts, tolerance_seconds=60
+        )
+        assert result == (1.08, 0.0001)
+
+    def test_within_tolerance_returns_nearest(self) -> None:
+        from datetime import datetime, timedelta
+
+        from lib.benchmark_core import find_nearest_benchmark
+
+        bench_ts = datetime(2025, 10, 6, 14, 0, 0)
+        target_ts = bench_ts + timedelta(seconds=30)
+        benchmark_by_ts = {bench_ts: (1.08, 0.0001)}
+        sorted_ts = [bench_ts]
+
+        result = find_nearest_benchmark(
+            sorted_ts, benchmark_by_ts, target_ts, tolerance_seconds=60
+        )
+        assert result == (1.08, 0.0001)
+
+    def test_outside_tolerance_returns_none(self) -> None:
+        from datetime import datetime, timedelta
+
+        from lib.benchmark_core import find_nearest_benchmark
+
+        bench_ts = datetime(2025, 10, 6, 14, 0, 0)
+        target_ts = bench_ts + timedelta(seconds=61)
+        benchmark_by_ts = {bench_ts: (1.08, 0.0001)}
+        sorted_ts = [bench_ts]
+
+        result = find_nearest_benchmark(
+            sorted_ts, benchmark_by_ts, target_ts, tolerance_seconds=60
+        )
+        assert result is None
+
+    def test_boundary_exactly_at_tolerance_returns_value(self) -> None:
+        from datetime import datetime, timedelta
+
+        from lib.benchmark_core import find_nearest_benchmark
+
+        bench_ts = datetime(2025, 10, 6, 14, 0, 0)
+        target_ts = bench_ts + timedelta(seconds=60)
+        benchmark_by_ts = {bench_ts: (1.08, 0.0001)}
+        sorted_ts = [bench_ts]
+
+        result = find_nearest_benchmark(
+            sorted_ts, benchmark_by_ts, target_ts, tolerance_seconds=60
+        )
+        assert result == (1.08, 0.0001)
+
+    def test_picks_closer_of_two_candidates(self) -> None:
+        from datetime import datetime, timedelta
+
+        from lib.benchmark_core import find_nearest_benchmark
+
+        ts1 = datetime(2025, 10, 6, 14, 0, 0)
+        ts2 = datetime(2025, 10, 6, 14, 1, 0)
+        target = datetime(2025, 10, 6, 14, 0, 20)  # closer to ts1
+        benchmark_by_ts = {ts1: (1.08, 0.0001), ts2: (1.09, 0.0002)}
+        sorted_ts = [ts1, ts2]
+
+        result = find_nearest_benchmark(
+            sorted_ts, benchmark_by_ts, target, tolerance_seconds=60
+        )
+        assert result == (1.08, 0.0001)
+
+    def test_empty_benchmark_returns_none(self) -> None:
+        from datetime import datetime
+
+        from lib.benchmark_core import find_nearest_benchmark
+
+        target = datetime(2025, 10, 6, 14, 0, 0)
+        result = find_nearest_benchmark([], {}, target, tolerance_seconds=60)
+        assert result is None
+
+    def test_tolerance_zero_requires_exact_match(self) -> None:
+        from datetime import datetime, timedelta
+
+        from lib.benchmark_core import find_nearest_benchmark
+
+        bench_ts = datetime(2025, 10, 6, 14, 0, 0)
+        target_exact = bench_ts
+        target_off = bench_ts + timedelta(seconds=1)
+        benchmark_by_ts = {bench_ts: (1.08, 0.0001)}
+        sorted_ts = [bench_ts]
+
+        assert find_nearest_benchmark(
+            sorted_ts, benchmark_by_ts, target_exact, tolerance_seconds=0
+        ) == (1.08, 0.0001)
+        assert (
+            find_nearest_benchmark(
+                sorted_ts, benchmark_by_ts, target_off, tolerance_seconds=0
+            )
+            is None
+        )

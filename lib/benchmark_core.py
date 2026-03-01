@@ -17,6 +17,7 @@ from __future__ import annotations
 import csv
 import statistics
 import time
+from bisect import bisect_left
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -46,6 +47,29 @@ from lib.sql_filters import (
 )
 from lib.statistics import compute_statistical_metrics
 from lib.thresholds import passes_benchmark
+
+
+def find_nearest_benchmark(
+    sorted_ts: list,
+    benchmark_by_ts: dict,
+    target_ts,
+    tolerance_seconds: int = 60,
+) -> tuple | None:
+    """Find nearest benchmark within tolerance. Returns (price, spread) or None."""
+    if not sorted_ts:
+        return None
+
+    idx = bisect_left(sorted_ts, target_ts)
+    candidates = []
+    if idx < len(sorted_ts):
+        candidates.append(sorted_ts[idx])
+    if idx > 0:
+        candidates.append(sorted_ts[idx - 1])
+
+    best = min(candidates, key=lambda t: abs((t - target_ts).total_seconds()))
+    if abs((best - target_ts).total_seconds()) <= tolerance_seconds:
+        return benchmark_by_ts[best]
+    return None
 
 
 def list_asset_classes_in_csv(csv_path: Path) -> dict[str, int]:
@@ -95,6 +119,7 @@ def evaluate_session_for_all_publishers(
     session: TradingSession,
     min_observations: int = SESSION_MIN_OBSERVATIONS,
     hit_rate_threshold: float = 95,
+    tolerance_seconds: int = 60,
 ) -> dict[int, ExtendedHoursMetrics]:
     """Evaluate one extended-hours session for all publishers in a feed."""
 
@@ -164,6 +189,7 @@ def evaluate_session_for_all_publishers(
             for row in bench_result.result_rows
             if row[1] is not None
         }
+        sorted_bench_ts = sorted(benchmark_by_ts.keys())
 
         publisher_metrics: dict[int, dict[str, list[float]]] = {
             pub_id: {
@@ -176,10 +202,13 @@ def evaluate_session_for_all_publishers(
         }
 
         for pub_id, ts, pub_price, _ in pub_result.result_rows:
-            if ts not in benchmark_by_ts:
+            match = find_nearest_benchmark(
+                sorted_bench_ts, benchmark_by_ts, ts, tolerance_seconds
+            )
+            if match is None:
                 continue
 
-            bench_price, spread = benchmark_by_ts[ts]
+            bench_price, spread = match
             diff = pub_price - bench_price
             pct_diff = abs(diff / bench_price) * 100 if bench_price else 0
 
@@ -288,6 +317,7 @@ def evaluate_overnight_for_all_publishers(
     min_observations: int = SESSION_MIN_OBSERVATIONS,
     reference_publisher_id: int = OVERNIGHT_REFERENCE_PUBLISHER_ID,
     hit_rate_threshold: float = 95,
+    tolerance_seconds: int = 60,
 ) -> dict[int, OvernightMetrics]:
     """Evaluate all publishers against overnight reference publisher 32."""
 
@@ -364,6 +394,7 @@ def evaluate_overnight_for_all_publishers(
                 )
                 reference_by_ts[ts] = (ref_price, spread)
 
+        sorted_ref_ts = sorted(reference_by_ts.keys())
         n_reference_observations = len(reference_by_ts)
 
         publisher_metrics: dict[int, dict[str, list[float]]] = {
@@ -380,10 +411,13 @@ def evaluate_overnight_for_all_publishers(
         for pub_id, ts, pub_price, _ in pub_result.result_rows:
             if pub_id == reference_publisher_id:
                 continue
-            if ts not in reference_by_ts:
+            match = find_nearest_benchmark(
+                sorted_ref_ts, reference_by_ts, ts, tolerance_seconds
+            )
+            if match is None:
                 continue
 
-            ref_price, spread = reference_by_ts[ts]
+            ref_price, spread = match
             diff = pub_price - ref_price
             pct_diff = abs(diff / ref_price) * 100 if ref_price else 0
 
@@ -526,9 +560,6 @@ def evaluate_feed_two_queries(
     start_time = time.time()
     mode = normalize_asset_class(mode)
 
-    # Kept for signature compatibility; current implementation aligns by 1-second buckets.
-    _ = tolerance_seconds
-
     symbol, exponent = get_feed_metadata(client_lazer, feed_id)
     if exponent is None:
         return BenchmarkResult(
@@ -626,6 +657,7 @@ def evaluate_feed_two_queries(
             for row in bench_result.result_rows
             if row[1] is not None
         }
+        sorted_bench_ts = sorted(benchmark_by_ts.keys())
 
         all_publishers = {row[0] for row in pub_result.result_rows}
         publisher_metrics: dict[int, dict[str, list[float]]] = {
@@ -641,10 +673,13 @@ def evaluate_feed_two_queries(
         }
 
         for pub_id, ts, pub_price, _ in pub_result.result_rows:
-            if ts not in benchmark_by_ts:
+            match = find_nearest_benchmark(
+                sorted_bench_ts, benchmark_by_ts, ts, tolerance_seconds
+            )
+            if match is None:
                 continue
 
-            bench_price, spread = benchmark_by_ts[ts]
+            bench_price, spread = match
             diff = pub_price - bench_price
 
             pct_diff = abs(diff / bench_price) * 100 if bench_price else 0
@@ -784,6 +819,7 @@ def evaluate_feed_two_queries(
                 session=TradingSession.PREMARKET,
                 min_observations=SESSION_MIN_OBSERVATIONS,
                 hit_rate_threshold=hit_rate_threshold,
+                tolerance_seconds=tolerance_seconds,
             )
             afterhours_results = evaluate_session_for_all_publishers(
                 client_lazer,
@@ -796,6 +832,7 @@ def evaluate_feed_two_queries(
                 session=TradingSession.AFTERHOURS,
                 min_observations=SESSION_MIN_OBSERVATIONS,
                 hit_rate_threshold=hit_rate_threshold,
+                tolerance_seconds=tolerance_seconds,
             )
 
             premarket_passing_count = sum(
@@ -830,6 +867,7 @@ def evaluate_feed_two_queries(
                 min_observations=SESSION_MIN_OBSERVATIONS,
                 reference_publisher_id=OVERNIGHT_REFERENCE_PUBLISHER_ID,
                 hit_rate_threshold=hit_rate_threshold,
+                tolerance_seconds=tolerance_seconds,
             )
 
             overnight_passing_count = sum(

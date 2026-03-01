@@ -139,6 +139,12 @@ Examples:
         help="Include overnight session for US equities",
     )
     parser.add_argument(
+        "--alignment-tolerance-sec",
+        type=int,
+        default=60,
+        help="Max seconds between publisher and benchmark timestamps for matching (default: 60)",
+    )
+    parser.add_argument(
         "--workers", type=int, default=4, help="Number of parallel workers (default: 4)"
     )
     parser.add_argument(
@@ -186,6 +192,8 @@ Examples:
         parser.error("--gap-threshold requires --precise")
     if args.uptime_threshold < 0 or args.uptime_threshold > 100:
         parser.error("--uptime-threshold must be between 0 and 100")
+    if args.alignment_tolerance_sec < 0:
+        parser.error("--alignment-tolerance-sec must be non-negative")
 
     if args.list_asset_classes:
         if not args.csv:
@@ -289,6 +297,7 @@ Examples:
             gap_threshold_ms=args.gap_threshold,
             uptime_threshold_pct=args.uptime_threshold,
             include_detailed=args.detailed,
+            tolerance_seconds=args.alignment_tolerance_sec,
         )
     else:
         work_items = [
@@ -307,6 +316,7 @@ Examples:
             gap_threshold_ms=args.gap_threshold,
             uptime_threshold_pct=args.uptime_threshold,
             include_detailed=args.detailed,
+            tolerance_seconds=args.alignment_tolerance_sec,
         )
 
     write_results_csv(
