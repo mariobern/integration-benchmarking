@@ -579,6 +579,7 @@ def evaluate_feed_readiness(
     gap_threshold_ms: int = DEFAULT_GAP_THRESHOLD_MS,
     uptime_threshold_pct: float = DEFAULT_UPTIME_THRESHOLD_PCT,
     include_detailed: bool = False,
+    tolerance_seconds: int = 60,
 ) -> FeedReadinessResult:
     start_time = time.time()
     normalized_mode = normalize_asset_class(mode)
@@ -592,6 +593,7 @@ def evaluate_feed_readiness(
                 date,
                 normalized_mode,
                 target_pub_count=target_pub_count,
+                tolerance_seconds=tolerance_seconds,
                 include_extended_hours=include_extended_hours,
                 include_overnight=include_overnight,
                 skip_scipy_tests=skip_scipy_tests,
@@ -698,6 +700,7 @@ def process_work_items(
     gap_threshold_ms: int = DEFAULT_GAP_THRESHOLD_MS,
     uptime_threshold_pct: float = DEFAULT_UPTIME_THRESHOLD_PCT,
     include_detailed: bool = False,
+    tolerance_seconds: int = 60,
 ) -> list[FeedReadinessResult]:
     if not work_items:
         print("Warning: No feeds to process")
@@ -726,6 +729,7 @@ def process_work_items(
                 gap_threshold_ms=gap_threshold_ms,
                 uptime_threshold_pct=uptime_threshold_pct,
                 include_detailed=include_detailed,
+                tolerance_seconds=tolerance_seconds,
             )
         except Exception as exc:
             return _make_error_result(
@@ -787,6 +791,7 @@ def process_csv(
     gap_threshold_ms: int = DEFAULT_GAP_THRESHOLD_MS,
     uptime_threshold_pct: float = DEFAULT_UPTIME_THRESHOLD_PCT,
     include_detailed: bool = False,
+    tolerance_seconds: int = 60,
 ) -> list[FeedReadinessResult]:
     include_normalized = None
     if include_asset_classes:
@@ -866,4 +871,5 @@ def process_csv(
         gap_threshold_ms=gap_threshold_ms,
         uptime_threshold_pct=uptime_threshold_pct,
         include_detailed=include_detailed,
+        tolerance_seconds=tolerance_seconds,
     )
