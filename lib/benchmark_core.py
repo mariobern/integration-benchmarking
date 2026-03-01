@@ -317,6 +317,7 @@ def evaluate_overnight_for_all_publishers(
     min_observations: int = SESSION_MIN_OBSERVATIONS,
     reference_publisher_id: int = OVERNIGHT_REFERENCE_PUBLISHER_ID,
     hit_rate_threshold: float = 95,
+    tolerance_seconds: int = 60,
 ) -> dict[int, OvernightMetrics]:
     """Evaluate all publishers against overnight reference publisher 32."""
 
@@ -393,6 +394,7 @@ def evaluate_overnight_for_all_publishers(
                 )
                 reference_by_ts[ts] = (ref_price, spread)
 
+        sorted_ref_ts = sorted(reference_by_ts.keys())
         n_reference_observations = len(reference_by_ts)
 
         publisher_metrics: dict[int, dict[str, list[float]]] = {
@@ -409,10 +411,13 @@ def evaluate_overnight_for_all_publishers(
         for pub_id, ts, pub_price, _ in pub_result.result_rows:
             if pub_id == reference_publisher_id:
                 continue
-            if ts not in reference_by_ts:
+            match = find_nearest_benchmark(
+                sorted_ref_ts, reference_by_ts, ts, tolerance_seconds
+            )
+            if match is None:
                 continue
 
-            ref_price, spread = reference_by_ts[ts]
+            ref_price, spread = match
             diff = pub_price - ref_price
             pct_diff = abs(diff / ref_price) * 100 if ref_price else 0
 
