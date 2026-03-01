@@ -520,3 +520,115 @@ class TestEdgeCases:
 
         assert result.ready is False
         assert "Connection refused" in (result.error or "")
+
+
+# ---------------------------------------------------------------------------
+# 8. find_nearest_benchmark — tolerance matching helper
+# ---------------------------------------------------------------------------
+class TestFindNearestBenchmark:
+    """Tests for bisect-based nearest benchmark lookup."""
+
+    def test_exact_match_returns_value(self) -> None:
+        from datetime import datetime
+
+        from lib.benchmark_core import find_nearest_benchmark
+
+        ts = datetime(2025, 10, 6, 14, 0, 0)
+        benchmark_by_ts = {ts: (1.08, 0.0001)}
+        sorted_ts = [ts]
+
+        result = find_nearest_benchmark(
+            sorted_ts, benchmark_by_ts, ts, tolerance_seconds=60
+        )
+        assert result == (1.08, 0.0001)
+
+    def test_within_tolerance_returns_nearest(self) -> None:
+        from datetime import datetime, timedelta
+
+        from lib.benchmark_core import find_nearest_benchmark
+
+        bench_ts = datetime(2025, 10, 6, 14, 0, 0)
+        target_ts = bench_ts + timedelta(seconds=30)
+        benchmark_by_ts = {bench_ts: (1.08, 0.0001)}
+        sorted_ts = [bench_ts]
+
+        result = find_nearest_benchmark(
+            sorted_ts, benchmark_by_ts, target_ts, tolerance_seconds=60
+        )
+        assert result == (1.08, 0.0001)
+
+    def test_outside_tolerance_returns_none(self) -> None:
+        from datetime import datetime, timedelta
+
+        from lib.benchmark_core import find_nearest_benchmark
+
+        bench_ts = datetime(2025, 10, 6, 14, 0, 0)
+        target_ts = bench_ts + timedelta(seconds=61)
+        benchmark_by_ts = {bench_ts: (1.08, 0.0001)}
+        sorted_ts = [bench_ts]
+
+        result = find_nearest_benchmark(
+            sorted_ts, benchmark_by_ts, target_ts, tolerance_seconds=60
+        )
+        assert result is None
+
+    def test_boundary_exactly_at_tolerance_returns_value(self) -> None:
+        from datetime import datetime, timedelta
+
+        from lib.benchmark_core import find_nearest_benchmark
+
+        bench_ts = datetime(2025, 10, 6, 14, 0, 0)
+        target_ts = bench_ts + timedelta(seconds=60)
+        benchmark_by_ts = {bench_ts: (1.08, 0.0001)}
+        sorted_ts = [bench_ts]
+
+        result = find_nearest_benchmark(
+            sorted_ts, benchmark_by_ts, target_ts, tolerance_seconds=60
+        )
+        assert result == (1.08, 0.0001)
+
+    def test_picks_closer_of_two_candidates(self) -> None:
+        from datetime import datetime, timedelta
+
+        from lib.benchmark_core import find_nearest_benchmark
+
+        ts1 = datetime(2025, 10, 6, 14, 0, 0)
+        ts2 = datetime(2025, 10, 6, 14, 1, 0)
+        target = datetime(2025, 10, 6, 14, 0, 20)  # closer to ts1
+        benchmark_by_ts = {ts1: (1.08, 0.0001), ts2: (1.09, 0.0002)}
+        sorted_ts = [ts1, ts2]
+
+        result = find_nearest_benchmark(
+            sorted_ts, benchmark_by_ts, target, tolerance_seconds=60
+        )
+        assert result == (1.08, 0.0001)
+
+    def test_empty_benchmark_returns_none(self) -> None:
+        from datetime import datetime
+
+        from lib.benchmark_core import find_nearest_benchmark
+
+        target = datetime(2025, 10, 6, 14, 0, 0)
+        result = find_nearest_benchmark([], {}, target, tolerance_seconds=60)
+        assert result is None
+
+    def test_tolerance_zero_requires_exact_match(self) -> None:
+        from datetime import datetime, timedelta
+
+        from lib.benchmark_core import find_nearest_benchmark
+
+        bench_ts = datetime(2025, 10, 6, 14, 0, 0)
+        target_exact = bench_ts
+        target_off = bench_ts + timedelta(seconds=1)
+        benchmark_by_ts = {bench_ts: (1.08, 0.0001)}
+        sorted_ts = [bench_ts]
+
+        assert find_nearest_benchmark(
+            sorted_ts, benchmark_by_ts, target_exact, tolerance_seconds=0
+        ) == (1.08, 0.0001)
+        assert (
+            find_nearest_benchmark(
+                sorted_ts, benchmark_by_ts, target_off, tolerance_seconds=0
+            )
+            is None
+        )

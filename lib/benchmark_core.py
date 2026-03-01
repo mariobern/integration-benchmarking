@@ -17,6 +17,7 @@ from __future__ import annotations
 import csv
 import statistics
 import time
+from bisect import bisect_left
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -46,6 +47,29 @@ from lib.sql_filters import (
 )
 from lib.statistics import compute_statistical_metrics
 from lib.thresholds import passes_benchmark
+
+
+def find_nearest_benchmark(
+    sorted_ts: list,
+    benchmark_by_ts: dict,
+    target_ts,
+    tolerance_seconds: int = 60,
+) -> tuple | None:
+    """Find nearest benchmark within tolerance. Returns (price, spread) or None."""
+    if not sorted_ts:
+        return None
+
+    idx = bisect_left(sorted_ts, target_ts)
+    candidates = []
+    if idx < len(sorted_ts):
+        candidates.append(sorted_ts[idx])
+    if idx > 0:
+        candidates.append(sorted_ts[idx - 1])
+
+    best = min(candidates, key=lambda t: abs((t - target_ts).total_seconds()))
+    if abs((best - target_ts).total_seconds()) <= tolerance_seconds:
+        return benchmark_by_ts[best]
+    return None
 
 
 def list_asset_classes_in_csv(csv_path: Path) -> dict[str, int]:
