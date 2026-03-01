@@ -119,6 +119,7 @@ def evaluate_session_for_all_publishers(
     session: TradingSession,
     min_observations: int = SESSION_MIN_OBSERVATIONS,
     hit_rate_threshold: float = 95,
+    tolerance_seconds: int = 60,
 ) -> dict[int, ExtendedHoursMetrics]:
     """Evaluate one extended-hours session for all publishers in a feed."""
 
@@ -188,6 +189,7 @@ def evaluate_session_for_all_publishers(
             for row in bench_result.result_rows
             if row[1] is not None
         }
+        sorted_bench_ts = sorted(benchmark_by_ts.keys())
 
         publisher_metrics: dict[int, dict[str, list[float]]] = {
             pub_id: {
@@ -200,10 +202,13 @@ def evaluate_session_for_all_publishers(
         }
 
         for pub_id, ts, pub_price, _ in pub_result.result_rows:
-            if ts not in benchmark_by_ts:
+            match = find_nearest_benchmark(
+                sorted_bench_ts, benchmark_by_ts, ts, tolerance_seconds
+            )
+            if match is None:
                 continue
 
-            bench_price, spread = benchmark_by_ts[ts]
+            bench_price, spread = match
             diff = pub_price - bench_price
             pct_diff = abs(diff / bench_price) * 100 if bench_price else 0
 

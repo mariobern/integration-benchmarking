@@ -459,6 +459,38 @@ class TestEvaluateSessionForAllPublishers:
 
         assert results == {}
 
+    def test_tolerance_matching_in_session(self) -> None:
+        from lib.benchmark_core import evaluate_session_for_all_publishers
+        from datetime import datetime, timedelta
+
+        # 100 benchmark timestamps spaced 60s apart
+        base = datetime(2025, 10, 6, 8, 0, 0)
+        bench_ts = [base + timedelta(seconds=i * 60) for i in range(100)]
+        # Publisher timestamps offset by 20s
+        pub_ts = [t + timedelta(seconds=20) for t in bench_ts]
+
+        pub_rows = [(55, ts, 100.0, 5) for ts in pub_ts]
+        bench_rows = [(ts, 100.0, 0.5) for ts in bench_ts]
+
+        client_lazer = _make_client(pub_rows)
+        client_analytics = _make_client(bench_rows)
+
+        results = evaluate_session_for_all_publishers(
+            client_lazer,
+            client_analytics,
+            feed_id=1163,
+            date="2025-10-06",
+            mode="us-equities",
+            divisor=1e8,
+            benchmark_table="datascope_global_equities_benchmark_data",
+            session=TradingSession.PREMARKET,
+            tolerance_seconds=60,
+        )
+
+        assert 55 in results
+        assert results[55].n_observations == 100
+        assert results[55].error is None
+
 
 # ---------------------------------------------------------------------------
 # 6. evaluate_overnight_for_all_publishers — overnight session
@@ -512,6 +544,39 @@ class TestEvaluateOvernightForAllPublishers:
         )
 
         assert results == {}
+
+    def test_tolerance_matching_overnight(self) -> None:
+        from lib.benchmark_core import evaluate_overnight_for_all_publishers
+        from datetime import datetime, timedelta
+
+        base = datetime(2025, 10, 6, 1, 0, 0)
+        # Reference publisher 32 timestamps spaced 60s apart
+        ref_ts = [base + timedelta(seconds=i * 60) for i in range(100)]
+        # Publisher 55 offset by 25s
+        pub_ts = [t + timedelta(seconds=25) for t in ref_ts]
+
+        pub_rows = [(55, ts, 100.0, 5) for ts in pub_ts] + [
+            (32, ts, 100.0, 5) for ts in ref_ts
+        ]
+        ref_rows = [(ts, 100.0, 0.5, 5) for ts in ref_ts]
+
+        client_lazer = MagicMock()
+        client_lazer.query.side_effect = [
+            MockQueryResult(result_rows=pub_rows),
+            MockQueryResult(result_rows=ref_rows),
+        ]
+
+        results = evaluate_overnight_for_all_publishers(
+            client_lazer,
+            feed_id=1163,
+            date="2025-10-06",
+            divisor=1e8,
+            tolerance_seconds=60,
+        )
+
+        assert 55 in results
+        assert results[55].n_observations == 100
+        assert results[55].error is None
 
     def test_reference_publisher_excluded_from_evaluation(self) -> None:
         from lib.benchmark_core import evaluate_overnight_for_all_publishers
