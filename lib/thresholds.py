@@ -1,8 +1,9 @@
-"""Per-session pass/fail thresholds for benchmark evaluation.
+"""Per-session and per-asset-class pass/fail thresholds for benchmark evaluation.
 
-US Equities extended hours (pre-market, after-hours, overnight) use
-relaxed thresholds due to lower liquidity and wider spreads.
-All other asset classes use regular thresholds regardless of session.
+Three threshold tiers:
+- REGULAR: fx, us-equities (regular session), us-treasuries
+- RELAXED: commodity, metals (lower liquidity, wider spreads)
+- EXTENDED: us-equities pre-market, after-hours, overnight
 """
 
 from __future__ import annotations
@@ -34,6 +35,14 @@ EXTENDED_THRESHOLDS = SessionThresholds(
 
 _EXTENDED_SESSIONS = {"premarket", "afterhours", "overnight"}
 
+RELAXED_THRESHOLDS = SessionThresholds(
+    nrmse_auto_pass=0.05,
+    nrmse_conditional=0.15,
+    hit_rate_threshold=85,
+)
+
+_RELAXED_ASSET_CLASSES = {"commodity", "metals"}
+
 
 def get_session_thresholds(
     session: str,
@@ -42,11 +51,17 @@ def get_session_thresholds(
 ) -> SessionThresholds:
     """Look up the correct thresholds for a session + asset class.
 
+    Priority:
+        1. US equities extended sessions -> EXTENDED_THRESHOLDS (fixed)
+        2. Commodity / metals -> RELAXED_THRESHOLDS
+        3. CLI hit_rate_override -> regular or relaxed NRMSE with custom hit rate
+        4. Everything else -> REGULAR_THRESHOLDS
+
     Args:
         session: One of "regular", "premarket", "afterhours", "overnight".
         mode: Asset class identifier (e.g. "us-equities", "fx", "metals").
-        hit_rate_override: Optional CLI override for the regular session
-            hit rate threshold. Ignored for extended sessions.
+        hit_rate_override: Optional CLI override for the hit rate threshold.
+            Applies to regular and relaxed tiers. Ignored for extended sessions.
 
     Returns:
         The applicable ``SessionThresholds`` for the given combination.
@@ -55,6 +70,15 @@ def get_session_thresholds(
 
     if is_us_equities and session in _EXTENDED_SESSIONS:
         return EXTENDED_THRESHOLDS
+
+    if mode in _RELAXED_ASSET_CLASSES:
+        if hit_rate_override is not None:
+            return SessionThresholds(
+                nrmse_auto_pass=RELAXED_THRESHOLDS.nrmse_auto_pass,
+                nrmse_conditional=RELAXED_THRESHOLDS.nrmse_conditional,
+                hit_rate_threshold=hit_rate_override,
+            )
+        return RELAXED_THRESHOLDS
 
     if hit_rate_override is not None:
         return SessionThresholds(
@@ -96,4 +120,23 @@ def passes_benchmark(
     t = get_session_thresholds(session, mode, hit_rate_override)
     return nrmse < t.nrmse_auto_pass or (
         nrmse < t.nrmse_conditional and hit_rate >= t.hit_rate_threshold
+    )
+
+
+def get_threshold_description(mode: str) -> str:
+    """Return human-readable pass criteria string for the given asset class.
+
+    Used by output modules to display the correct thresholds dynamically
+    instead of hardcoding threshold values.
+
+    Args:
+        mode: Asset class identifier (e.g. "us-equities", "commodity").
+
+    Returns:
+        Formatted string like "nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 95%)".
+    """
+    t = get_session_thresholds("regular", mode)
+    return (
+        f"nrmse < {t.nrmse_auto_pass} OR "
+        f"(nrmse < {t.nrmse_conditional} AND hit_rate >= {t.hit_rate_threshold}%)"
     )

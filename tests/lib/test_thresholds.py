@@ -5,8 +5,10 @@ import pytest
 from lib.thresholds import (
     EXTENDED_THRESHOLDS,
     REGULAR_THRESHOLDS,
+    RELAXED_THRESHOLDS,
     SessionThresholds,
     get_session_thresholds,
+    get_threshold_description,
     passes_benchmark,
 )
 
@@ -23,6 +25,20 @@ class TestSessionThresholds:
         assert EXTENDED_THRESHOLDS.nrmse_auto_pass == 0.05
         assert EXTENDED_THRESHOLDS.nrmse_conditional == 0.15
         assert EXTENDED_THRESHOLDS.hit_rate_threshold == 85
+
+
+class TestRelaxedThresholds:
+    """Verify RELAXED_THRESHOLDS constant values."""
+
+    def test_relaxed_thresholds_values(self) -> None:
+        assert RELAXED_THRESHOLDS.nrmse_auto_pass == 0.05
+        assert RELAXED_THRESHOLDS.nrmse_conditional == 0.15
+        assert RELAXED_THRESHOLDS.hit_rate_threshold == 85
+
+    def test_relaxed_is_separate_from_extended(self) -> None:
+        """RELAXED and EXTENDED have same values but are different objects."""
+        assert RELAXED_THRESHOLDS == EXTENDED_THRESHOLDS
+        assert RELAXED_THRESHOLDS is not EXTENDED_THRESHOLDS
 
 
 class TestGetSessionThresholds:
@@ -57,10 +73,30 @@ class TestGetSessionThresholds:
             t = get_session_thresholds(session, "fx")
             assert t == REGULAR_THRESHOLDS, f"fx/{session} should use regular"
 
-    def test_metals_always_regular(self) -> None:
-        for session in ("regular", "premarket", "afterhours", "overnight"):
-            t = get_session_thresholds(session, "metals")
-            assert t == REGULAR_THRESHOLDS, f"metals/{session} should use regular"
+    def test_commodity_regular_uses_relaxed(self) -> None:
+        t = get_session_thresholds("regular", "commodity")
+        assert t == RELAXED_THRESHOLDS
+
+    def test_metals_regular_uses_relaxed(self) -> None:
+        t = get_session_thresholds("regular", "metals")
+        assert t == RELAXED_THRESHOLDS
+
+    def test_us_treasuries_always_regular(self) -> None:
+        t = get_session_thresholds("regular", "us-treasuries")
+        assert t == REGULAR_THRESHOLDS
+
+    def test_custom_hit_rate_override_relaxed(self) -> None:
+        """CLI --hit-rate-threshold applies to relaxed asset classes too."""
+        t = get_session_thresholds("regular", "commodity", hit_rate_override=80.0)
+        assert t.nrmse_auto_pass == RELAXED_THRESHOLDS.nrmse_auto_pass
+        assert t.nrmse_conditional == RELAXED_THRESHOLDS.nrmse_conditional
+        assert t.hit_rate_threshold == 80.0
+
+    def test_custom_hit_rate_override_metals(self) -> None:
+        t = get_session_thresholds("regular", "metals", hit_rate_override=80.0)
+        assert t.nrmse_auto_pass == RELAXED_THRESHOLDS.nrmse_auto_pass
+        assert t.nrmse_conditional == RELAXED_THRESHOLDS.nrmse_conditional
+        assert t.hit_rate_threshold == 80.0
 
     # CLI override for hit rate
     def test_custom_hit_rate_override(self) -> None:
@@ -146,3 +182,59 @@ class TestPassesBenchmark:
     def test_boundary_hit_rate_95_regular(self) -> None:
         """Exactly 95% hit rate passes regular conditional (>=)."""
         assert passes_benchmark(nrmse=0.03, hit_rate=95.0, session="regular") is True
+
+    # ---- Relaxed asset classes (commodity, metals) ----
+    def test_commodity_auto_pass(self) -> None:
+        """nrmse=0.04 auto-passes for commodity (< 0.05) but NOT for fx (>= 0.01)."""
+        assert passes_benchmark(nrmse=0.04, hit_rate=50.0, mode="commodity") is True
+        assert passes_benchmark(nrmse=0.04, hit_rate=50.0, mode="fx") is False
+
+    def test_metals_auto_pass(self) -> None:
+        assert passes_benchmark(nrmse=0.04, hit_rate=50.0, mode="metals") is True
+
+    def test_commodity_conditional_pass(self) -> None:
+        """nrmse=0.10 with hit_rate=90 passes commodity (< 0.15 AND >= 85)."""
+        assert passes_benchmark(nrmse=0.10, hit_rate=90.0, mode="commodity") is True
+
+    def test_commodity_conditional_fail_low_hit_rate(self) -> None:
+        """nrmse=0.10 with hit_rate=80 fails commodity (< 85)."""
+        assert passes_benchmark(nrmse=0.10, hit_rate=80.0, mode="commodity") is False
+
+    def test_commodity_fail_high_nrmse(self) -> None:
+        """nrmse=0.20 fails commodity (>= 0.15)."""
+        assert passes_benchmark(nrmse=0.20, hit_rate=99.0, mode="commodity") is False
+
+    def test_metals_conditional_pass(self) -> None:
+        assert passes_benchmark(nrmse=0.10, hit_rate=85.0, mode="metals") is True
+
+    def test_boundary_nrmse_0_05_relaxed(self) -> None:
+        """Exactly 0.05 does NOT auto-pass relaxed (strict <)."""
+        assert passes_benchmark(nrmse=0.05, hit_rate=85.0, mode="commodity") is True
+        assert passes_benchmark(nrmse=0.05, hit_rate=84.9, mode="commodity") is False
+
+
+class TestGetThresholdDescription:
+    """Verify the human-readable threshold description strings."""
+
+    def test_regular_description(self) -> None:
+        desc = get_threshold_description("fx")
+        assert "0.01" in desc
+        assert "0.05" in desc
+        assert "95" in desc
+
+    def test_relaxed_description(self) -> None:
+        desc = get_threshold_description("commodity")
+        assert "0.05" in desc
+        assert "0.15" in desc
+        assert "85" in desc
+
+    def test_metals_description(self) -> None:
+        desc = get_threshold_description("metals")
+        assert "0.15" in desc
+        assert "85" in desc
+
+    def test_us_equities_regular_description(self) -> None:
+        desc = get_threshold_description("us-equities")
+        assert "0.01" in desc
+        assert "0.05" in desc
+        assert "95" in desc
