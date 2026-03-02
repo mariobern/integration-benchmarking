@@ -607,3 +607,117 @@ class TestWriteResultsCsvSessionConsistency:
         content = path.read_text()
         assert "PREMARKET PUBLISHER CONSISTENCY" not in content
         path.unlink()
+
+    def test_results_csv_includes_session_publisher_list_columns_and_values(self):
+        details = [
+            make_detail(
+                publisher_id=12,
+                fully_passes=True,
+                benchmark_passes=True,
+                uptime_passes=True,
+            )
+        ]
+        result = make_result(feed_id=922, date="2026-02-17", details=details)
+        result.premarket_ready = True
+        result.premarket_benchmark_passing_count = 3
+        result.premarket_uptime_passing_count = 3
+        result.premarket_uptime_failing_count = 0
+        result.premarket_median_uptime_pct = 99.1000
+        result.premarket_fully_passing_count = 3
+        result.premarket_fully_passing_publishers = [12, 13, 19]
+
+        result.afterhours_ready = False
+        result.afterhours_benchmark_passing_count = 2
+        result.afterhours_uptime_passing_count = 2
+        result.afterhours_uptime_failing_count = 1
+        result.afterhours_median_uptime_pct = 96.2000
+        result.afterhours_fully_passing_count = 2
+        result.afterhours_fully_passing_publishers = [42, 55]
+
+        result.overnight_ready = True
+        result.overnight_benchmark_passing_count = 4
+        result.overnight_uptime_passing_count = 4
+        result.overnight_uptime_failing_count = 0
+        result.overnight_median_uptime_pct = 94.9000
+        result.overnight_fully_passing_count = 4
+        result.overnight_fully_passing_publishers = [7, 8, 9, 10]
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+            path = Path(f.name)
+        write_results_csv(
+            [result],
+            path,
+            include_extended_hours=True,
+            include_overnight=True,
+            include_detailed=False,
+        )
+
+        with open(path) as f:
+            rows = list(csv.reader(f))
+        header = rows[0]
+        row = rows[1]
+
+        pm_count_idx = header.index("premarket_fully_passing_count")
+        pm_pub_idx = header.index("premarket_fully_passing_publishers")
+        ah_count_idx = header.index("afterhours_fully_passing_count")
+        ah_pub_idx = header.index("afterhours_fully_passing_publishers")
+        on_count_idx = header.index("overnight_fully_passing_count")
+        on_pub_idx = header.index("overnight_fully_passing_publishers")
+
+        assert pm_pub_idx == pm_count_idx + 1
+        assert ah_pub_idx == ah_count_idx + 1
+        assert on_pub_idx == on_count_idx + 1
+
+        assert row[pm_count_idx] == "3"
+        assert row[pm_pub_idx] == "12;13;19"
+        assert row[ah_count_idx] == "2"
+        assert row[ah_pub_idx] == "42;55"
+        assert row[on_count_idx] == "4"
+        assert row[on_pub_idx] == "7;8;9;10"
+        path.unlink()
+
+    def test_results_csv_writes_empty_session_publisher_lists_when_missing(self):
+        details = [
+            make_detail(
+                publisher_id=12,
+                fully_passes=False,
+                benchmark_passes=False,
+                uptime_passes=False,
+            )
+        ]
+        result = make_result(feed_id=922, date="2026-02-17", details=details)
+        result.premarket_ready = False
+        result.premarket_fully_passing_count = 0
+        result.premarket_fully_passing_publishers = []
+
+        result.afterhours_ready = False
+        result.afterhours_fully_passing_count = 0
+        result.afterhours_fully_passing_publishers = None
+
+        result.overnight_ready = False
+        result.overnight_fully_passing_count = 0
+        result.overnight_fully_passing_publishers = None
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+            path = Path(f.name)
+        write_results_csv(
+            [result],
+            path,
+            include_extended_hours=True,
+            include_overnight=True,
+            include_detailed=False,
+        )
+
+        with open(path) as f:
+            rows = list(csv.reader(f))
+        header = rows[0]
+        row = rows[1]
+
+        pm_pub_idx = header.index("premarket_fully_passing_publishers")
+        ah_pub_idx = header.index("afterhours_fully_passing_publishers")
+        on_pub_idx = header.index("overnight_fully_passing_publishers")
+
+        assert row[pm_pub_idx] == ""
+        assert row[ah_pub_idx] == ""
+        assert row[on_pub_idx] == ""
+        path.unlink()

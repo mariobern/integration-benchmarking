@@ -296,3 +296,32 @@ class TestWriteSummaryCsv:
         assert row[7] == ""  # median_hit_rate
         assert row[8] == ""  # median_uptime_pct
         assert row[9] == ""  # fully_passing_publishers (empty list)
+
+    def test_empty_session_publisher_lists_render_empty(self, tmp_path):
+        """Session publisher list columns should be empty when values are []/None."""
+        results = [
+            _make_result(
+                premarket_ready=False,
+                premarket_fully_passing_count=0,
+                premarket_fully_passing_publishers=[],
+                afterhours_ready=False,
+                afterhours_fully_passing_count=0,
+                afterhours_fully_passing_publishers=None,
+                overnight_ready=False,
+                overnight_fully_passing_count=0,
+                overnight_fully_passing_publishers=None,
+            )
+        ]
+        out = tmp_path / "summary.csv"
+        write_summary_csv(
+            results,
+            out,
+            include_extended_hours=True,
+            include_overnight=True,
+        )
+
+        header, rows = _read_csv(out)
+        row = rows[0]
+        assert row[header.index("premarket_fully_passing_publishers")] == ""
+        assert row[header.index("afterhours_fully_passing_publishers")] == ""
+        assert row[header.index("overnight_fully_passing_publishers")] == ""
