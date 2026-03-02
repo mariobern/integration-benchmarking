@@ -20,12 +20,13 @@ cp config.yaml.sample config.yaml  # then fill in ClickHouse credentials
 
 ### Per-Session Thresholds
 
-| Session                                    | nrmse_auto_pass | nrmse_conditional | hit_rate_threshold |
+| Session / Asset Class                      | nrmse_auto_pass | nrmse_conditional | hit_rate_threshold |
 | ------------------------------------------ | --------------- | ----------------- | ------------------ |
-| Regular (all asset classes)                | 0.01            | 0.05              | 95%                |
+| Regular (fx, us-equities, us-treasuries)   | 0.01            | 0.05              | 95%                |
+| Relaxed (commodity, metals)                | 0.05            | 0.15              | 85%                |
 | Extended (US equities pre/after/overnight) | 0.05            | 0.15              | 85%                |
 
-Thresholds are defined in `lib/thresholds.py`. The `--hit-rate-threshold` CLI flag overrides the regular session hit rate only; extended session thresholds are fixed.
+Thresholds are defined in `lib/thresholds.py`. The `--hit-rate-threshold` CLI flag overrides the hit rate for regular and relaxed tiers; extended session thresholds are fixed.
 
 ## Database Configuration
 

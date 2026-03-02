@@ -93,6 +93,12 @@ Publisher bucket classification:
 
 Publishers missing from one side are treated as failing that side.
 
+### Asset-Class Thresholds
+
+Commodity and metals feeds use relaxed benchmark thresholds (NRMSE auto-pass < 0.05,
+conditional < 0.15, hit rate >= 85%) due to lower liquidity and wider spreads. This is
+automatic — no CLI flag needed. See `lib/thresholds.py` for the full routing logic.
+
 ## Benchmarkable Modes
 
 Benchmark checks run only for benchmarkable asset classes (`fx`, `metals`, `us-equities`, `commodity`, `us-treasuries`).
