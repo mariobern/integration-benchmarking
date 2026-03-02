@@ -56,6 +56,7 @@ from lib.publisher_output import (
     print_interpretation_guide,
     write_results_csv,
 )
+from lib.thresholds import get_session_thresholds, get_threshold_description
 
 
 def main():
@@ -314,15 +315,16 @@ Examples:
     print(f"\n{'='*70}")
     print(f"SUMMARY - Publisher {publisher_id}")
     print(f"{'='*70}")
-    print(
-        f"Pass criteria: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= {args.hit_rate_threshold}%)"
-    )
+    modes = {r.mode for r in results if r.mode}
+    primary_mode = next(iter(modes)) if len(modes) == 1 else "us-equities"
+    print(f"Pass criteria: {get_threshold_description(primary_mode)}")
     print(f"{'='*70}")
     print(f"Total feeds evaluated: {summary_stats['total_feeds']}")
     print(f"PASS: {summary_stats['pass_count']}")
     print(f"  - by nrmse < 0.01 alone: {summary_stats['pass_by_nrmse_alone']}")
+    t = get_session_thresholds("regular", primary_mode)
     print(
-        f"  - by nrmse < 0.05 + hit_rate >= {args.hit_rate_threshold}%: {summary_stats['pass_by_nrmse_and_hit_rate']}"
+        f"  - by nrmse < {t.nrmse_conditional} + hit_rate >= {t.hit_rate_threshold}%: {summary_stats['pass_by_nrmse_and_hit_rate']}"
     )
     print(f"FAIL: {summary_stats['fail_count']}")
     print(f"Errors: {summary_stats['error_count']}")
@@ -488,7 +490,7 @@ Examples:
                 print("  No overnight data available")
 
     print_interpretation_guide(
-        summary_stats, hit_rate_threshold=args.hit_rate_threshold
+        summary_stats, hit_rate_threshold=args.hit_rate_threshold, mode=primary_mode
     )
 
 

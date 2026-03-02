@@ -29,6 +29,7 @@ from lib.models import (
     TradingSession,
 )
 from lib.statistics import distribution_stats
+from lib.thresholds import get_threshold_description
 
 
 def compute_publisher_summary(
@@ -703,7 +704,7 @@ def compute_summary_stats(
 
 
 def print_interpretation_guide(
-    summary_stats: dict, hit_rate_threshold: float = 95
+    summary_stats: dict, hit_rate_threshold: float = 95, mode: str = "us-equities"
 ) -> None:
     """Print a concise interpretation guide for feed-level results."""
 
@@ -711,9 +712,7 @@ def print_interpretation_guide(
     print("INTERPRETATION GUIDE")
     print(f"{'='*70}")
 
-    print(
-        f"PASS criteria per publisher: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= {hit_rate_threshold}%)"
-    )
+    print(f"PASS criteria per publisher: {get_threshold_description(mode)}")
     print("Feed is READY when passing publishers >= target publisher count.")
 
     median_nrmse = summary_stats.get("nrmse", {}).get("median")
@@ -837,9 +836,13 @@ def print_console_summary(
     print(f"\n{'='*70}")
     print("PASS/FAIL CRITERIA")
     print(f"{'='*70}")
-    print(
-        f"Publisher passes if: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= {hit_rate_threshold}%)"
-    )
+    modes = {r.mode for r in results if r.mode}
+    if len(modes) == 1:
+        print(f"Publisher passes if: {get_threshold_description(next(iter(modes)))}")
+    else:
+        print("Publisher pass criteria (per asset class):")
+        for m in sorted(modes):
+            print(f"  {m}: {get_threshold_description(m)}")
     print("Feed is READY if passing publishers >= target publisher count")
 
     print(f"\n{'='*70}")
@@ -930,7 +933,10 @@ def print_console_summary(
         f"\nTiming: total={summary['total_time_sec']:.2f}s, avg_per_feed={summary['avg_time_ms']:.0f}ms"
     )
 
-    print_interpretation_guide(summary, hit_rate_threshold=hit_rate_threshold)
+    guide_mode = next(iter(modes)) if len(modes) == 1 else "us-equities"
+    print_interpretation_guide(
+        summary, hit_rate_threshold=hit_rate_threshold, mode=guide_mode
+    )
 
     if len({r.date for r in results}) > 1:
         publisher_summary = compute_publisher_summary(

@@ -19,6 +19,7 @@ from typing import Optional
 from lib.config import normalize_asset_class
 from lib.models import OVERNIGHT_REFERENCE_PUBLISHER_ID, PublisherBenchmarkResult
 from lib.statistics import distribution_stats
+from lib.thresholds import get_session_thresholds, get_threshold_description
 
 
 def compute_summary_stats(
@@ -680,7 +681,7 @@ def write_results_csv(
 
 
 def print_interpretation_guide(
-    summary_stats: dict, hit_rate_threshold: float = 95
+    summary_stats: dict, hit_rate_threshold: float = 95, mode: str = "us-equities"
 ) -> None:
     """Print an interpretive guide explaining what the metrics mean."""
     print(f"\n{'='*70}")
@@ -688,9 +689,7 @@ def print_interpretation_guide(
     print(f"{'='*70}")
 
     print("\n--- PASS/FAIL CRITERIA ---")
-    print(
-        f"Your feed PASSES if: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= {hit_rate_threshold}%)"
-    )
+    print(f"Your feed PASSES if: {get_threshold_description(mode)}")
     print("  - nrmse: RMSE normalized by benchmark price range (lower is better)")
     print(
         "  - hit_rate: % of prices within 10 basis points of benchmark (higher is better)"
@@ -785,7 +784,8 @@ def print_interpretation_guide(
     print("   - Validate price updates against recent history")
     print("   - Implement circuit breakers for extreme moves")
     print("\n4. INCREASE HIT RATE:")
-    print(f"   - Target: >{hit_rate_threshold}% of prices within 10 basis points")
+    t = get_session_thresholds("regular", mode)
+    print(f"   - Target: >{t.hit_rate_threshold}% of prices within 10 basis points")
     print("   - Monitor real-time deviation from benchmark")
     print("   - Alert on sustained deviations")
     print(f"{'='*70}\n")

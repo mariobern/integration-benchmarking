@@ -34,6 +34,7 @@ from lib.readiness_core import (
     SESSION_REGULAR,
 )
 from lib.statistics import distribution_stats as _distribution_stats
+from lib.thresholds import get_threshold_description
 
 
 # ---------------------------------------------------------------------------
@@ -829,7 +830,13 @@ def print_console_summary(
     print(
         f"Feeds evaluated: {summary['total_feeds']} | Target publishers: {target_pub_count}"
     )
-    print("Benchmark: nrmse < 0.01 OR (nrmse < 0.05 AND hit_rate >= 95%)")
+    modes = {r.mode for r in results if r.mode}
+    if len(modes) == 1:
+        print(f"Benchmark: {get_threshold_description(next(iter(modes)))}")
+    else:
+        print("Benchmark thresholds (per asset class):")
+        for mode in sorted(modes):
+            print(f"  {mode}: {get_threshold_description(mode)}")
     print(
         f"Uptime: regular session >= {uptime_threshold_pct:.1f}% (1s window unless --precise)"
     )
