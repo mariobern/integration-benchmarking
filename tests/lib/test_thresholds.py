@@ -81,6 +81,11 @@ class TestGetSessionThresholds:
         t = get_session_thresholds("regular", "metals")
         assert t == RELAXED_THRESHOLDS
 
+    def test_metal_alias_uses_relaxed(self) -> None:
+        """The 'metal' alias (unnormalized) should also route to RELAXED."""
+        t = get_session_thresholds("regular", "metal")
+        assert t == RELAXED_THRESHOLDS
+
     def test_us_treasuries_always_regular(self) -> None:
         t = get_session_thresholds("regular", "us-treasuries")
         assert t == REGULAR_THRESHOLDS

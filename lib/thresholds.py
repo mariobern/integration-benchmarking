@@ -41,7 +41,7 @@ RELAXED_THRESHOLDS = SessionThresholds(
     hit_rate_threshold=85,
 )
 
-_RELAXED_ASSET_CLASSES = {"commodity", "metals"}
+_RELAXED_ASSET_CLASSES = {"commodity", "metals", "metal"}
 
 
 def get_session_thresholds(
