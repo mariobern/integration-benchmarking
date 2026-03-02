@@ -321,8 +321,10 @@ Examples:
     print(f"{'='*70}")
     print(f"Total feeds evaluated: {summary_stats['total_feeds']}")
     print(f"PASS: {summary_stats['pass_count']}")
-    print(f"  - by nrmse < 0.01 alone: {summary_stats['pass_by_nrmse_alone']}")
     t = get_session_thresholds("regular", primary_mode)
+    print(
+        f"  - by nrmse < {t.nrmse_auto_pass} alone: {summary_stats['pass_by_nrmse_alone']}"
+    )
     print(
         f"  - by nrmse < {t.nrmse_conditional} + hit_rate >= {t.hit_rate_threshold}%: {summary_stats['pass_by_nrmse_and_hit_rate']}"
     )

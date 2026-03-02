@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Optional
 
 from lib.publisher_health import FeedHealthResult
+from lib.thresholds import get_threshold_description
 
 
 def format_diagnostics(
@@ -202,7 +203,9 @@ def print_health_report(
         if quality_fails > 0:
             print(f"  - {quality_fails} feed(s) failing data quality:")
             print(f"    Check price source calibration, reduce latency")
-            print(f"    Target: nrmse < 0.01 or (nrmse < 0.05 + hit_rate >= 95%)")
+            modes = {r.mode for r in results if r.mode}
+            mode = next(iter(modes)) if len(modes) == 1 else "us-equities"
+            print(f"    Target: {get_threshold_description(mode)}")
         if uptime_fails > 0:
             print(
                 f"  - {uptime_fails} feed(s) with low uptime (< {uptime_threshold:.0f}%):"

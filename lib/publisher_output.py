@@ -36,22 +36,20 @@ def compute_summary_stats(
     pass_count = sum(1 for r in results if r.passes and not r.error)
     fail_count = sum(1 for r in results if not r.passes and not r.error)
 
-    pass_by_nrmse_alone = sum(
-        1
-        for r in results
-        if r.passes and not r.error and r.nrmse is not None and r.nrmse < 0.01
-    )
-    pass_by_nrmse_and_hit_rate = sum(
-        1
-        for r in results
-        if r.passes
-        and not r.error
-        and r.nrmse is not None
-        and r.nrmse >= 0.01
-        and r.nrmse < 0.05
-        and r.hit_rate is not None
-        and r.hit_rate >= hit_rate_threshold
-    )
+    pass_by_nrmse_alone = 0
+    pass_by_nrmse_and_hit_rate = 0
+    for r in results:
+        if not (r.passes and not r.error and r.nrmse is not None):
+            continue
+        t = get_session_thresholds("regular", r.mode or "us-equities")
+        if r.nrmse < t.nrmse_auto_pass:
+            pass_by_nrmse_alone += 1
+        elif (
+            r.nrmse < t.nrmse_conditional
+            and r.hit_rate is not None
+            and r.hit_rate >= t.hit_rate_threshold
+        ):
+            pass_by_nrmse_and_hit_rate += 1
 
     # RMSE/spread distribution
     valid_rmse_ratios = [
