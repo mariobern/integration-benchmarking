@@ -173,3 +173,130 @@ def compute_feed_publishers(rows: list[dict]) -> dict:
     result["top_level"] = sorted(all_pubs)
     result["mode"] = mode
     return result
+
+
+def modify_config(
+    config_path: str,
+    feed_publishers: dict[int, dict],
+    dry_run: bool = False,
+) -> dict:
+    """Modify after.json with per-session publisher lists.
+
+    Uses surgical regex replacements to preserve the original formatting.
+    Returns summary dict with counts.
+    """
+    with open(config_path) as f:
+        raw = f.read()
+
+    data = json.loads(raw)
+    feeds = data["feeds"]
+
+    # Build feedId -> {name, state} lookup
+    feed_lookup: dict[int, dict] = {}
+    for feed in feeds:
+        feed_lookup[feed["feedId"]] = {
+            "name": feed.get("metadata", {}).get("name", ""),
+            "state": feed["state"],
+            "symbol": feed.get("symbol", ""),
+        }
+
+    newly_stable = 0
+    updated_stable = 0
+    skipped_empty = 0
+    not_found = []
+
+    for feed_id, pub_data in feed_publishers.items():
+        if feed_id not in feed_lookup:
+            not_found.append(feed_id)
+            print(f"  WARNING: feedId={feed_id} not found in config")
+            continue
+
+        info = feed_lookup[feed_id]
+
+        # Skip if no publishers at all
+        if not pub_data["top_level"]:
+            skipped_empty += 1
+            print(
+                f"  SKIP: {info['name']} (feedId={feed_id})"
+                " -> no passing publishers after filtering"
+            )
+            continue
+
+        # Only handle COMING_SOON and STABLE
+        if info["state"] not in ("COMING_SOON", "STABLE"):
+            print(
+                f"  SKIP: {info['name']} (feedId={feed_id}," f" state={info['state']})"
+            )
+            continue
+
+        bounds = _find_feed_block(raw, feed_id)
+        if not bounds:
+            not_found.append(feed_id)
+            print(
+                f"  WARNING: {info['name']} feedId={feed_id}"
+                " block not found in raw text"
+            )
+            continue
+
+        start, end = bounds
+        block = raw[start:end]
+
+        # 1. State transition: COMING_SOON -> STABLE
+        if info["state"] == "COMING_SOON":
+            block = re.sub(r'"state": "COMING_SOON"', '"state": "STABLE"', block)
+
+        # 2. Update top-level allowedPublisherIds
+        pub_str = "[ " + ", ".join(str(p) for p in pub_data["top_level"]) + " ]"
+        if re.search(r'"allowedPublisherIds":', block):
+            # Replace the FIRST occurrence (top-level, before marketSchedules)
+            block = re.sub(
+                r'"allowedPublisherIds": \[[^\]]*\]',
+                f'"allowedPublisherIds": {pub_str}',
+                block,
+                count=1,
+            )
+        else:
+            # Insert after opening {
+            newline_pos = block.index("\n")
+            insert_line = f'\n      "allowedPublisherIds": {pub_str},'
+            block = block[:newline_pos] + insert_line + block[newline_pos:]
+
+        # 3. Update top-level minPublishers to 1
+        block = re.sub(r'"minPublishers": \d+', '"minPublishers": 1', block, count=1)
+
+        raw = raw[:start] + block + raw[end:]
+
+        if info["state"] == "COMING_SOON":
+            newly_stable += 1
+            label = "OK"
+        else:
+            updated_stable += 1
+            label = "UPDATE"
+
+        sessions_str = f"regular={pub_data['regular']}"
+        if pub_data["premarket"]:
+            sessions_str += f", premarket={pub_data['premarket']}"
+        if pub_data["afterhours"]:
+            sessions_str += f", afterhours={pub_data['afterhours']}"
+        if pub_data["overnight"]:
+            sessions_str += f", overnight={pub_data['overnight']}"
+
+        state_label = "STABLE" if info["state"] == "COMING_SOON" else "updated"
+        print(
+            f"  {label}: {info['name']} (feedId={feed_id})"
+            f" -> {state_label}, {sessions_str}"
+        )
+
+    if not dry_run and (newly_stable + updated_stable) > 0:
+        backup_path = config_path + ".bak"
+        shutil.copy2(config_path, backup_path)
+        with open(config_path, "w") as f:
+            f.write(raw)
+        print(f"\nBackup saved to {backup_path}")
+
+    return {
+        "newly_stable": newly_stable,
+        "updated_stable": updated_stable,
+        "skipped_empty": skipped_empty,
+        "not_found": not_found,
+    }

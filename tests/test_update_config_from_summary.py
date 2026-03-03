@@ -334,3 +334,141 @@ def test_find_feed_block_returns_none_for_missing():
 
     raw = json.dumps(SAMPLE_CONFIG_EQUITIES, indent=2)
     assert _find_feed_block(raw, 999) is None
+
+
+def test_modify_config_updates_top_level_publishers(tmp_path):
+    from update_config_from_summary import modify_config
+
+    config_file = tmp_path / "after.json"
+    config_file.write_text(json.dumps(SAMPLE_CONFIG_EQUITIES, indent=2))
+
+    feed_publishers = {
+        100: {
+            "regular": [12, 19, 22],
+            "premarket": [19, 22],
+            "afterhours": [],
+            "overnight": [],
+            "top_level": [12, 19, 22],
+            "mode": "us-equities",
+        }
+    }
+    result = modify_config(str(config_file), feed_publishers, dry_run=False)
+
+    with open(config_file) as f:
+        data = json.load(f)
+
+    feed = [f for f in data["feeds"] if f["feedId"] == 100][0]
+    assert feed["state"] == "STABLE"
+    assert feed["allowedPublisherIds"] == [12, 19, 22]
+    assert feed["minPublishers"] == 1
+    assert result["newly_stable"] == 1
+
+
+def test_modify_config_updates_already_stable(tmp_path):
+    from update_config_from_summary import modify_config
+
+    config_file = tmp_path / "after.json"
+    config_file.write_text(json.dumps(SAMPLE_CONFIG_EQUITIES, indent=2))
+
+    feed_publishers = {
+        200: {
+            "regular": [12, 19, 22],
+            "premarket": [],
+            "afterhours": [],
+            "overnight": [],
+            "top_level": [12, 19, 22],
+            "mode": "metals",
+        }
+    }
+    result = modify_config(str(config_file), feed_publishers, dry_run=False)
+
+    with open(config_file) as f:
+        data = json.load(f)
+
+    feed = [f for f in data["feeds"] if f["feedId"] == 200][0]
+    assert feed["state"] == "STABLE"  # unchanged
+    assert feed["allowedPublisherIds"] == [12, 19, 22]  # updated
+    assert result["updated_stable"] == 1
+
+
+def test_modify_config_dry_run_no_write(tmp_path):
+    from update_config_from_summary import modify_config
+
+    config_file = tmp_path / "after.json"
+    original = json.dumps(SAMPLE_CONFIG_EQUITIES, indent=2)
+    config_file.write_text(original)
+
+    feed_publishers = {
+        100: {
+            "regular": [12, 19, 22],
+            "premarket": [],
+            "afterhours": [],
+            "overnight": [],
+            "top_level": [12, 19, 22],
+            "mode": "us-equities",
+        }
+    }
+    modify_config(str(config_file), feed_publishers, dry_run=True)
+
+    assert config_file.read_text() == original
+
+
+def test_modify_config_creates_backup(tmp_path):
+    from update_config_from_summary import modify_config
+
+    config_file = tmp_path / "after.json"
+    config_file.write_text(json.dumps(SAMPLE_CONFIG_EQUITIES, indent=2))
+
+    feed_publishers = {
+        100: {
+            "regular": [12, 19, 22],
+            "premarket": [],
+            "afterhours": [],
+            "overnight": [],
+            "top_level": [12, 19, 22],
+            "mode": "us-equities",
+        }
+    }
+    modify_config(str(config_file), feed_publishers, dry_run=False)
+
+    assert (tmp_path / "after.json.bak").exists()
+
+
+def test_modify_config_warns_missing_feed(tmp_path):
+    from update_config_from_summary import modify_config
+
+    config_file = tmp_path / "after.json"
+    config_file.write_text(json.dumps(SAMPLE_CONFIG_EQUITIES, indent=2))
+
+    feed_publishers = {
+        999: {
+            "regular": [12, 19],
+            "premarket": [],
+            "afterhours": [],
+            "overnight": [],
+            "top_level": [12, 19],
+            "mode": "us-equities",
+        }
+    }
+    result = modify_config(str(config_file), feed_publishers, dry_run=False)
+    assert result["not_found"] == [999]
+
+
+def test_modify_config_skips_empty_publishers(tmp_path):
+    from update_config_from_summary import modify_config
+
+    config_file = tmp_path / "after.json"
+    config_file.write_text(json.dumps(SAMPLE_CONFIG_EQUITIES, indent=2))
+
+    feed_publishers = {
+        100: {
+            "regular": [],
+            "premarket": [],
+            "afterhours": [],
+            "overnight": [],
+            "top_level": [],
+            "mode": "us-equities",
+        }
+    }
+    result = modify_config(str(config_file), feed_publishers, dry_run=False)
+    assert result["skipped_empty"] == 1
