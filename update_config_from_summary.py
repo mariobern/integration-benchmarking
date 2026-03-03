@@ -79,6 +79,52 @@ def _parse_publisher_list(pub_str: str) -> set[int]:
     return {int(p) for p in pub_str.split(";")}
 
 
+def _find_feed_block(raw: str, feed_id: int) -> tuple[int, int] | None:
+    """Find the start/end positions of a feed entry by feedId in the raw JSON text."""
+    pattern = rf'"feedId":\s*{feed_id}\s*[,\n}}]'
+    match = re.search(pattern, raw)
+    if not match:
+        return None
+
+    pos = match.start()
+
+    # Scan backward for opening { (string-aware)
+    depth = 0
+    start = pos - 1
+    while start >= 0:
+        c = raw[start]
+        if c == '"':
+            start -= 1
+            while start >= 0 and raw[start] != '"':
+                if raw[start] == "\\" and start > 0:
+                    start -= 1
+                start -= 1
+        elif c == "}":
+            depth += 1
+        elif c == "{":
+            if depth == 0:
+                break
+            depth -= 1
+        start -= 1
+
+    # Scan forward from opening { for matching }
+    depth = 1
+    end = start + 1
+    in_string = False
+    while end < len(raw) and depth > 0:
+        c = raw[end]
+        if c == '"' and (end == 0 or raw[end - 1] != "\\"):
+            in_string = not in_string
+        elif not in_string:
+            if c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+        end += 1
+
+    return (start, end)
+
+
 def compute_feed_publishers(rows: list[dict]) -> dict:
     """Compute per-session publisher lists for a single feed.
 

@@ -235,3 +235,102 @@ def test_compute_feed_publishers_top_level_is_union():
 
     # Top-level = union of all sessions
     assert result["top_level"] == sorted([12, 19, 22, 44, 54, 29, 41])
+
+
+# --- Sample after.json structures ---
+
+SAMPLE_CONFIG_EQUITIES = {
+    "feeds": [
+        {
+            "allowedPublisherIds": [1, 2, 3, 13, 14, 15],
+            "expiryTime": "5.000000000s",
+            "exponent": -5,
+            "feedId": 100,
+            "isEnabledInShard": True,
+            "kind": "PRICE",
+            "marketSchedules": [
+                {
+                    "allowedPublisherIds": [1, 2, 3, 14],
+                    "marketSchedule": "America/New_York;0930-1600,0930-1600,0930-1600,0930-1600,0930-1600,C,C;0101/C",
+                    "minPublishers": 3,
+                    "session": "REGULAR",
+                },
+                {
+                    "allowedPublisherIds": [1, 2],
+                    "marketSchedule": "America/New_York;0400-0930,0400-0930,0400-0930,0400-0930,0400-0930,C,C;0101/C",
+                    "minPublishers": 2,
+                    "session": "PRE_MARKET",
+                },
+            ],
+            "metadata": {
+                "asset_type": "equity",
+                "name": "AAPL",
+                "nasdaq_symbol": "AAPL",
+                "quote_currency": "USD",
+            },
+            "minChannel": {"rate": "0.050000000s"},
+            "minPublishers": 1,
+            "state": "COMING_SOON",
+            "symbol": "Equity.US.AAPL/USD",
+        },
+        {
+            "allowedPublisherIds": [1, 2, 3],
+            "feedId": 200,
+            "kind": "PRICE",
+            "marketSchedules": [
+                {
+                    "marketSchedule": "America/New_York;0000-1700&1800-2400,0000-1700&1800-2400,0000-1700&1800-2400,0000-1700&1800-2400,0000-1700,C,1800-2400;",
+                    "session": "REGULAR",
+                }
+            ],
+            "metadata": {
+                "asset_type": "metal",
+                "name": "XAGUSD",
+                "quote_currency": "USD",
+            },
+            "minPublishers": 3,
+            "state": "STABLE",
+            "symbol": "Metal.XAG/USD",
+        },
+        {
+            "allowedPublisherIds": [1, 2, 3],
+            "feedId": 300,
+            "kind": "PRICE",
+            "marketSchedules": [
+                {
+                    "marketSchedule": "America/New_York;0930-1600,0930-1600,0930-1600,0930-1600,0930-1600,C,C;0101/C",
+                    "session": "REGULAR",
+                }
+            ],
+            "metadata": {
+                "asset_type": "equity",
+                "name": "MSFT",
+                "nasdaq_symbol": "MSFT",
+                "quote_currency": "USD",
+            },
+            "minChannel": {"rate": "0.050000000s"},
+            "minPublishers": 100,
+            "state": "COMING_SOON",
+            "symbol": "Equity.US.MSFT/USD",
+        },
+    ]
+}
+
+
+def test_find_feed_block_locates_feed():
+    from update_config_from_summary import _find_feed_block
+
+    raw = json.dumps(SAMPLE_CONFIG_EQUITIES, indent=2)
+    bounds = _find_feed_block(raw, 100)
+    assert bounds is not None
+    start, end = bounds
+    block = raw[start:end]
+    assert '"feedId": 100' in block
+    assert '"name": "AAPL"' in block
+
+
+def test_find_feed_block_returns_none_for_missing():
+    from update_config_from_summary import _find_feed_block
+
+    raw = json.dumps(SAMPLE_CONFIG_EQUITIES, indent=2)
+    assert _find_feed_block(raw, 999) is None
