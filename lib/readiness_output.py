@@ -288,12 +288,14 @@ def write_results_csv(
                 "premarket_uptime_failing_count",
                 "premarket_median_uptime_pct",
                 "premarket_fully_passing_count",
+                "premarket_fully_passing_publishers",
                 "afterhours_ready",
                 "afterhours_benchmark_passing_count",
                 "afterhours_uptime_passing_count",
                 "afterhours_uptime_failing_count",
                 "afterhours_median_uptime_pct",
                 "afterhours_fully_passing_count",
+                "afterhours_fully_passing_publishers",
             ]
         )
     if include_overnight:
@@ -305,6 +307,7 @@ def write_results_csv(
                 "overnight_uptime_failing_count",
                 "overnight_median_uptime_pct",
                 "overnight_fully_passing_count",
+                "overnight_fully_passing_publishers",
             ]
         )
 
@@ -369,6 +372,10 @@ def write_results_csv(
                         result.premarket_fully_passing_count
                         if result.premarket_fully_passing_count is not None
                         else "",
+                        ";".join(
+                            str(pid)
+                            for pid in (result.premarket_fully_passing_publishers or [])
+                        ),
                         result.afterhours_ready
                         if result.afterhours_ready is not None
                         else "",
@@ -387,6 +394,12 @@ def write_results_csv(
                         result.afterhours_fully_passing_count
                         if result.afterhours_fully_passing_count is not None
                         else "",
+                        ";".join(
+                            str(pid)
+                            for pid in (
+                                result.afterhours_fully_passing_publishers or []
+                            )
+                        ),
                     ]
                 )
             if include_overnight:
@@ -410,6 +423,10 @@ def write_results_csv(
                         result.overnight_fully_passing_count
                         if result.overnight_fully_passing_count is not None
                         else "",
+                        ";".join(
+                            str(pid)
+                            for pid in (result.overnight_fully_passing_publishers or [])
+                        ),
                     ]
                 )
 
@@ -636,8 +653,10 @@ def write_summary_csv(
             [
                 "premarket_ready",
                 "premarket_fully_passing_count",
+                "premarket_fully_passing_publishers",
                 "afterhours_ready",
                 "afterhours_fully_passing_count",
+                "afterhours_fully_passing_publishers",
             ]
         )
     if include_overnight:
@@ -645,6 +664,7 @@ def write_summary_csv(
             [
                 "overnight_ready",
                 "overnight_fully_passing_count",
+                "overnight_fully_passing_publishers",
             ]
         )
 
@@ -682,12 +702,22 @@ def write_summary_csv(
                         result.premarket_fully_passing_count
                         if result.premarket_fully_passing_count is not None
                         else "",
+                        ";".join(
+                            str(pid)
+                            for pid in (result.premarket_fully_passing_publishers or [])
+                        ),
                         result.afterhours_ready
                         if result.afterhours_ready is not None
                         else "",
                         result.afterhours_fully_passing_count
                         if result.afterhours_fully_passing_count is not None
                         else "",
+                        ";".join(
+                            str(pid)
+                            for pid in (
+                                result.afterhours_fully_passing_publishers or []
+                            )
+                        ),
                     ]
                 )
             if include_overnight:
@@ -699,6 +729,10 @@ def write_summary_csv(
                         result.overnight_fully_passing_count
                         if result.overnight_fully_passing_count is not None
                         else "",
+                        ";".join(
+                            str(pid)
+                            for pid in (result.overnight_fully_passing_publishers or [])
+                        ),
                     ]
                 )
 

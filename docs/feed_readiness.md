@@ -228,21 +228,21 @@ The file uses a curated subset of columns for quick readability and sharing.
 
 ### Extended session columns (with `--extended-hours`)
 
-| Column                           | Description                    |
-| -------------------------------- | ------------------------------ |
-| `premarket_ready`                | Pre-market session readiness   |
-| `premarket_fully_passing_count`  | Publishers passing pre-market  |
-| `premarket_fully_passing_publishers` | Pre-market passing publisher IDs |
-| `afterhours_ready`               | After-hours session readiness  |
-| `afterhours_fully_passing_count` | Publishers passing after-hours |
+| Column                                | Description                       |
+| ------------------------------------- | --------------------------------- |
+| `premarket_ready`                     | Pre-market session readiness      |
+| `premarket_fully_passing_count`       | Publishers passing pre-market     |
+| `premarket_fully_passing_publishers`  | Pre-market passing publisher IDs  |
+| `afterhours_ready`                    | After-hours session readiness     |
+| `afterhours_fully_passing_count`      | Publishers passing after-hours    |
 | `afterhours_fully_passing_publishers` | After-hours passing publisher IDs |
 
 ### Overnight columns (with `--overnight`)
 
-| Column                          | Description                  |
-| ------------------------------- | ---------------------------- |
-| `overnight_ready`               | Overnight session readiness  |
-| `overnight_fully_passing_count` | Publishers passing overnight |
+| Column                               | Description                     |
+| ------------------------------------ | ------------------------------- |
+| `overnight_ready`                    | Overnight session readiness     |
+| `overnight_fully_passing_count`      | Publishers passing overnight    |
 | `overnight_fully_passing_publishers` | Overnight passing publisher IDs |
 
 Session publisher-list columns use semicolon-separated publisher IDs (for example, `12;13;19`). These fields are empty strings when the session is disabled, unavailable, or has no passing publishers.

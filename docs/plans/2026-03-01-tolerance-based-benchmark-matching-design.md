@@ -23,10 +23,10 @@ Replace the exact dict-lookup matching with a **bisect-based nearest-match** tha
 
 ### Why Not Alternatives
 
-| Alternative | Reason Rejected |
-|-------------|-----------------|
-| pandas `merge_asof` | Adds pandas dependency, larger refactor, heavier processing |
-| ClickHouse `ASOF JOIN` | Biggest change, rewrites SQL queries, harder to test |
+| Alternative            | Reason Rejected                                             |
+| ---------------------- | ----------------------------------------------------------- |
+| pandas `merge_asof`    | Adds pandas dependency, larger refactor, heavier processing |
+| ClickHouse `ASOF JOIN` | Biggest change, rewrites SQL queries, harder to test        |
 
 ## Design
 
@@ -119,11 +119,11 @@ feed_readiness.py  --alignment-tolerance-sec
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
+| File                    | Change                                                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `lib/benchmark_core.py` | Add `find_nearest_benchmark()` helper, update 3 matching loops, add `tolerance_seconds` param to 2 functions that lack it |
-| `feed_readiness.py` | Add `--alignment-tolerance-sec` CLI arg, pass through to processing |
-| `lib/readiness_core.py` | Thread `tolerance_seconds` through to benchmark function calls |
+| `feed_readiness.py`     | Add `--alignment-tolerance-sec` CLI arg, pass through to processing                                                       |
+| `lib/readiness_core.py` | Thread `tolerance_seconds` through to benchmark function calls                                                            |
 
 ## What Stays the Same
 
