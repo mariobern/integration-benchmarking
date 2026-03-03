@@ -175,6 +175,201 @@ def compute_feed_publishers(rows: list[dict]) -> dict:
     return result
 
 
+# Market schedule templates (from feed 922 — AAPL)
+_SCHEDULE_TEMPLATES = {
+    "REGULAR": (
+        "America/New_York;0930-1600,0930-1600,0930-1600,0930-1600,0930-1600,C,C;"
+        "0101/C,0119/C,0216/C,0403/C,0525/C,0619/C,0703/C,0907/C,1126/C,"
+        "1127/0930-1300,1224/0930-1300,1225/C"
+    ),
+    "PRE_MARKET": (
+        "America/New_York;0400-0930,0400-0930,0400-0930,0400-0930,0400-0930,C,C;"
+        "0101/C,0119/C,0216/C,0403/C,0525/C,0619/C,0703/C,0907/C,1126/C,1225/C"
+    ),
+    "POST_MARKET": (
+        "America/New_York;1600-2000,1600-2000,1600-2000,1600-2000,1600-2000,C,C;"
+        "0101/C,0119/C,0216/C,0403/C,0525/C,0619/C,0703/C,0907/C,1126/C,1225/C"
+    ),
+    "OVER_NIGHT": (
+        "America/New_York;0000-0400&2000-2400,0000-0400&2000-2400,"
+        "0000-0400&2000-2400,0000-0400&2000-2400,0000-0400,C,2000-2400;"
+        "0118/C,0119/2000-2400,0215/C,0216/2000-2400,0402/0000-0400,0403/C,"
+        "0524/C,0525/2000-2400,0618/0000-0400,0619/C,0702/0000-0400,0703/C,"
+        "0906/C,0907/2000-2400,1125/0000-0400,1126/2000-2400,1224/0000-0400,"
+        "1225/C,1231/0000-0400,0101/C"
+    ),
+}
+
+# Session key (from compute_feed_publishers) -> after.json session name
+_SESSION_KEY_TO_JSON = {
+    "regular": "REGULAR",
+    "premarket": "PRE_MARKET",
+    "afterhours": "POST_MARKET",
+    "overnight": "OVER_NIGHT",
+}
+
+# minPublishers per session
+_SESSION_MIN_PUBLISHERS = {
+    "REGULAR": 3,
+    "PRE_MARKET": 2,
+    "POST_MARKET": 2,
+    "OVER_NIGHT": 1,
+}
+
+
+def _find_session_block(block: str, session_name: str) -> tuple[int, int] | None:
+    """Find the start/end of a session entry within a marketSchedules array."""
+    pattern = rf'"session":\s*"{session_name}"'
+    match = re.search(pattern, block)
+    if not match:
+        return None
+
+    pos = match.start()
+
+    # Scan backward for opening {
+    depth = 0
+    start = pos - 1
+    while start >= 0:
+        c = block[start]
+        if c == "}":
+            depth += 1
+        elif c == "{":
+            if depth == 0:
+                break
+            depth -= 1
+        start -= 1
+
+    # Scan forward for matching }
+    depth = 1
+    end = start + 1
+    in_string = False
+    while end < len(block) and depth > 0:
+        c = block[end]
+        if c == '"' and (end == 0 or block[end - 1] != "\\"):
+            in_string = not in_string
+        elif not in_string:
+            if c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+        end += 1
+
+    return (start, end)
+
+
+def _build_session_entry(
+    session_name: str, pub_ids: list[int], indent: str = "        "
+) -> str:
+    """Build a JSON session entry string for insertion into marketSchedules."""
+    pub_str = ", ".join(str(p) for p in pub_ids)
+    schedule = _SCHEDULE_TEMPLATES[session_name]
+    min_pub = _SESSION_MIN_PUBLISHERS[session_name]
+    return (
+        f"{indent}{{\n"
+        f'{indent}  "allowedPublisherIds": [ {pub_str} ],\n'
+        f'{indent}  "marketSchedule": "{schedule}",\n'
+        f'{indent}  "minPublishers": {min_pub},\n'
+        f'{indent}  "session": "{session_name}"\n'
+        f"{indent}}}"
+    )
+
+
+def _update_market_schedules(block: str, pub_data: dict) -> str:
+    """Update marketSchedules entries within a feed block.
+
+    For each session with publishers:
+    - If session exists: update allowedPublisherIds and minPublishers
+    - If session missing AND mode is us-equities: insert new entry
+    """
+    is_extended = pub_data["mode"] in _EXTENDED_SESSION_MODES
+
+    for session_key, json_session in _SESSION_KEY_TO_JSON.items():
+        pubs = pub_data[session_key]
+        if not pubs:
+            continue
+
+        min_pub = _SESSION_MIN_PUBLISHERS[json_session]
+        pub_str = "[ " + ", ".join(str(p) for p in pubs) + " ]"
+
+        session_bounds = _find_session_block(block, json_session)
+
+        if session_bounds:
+            s_start, s_end = session_bounds
+            session_block = block[s_start:s_end]
+
+            # Update allowedPublisherIds within this session
+            if re.search(r'"allowedPublisherIds":', session_block):
+                session_block = re.sub(
+                    r'"allowedPublisherIds": \[[^\]]*\]',
+                    f'"allowedPublisherIds": {pub_str}',
+                    session_block,
+                )
+            else:
+                # Insert allowedPublisherIds after opening {
+                nl = session_block.index("\n")
+                insert = f'\n            "allowedPublisherIds": {pub_str},'
+                session_block = session_block[:nl] + insert + session_block[nl:]
+
+            # Update minPublishers within this session
+            if re.search(r'"minPublishers":', session_block):
+                session_block = re.sub(
+                    r'"minPublishers": \d+',
+                    f'"minPublishers": {min_pub}',
+                    session_block,
+                )
+            else:
+                # Insert minPublishers before "session" key
+                session_match = re.search(r'"session":', session_block)
+                if session_match:
+                    insert_pos = session_match.start()
+                    # Detect indentation from the "session" line
+                    line_start = session_block.rfind("\n", 0, insert_pos) + 1
+                    indent = session_block[line_start:insert_pos]
+                    insert_str = f'"minPublishers": {min_pub},\n{indent}'
+                    session_block = (
+                        session_block[:insert_pos]
+                        + insert_str
+                        + session_block[insert_pos:]
+                    )
+
+            block = block[:s_start] + session_block + block[s_end:]
+
+        elif is_extended:
+            # Session doesn't exist — insert before closing ] of marketSchedules
+            # Find the marketSchedules closing bracket
+            ms_match = re.search(r'"marketSchedules":\s*\[', block)
+            if not ms_match:
+                continue
+
+            # Find the ] that closes the marketSchedules array
+            ms_start = ms_match.end()
+            depth = 1
+            pos = ms_start
+            in_str = False
+            while pos < len(block) and depth > 0:
+                c = block[pos]
+                if c == '"' and (pos == 0 or block[pos - 1] != "\\"):
+                    in_str = not in_str
+                elif not in_str:
+                    if c == "[":
+                        depth += 1
+                    elif c == "]":
+                        depth -= 1
+                pos += 1
+            closing_bracket = pos - 1  # position of ]
+
+            # Walk back to find the last } before ]
+            p = closing_bracket - 1
+            while p >= 0 and block[p] in (" ", "\n", "\t", "\r"):
+                p -= 1
+
+            # Insert after the last session entry
+            new_entry = ",\n" + _build_session_entry(json_session, pubs)
+            block = block[: p + 1] + new_entry + block[p + 1 :]
+
+    return block
+
+
 def modify_config(
     config_path: str,
     feed_publishers: dict[int, dict],
@@ -263,6 +458,9 @@ def modify_config(
 
         # 3. Update top-level minPublishers to 1
         block = re.sub(r'"minPublishers": \d+', '"minPublishers": 1', block, count=1)
+
+        # 4. Update per-session marketSchedules
+        block = _update_market_schedules(block, pub_data)
 
         raw = raw[:start] + block + raw[end:]
 

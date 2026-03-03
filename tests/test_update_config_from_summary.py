@@ -472,3 +472,124 @@ def test_modify_config_skips_empty_publishers(tmp_path):
     }
     result = modify_config(str(config_file), feed_publishers, dry_run=False)
     assert result["skipped_empty"] == 1
+
+
+def test_modify_config_updates_regular_session_publishers(tmp_path):
+    from update_config_from_summary import modify_config
+
+    config_file = tmp_path / "after.json"
+    config_file.write_text(json.dumps(SAMPLE_CONFIG_EQUITIES, indent=2))
+
+    feed_publishers = {
+        100: {
+            "regular": [12, 19, 22],
+            "premarket": [19, 22],
+            "afterhours": [],
+            "overnight": [],
+            "top_level": [12, 19, 22],
+            "mode": "us-equities",
+        }
+    }
+    modify_config(str(config_file), feed_publishers, dry_run=False)
+
+    with open(config_file) as f:
+        data = json.load(f)
+
+    feed = [f for f in data["feeds"] if f["feedId"] == 100][0]
+    regular = [s for s in feed["marketSchedules"] if s["session"] == "REGULAR"][0]
+    assert regular["allowedPublisherIds"] == [12, 19, 22]
+    assert regular["minPublishers"] == 3
+
+
+def test_modify_config_updates_premarket_session_publishers(tmp_path):
+    from update_config_from_summary import modify_config
+
+    config_file = tmp_path / "after.json"
+    config_file.write_text(json.dumps(SAMPLE_CONFIG_EQUITIES, indent=2))
+
+    feed_publishers = {
+        100: {
+            "regular": [12, 19, 22],
+            "premarket": [19, 22],
+            "afterhours": [],
+            "overnight": [],
+            "top_level": [12, 19, 22],
+            "mode": "us-equities",
+        }
+    }
+    modify_config(str(config_file), feed_publishers, dry_run=False)
+
+    with open(config_file) as f:
+        data = json.load(f)
+
+    feed = [f for f in data["feeds"] if f["feedId"] == 100][0]
+    premarket = [s for s in feed["marketSchedules"] if s["session"] == "PRE_MARKET"][0]
+    assert premarket["allowedPublisherIds"] == [19, 22]
+    assert premarket["minPublishers"] == 2
+
+
+def test_modify_config_adds_missing_extended_sessions(tmp_path):
+    """Feed 300 has only REGULAR — should add PRE_MARKET, POST_MARKET, OVER_NIGHT if publishers pass."""
+    from update_config_from_summary import modify_config
+
+    config_file = tmp_path / "after.json"
+    config_file.write_text(json.dumps(SAMPLE_CONFIG_EQUITIES, indent=2))
+
+    feed_publishers = {
+        300: {
+            "regular": [12, 19, 22],
+            "premarket": [19, 22],
+            "afterhours": [19],
+            "overnight": [29, 41],
+            "top_level": [12, 19, 22, 29, 41],
+            "mode": "us-equities",
+        }
+    }
+    modify_config(str(config_file), feed_publishers, dry_run=False)
+
+    with open(config_file) as f:
+        data = json.load(f)
+
+    feed = [f for f in data["feeds"] if f["feedId"] == 300][0]
+    sessions = {s["session"]: s for s in feed["marketSchedules"]}
+
+    assert "REGULAR" in sessions
+    assert "PRE_MARKET" in sessions
+    assert "POST_MARKET" in sessions
+    assert "OVER_NIGHT" in sessions
+
+    assert sessions["REGULAR"]["allowedPublisherIds"] == [12, 19, 22]
+    assert sessions["REGULAR"]["minPublishers"] == 3
+    assert sessions["PRE_MARKET"]["allowedPublisherIds"] == [19, 22]
+    assert sessions["PRE_MARKET"]["minPublishers"] == 2
+    assert sessions["POST_MARKET"]["allowedPublisherIds"] == [19]
+    assert sessions["POST_MARKET"]["minPublishers"] == 2
+    assert sessions["OVER_NIGHT"]["allowedPublisherIds"] == [29, 41]
+    assert sessions["OVER_NIGHT"]["minPublishers"] == 1
+
+
+def test_modify_config_does_not_add_sessions_for_non_equities(tmp_path):
+    """Metals feed should not get extended sessions added."""
+    from update_config_from_summary import modify_config
+
+    config_file = tmp_path / "after.json"
+    config_file.write_text(json.dumps(SAMPLE_CONFIG_EQUITIES, indent=2))
+
+    feed_publishers = {
+        200: {
+            "regular": [12, 19, 22],
+            "premarket": [],
+            "afterhours": [],
+            "overnight": [],
+            "top_level": [12, 19, 22],
+            "mode": "metals",
+        }
+    }
+    modify_config(str(config_file), feed_publishers, dry_run=False)
+
+    with open(config_file) as f:
+        data = json.load(f)
+
+    feed = [f for f in data["feeds"] if f["feedId"] == 200][0]
+    sessions = [s["session"] for s in feed["marketSchedules"]]
+    assert sessions == ["REGULAR"]
