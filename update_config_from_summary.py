@@ -498,3 +498,76 @@ def modify_config(
         "skipped_empty": skipped_empty,
         "not_found": not_found,
     }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Update after.json from a feed_readiness summary CSV"
+    )
+    parser.add_argument(
+        "--summary",
+        required=True,
+        help="Path to feed_readiness summary CSV",
+    )
+    parser.add_argument(
+        "--config",
+        required=True,
+        help="Path to after.json config file",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print changes without writing to file",
+    )
+    args = parser.parse_args()
+
+    summary_path = Path(args.summary)
+    if not summary_path.exists():
+        print(f"ERROR: Summary file not found: {summary_path}")
+        sys.exit(1)
+    config_path = Path(args.config)
+    if not config_path.exists():
+        print(f"ERROR: Config file not found: {config_path}")
+        sys.exit(1)
+
+    # 1. Parse CSV
+    print(f"Reading summary from {summary_path}")
+    with open(summary_path) as f:
+        grouped_rows = parse_summary_csv(f)
+    print(f"Found {len(grouped_rows)} unique feeds across CSV rows")
+
+    # 2. Compute per-feed publisher lists
+    feed_publishers = {}
+    for feed_id, rows in grouped_rows.items():
+        pub_data = compute_feed_publishers(rows)
+        feed_publishers[feed_id] = pub_data
+
+    if args.dry_run:
+        print("\n=== DRY RUN (no files will be modified) ===\n")
+    else:
+        print()
+
+    # 3. Apply to config
+    result = modify_config(str(config_path), feed_publishers, dry_run=args.dry_run)
+
+    # 4. Print summary
+    print(f"\n{'='*50}")
+    print("SUMMARY")
+    print(f"{'='*50}")
+    print(f"  Newly STABLE:             {result['newly_stable']}")
+    print(f"  Updated (already STABLE): {result['updated_stable']}")
+    print(f"  Skipped (empty):          {result['skipped_empty']}")
+    print(f"  Not found in config:      {len(result['not_found'])}")
+    if result["not_found"]:
+        print(f"  Missing feed IDs: {result['not_found']}")
+    total = (
+        result["newly_stable"]
+        + result["updated_stable"]
+        + result["skipped_empty"]
+        + len(result["not_found"])
+    )
+    print(f"  Total processed:          {total}/{len(feed_publishers)}")
+
+
+if __name__ == "__main__":
+    main()

@@ -593,3 +593,107 @@ def test_modify_config_does_not_add_sessions_for_non_equities(tmp_path):
     feed = [f for f in data["feeds"] if f["feedId"] == 200][0]
     sessions = [s["session"] for s in feed["marketSchedules"]]
     assert sessions == ["REGULAR"]
+
+
+# --- CLI integration tests ---
+
+
+def _write_test_csv(tmp_path):
+    """Write a test summary CSV and config, return paths."""
+    csv_file = tmp_path / "summary.csv"
+    csv_file.write_text(SAMPLE_CSV)
+    config_file = tmp_path / "after.json"
+    config_file.write_text(json.dumps(SAMPLE_CONFIG_EQUITIES, indent=2))
+    return csv_file, config_file
+
+
+def test_cli_dry_run(tmp_path):
+    csv_file, config_file = _write_test_csv(tmp_path)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "update_config_from_summary.py",
+            "--summary",
+            str(csv_file),
+            "--config",
+            str(config_file),
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        cwd="/home/mariobern/integration-benchmarking",
+    )
+    assert result.returncode == 0
+    assert "DRY RUN" in result.stdout
+
+    # Config file unchanged
+    with open(config_file) as f:
+        data = json.load(f)
+    feed = [f for f in data["feeds"] if f["feedId"] == 100][0]
+    assert feed["state"] == "COMING_SOON"
+
+
+def test_cli_real_run(tmp_path):
+    csv_file, config_file = _write_test_csv(tmp_path)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "update_config_from_summary.py",
+            "--summary",
+            str(csv_file),
+            "--config",
+            str(config_file),
+        ],
+        capture_output=True,
+        text=True,
+        cwd="/home/mariobern/integration-benchmarking",
+    )
+    assert result.returncode == 0
+    assert "SUMMARY" in result.stdout
+
+    with open(config_file) as f:
+        data = json.load(f)
+    feed = [f for f in data["feeds"] if f["feedId"] == 100][0]
+    assert feed["state"] == "STABLE"
+
+
+def test_cli_missing_summary_file(tmp_path):
+    config_file = tmp_path / "after.json"
+    config_file.write_text(json.dumps(SAMPLE_CONFIG_EQUITIES, indent=2))
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "update_config_from_summary.py",
+            "--summary",
+            str(tmp_path / "nonexistent.csv"),
+            "--config",
+            str(config_file),
+        ],
+        capture_output=True,
+        text=True,
+        cwd="/home/mariobern/integration-benchmarking",
+    )
+    assert result.returncode != 0
+
+
+def test_cli_prints_summary_counts(tmp_path):
+    csv_file, config_file = _write_test_csv(tmp_path)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "update_config_from_summary.py",
+            "--summary",
+            str(csv_file),
+            "--config",
+            str(config_file),
+        ],
+        capture_output=True,
+        text=True,
+        cwd="/home/mariobern/integration-benchmarking",
+    )
+    assert "Newly STABLE:" in result.stdout
+    assert "Updated (already STABLE):" in result.stdout
