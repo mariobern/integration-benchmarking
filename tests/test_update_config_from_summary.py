@@ -697,3 +697,354 @@ def test_cli_prints_summary_counts(tmp_path):
     )
     assert "Newly STABLE:" in result.stdout
     assert "Updated (already STABLE):" in result.stdout
+
+
+# ── Coverage gap tests ────────────────────────────────────────────────
+
+
+def test_find_feed_block_with_nested_braces():
+    """Cover _find_feed_block brace-depth scanning (lines 100, 103, 107)."""
+    from update_config_from_summary import _find_feed_block
+
+    # Feed with nested objects that force brace-depth tracking
+    config = {
+        "feeds": [
+            {
+                "feedId": 50,
+                "metadata": {"nested": {"deep": "value"}},
+                "state": "STABLE",
+            },
+            {
+                "feedId": 60,
+                "metadata": {"name": "TEST"},
+                "state": "COMING_SOON",
+            },
+        ]
+    }
+    raw = json.dumps(config, indent=2)
+    # Finding feed 60 requires scanning backward past feed 50's closing braces
+    bounds = _find_feed_block(raw, 60)
+    assert bounds is not None
+    block = raw[bounds[0] : bounds[1]]
+    assert '"feedId": 60' in block
+    assert '"feedId": 50' not in block
+
+
+def test_find_feed_block_with_escaped_strings():
+    """Cover _find_feed_block escaped string handling (lines 100-101)."""
+    from update_config_from_summary import _find_feed_block
+
+    # Feed with escaped quotes in string values
+    config = {
+        "feeds": [
+            {
+                "feedId": 70,
+                "metadata": {"description": 'value with \\"quotes\\"'},
+                "state": "STABLE",
+            }
+        ]
+    }
+    raw = json.dumps(config, indent=2)
+    bounds = _find_feed_block(raw, 70)
+    assert bounds is not None
+    block = raw[bounds[0] : bounds[1]]
+    assert '"feedId": 70' in block
+
+
+def test_find_session_block_with_nested_objects():
+    """Cover _find_session_block nested brace tracking (lines 235, 239, 252)."""
+    from update_config_from_summary import _find_session_block
+
+    # Block with session entry containing nested arrays/objects
+    block = json.dumps(
+        {
+            "marketSchedules": [
+                {
+                    "allowedPublisherIds": [1, 2, 3],
+                    "marketSchedule": "schedule_string",
+                    "minPublishers": 3,
+                    "session": "REGULAR",
+                },
+                {
+                    "allowedPublisherIds": [4, 5],
+                    "marketSchedule": "schedule_string2",
+                    "minPublishers": 2,
+                    "session": "PRE_MARKET",
+                },
+            ]
+        },
+        indent=2,
+    )
+    # Finding PRE_MARKET requires scanning past REGULAR's nested structures
+    bounds = _find_session_block(block, "PRE_MARKET")
+    assert bounds is not None
+    session_block = block[bounds[0] : bounds[1]]
+    assert '"session": "PRE_MARKET"' in session_block
+    assert '"session": "REGULAR"' not in session_block
+
+
+def test_modify_config_skips_inactive_state(tmp_path):
+    """Cover skip for non-COMING_SOON/STABLE state (lines 422-425)."""
+    from update_config_from_summary import modify_config
+
+    config = {
+        "feeds": [
+            {
+                "allowedPublisherIds": [1, 2],
+                "feedId": 400,
+                "metadata": {"name": "INACTIVE_FEED"},
+                "minPublishers": 1,
+                "state": "INACTIVE",
+                "symbol": "Test/USD",
+            }
+        ]
+    }
+    config_file = tmp_path / "after.json"
+    config_file.write_text(json.dumps(config, indent=2))
+
+    feed_publishers = {
+        400: {
+            "regular": [12, 19],
+            "premarket": [],
+            "afterhours": [],
+            "overnight": [],
+            "top_level": [12, 19],
+            "mode": "us-equities",
+        }
+    }
+    result = modify_config(str(config_file), feed_publishers, dry_run=False)
+
+    # Feed should not be modified (INACTIVE state)
+    assert result["newly_stable"] == 0
+    assert result["updated_stable"] == 0
+    with open(config_file) as f:
+        data = json.load(f)
+    assert data["feeds"][0]["allowedPublisherIds"] == [1, 2]  # unchanged
+
+
+def test_modify_config_inserts_missing_allowed_publisher_ids(tmp_path):
+    """Cover insert of allowedPublisherIds when field is absent (lines 455-457)."""
+    from update_config_from_summary import modify_config
+
+    config = {
+        "feeds": [
+            {
+                "feedId": 500,
+                "kind": "PRICE",
+                "marketSchedules": [
+                    {
+                        "marketSchedule": "America/New_York;O,O,O,O,O,O,O;",
+                        "session": "REGULAR",
+                    }
+                ],
+                "metadata": {"name": "NO_PUBS_FEED"},
+                "minPublishers": 100,
+                "state": "COMING_SOON",
+                "symbol": "Equity.US.NOPUB/USD",
+            }
+        ]
+    }
+    config_file = tmp_path / "after.json"
+    config_file.write_text(json.dumps(config, indent=2))
+
+    feed_publishers = {
+        500: {
+            "regular": [12, 19, 22],
+            "premarket": [],
+            "afterhours": [],
+            "overnight": [],
+            "top_level": [12, 19, 22],
+            "mode": "us-equities",
+        }
+    }
+    result = modify_config(str(config_file), feed_publishers, dry_run=False)
+
+    assert result["newly_stable"] == 1
+    with open(config_file) as f:
+        data = json.load(f)
+    feed = data["feeds"][0]
+    assert feed["allowedPublisherIds"] == [12, 19, 22]
+    assert feed["state"] == "STABLE"
+
+
+def test_main_directly(tmp_path, monkeypatch):
+    """Cover main() in-process for coverage tracking (lines 504-569)."""
+    from update_config_from_summary import main
+
+    csv_file = tmp_path / "summary.csv"
+    csv_file.write_text(SAMPLE_CSV)
+    config_file = tmp_path / "after.json"
+    config_file.write_text(json.dumps(SAMPLE_CONFIG_EQUITIES, indent=2))
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "update_config_from_summary.py",
+            "--summary",
+            str(csv_file),
+            "--config",
+            str(config_file),
+            "--dry-run",
+        ],
+    )
+    main()
+
+    # Config unchanged (dry-run)
+    with open(config_file) as f:
+        data = json.load(f)
+    assert data["feeds"][0]["state"] == "COMING_SOON"
+
+
+def test_main_real_run(tmp_path, monkeypatch):
+    """Cover main() real run path including non-dry-run branch."""
+    from update_config_from_summary import main
+
+    csv_file = tmp_path / "summary.csv"
+    csv_file.write_text(SAMPLE_CSV)
+    config_file = tmp_path / "after.json"
+    config_file.write_text(json.dumps(SAMPLE_CONFIG_EQUITIES, indent=2))
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "update_config_from_summary.py",
+            "--summary",
+            str(csv_file),
+            "--config",
+            str(config_file),
+        ],
+    )
+    main()
+
+    with open(config_file) as f:
+        data = json.load(f)
+    feed = [f for f in data["feeds"] if f["feedId"] == 100][0]
+    assert feed["state"] == "STABLE"
+
+
+def test_main_missing_file(tmp_path, monkeypatch):
+    """Cover main() exit on missing file (lines 526-527)."""
+    from update_config_from_summary import main
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "update_config_from_summary.py",
+            "--summary",
+            str(tmp_path / "nope.csv"),
+            "--config",
+            str(tmp_path / "nope.json"),
+        ],
+    )
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+    assert exc_info.value.code == 1
+
+
+def test_main_missing_config_file(tmp_path, monkeypatch):
+    """Cover main() exit on missing config file (lines 530-531)."""
+    from update_config_from_summary import main
+
+    csv_file = tmp_path / "summary.csv"
+    csv_file.write_text(SAMPLE_CSV)
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "update_config_from_summary.py",
+            "--summary",
+            str(csv_file),
+            "--config",
+            str(tmp_path / "nope.json"),
+        ],
+    )
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+    assert exc_info.value.code == 1
+
+
+def test_main_prints_not_found_feeds(tmp_path, monkeypatch):
+    """Cover main() not_found feed IDs output (line 562)."""
+    from update_config_from_summary import main
+
+    # CSV references feed 100 but config only has feed 999
+    csv_file = tmp_path / "summary.csv"
+    csv_file.write_text(SAMPLE_CSV)
+    config = {
+        "feeds": [
+            {
+                "allowedPublisherIds": [1, 2],
+                "feedId": 999,
+                "metadata": {"name": "OTHER"},
+                "minPublishers": 1,
+                "state": "STABLE",
+                "symbol": "Other/USD",
+            }
+        ]
+    }
+    config_file = tmp_path / "after.json"
+    config_file.write_text(json.dumps(config, indent=2))
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "update_config_from_summary.py",
+            "--summary",
+            str(csv_file),
+            "--config",
+            str(config_file),
+        ],
+    )
+    main()
+    # If we get here without error, the not_found path was exercised
+
+
+def test_modify_config_feed_block_not_in_raw(tmp_path):
+    """Cover modify_config when feed exists in parsed JSON but block not found (lines 429-434).
+
+    This is a defensive path — we simulate it by having a feedId that parses
+    but whose raw text block can't be located by regex (e.g., feedId embedded
+    only in a string value, not as a real key).
+    """
+    from update_config_from_summary import modify_config
+
+    # Manually craft JSON where feedId 42 appears only inside a string
+    raw = '{"feeds": [{"feedId": 42, "state": "COMING_SOON", "metadata": {"name": "GHOST"}}]}'
+    # json.loads can parse this, but _find_feed_block uses regex on formatted text.
+    # With no indentation, the block finder still works. We need a trickier approach:
+    # Use a config where the feed lookup has an ID but _find_feed_block fails.
+    # Simplest: write valid JSON, then corrupt the raw text after parsing.
+    # Instead, test the actual path via a mock.
+    import unittest.mock
+
+    config_file = tmp_path / "after.json"
+    config = {
+        "feeds": [
+            {
+                "feedId": 42,
+                "state": "COMING_SOON",
+                "metadata": {"name": "GHOST"},
+                "minPublishers": 1,
+                "allowedPublisherIds": [1],
+            }
+        ]
+    }
+    config_file.write_text(json.dumps(config, indent=2))
+
+    feed_publishers = {
+        42: {
+            "regular": [12, 19],
+            "premarket": [],
+            "afterhours": [],
+            "overnight": [],
+            "top_level": [12, 19],
+            "mode": "fx",
+        }
+    }
+
+    with unittest.mock.patch(
+        "update_config_from_summary._find_feed_block", return_value=None
+    ):
+        result = modify_config(str(config_file), feed_publishers, dry_run=True)
+
+    assert 42 in result["not_found"]
