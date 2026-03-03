@@ -498,7 +498,8 @@ def test_modify_config_updates_regular_session_publishers(tmp_path):
     feed = [f for f in data["feeds"] if f["feedId"] == 100][0]
     regular = [s for s in feed["marketSchedules"] if s["session"] == "REGULAR"][0]
     assert regular["allowedPublisherIds"] == [12, 19, 22]
-    assert regular["minPublishers"] == 3
+    # 3 publishers <= 5 threshold → minPublishers reduced to 2
+    assert regular["minPublishers"] == 2
 
 
 def test_modify_config_updates_premarket_session_publishers(tmp_path):
@@ -559,7 +560,8 @@ def test_modify_config_adds_missing_extended_sessions(tmp_path):
     assert "OVER_NIGHT" in sessions
 
     assert sessions["REGULAR"]["allowedPublisherIds"] == [12, 19, 22]
-    assert sessions["REGULAR"]["minPublishers"] == 3
+    # 3 publishers <= 5 threshold → minPublishers reduced to 2
+    assert sessions["REGULAR"]["minPublishers"] == 2
     assert sessions["PRE_MARKET"]["allowedPublisherIds"] == [19, 22]
     assert sessions["PRE_MARKET"]["minPublishers"] == 2
     assert sessions["POST_MARKET"]["allowedPublisherIds"] == [19]
@@ -997,6 +999,63 @@ def test_main_prints_not_found_feeds(tmp_path, monkeypatch):
     )
     main()
     # If we get here without error, the not_found path was exercised
+
+
+def test_get_min_publishers_regular_low_count():
+    """REGULAR session with <= 5 publishers should use minPublishers=2."""
+    from update_config_from_summary import _get_min_publishers
+
+    assert _get_min_publishers("REGULAR", 1) == 2
+    assert _get_min_publishers("REGULAR", 3) == 2
+    assert _get_min_publishers("REGULAR", 5) == 2
+
+
+def test_get_min_publishers_regular_high_count():
+    """REGULAR session with > 5 publishers should use default minPublishers=3."""
+    from update_config_from_summary import _get_min_publishers
+
+    assert _get_min_publishers("REGULAR", 6) == 3
+    assert _get_min_publishers("REGULAR", 10) == 3
+
+
+def test_get_min_publishers_other_sessions_unaffected():
+    """Non-REGULAR sessions should always use their default values."""
+    from update_config_from_summary import _get_min_publishers
+
+    # Low count should NOT affect non-REGULAR sessions
+    assert _get_min_publishers("PRE_MARKET", 1) == 2
+    assert _get_min_publishers("PRE_MARKET", 10) == 2
+    assert _get_min_publishers("POST_MARKET", 1) == 2
+    assert _get_min_publishers("OVER_NIGHT", 1) == 1
+
+
+def test_modify_config_regular_session_high_pub_count(tmp_path):
+    """REGULAR session with > 5 publishers should get minPublishers=3."""
+    from update_config_from_summary import modify_config
+
+    config_file = tmp_path / "after.json"
+    config_file.write_text(json.dumps(SAMPLE_CONFIG_EQUITIES, indent=2))
+
+    feed_publishers = {
+        100: {
+            "regular": [12, 19, 22, 29, 41, 54],
+            "premarket": [],
+            "afterhours": [],
+            "overnight": [],
+            "top_level": [12, 19, 22, 29, 41, 54],
+            "mode": "us-equities",
+        }
+    }
+    modify_config(str(config_file), feed_publishers, dry_run=False)
+
+    with open(config_file) as f:
+        data = json.load(f)
+
+    feed = [f for f in data["feeds"] if f["feedId"] == 100][0]
+    regular = [s for s in feed["marketSchedules"] if s["session"] == "REGULAR"][0]
+    assert regular["allowedPublisherIds"] == [12, 19, 22, 29, 41, 54]
+    # 6 publishers > 5 threshold → default minPublishers=3
+    assert regular["minPublishers"] == 3
 
 
 def test_modify_config_feed_block_not_in_raw(tmp_path):

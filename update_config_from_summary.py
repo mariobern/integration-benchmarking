@@ -208,13 +208,28 @@ _SESSION_KEY_TO_JSON = {
     "overnight": "OVER_NIGHT",
 }
 
-# minPublishers per session
+# minPublishers per session (default values)
 _SESSION_MIN_PUBLISHERS = {
     "REGULAR": 3,
     "PRE_MARKET": 2,
     "POST_MARKET": 2,
     "OVER_NIGHT": 1,
 }
+
+# If REGULAR session has this many or fewer publishers, use reduced minPublishers
+_REGULAR_LOW_PUB_THRESHOLD = 5
+_REGULAR_LOW_PUB_MIN = 2
+
+
+def _get_min_publishers(session_name: str, pub_count: int) -> int:
+    """Return minPublishers for a session, adjusting for low publisher counts.
+
+    For REGULAR sessions with 5 or fewer publishers, returns 2 instead of 3.
+    """
+    base = _SESSION_MIN_PUBLISHERS[session_name]
+    if session_name == "REGULAR" and pub_count <= _REGULAR_LOW_PUB_THRESHOLD:
+        return _REGULAR_LOW_PUB_MIN
+    return base
 
 
 def _find_session_block(block: str, session_name: str) -> tuple[int, int] | None:
@@ -263,7 +278,7 @@ def _build_session_entry(
     """Build a JSON session entry string for insertion into marketSchedules."""
     pub_str = ", ".join(str(p) for p in pub_ids)
     schedule = _SCHEDULE_TEMPLATES[session_name]
-    min_pub = _SESSION_MIN_PUBLISHERS[session_name]
+    min_pub = _get_min_publishers(session_name, len(pub_ids))
     return (
         f"{indent}{{\n"
         f'{indent}  "allowedPublisherIds": [ {pub_str} ],\n'
@@ -288,7 +303,7 @@ def _update_market_schedules(block: str, pub_data: dict) -> str:
         if not pubs:
             continue
 
-        min_pub = _SESSION_MIN_PUBLISHERS[json_session]
+        min_pub = _get_min_publishers(json_session, len(pubs))
         pub_str = "[ " + ", ".join(str(p) for p in pubs) + " ]"
 
         session_bounds = _find_session_block(block, json_session)
