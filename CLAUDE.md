@@ -99,6 +99,7 @@ FX and Metals use 24-hour regular session (with maintenance windows). See indivi
 | `trading_halt_history.py`       | Download NASDAQ LUDP halt data                                | `python trading_halt_history.py`                                            | [docs/trading_halt_history.md](docs/trading_halt_history.md)             |
 | `generate_price_list.py`        | Generate price_id_list.csv from feed IDs + lazer_symbols.json | `python3 generate_price_list.py --feed-id 327 340 --date 2026-02-27`        | -                                                                        |
 | `verify_uptime.py`              | Compare uptime calculation methods (1s window vs 200ms gap)   | `python verify_uptime.py --publisher-id 55 --date 2026-01-28`               | -                                                                        |
+| `volume_profile.py`             | Volume profile analysis for US equities (per-session)         | `python3 volume_profile.py --tickers AAPL,MSFT --date 2026-03-03`           | [docs/volume_profile.md](docs/volume_profile.md)                         |
 
 ### Publisher Performance Portal
 
