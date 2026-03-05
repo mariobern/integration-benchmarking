@@ -59656,7 +59656,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "PYTH PRICE IN USD FOR BRENT 28 NOVEMBER 2025",
+        "description": "DEPRECATED FEED - PYTH BRENT 28 NOVEMBER 2025 / US DOLLAR",
         "hermes_id": "14cc780e57246819f68589d9646f507e70b637d14ac0dff2d384cfbc792a0256",
         "name": "BRENTF6",
         "quote_currency": "USD"
@@ -68951,7 +68951,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "PYTH PRICE IN USD FOR WTI 20 FEBRUARY 2026",
+        "description": "DEPRECATED FEED - PYTH WTI 20 FEBRUARY 2026 / US DOLLAR",
         "hermes_id": "0058c6f03fd28b18083d00fcdc3baaed2f11edef8b981f6b74130b85be474b17",
         "name": "WTIH6",
         "quote_currency": "USD"
@@ -69026,7 +69026,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "PYTH PRICE IN USD FOR BRENT 30 DECEMBER 2025",
+        "description": "DEPRECATED FEED - PYTH BRENT 30 DECEMBER 2025 / US DOLLAR",
         "hermes_id": "0169b040900764f5ec0d1c54861057c2696ed5dee8814c0a711c7e4385e6a151",
         "name": "BRENTG6",
         "quote_currency": "USD"
@@ -69051,7 +69051,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "PYTH PRICE IN USD FOR BRENT 30 JANUARY 2026",
+        "description": "DEPRECATED FEED - PYTH BRENT 30 JANUARY 2026 / US DOLLAR",
         "hermes_id": "4a98349a329fc4b4ffbbd924447174f4308f3721351f2ecc31eb305b6929a510",
         "name": "BRENTH6",
         "quote_currency": "USD"
