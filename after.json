@@ -58780,7 +58780,7 @@
       ],
       "metadata": {
         "asset_type": "equity",
-        "description": "CME DJ INDEX FUTURES 20 MARCH 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR CME DJ INDEX FUTURES 20 MARCH 2026",
         "hermes_id": "9297f135ea97d8f7fa6ee79998bf00c3344328a59beaa984621b659d5afafb26",
         "name": "DMH6",
         "quote_currency": "USD"
@@ -58854,7 +58854,7 @@
       ],
       "metadata": {
         "asset_type": "equity",
-        "description": "CME S&P 500 INDEX E-MINI FUTURES 20 MARCH 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR CME S&P 500 INDEX E-MINI FUTURES 20 MARCH 2026",
         "hermes_id": "7742d1d4650d34baec571c9a610345335cdc7eb88dc9a8b3ff810dc717a6c182",
         "name": "EMH6",
         "quote_currency": "USD"
@@ -58903,7 +58903,7 @@
       ],
       "metadata": {
         "asset_type": "equity",
-        "description": "CME S&P 500 INDEX E-MINI FUTURES 19 DECEMBER 2025 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR CME S&P 500 INDEX E-MINI FUTURES 19 DECEMBER 2025",
         "hermes_id": "2f007d2339327f9be181b61354ca0ec579d8c4ed37d575bb66921109ebffc2c9",
         "name": "EMZ5",
         "quote_currency": "USD"
@@ -59155,7 +59155,7 @@
       ],
       "metadata": {
         "asset_type": "equity",
-        "description": "CME NASDAQ E-MINI INDEX FUTURES 20 MARCH 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR CME NASDAQ E-MINI INDEX FUTURES 20 MARCH 2026",
         "hermes_id": "3f25534247e93c87271d0b65b475b0c139b6cb3a734f3800a658e287a1283b2c",
         "name": "NMH6",
         "quote_currency": "USD"
@@ -59204,7 +59204,7 @@
       ],
       "metadata": {
         "asset_type": "equity",
-        "description": "CME NASDAQ E-MINI INDEX FUTURES 19 DECEMBER 2025 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR CME NASDAQ E-MINI INDEX FUTURES 19 DECEMBER 2025",
         "hermes_id": "c9a251e28c660c08796f005a4d61769829c81fd4474dbd91d934fa9d36398e08",
         "name": "NMZ5",
         "quote_currency": "USD"
@@ -59656,7 +59656,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "DEPRECATED FEED - PYTH BRENT 28 NOVEMBER 2025 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR BRENT 28 NOVEMBER 2025",
         "hermes_id": "14cc780e57246819f68589d9646f507e70b637d14ac0dff2d384cfbc792a0256",
         "name": "BRENTF6",
         "quote_currency": "USD"
@@ -68951,7 +68951,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "DEPRECATED FEED - PYTH WTI 20 FEBRUARY 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR WTI 20 FEBRUARY 2026",
         "hermes_id": "0058c6f03fd28b18083d00fcdc3baaed2f11edef8b981f6b74130b85be474b17",
         "name": "WTIH6",
         "quote_currency": "USD"
@@ -68976,7 +68976,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "WTI 20 MARCH 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR WTI 20 MARCH 2026",
         "hermes_id": "6a60b0d1ea6809b47dbe599f24a71c8bda335aa5c77e503e7260cde5ba2f4694",
         "name": "WTIJ6",
         "quote_currency": "USD"
@@ -69001,7 +69001,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "WTI 21 APRIL 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR WTI 21 APRIL 2026",
         "hermes_id": "40d9903bd7a727ad128c89fca177d77d0175de6ea5c789a81473bf17bad64b39",
         "name": "WTIK6",
         "quote_currency": "USD"
@@ -69026,7 +69026,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "DEPRECATED FEED - PYTH BRENT 30 DECEMBER 2025 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR BRENT 30 DECEMBER 2025",
         "hermes_id": "0169b040900764f5ec0d1c54861057c2696ed5dee8814c0a711c7e4385e6a151",
         "name": "BRENTG6",
         "quote_currency": "USD"
@@ -69051,7 +69051,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "DEPRECATED FEED - PYTH BRENT 30 JANUARY 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR BRENT 30 JANUARY 2026",
         "hermes_id": "4a98349a329fc4b4ffbbd924447174f4308f3721351f2ecc31eb305b6929a510",
         "name": "BRENTH6",
         "quote_currency": "USD"
@@ -69099,7 +69099,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "BRENT 31 MARCH 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR BRENT 31 MARCH 2026",
         "hermes_id": "e51dd42e6cf3fef7e1afcfac913c68bbcb0e6cb6154017f8ad98203dba5241fa",
         "name": "BRENTK6",
         "quote_currency": "USD"
@@ -74391,7 +74391,7 @@
       ],
       "metadata": {
         "asset_type": "equity",
-        "description": "CME NIKKEI USD FUTURES 12 MARCH 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR CME NIKKEI USD FUTURES 12 MARCH 2026",
         "hermes_id": "b3d3d2d7ed79dbbb036feead2310d5f6c6e63a70609a1243314ab5dfab4ae427",
         "name": "NIDH6",
         "quote_currency": "USD"
@@ -74415,7 +74415,7 @@
       ],
       "metadata": {
         "asset_type": "equity",
-        "description": "CME NIKKEI USD FUTURES 11 JUNE 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR CME NIKKEI USD FUTURES 11 JUNE 2026",
         "hermes_id": "a782aa53a79a0aaa311e50f6631577bdc972781fdc75ab95f357ba8fb61d2d0d",
         "name": "NIDM6",
         "quote_currency": "USD"
@@ -74439,7 +74439,7 @@
       ],
       "metadata": {
         "asset_type": "equity",
-        "description": "CME NIKKEI USD FUTURES 10 SEPTEMBER 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR CME NIKKEI USD FUTURES 10 SEPTEMBER 2026",
         "hermes_id": "7561853a241258b29ccb3aeeb176834feb168566319f7455a9dc6f05e2511268",
         "name": "NIDU6",
         "quote_currency": "USD"
@@ -74858,7 +74858,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "COMEX HIGH GRADE COPPER FUTURES MARCH 2026",
+        "description": "PYTH PRICE IN USD FOR COMEX HIGH GRADE COPPER FUTURES MARCH 2026",
         "hermes_id": "3ba8f8b6b6f3e5796feb24ab64147ba52dc3a53ce31a08cdc00405e9579b371d",
         "name": "CCH6",
         "quote_currency": "USD"
@@ -74883,7 +74883,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "COMEX HIGH GRADE COPPER FUTURES APRIL 2026",
+        "description": "PYTH PRICE IN USD FOR COMEX HIGH GRADE COPPER FUTURES APRIL 2026",
         "hermes_id": "6bd847f1c37fb81771ac6d64e6a9409bea27f09f7e905993ee46cf4378cae722",
         "name": "CCJ6",
         "quote_currency": "USD"
@@ -74908,7 +74908,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "COMEX HIGH GRADE COPPER FUTURES MAY 2026",
+        "description": "PYTH PRICE IN USD FOR COMEX HIGH GRADE COPPER FUTURES MAY 2026",
         "hermes_id": "d6a6755e89a16800a66dbc1a62356e5aaaba575c85fc4a86d787a84b5efe5fc4",
         "name": "CCK6",
         "quote_currency": "USD"
@@ -74933,7 +74933,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "COMEX HIGH GRADE COPPER FUTURES JUNE 2026",
+        "description": "PYTH PRICE IN USD FOR COMEX HIGH GRADE COPPER FUTURES JUNE 2026",
         "hermes_id": "4a41250a5924a6a3459aaa617c081ce57480f0bfa1be2cac993a43aced4b61cc",
         "name": "CCM6",
         "quote_currency": "USD"
@@ -74958,7 +74958,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "COMEX HIGH GRADE COPPER FUTURES JULY 2026",
+        "description": "PYTH PRICE IN USD FOR COMEX HIGH GRADE COPPER FUTURES JULY 2026",
         "hermes_id": "14ce75bc8f30f7332a2c49fdb8765df37d2480564cc64d280bc133f6830e1b53",
         "name": "CCN6",
         "quote_currency": "USD"
@@ -74983,7 +74983,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "COMEX HIGH GRADE COPPER FUTURES AUGUST 2026",
+        "description": "PYTH PRICE IN USD FOR COMEX HIGH GRADE COPPER FUTURES AUGUST 2026",
         "hermes_id": "0ecbef2e191ed6ced916db4823a1d18528f93ebc82c91e05916f18c3e80c0af7",
         "name": "CCQ6",
         "quote_currency": "USD"
@@ -75008,7 +75008,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "COMEX HIGH GRADE COPPER FUTURES SEPTEMBER 2026",
+        "description": "PYTH PRICE IN USD FOR COMEX HIGH GRADE COPPER FUTURES SEPTEMBER 2026",
         "hermes_id": "e18f040343bc881281f3f210eafd20d0206e6a0d9ce572b94e71b118121c6416",
         "name": "CCU6",
         "quote_currency": "USD"
@@ -75033,7 +75033,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "COMEX HIGH GRADE COPPER FUTURES OCTOBER 2026",
+        "description": "PYTH PRICE IN USD FOR COMEX HIGH GRADE COPPER FUTURES OCTOBER 2026",
         "hermes_id": "2258398ffd584e54c5075d29e80cd8e5cf9e79c916f6498fef81b2c306833132",
         "name": "CCV6",
         "quote_currency": "USD"
@@ -75058,7 +75058,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "COMEX HIGH GRADE COPPER FUTURES NOVEMBER 2026",
+        "description": "PYTH PRICE IN USD FOR COMEX HIGH GRADE COPPER FUTURES NOVEMBER 2026",
         "hermes_id": "886d78227a4f4029aad70dc34856f935929899ba49e37d90db4e6780a4aaa570",
         "name": "CCX6",
         "quote_currency": "USD"
@@ -75083,7 +75083,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "COMEX HIGH GRADE COPPER FUTURES DECEMBER 2026",
+        "description": "PYTH PRICE IN USD FOR COMEX HIGH GRADE COPPER FUTURES DECEMBER 2026",
         "hermes_id": "b0608465d2f5e17fdd2097b9e32c76a31973d73971c0246a949599e8a2b4e414",
         "name": "CCZ6",
         "quote_currency": "USD"
@@ -75964,7 +75964,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "ALUMINIUM FUTURES 27 MARCH 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR ALUMINIUM FUTURES 27 MARCH 2026",
         "hermes_id": "2f99b6f1fc74227b450e091484b0418fdeae5b8976198b88b8e2035137058d6d",
         "name": "ALH6",
         "quote_currency": "USD"
@@ -75989,7 +75989,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "ALUMINIUM FUTURES 28 APRIL 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR ALUMINIUM FUTURES 28 APRIL 2026",
         "hermes_id": "59cf9297864b2855ecbd005f43329e62d60ca58d28ad6e02f8453a2112f1e99b",
         "name": "ALJ6",
         "quote_currency": "USD"
@@ -76014,7 +76014,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "ALUMINIUM FUTURES 27 MAY 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR ALUMINIUM FUTURES 27 MAY 2026",
         "hermes_id": "906b2cf5b7767bfe96609824edd0d6d4d40874545c8be1dedc5943450f9b902f",
         "name": "ALK6",
         "quote_currency": "USD"
@@ -76114,7 +76114,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "PLATINUM 28 APRIL 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR PLATINUM 28 APRIL 2026",
         "hermes_id": "8ecd88da6dc67b6385d9f8afbea0aebc85db89a9c93a24804c6b327da4bf95b5",
         "name": "PTJ6",
         "quote_currency": "USD"
@@ -76139,7 +76139,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "PLATINUM 29 JULY 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR PLATINUM 29 JULY 2026",
         "hermes_id": "e7c66e9aac3b5ea0b4e9051472a7bcdec2edfaa743697eaca85741fcdc5c8b2e",
         "name": "PTN6",
         "quote_currency": "USD"
@@ -76164,7 +76164,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "PLATINUM 28 OCTOBER 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR PLATINUM 28 OCTOBER 2026",
         "hermes_id": "54a5a2a245da9b9188e4b448a7d35d7503adb660648ca108339e221cbb22e92a",
         "name": "PTV6",
         "quote_currency": "USD"
@@ -76189,7 +76189,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "URANIUM 23 FEBRUARY 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR URANIUM 23 FEBRUARY 2026",
         "hermes_id": "cde5ae55ddfe9e7d5f75019e86506f59cb29b07249a3ad1a20924edecf767b97",
         "name": "URG6",
         "quote_currency": "USD"
@@ -76214,7 +76214,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "URANIUM 30 MARCH 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR URANIUM 30 MARCH 2026",
         "hermes_id": "e89181f85868042f2da8358ebac02e1223cb0db2580d42db123d7ba1319ecbd3",
         "name": "URH6",
         "quote_currency": "USD"
@@ -76239,7 +76239,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "URANIUM 27 APRIL 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR URANIUM 27 APRIL 2026",
         "hermes_id": "bb14197492ff63d6f3ad1e19d6827b43097c72ded09ed729cb97cbfeec525b4f",
         "name": "URJ6",
         "quote_currency": "USD"
@@ -76627,7 +76627,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "NICKEL 18 MARCH 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR NICKEL 18 MARCH 2026",
         "hermes_id": "f58cae2e4e3fac1357f89bd102fbba31a1be0272798c1db53c17347dc181d370",
         "name": "NLH6",
         "quote_currency": "USD"
@@ -76651,7 +76651,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "NICKEL 15 APRIL 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR NICKEL 15 APRIL 2026",
         "hermes_id": "5055b213bdea9be04fb2b55064751560152f1e7c80c82bce26300a72c2a75f73",
         "name": "NLJ6",
         "quote_currency": "USD"
@@ -76748,7 +76748,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "HH NATURAL GAS 27 MARCH 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR HH NATURAL GAS 27 MARCH 2026",
         "hermes_id": "59cc2c539fd36b03c6f5329590f8fe42125106861e7a7f45c26761e88fe88318",
         "name": "NGDJ6",
         "quote_currency": "USD"
@@ -76773,7 +76773,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "HH NATURAL GAS 28 APRIL 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR HH NATURAL GAS 28 APRIL 2026",
         "hermes_id": "cbbe4de47ffd7681b33db9ebdf22eeb899046cbe566be06e875bf088324787ce",
         "name": "NGDK6",
         "quote_currency": "USD"
@@ -76798,7 +76798,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "HH NATURAL GAS 27 MAY 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR HH NATURAL GAS 27 MAY 2026",
         "hermes_id": "fbc11c7e9e320d833ee90ebc2002c36cf1bf6f501786c8cf1730ee85cc1705d9",
         "name": "NGDM6",
         "quote_currency": "USD"
@@ -76846,7 +76846,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "LEAD 16 JUNE 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR LEAD 16 JUNE 2026",
         "hermes_id": "066df60f6f9eccef8d58c091f9f67bfedc2113797917c329c678963a17ebcb90",
         "name": "LEM6",
         "quote_currency": "USD"
@@ -76870,7 +76870,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "LEAD 16 SEPTEMBER 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR LEAD 16 SEPTEMBER 2026",
         "hermes_id": "7c87a4d514d0274b25039d4a5074142f6a1e6476c4760d6bb9eb96ee28106c1c",
         "name": "LEU6",
         "quote_currency": "USD"
@@ -76894,7 +76894,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "TIN 17 MARCH 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR TIN 17 MARCH 2026",
         "hermes_id": "3c9d8e2de11a40a33c6e46f33e16265606abbe542dd00db72d9885d5c498b963",
         "name": "TIH6",
         "quote_currency": "USD"
@@ -76918,7 +76918,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "TIN 16 JUNE 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR TIN 16 JUNE 2026",
         "hermes_id": "4a7c532952fed05460501086a0293b44c6e8b78c863e93878b3602fb88203b80",
         "name": "TIM6",
         "quote_currency": "USD"
@@ -76942,7 +76942,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "TIN 15 SEPTEMBER 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR TIN 15 SEPTEMBER 2026",
         "hermes_id": "cc023ee1359ce903eefd0d7ed31d00038b2c14721486669a24957b1a3ee6b5d0",
         "name": "TIU6",
         "quote_currency": "USD"
@@ -76966,7 +76966,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "RAW SUGAR 27 FEBRUARY 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR RAW SUGAR 27 FEBRUARY 2026",
         "hermes_id": "6a6dddec2580c6a0f9237350aaf832957c416ac35bc551dea196f9de7c0aef64",
         "name": "RSH6",
         "quote_currency": "USD"
@@ -76990,7 +76990,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "RAW SUGAR 30 APRIL 2O26 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR RAW SUGAR 30 APRIL 2O26",
         "hermes_id": "5f042335ca301fd60937721c36d5f1e320155f7a8e65958d49102b342761ec96",
         "name": "RSK6",
         "quote_currency": "USD"
@@ -77014,7 +77014,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "RAW SUGAR 30 JUNE 2O26 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR RAW SUGAR 30 JUNE 2O26",
         "hermes_id": "0bd82229bc26af207a17c24949bf1a2ed70600377adada64597ca418028777f5",
         "name": "RSN6",
         "quote_currency": "USD"
@@ -77039,7 +77039,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "CORN 13 MARCH 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR CORN 13 MARCH 2026",
         "hermes_id": "422714ce5c05f1b9592916c5d996acb2dd00d8128c6e3a0655ddba51a81e6ac4",
         "name": "COH6",
         "quote_currency": "USD"
@@ -77064,7 +77064,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "CORN 14 MAY 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR CORN 14 MAY 2026",
         "hermes_id": "2cf5cd9186761a0c667f50ff7bd345ce87ff3de91803dda8613398378c3aa97b",
         "name": "COK6",
         "quote_currency": "USD"
@@ -77089,7 +77089,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "CORN 14 JULY 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR CORN 14 JULY 2026",
         "hermes_id": "fafacefa9dbab943d0bcbfb14bbdb6d37657220ff756b1328edfb6c4aef80c8a",
         "name": "CON6",
         "quote_currency": "USD"
@@ -77113,7 +77113,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "LS GASOIL 12 MARCH 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR LS GASOIL 12 MARCH 2026",
         "hermes_id": "b4ff2169fbc38c38c767af02d48e9c9439f0fbb22d8751c978874055b6fe029b",
         "name": "GOH6",
         "quote_currency": "USD"
@@ -77137,7 +77137,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "LS GASOIL 10 APRIL 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR LS GASOIL 10 APRIL 2026",
         "hermes_id": "cfb4b9276e8f86485a0a3f3dfb5f30e8b27f38d7576d2a9dda1326918a965f17",
         "name": "GOJ6",
         "quote_currency": "USD"
@@ -77161,7 +77161,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "LS GASOIL 12 MAY 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR LS GASOIL 12 MAY 2026",
         "hermes_id": "6dfc2f1dd90f947ed01053a325d58a3ae47a23fdd3836a41751f8b4347238dbc",
         "name": "GOK6",
         "quote_currency": "USD"
@@ -77210,7 +77210,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "HH NATURAL GAS 25 FEBRUARY 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR HH NATURAL GAS 25 FEBRUARY 2026",
         "hermes_id": "f39ddf4e7f133c8cc4d4a09de352fe3faa1e122e4c8697e2925bf4ce1ad4e94e",
         "name": "NGDH6",
         "quote_currency": "USD"
@@ -77280,7 +77280,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "HH NATURAL GAS 29 JULY 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR HH NATURAL GAS 29 JULY 2026",
         "hermes_id": "3ea3adf4dfa7eed79e357c9bdf8a15c6d4dc8fb5454cf71110c73390fb230436",
         "name": "NGDQ6",
         "quote_currency": "USD"
@@ -77304,7 +77304,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "HH NATURAL GAS 27 AUGUST 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR HH NATURAL GAS 27 AUGUST 2026",
         "hermes_id": "8805823f20690f7b1b138d912a1e6988dca4ed166c813118f8d05cbf00d61dce",
         "name": "NGDU6",
         "quote_currency": "USD"
@@ -77353,7 +77353,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "HH NATURAL GAS 26 JUNE 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR HH NATURAL GAS 26 JUNE 2026",
         "hermes_id": "1c597df8d6db7b35d20eb6ca5430e462425eddfe84ebc63530118d7389a43318",
         "name": "NGDN6",
         "quote_currency": "USD"
@@ -77428,7 +77428,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "WTI 19 MAY 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR WTI 19 MAY 2026",
         "hermes_id": "5519b89cd7b80d074113aae5d6555ddd74469222e331d9edc182c68153cf27b1",
         "name": "WTIM6",
         "quote_currency": "USD"
@@ -77453,7 +77453,7 @@
       ],
       "metadata": {
         "asset_type": "equity",
-        "description": "CME DJ INDEX FUTURES 18 JUNE 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR CME DJ INDEX FUTURES 18 JUNE 2026",
         "hermes_id": "",
         "name": "DMM6",
         "quote_currency": "USD"
@@ -77478,7 +77478,7 @@
       ],
       "metadata": {
         "asset_type": "equity",
-        "description": "CME S&P 500 INDEX E-MINI FUTURES 18 JUNE 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR CME S&P 500 INDEX E-MINI FUTURES 18 JUNE 2026",
         "hermes_id": "",
         "name": "EMM6",
         "quote_currency": "USD"
@@ -77503,7 +77503,7 @@
       ],
       "metadata": {
         "asset_type": "equity",
-        "description": "CME NASDAQ E-MINI INDEX FUTURES 18 JUNE 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR CME NASDAQ E-MINI INDEX FUTURES 18 JUNE 2026",
         "hermes_id": "",
         "name": "NMM6",
         "quote_currency": "USD"
@@ -77631,7 +77631,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "BRENT 30 APRIL 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR BRENT 30 APRIL 2026",
         "hermes_id": "16599f19706cca02fd0bc054128b3cef54c517c0085eeb18d87f69a7ed2b6ce4",
         "name": "BRENTM6",
         "quote_currency": "USD"
@@ -77655,7 +77655,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "BRENT 29 MAY 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR BRENT 29 MAY 2026",
         "hermes_id": "1a898bc6959f5c420a596ee6f074601e8e66e61eb042af194b37b89565991f1a",
         "name": "BRENTN6",
         "quote_currency": "USD"
@@ -77679,7 +77679,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "BRENT 30 JUNE 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR BRENT 30 JUNE 2026",
         "hermes_id": "cfdf6d7bd0e4221d8fc74a35caee1bf3c203c177781a5c9eef0b29c150698dab",
         "name": "BRENTQ6",
         "quote_currency": "USD"
@@ -77703,7 +77703,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "BRENT 31 JULY 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR BRENT 31 JULY 2026",
         "hermes_id": "93fdb7c6f23c6ba97baf2f086891e6749461a5f6cd620338102845acf210e96b",
         "name": "BRENTU6",
         "quote_currency": "USD"
@@ -77727,7 +77727,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "BRENT 28 AUGUST 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR BRENT 28 AUGUST 2026",
         "hermes_id": "6e3607735df0f027dc63890cc48055cccf1551003cc7a7c934cabe04485d1193",
         "name": "BRENTV6",
         "quote_currency": "USD"
@@ -77751,7 +77751,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "BRENT 30 SEPTEMBER 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR BRENT 30 SEPTEMBER 2026",
         "hermes_id": "25b67e140c4f6683d86ddaea0efaa20a0c13722da04b16d60361ad0b05d0d394",
         "name": "BRENTX6",
         "quote_currency": "USD"
@@ -77775,7 +77775,7 @@
       ],
       "metadata": {
         "asset_type": "commodity",
-        "description": "BRENT 30 OCTOBER 2026 / US DOLLAR",
+        "description": "PYTH PRICE IN USD FOR BRENT 30 OCTOBER 2026",
         "hermes_id": "6db688b9ec9e90a3e53f75891c3581e29ba157edf2a9ae98dffb5e5b5e595742",
         "name": "BRENTZ6",
         "quote_currency": "USD"
