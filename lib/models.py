@@ -111,6 +111,7 @@ class BenchmarkResult:
     overnight_failing_count: Optional[int] = None
     overnight_reference_publisher_id: Optional[int] = None
     error: Optional[str] = None
+    agg_metrics: Optional[PublisherFeedMetrics] = None
     execution_time_ms: int = 0
 
 
