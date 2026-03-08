@@ -394,8 +394,8 @@ class TestEvaluateFeedUptime1sWindow:
                 [("Equity.US.AAPL/USD",)],
                 # discover_publishers query
                 [(55,)],
-                # compute_uptime_1s_window query
-                [(23000, 23000, total_seconds, 23000 / total_seconds, uptime_pct)],
+                # batch_compute_uptime_1s_window query
+                [(55, 23000, 23000, total_seconds, 23000 / total_seconds, uptime_pct)],
             ]
         )
 
@@ -431,7 +431,7 @@ class TestEvaluateFeedUptime1sWindow:
             [
                 [("Equity.US.AAPL/USD",)],
                 [(55,)],
-                [(18720, 18720, total_seconds, 18720 / total_seconds, uptime_pct)],
+                [(55, 18720, 18720, total_seconds, 18720 / total_seconds, uptime_pct)],
             ]
         )
 
@@ -490,7 +490,7 @@ class TestEvaluateFeedUptime1sWindow:
             [
                 [("Equity.US.AAPL/USD",)],
                 [(55,)],
-                [(21060, 21060, total_seconds, 21060 / total_seconds, uptime_pct)],
+                [(55, 21060, 21060, total_seconds, 21060 / total_seconds, uptime_pct)],
             ]
         )
 
@@ -514,10 +514,11 @@ class TestEvaluateFeedUptime1sWindow:
             [
                 [("Equity.US.AAPL/USD",)],
                 [(55,), (71,)],
-                # Publisher 55 regular session
-                [(23000, 23000, total_seconds, 23000 / total_seconds, 98.0)],
-                # Publisher 71 regular session
-                [(10000, 10000, total_seconds, 10000 / total_seconds, 42.7)],
+                # Single batched query returns both publishers
+                [
+                    (55, 23000, 23000, total_seconds, 23000 / total_seconds, 98.0),
+                    (71, 10000, 10000, total_seconds, 10000 / total_seconds, 42.7),
+                ],
             ]
         )
 
@@ -571,7 +572,7 @@ class TestEvaluateFeedUptimePrecise:
                 # total_updates, max_gap_ms, gaps_over_threshold,
                 # consecutive_downtime_ms, start_gap_ms, end_gap_ms,
                 # total_time_ms, total_downtime_ms
-                [(23000, 150, 0, 0, 0, 0, total_ms, 0)],
+                [(55, 23000, 150, 0, 0, 0, 0, total_ms, 0)],
             ]
         )
 
@@ -610,7 +611,7 @@ class TestEvaluateFeedUptimeFx:
             [
                 [("FX.EURUSD/USD",)],
                 [(55,)],
-                [(85000, 85000, total_seconds, 85000 / total_seconds, uptime_pct)],
+                [(55, 85000, 85000, total_seconds, 85000 / total_seconds, uptime_pct)],
             ]
         )
 

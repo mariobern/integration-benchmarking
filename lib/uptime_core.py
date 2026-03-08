@@ -553,24 +553,23 @@ def evaluate_feed_uptime(
             )
 
         publisher_uptimes: list[PublisherSessionUptime] = []
-        for publisher_id in publishers:
-            for session_window in filtered_sessions:
-                if precise:
-                    uptime = compute_uptime_200ms_gap(
-                        client=client,
-                        publisher_id=publisher_id,
-                        feed_id=feed_id,
-                        start_utc=session_window.start_utc,
-                        end_utc=session_window.end_utc,
-                        gap_threshold_ms=gap_threshold_ms,
-                    )
+        for session_window in filtered_sessions:
+            total_seconds = int(
+                (session_window.end_utc - session_window.start_utc).total_seconds()
+            )
+            if precise:
+                batch_results = batch_compute_uptime_200ms_gap(
+                    client=client,
+                    publisher_ids=publishers,
+                    feed_id=feed_id,
+                    start_utc=session_window.start_utc,
+                    end_utc=session_window.end_utc,
+                    gap_threshold_ms=gap_threshold_ms,
+                )
+                for publisher_id in publishers:
+                    uptime = batch_results[publisher_id]
                     uptime_pct = uptime["uptime_pct"]
                     passes = uptime_pct >= uptime_threshold_pct
-                    total_seconds = int(
-                        (
-                            session_window.end_utc - session_window.start_utc
-                        ).total_seconds()
-                    )
                     publisher_uptimes.append(
                         PublisherSessionUptime(
                             publisher_id=publisher_id,
@@ -587,14 +586,16 @@ def evaluate_feed_uptime(
                             gaps_over_threshold=uptime["gaps_over_threshold"],
                         )
                     )
-                else:
-                    uptime = compute_uptime_1s_window(
-                        client=client,
-                        publisher_id=publisher_id,
-                        feed_id=feed_id,
-                        start_utc=session_window.start_utc,
-                        end_utc=session_window.end_utc,
-                    )
+            else:
+                batch_results = batch_compute_uptime_1s_window(
+                    client=client,
+                    publisher_ids=publishers,
+                    feed_id=feed_id,
+                    start_utc=session_window.start_utc,
+                    end_utc=session_window.end_utc,
+                )
+                for publisher_id in publishers:
+                    uptime = batch_results[publisher_id]
                     uptime_pct = uptime["uptime_pct"]
                     passes = uptime_pct >= uptime_threshold_pct
                     publisher_uptimes.append(
