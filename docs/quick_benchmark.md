@@ -72,6 +72,7 @@ python quick_benchmark.py --csv price_id_list.csv --filter-feed-id 327 1163
 | `--detailed`            | Append per-publisher detail rows to CSV                                                              | Off                           |
 | `--filter-feed-id`      | Only process these feed IDs (CSV mode only)                                                          | All                           |
 | `--hit-rate-threshold`  | Hit rate threshold for conditional pass (Path 2)                                                     | `95`                          |
+| `--no-agg`              | Disable aggregate feed (publisher 0) evaluation                                                      | Off (agg enabled)             |
 | `--list-asset-classes`  | List unique asset classes in CSV and exit                                                            | Off                           |
 
 ## Input Mode Rules
@@ -161,6 +162,18 @@ Console additions for multi-date detailed runs:
 - Uses short `MM-DD` date labels in console and full `YYYY-MM-DD` in CSV.
 
 When multiple dates are evaluated in single-feed mode, console output includes a per-date readiness breakdown.
+
+## Aggregate Feed (Publisher 0)
+
+By default, the script evaluates the aggregated price feed from the `price_feeds` table as **publisher 0**. This provides a quality check on the combined feed output alongside individual publishers.
+
+- Publisher 0 appears in console output and in `--detailed` CSV rows.
+- Publisher 0 is **excluded** from `passing_pub_count` and `failing_pub_count` and does not affect the `ready` verdict.
+- Use `--no-agg` to skip aggregate feed evaluation entirely.
+
+## US Equities Qualifier Filter
+
+For `us-equities` mode, benchmark queries automatically filter out irregular trade conditions from Datascope data. Trades with IRGCOND qualifiers (`CON`, `ODD`, `378`, `2315`, `DAP`, `PD_*` pattern) are excluded to ensure benchmarks reflect normal market conditions. This filter is applied automatically and requires no CLI flag.
 
 ## Asset Class Filtering
 

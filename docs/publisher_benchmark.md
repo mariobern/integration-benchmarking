@@ -98,6 +98,12 @@ Extended hours use relaxed thresholds:
 
 Thresholds are defined in `lib/thresholds.py`. The `--hit-rate-threshold` override only affects the regular session.
 
+## US Equities Qualifier Filter
+
+For `us-equities` mode, benchmark queries automatically filter out irregular trade conditions from Datascope data. Trades with IRGCOND qualifiers (`CON`, `ODD`, `378`, `2315`, `DAP`, `PD_*` pattern) are excluded to ensure benchmarks reflect normal market conditions. This filter is applied automatically and requires no CLI flag.
+
+> **Note:** Aggregate feed evaluation (publisher 0) is available in `quick_benchmark.py` and `feed_readiness.py` only. `publisher_benchmark.py` evaluates a single named publisher and does not include aggregate feed metrics.
+
 ## Summary Statistics
 
 After processing, the script outputs a summary (console + CSV):
