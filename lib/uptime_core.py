@@ -18,7 +18,6 @@ Functions:
 from __future__ import annotations
 
 import csv
-import threading
 import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -26,7 +25,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from lib.config import get_lazer_client, load_config, normalize_asset_class
+from lib.config import (
+    ThreadLocalClients,
+    get_lazer_client,
+    load_config,
+    normalize_asset_class,
+)
 from lib.models import FeedUptimeResult, PublisherSessionUptime
 from portal.batch.uptime_sessions import SessionWindow, get_session_windows
 
@@ -658,19 +662,13 @@ def process_work_items(
     worker_count = max(1, min(max_workers, len(work_items)))
     print(f"Processing {len(work_items)} feeds with {worker_count} workers...")
 
-    thread_local = threading.local()
-
-    def get_thread_client():
-        """Get or create ClickHouse client for the current thread."""
-        if not hasattr(thread_local, "client"):
-            thread_local.client = get_lazer_client(config)
-        return thread_local.client
-
-    def evaluate_single(item: tuple[int, str, str]) -> FeedUptimeResult:
+    def evaluate_single(
+        pool: ThreadLocalClients, item: tuple[int, str, str]
+    ) -> FeedUptimeResult:
         feed_id, date, mode = item
         start_time_ts = time.time()
         try:
-            client = get_thread_client()
+            client = pool.get_lazer_client()
             return evaluate_feed_uptime(
                 client=client,
                 feed_id=feed_id,
@@ -695,8 +693,12 @@ def process_work_items(
             )
 
     results: list[FeedUptimeResult] = []
-    with ThreadPoolExecutor(max_workers=worker_count) as executor:
-        futures = {executor.submit(evaluate_single, item): item for item in work_items}
+    with ThreadLocalClients(config, lazer_only=True) as pool, ThreadPoolExecutor(
+        max_workers=worker_count
+    ) as executor:
+        futures = {
+            executor.submit(evaluate_single, pool, item): item for item in work_items
+        }
 
         for future in as_completed(futures):
             feed_id, date, mode = futures[future]
