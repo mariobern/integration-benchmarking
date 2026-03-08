@@ -189,3 +189,28 @@ def get_benchmark_columns(mode: str) -> tuple[str, str, str]:
     if mode == "us-treasuries":
         return ("yield", "bid_yield", "ask_yield")
     return ("price", "bid_price", "ask_price")
+
+
+def get_qualifier_filter_sql(mode: str) -> str:
+    """Return SQL WHERE clause fragment to exclude irregular trade qualifiers.
+
+    Only applies to US equities benchmark data. For all other asset classes,
+    returns an empty string (no filtering needed).
+    """
+
+    if mode not in ("us-equities", "equity-us"):
+        return ""
+
+    return """
+        AND (
+          qualifiers IS NULL
+          OR (
+            qualifiers NOT LIKE '%CON[IRGCOND]%'
+            AND qualifiers NOT LIKE '%ODD[IRGCOND]%'
+            AND qualifiers NOT LIKE '%378[IRGCOND]%'
+            AND qualifiers NOT LIKE '%2315[IRGCOND]%'
+            AND qualifiers NOT LIKE '%DAP[IRGCOND]%'
+            AND NOT match(qualifiers, 'PD_[A-Za-z0-9_]*')
+          )
+        )
+    """
