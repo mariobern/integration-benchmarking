@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from lib.benchmark_core import evaluate_feed_two_queries
 from lib.models import (
     BenchmarkResult,
     ExtendedHoursMetrics,
@@ -775,3 +776,49 @@ class TestFindNearestBenchmark:
             )
             is None
         )
+
+
+# ---------------------------------------------------------------------------
+# 9. Qualifier filter injection into benchmark queries
+# ---------------------------------------------------------------------------
+class TestQualifierFilterInQueries:
+    """Verify qualifier filter is injected into benchmark SQL for us-equities."""
+
+    @patch("lib.benchmark_core.get_feed_metadata")
+    def test_us_equities_includes_qualifier_filter(self, mock_meta) -> None:
+        mock_meta.return_value = ("Equity.US.AAPL/USD", -8)
+        client_lazer = _make_client([])
+        client_analytics = _make_client([])
+
+        evaluate_feed_two_queries(
+            client_lazer,
+            client_analytics,
+            feed_id=327,
+            date="2025-10-06",
+            mode="us-equities",
+        )
+
+        analytics_call = client_analytics.query.call_args
+        if analytics_call:
+            query_sql = analytics_call[0][0]
+            assert "qualifiers" in query_sql
+            assert "IRGCOND" in query_sql
+
+    @patch("lib.benchmark_core.get_feed_metadata")
+    def test_fx_excludes_qualifier_filter(self, mock_meta) -> None:
+        mock_meta.return_value = ("FX.EUR/USD", -8)
+        client_lazer = _make_client([])
+        client_analytics = _make_client([])
+
+        evaluate_feed_two_queries(
+            client_lazer,
+            client_analytics,
+            feed_id=327,
+            date="2025-10-06",
+            mode="fx",
+        )
+
+        analytics_call = client_analytics.query.call_args
+        if analytics_call:
+            query_sql = analytics_call[0][0]
+            assert "qualifiers" not in query_sql

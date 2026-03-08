@@ -44,6 +44,7 @@ from lib.sql_filters import (
     get_extended_hours_filter_sql,
     get_market_hours_filter_sql,
     get_overnight_hours_filter_sql,
+    get_qualifier_filter_sql,
 )
 from lib.statistics import compute_statistical_metrics
 from lib.thresholds import passes_benchmark
@@ -126,6 +127,7 @@ def evaluate_session_for_all_publishers(
     price_col, bid_col, ask_col = get_benchmark_columns(mode)
     publisher_time_filter = get_extended_hours_filter_sql(session, date, "publish_time")
     benchmark_time_filter = get_extended_hours_filter_sql(session, date, "date_time")
+    qualifier_filter = get_qualifier_filter_sql(mode)
 
     publisher_query = f"""
         SELECT
@@ -155,6 +157,7 @@ def evaluate_session_for_all_publishers(
           AND ({bid_col} IS NOT NULL AND {ask_col} IS NOT NULL
                OR {price_col} IS NOT NULL)
           {benchmark_time_filter}
+          {qualifier_filter}
         GROUP BY ts_second
         ORDER BY ts_second
     """
@@ -583,6 +586,7 @@ def evaluate_feed_two_queries(
 
     publisher_market_filter = get_market_hours_filter_sql(mode, date, "publish_time")
     benchmark_market_filter = get_market_hours_filter_sql(mode, date, "date_time")
+    qualifier_filter = get_qualifier_filter_sql(mode)
 
     publisher_query = f"""
         SELECT
@@ -612,6 +616,7 @@ def evaluate_feed_two_queries(
           AND ({bid_col} IS NOT NULL AND {ask_col} IS NOT NULL
                OR {price_col} IS NOT NULL)
           {benchmark_market_filter}
+          {qualifier_filter}
         GROUP BY ts_second
         ORDER BY ts_second
     """
