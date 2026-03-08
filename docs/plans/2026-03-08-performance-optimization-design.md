@@ -25,18 +25,23 @@ Rewrite `compute_uptime_1s_window()` and `compute_uptime_200ms_gap()` to accept 
 
 **Before:** 120 queries/feed → **After:** 4 queries/feed
 
-### Connection Reuse
+### Connection Reuse via `ThreadLocalClients`
 
-Move `get_clients(config)` call outside the per-feed loop in worker threads. Create clients once per thread, reuse across all feed evaluations.
+Extracted a shared `ThreadLocalClients` class in `lib/config.py` that replaces duplicated `threading.local()` patterns across 3 files. Key properties:
+
+- **Thread-local caching**: creates one client (or client pair) per worker thread, reuses across all feed evaluations on that thread
+- **Thread-safe tracking**: all created clients are tracked in a lock-protected list
+- **Explicit cleanup**: context manager calls `client.close()` on all tracked clients when the `ThreadPoolExecutor` `with` block exits
+- **Two modes**: `get_clients()` for lazer+analytics (benchmark/readiness), `get_lazer_client()` for lazer-only (uptime) via `lazer_only=True`
 
 ## Files Affected
 
-| File                    | Change                                        |
-| ----------------------- | --------------------------------------------- |
-| `lib/uptime_core.py`    | Batch uptime queries by publisher             |
-| `lib/config.py`         | No change needed (factory functions are fine) |
-| `lib/readiness_core.py` | Move client creation outside per-feed loop    |
-| `lib/benchmark_core.py` | Move client creation outside per-feed loop    |
+| File                    | Change                                                     |
+| ----------------------- | ---------------------------------------------------------- |
+| `lib/uptime_core.py`    | Batch uptime queries by publisher                          |
+| `lib/config.py`         | Add `ThreadLocalClients` class for connection pool+cleanup |
+| `lib/readiness_core.py` | Use `ThreadLocalClients` context manager                   |
+| `lib/benchmark_core.py` | Use `ThreadLocalClients` context manager                   |
 
 ## Backups
 
