@@ -394,8 +394,8 @@ class TestEvaluateFeedUptime1sWindow:
                 [("Equity.US.AAPL/USD",)],
                 # discover_publishers query
                 [(55,)],
-                # compute_uptime_1s_window query
-                [(23000, 23000, total_seconds, 23000 / total_seconds, uptime_pct)],
+                # batch_compute_uptime_1s_window query
+                [(55, 23000, 23000, total_seconds, 23000 / total_seconds, uptime_pct)],
             ]
         )
 
@@ -431,7 +431,7 @@ class TestEvaluateFeedUptime1sWindow:
             [
                 [("Equity.US.AAPL/USD",)],
                 [(55,)],
-                [(18720, 18720, total_seconds, 18720 / total_seconds, uptime_pct)],
+                [(55, 18720, 18720, total_seconds, 18720 / total_seconds, uptime_pct)],
             ]
         )
 
@@ -490,7 +490,7 @@ class TestEvaluateFeedUptime1sWindow:
             [
                 [("Equity.US.AAPL/USD",)],
                 [(55,)],
-                [(21060, 21060, total_seconds, 21060 / total_seconds, uptime_pct)],
+                [(55, 21060, 21060, total_seconds, 21060 / total_seconds, uptime_pct)],
             ]
         )
 
@@ -514,10 +514,11 @@ class TestEvaluateFeedUptime1sWindow:
             [
                 [("Equity.US.AAPL/USD",)],
                 [(55,), (71,)],
-                # Publisher 55 regular session
-                [(23000, 23000, total_seconds, 23000 / total_seconds, 98.0)],
-                # Publisher 71 regular session
-                [(10000, 10000, total_seconds, 10000 / total_seconds, 42.7)],
+                # Single batched query returns both publishers
+                [
+                    (55, 23000, 23000, total_seconds, 23000 / total_seconds, 98.0),
+                    (71, 10000, 10000, total_seconds, 10000 / total_seconds, 42.7),
+                ],
             ]
         )
 
@@ -571,7 +572,7 @@ class TestEvaluateFeedUptimePrecise:
                 # total_updates, max_gap_ms, gaps_over_threshold,
                 # consecutive_downtime_ms, start_gap_ms, end_gap_ms,
                 # total_time_ms, total_downtime_ms
-                [(23000, 150, 0, 0, 0, 0, total_ms, 0)],
+                [(55, 23000, 150, 0, 0, 0, 0, total_ms, 0)],
             ]
         )
 
@@ -610,7 +611,7 @@ class TestEvaluateFeedUptimeFx:
             [
                 [("FX.EURUSD/USD",)],
                 [(55,)],
-                [(85000, 85000, total_seconds, 85000 / total_seconds, uptime_pct)],
+                [(55, 85000, 85000, total_seconds, 85000 / total_seconds, uptime_pct)],
             ]
         )
 
@@ -678,3 +679,289 @@ class TestEdgeCases:
         )
 
         assert result.error is not None
+
+
+# ---------------------------------------------------------------------------
+# 11. batch_compute_uptime_1s_window
+# ---------------------------------------------------------------------------
+class TestBatchComputeUptime1sWindow:
+    def test_returns_dict_keyed_by_publisher_id(self) -> None:
+        """Two publishers, both have data. Verify dict keys and values."""
+        from lib.uptime_core import batch_compute_uptime_1s_window
+
+        start = datetime(2026, 2, 9, 14, 30, 0)
+        end = datetime(2026, 2, 9, 21, 0, 0)
+        total_seconds = int((end - start).total_seconds())  # 23400
+
+        uptime_pct_55 = 20000 * 100.0 / total_seconds
+        uptime_pct_71 = 15000 * 100.0 / total_seconds
+
+        # Batched query returns rows with publisher_id as first column
+        client = _make_client(
+            [
+                (55, 20000, 20000, total_seconds, 20000 / total_seconds, uptime_pct_55),
+                (71, 15000, 15000, total_seconds, 15000 / total_seconds, uptime_pct_71),
+            ]
+        )
+
+        result = batch_compute_uptime_1s_window(
+            client,
+            publisher_ids=[55, 71],
+            feed_id=922,
+            start_utc=start,
+            end_utc=end,
+        )
+
+        assert isinstance(result, dict)
+        assert set(result.keys()) == {55, 71}
+
+        assert result[55]["uptime_pct"] == pytest.approx(uptime_pct_55, abs=0.01)
+        assert result[55]["seconds_with_data"] == 20000
+        assert result[55]["total_seconds"] == total_seconds
+        assert result[55]["updates_total"] == 20000
+
+        assert result[71]["uptime_pct"] == pytest.approx(uptime_pct_71, abs=0.01)
+        assert result[71]["seconds_with_data"] == 15000
+        assert result[71]["total_seconds"] == total_seconds
+        assert result[71]["updates_total"] == 15000
+
+    def test_missing_publisher_gets_zero_uptime(self) -> None:
+        """Request [55, 71] but only 55 has data. Verify 71 gets zeros."""
+        from lib.uptime_core import batch_compute_uptime_1s_window
+
+        start = datetime(2026, 2, 9, 14, 30, 0)
+        end = datetime(2026, 2, 9, 21, 0, 0)
+        total_seconds = int((end - start).total_seconds())  # 23400
+
+        uptime_pct_55 = 20000 * 100.0 / total_seconds
+
+        # Only publisher 55 returned from query; 71 is missing
+        client = _make_client(
+            [
+                (55, 20000, 20000, total_seconds, 20000 / total_seconds, uptime_pct_55),
+            ]
+        )
+
+        result = batch_compute_uptime_1s_window(
+            client,
+            publisher_ids=[55, 71],
+            feed_id=922,
+            start_utc=start,
+            end_utc=end,
+        )
+
+        assert set(result.keys()) == {55, 71}
+
+        # Publisher 55 has real data
+        assert result[55]["uptime_pct"] == pytest.approx(uptime_pct_55, abs=0.01)
+        assert result[55]["updates_total"] == 20000
+
+        # Publisher 71 gets zero-uptime defaults
+        assert result[71]["uptime_pct"] == 0.0
+        assert result[71]["seconds_with_data"] == 0
+        assert result[71]["total_seconds"] == total_seconds
+        assert result[71]["updates_total"] == 0
+        assert result[71]["updates_per_second"] == 0.0
+
+    def test_empty_publisher_list_returns_empty_dict(self) -> None:
+        """Empty publisher list returns empty dict, no query executed."""
+        from lib.uptime_core import batch_compute_uptime_1s_window
+
+        start = datetime(2026, 2, 9, 14, 30, 0)
+        end = datetime(2026, 2, 9, 21, 0, 0)
+
+        client = _make_client([])
+
+        result = batch_compute_uptime_1s_window(
+            client,
+            publisher_ids=[],
+            feed_id=922,
+            start_utc=start,
+            end_utc=end,
+        )
+
+        assert result == {}
+        client.query.assert_not_called()
+
+    def test_single_publisher_matches_original_function(self) -> None:
+        """Single publisher result has same structure as compute_uptime_1s_window."""
+        from lib.uptime_core import batch_compute_uptime_1s_window
+
+        start = datetime(2026, 2, 9, 14, 30, 0)
+        end = datetime(2026, 2, 9, 21, 0, 0)
+        total_seconds = int((end - start).total_seconds())  # 23400
+
+        uptime_pct = 20000 * 100.0 / total_seconds
+
+        client = _make_client(
+            [
+                (55, 20000, 20000, total_seconds, 20000 / total_seconds, uptime_pct),
+            ]
+        )
+
+        result = batch_compute_uptime_1s_window(
+            client,
+            publisher_ids=[55],
+            feed_id=922,
+            start_utc=start,
+            end_utc=end,
+        )
+
+        assert len(result) == 1
+        assert 55 in result
+
+        entry = result[55]
+        expected_keys = {
+            "uptime_pct",
+            "seconds_with_data",
+            "total_seconds",
+            "updates_total",
+            "updates_per_second",
+        }
+        assert set(entry.keys()) == expected_keys
+        assert entry["uptime_pct"] == pytest.approx(uptime_pct, abs=0.01)
+        assert entry["seconds_with_data"] == 20000
+        assert entry["total_seconds"] == total_seconds
+        assert entry["updates_total"] == 20000
+        assert entry["updates_per_second"] == pytest.approx(
+            20000 / total_seconds, abs=0.01
+        )
+
+
+# ---------------------------------------------------------------------------
+# 12. batch_compute_uptime_200ms_gap
+# ---------------------------------------------------------------------------
+class TestBatchComputeUptime200msGap:
+    def test_returns_dict_keyed_by_publisher_id(self) -> None:
+        """Two publishers with different uptime. Verify both."""
+        from lib.uptime_core import batch_compute_uptime_200ms_gap
+
+        start = datetime(2026, 2, 9, 14, 30, 0)
+        end = datetime(2026, 2, 9, 14, 31, 0)
+        total_ms = 60000
+
+        # Batched query returns rows with publisher_id as FIRST column:
+        # (publisher_id, total_updates, max_gap_ms, gaps_over_threshold,
+        #  consecutive_downtime_ms, start_gap_ms, end_gap_ms, total_time_ms,
+        #  total_downtime_ms)
+        client = _make_client(
+            [
+                (55, 1000, 150, 0, 0, 0, 0, total_ms, 0),
+                (71, 500, 5000, 3, 8000, 1000, 1000, total_ms, 10000),
+            ]
+        )
+
+        result = batch_compute_uptime_200ms_gap(
+            client,
+            publisher_ids=[55, 71],
+            feed_id=922,
+            start_utc=start,
+            end_utc=end,
+        )
+
+        assert isinstance(result, dict)
+        assert set(result.keys()) == {55, 71}
+
+        # Publisher 55: zero downtime -> 100% uptime
+        assert result[55]["uptime_pct"] == 100.0
+        assert result[55]["updates_total"] == 1000
+        assert result[55]["max_gap_ms"] == 150
+        assert result[55]["gaps_over_threshold"] == 0
+        assert result[55]["total_downtime_ms"] == 0
+        assert result[55]["period_length_ms"] == total_ms
+
+        # Publisher 71: 10s downtime out of 60s -> ~83.33%
+        expected_uptime_71 = (total_ms - 10000) / total_ms * 100.0
+        assert result[71]["uptime_pct"] == pytest.approx(expected_uptime_71, abs=0.01)
+        assert result[71]["updates_total"] == 500
+        assert result[71]["max_gap_ms"] == 5000
+        assert result[71]["gaps_over_threshold"] == 3
+        assert result[71]["total_downtime_ms"] == 10000
+
+    def test_missing_publisher_gets_zero_uptime(self) -> None:
+        """Request [55, 71] but only 55 returned. Publisher 71 gets zeros."""
+        from lib.uptime_core import batch_compute_uptime_200ms_gap
+
+        start = datetime(2026, 2, 9, 14, 30, 0)
+        end = datetime(2026, 2, 9, 14, 31, 0)
+        total_ms = 60000
+
+        # Only publisher 55 has data
+        client = _make_client(
+            [
+                (55, 1000, 150, 0, 0, 0, 0, total_ms, 0),
+            ]
+        )
+
+        result = batch_compute_uptime_200ms_gap(
+            client,
+            publisher_ids=[55, 71],
+            feed_id=922,
+            start_utc=start,
+            end_utc=end,
+        )
+
+        assert set(result.keys()) == {55, 71}
+
+        # Publisher 55 has data
+        assert result[55]["uptime_pct"] == 100.0
+        assert result[55]["updates_total"] == 1000
+
+        # Publisher 71 missing -> zero uptime, total_downtime = total_ms
+        assert result[71]["uptime_pct"] == 0.0
+        assert result[71]["updates_total"] == 0
+        assert result[71]["total_downtime_ms"] == total_ms
+        assert result[71]["period_length_ms"] == total_ms
+        assert result[71]["max_gap_ms"] is None
+        assert result[71]["gaps_over_threshold"] == 0
+        assert result[71]["updates_per_second"] == 0.0
+
+    def test_empty_publisher_list(self) -> None:
+        """Empty list returns empty dict, no query executed."""
+        from lib.uptime_core import batch_compute_uptime_200ms_gap
+
+        start = datetime(2026, 2, 9, 14, 30, 0)
+        end = datetime(2026, 2, 9, 14, 31, 0)
+
+        client = _make_client([])
+
+        result = batch_compute_uptime_200ms_gap(
+            client,
+            publisher_ids=[],
+            feed_id=922,
+            start_utc=start,
+            end_utc=end,
+        )
+
+        assert result == {}
+        client.query.assert_not_called()
+
+    def test_custom_gap_threshold(self) -> None:
+        """Custom threshold (100ms) is passed through correctly."""
+        from lib.uptime_core import batch_compute_uptime_200ms_gap
+
+        start = datetime(2026, 2, 9, 14, 30, 0)
+        end = datetime(2026, 2, 9, 14, 31, 0)
+        total_ms = 60000
+
+        client = _make_client(
+            [
+                (55, 1000, 80, 0, 0, 0, 0, total_ms, 0),
+            ]
+        )
+
+        result = batch_compute_uptime_200ms_gap(
+            client,
+            publisher_ids=[55],
+            feed_id=922,
+            start_utc=start,
+            end_utc=end,
+            gap_threshold_ms=100,
+        )
+
+        assert result[55]["uptime_pct"] == 100.0
+        assert result[55]["updates_total"] == 1000
+
+        # Verify the query was called with the custom threshold
+        query_text = client.query.call_args[0][0]
+        assert "100" in query_text

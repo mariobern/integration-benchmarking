@@ -24,6 +24,7 @@ from typing import Optional, TypedDict
 from lib.benchmark_core import evaluate_feed_two_queries
 from lib.config import (
     BENCHMARKABLE_ASSET_CLASSES,
+    ThreadLocalClients,
     get_clients,
     load_config,
     normalize_asset_class,
@@ -724,11 +725,13 @@ def process_work_items(
     worker_count = max(1, min(max_workers, len(work_items)))
     print(f"Processing {len(work_items)} feeds with {worker_count} workers...")
 
-    def evaluate_single(item: tuple[int, str, str]) -> FeedReadinessResult:
+    def evaluate_single(
+        pool: ThreadLocalClients, item: tuple[int, str, str]
+    ) -> FeedReadinessResult:
         feed_id, date, mode = item
         start_time = time.time()
         try:
-            client_lazer, client_analytics = get_clients(config)
+            client_lazer, client_analytics = pool.get_clients()
             return evaluate_feed_readiness(
                 client_lazer=client_lazer,
                 client_analytics=client_analytics,
@@ -758,8 +761,12 @@ def process_work_items(
             )
 
     results: list[FeedReadinessResult] = []
-    with ThreadPoolExecutor(max_workers=worker_count) as executor:
-        futures = {executor.submit(evaluate_single, item): item for item in work_items}
+    with ThreadLocalClients(config) as pool, ThreadPoolExecutor(
+        max_workers=worker_count
+    ) as executor:
+        futures = {
+            executor.submit(evaluate_single, pool, item): item for item in work_items
+        }
         for future in as_completed(futures):
             feed_id, date, _ = futures[future]
             try:

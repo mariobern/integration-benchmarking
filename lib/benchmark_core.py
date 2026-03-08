@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Optional
 
 from lib.config import (
+    ThreadLocalClients,
     get_clients,
     load_config,
     normalize_asset_class,
@@ -1125,9 +1126,9 @@ def process_csv(
 
     results = []
 
-    def evaluate_single(args):
+    def evaluate_single(pool, args):
         feed_id, date, mode = args
-        client_lazer, client_analytics = get_clients(config)
+        client_lazer, client_analytics = pool.get_clients()
         return evaluate_feed_two_queries(
             client_lazer,
             client_analytics,
@@ -1143,9 +1144,12 @@ def process_csv(
             include_agg=include_agg,
         )
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    with ThreadLocalClients(config) as pool, ThreadPoolExecutor(
+        max_workers=max_workers
+    ) as executor:
         futures = {
-            executor.submit(evaluate_single, args): args for args in feeds_to_process
+            executor.submit(evaluate_single, pool, args): args
+            for args in feeds_to_process
         }
 
         for future in as_completed(futures):

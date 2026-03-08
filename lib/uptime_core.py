@@ -25,7 +25,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from lib.config import get_lazer_client, load_config, normalize_asset_class
+from lib.config import (
+    ThreadLocalClients,
+    get_lazer_client,
+    load_config,
+    normalize_asset_class,
+)
 from lib.models import FeedUptimeResult, PublisherSessionUptime
 from portal.batch.uptime_sessions import SessionWindow, get_session_windows
 
@@ -127,6 +132,82 @@ def compute_uptime_1s_window(
         "updates_total": int(row[0] or 0),
         "updates_per_second": float(row[3] or 0),
     }
+
+
+def batch_compute_uptime_1s_window(
+    client,
+    publisher_ids: list[int],
+    feed_id: int,
+    start_utc: datetime,
+    end_utc: datetime,
+) -> dict[int, dict]:
+    """
+    Compute uptime using 1-second window method for multiple publishers in one query.
+
+    Returns a dict keyed by publisher_id, each value matching the structure of
+    compute_uptime_1s_window output. Publishers with no data get zero-uptime entries.
+    """
+    if not publisher_ids:
+        return {}
+
+    start_str = start_utc.strftime("%Y-%m-%d %H:%M:%S")
+    end_str = end_utc.strftime("%Y-%m-%d %H:%M:%S")
+    total_seconds = int((end_utc - start_utc).total_seconds())
+    pub_list = ", ".join(str(pid) for pid in publisher_ids)
+
+    query = f"""
+        WITH
+            parseDateTimeBestEffort('{start_str}') AS start_time,
+            parseDateTimeBestEffort('{end_str}') AS end_time,
+            dateDiff('second', start_time, end_time) AS total_seconds,
+            per_second AS (
+                SELECT
+                    publisher_id,
+                    toStartOfSecond(publish_time) AS second_start,
+                    count() AS update_count
+                FROM publisher_updates
+                PREWHERE price_feed_id = {feed_id}
+                    AND publisher_id IN ({pub_list})
+                WHERE publish_time >= start_time
+                    AND publish_time < end_time
+                GROUP BY publisher_id, second_start
+            )
+        SELECT
+            publisher_id,
+            sum(update_count) AS updates_total,
+            count() AS seconds_with_data,
+            total_seconds,
+            if(total_seconds = 0, 0, updates_total / total_seconds) AS updates_per_second,
+            if(total_seconds = 0, 0, seconds_with_data * 100.0 / total_seconds) AS uptime_pct
+        FROM per_second
+        GROUP BY publisher_id, total_seconds
+        ORDER BY publisher_id
+    """
+    result = client.query(query)
+
+    results: dict[int, dict] = {}
+    for row in result.result_rows:
+        pid = int(row[0])
+        results[pid] = {
+            "uptime_pct": float(row[5] or 0),
+            "seconds_with_data": int(row[2] or 0),
+            "total_seconds": int(row[3] or 0),
+            "updates_total": int(row[1] or 0),
+            "updates_per_second": float(row[4] or 0),
+        }
+
+    # Fill in zero-uptime entries for publishers not in the query result
+    for pid in publisher_ids:
+        if pid not in results:
+            results[pid] = {
+                "uptime_pct": 0.0,
+                "seconds_with_data": 0,
+                "total_seconds": max(0, total_seconds),
+                "updates_total": 0,
+                "updates_per_second": 0.0,
+            }
+
+    return results
 
 
 def compute_uptime_200ms_gap(
@@ -260,6 +341,156 @@ def compute_uptime_200ms_gap(
     }
 
 
+def batch_compute_uptime_200ms_gap(
+    client,
+    publisher_ids: list[int],
+    feed_id: int,
+    start_utc: datetime,
+    end_utc: datetime,
+    gap_threshold_ms: int = DEFAULT_GAP_THRESHOLD_MS,
+) -> dict[int, dict]:
+    """
+    Compute uptime using gap-based method for multiple publishers in one query.
+
+    Returns a dict keyed by publisher_id, each value matching the structure of
+    compute_uptime_200ms_gap output. Publishers with no data get zero-uptime entries.
+    """
+    if not publisher_ids:
+        return {}
+
+    start_str = start_utc.strftime("%Y-%m-%d %H:%M:%S")
+    end_str = end_utc.strftime("%Y-%m-%d %H:%M:%S")
+    total_ms = int((end_utc - start_utc).total_seconds() * 1000)
+    pub_list = ", ".join(str(pid) for pid in publisher_ids)
+
+    query = f"""
+        WITH
+            parseDateTimeBestEffort('{start_str}') AS start_time,
+            parseDateTimeBestEffort('{end_str}') AS end_time,
+            dateDiff('millisecond', start_time, end_time) AS total_time_ms,
+            updates AS (
+                SELECT
+                    publisher_id,
+                    publish_time,
+                    lagInFrame(publish_time, 1) OVER (
+                        PARTITION BY publisher_id ORDER BY publish_time
+                    ) AS prev_time
+                FROM publisher_updates
+                PREWHERE price_feed_id = {feed_id}
+                    AND publisher_id IN ({pub_list})
+                WHERE publish_time >= start_time
+                    AND publish_time <= end_time
+            ),
+            gaps AS (
+                SELECT
+                    publisher_id,
+                    publish_time,
+                    prev_time,
+                    CASE
+                        WHEN prev_time IS NOT NULL THEN
+                            dateDiff('millisecond',
+                                if(prev_time < start_time, start_time, prev_time),
+                                publish_time)
+                        ELSE 0
+                    END AS gap_ms
+                FROM updates
+            ),
+            gap_stats AS (
+                SELECT
+                    publisher_id,
+                    count() AS total_updates,
+                    min(publish_time) AS first_update,
+                    max(publish_time) AS last_update,
+                    max(gap_ms) AS max_gap_ms,
+                    countIf(gap_ms > {gap_threshold_ms}) AS gaps_over_threshold,
+                    sum(greatest(0, gap_ms - {gap_threshold_ms})) AS consecutive_downtime_ms
+                FROM gaps
+                GROUP BY publisher_id
+            )
+        SELECT
+            publisher_id,
+            total_updates,
+            max_gap_ms,
+            gaps_over_threshold,
+            consecutive_downtime_ms,
+            if(
+                total_updates = 0,
+                total_time_ms,
+                greatest(0, dateDiff('millisecond', start_time, first_update) - {gap_threshold_ms})
+            ) AS start_gap_ms,
+            if(
+                total_updates = 0,
+                0,
+                greatest(0, dateDiff('millisecond', last_update, end_time) - {gap_threshold_ms})
+            ) AS end_gap_ms,
+            total_time_ms,
+            least(
+                consecutive_downtime_ms +
+                if(
+                    total_updates = 0,
+                    total_time_ms,
+                    greatest(0, dateDiff('millisecond', start_time, first_update) - {gap_threshold_ms})
+                ) +
+                if(
+                    total_updates = 0,
+                    0,
+                    greatest(0, dateDiff('millisecond', last_update, end_time) - {gap_threshold_ms})
+                ),
+                total_time_ms
+            ) AS total_downtime_ms
+        FROM gap_stats
+        ORDER BY publisher_id
+    """
+    result = client.query(query)
+
+    results: dict[int, dict] = {}
+    for row in result.result_rows:
+        pid = int(row[0])
+        updates_total = int(row[1] or 0)
+        max_gap_ms = int(row[2]) if row[2] is not None else None
+        gaps_over_threshold = int(row[3] or 0)
+        total_time_ms = int(row[7] or 0)
+
+        if updates_total == 0:
+            total_downtime_ms = total_time_ms
+        else:
+            total_downtime_ms = int(row[8] or 0)
+
+        uptime_pct = (
+            ((total_time_ms - total_downtime_ms) / total_time_ms * 100.0)
+            if total_time_ms > 0
+            else 0.0
+        )
+        updates_per_second = (
+            (updates_total / (total_time_ms / 1000.0)) if total_time_ms > 0 else 0.0
+        )
+
+        results[pid] = {
+            "uptime_pct": uptime_pct,
+            "total_downtime_ms": total_downtime_ms,
+            "period_length_ms": total_time_ms,
+            "updates_total": updates_total,
+            "updates_per_second": updates_per_second,
+            "max_gap_ms": max_gap_ms,
+            "gaps_over_threshold": gaps_over_threshold,
+        }
+
+    # Fill in zero-uptime entries for publishers not in the query result
+    for pid in publisher_ids:
+        if pid not in results:
+            results[pid] = {
+                "uptime_pct": 0.0,
+                "total_downtime_ms": total_ms,
+                "period_length_ms": total_ms,
+                "updates_total": 0,
+                "updates_per_second": 0.0,
+                "max_gap_ms": None,
+                "gaps_over_threshold": 0,
+            }
+
+    return results
+
+
 def filter_sessions(
     sessions: list[SessionWindow],
     include_extended_hours: bool,
@@ -327,24 +558,23 @@ def evaluate_feed_uptime(
             )
 
         publisher_uptimes: list[PublisherSessionUptime] = []
-        for publisher_id in publishers:
-            for session_window in filtered_sessions:
-                if precise:
-                    uptime = compute_uptime_200ms_gap(
-                        client=client,
-                        publisher_id=publisher_id,
-                        feed_id=feed_id,
-                        start_utc=session_window.start_utc,
-                        end_utc=session_window.end_utc,
-                        gap_threshold_ms=gap_threshold_ms,
-                    )
+        for session_window in filtered_sessions:
+            total_seconds = int(
+                (session_window.end_utc - session_window.start_utc).total_seconds()
+            )
+            if precise:
+                batch_results = batch_compute_uptime_200ms_gap(
+                    client=client,
+                    publisher_ids=publishers,
+                    feed_id=feed_id,
+                    start_utc=session_window.start_utc,
+                    end_utc=session_window.end_utc,
+                    gap_threshold_ms=gap_threshold_ms,
+                )
+                for publisher_id in publishers:
+                    uptime = batch_results[publisher_id]
                     uptime_pct = uptime["uptime_pct"]
                     passes = uptime_pct >= uptime_threshold_pct
-                    total_seconds = int(
-                        (
-                            session_window.end_utc - session_window.start_utc
-                        ).total_seconds()
-                    )
                     publisher_uptimes.append(
                         PublisherSessionUptime(
                             publisher_id=publisher_id,
@@ -361,14 +591,16 @@ def evaluate_feed_uptime(
                             gaps_over_threshold=uptime["gaps_over_threshold"],
                         )
                     )
-                else:
-                    uptime = compute_uptime_1s_window(
-                        client=client,
-                        publisher_id=publisher_id,
-                        feed_id=feed_id,
-                        start_utc=session_window.start_utc,
-                        end_utc=session_window.end_utc,
-                    )
+            else:
+                batch_results = batch_compute_uptime_1s_window(
+                    client=client,
+                    publisher_ids=publishers,
+                    feed_id=feed_id,
+                    start_utc=session_window.start_utc,
+                    end_utc=session_window.end_utc,
+                )
+                for publisher_id in publishers:
+                    uptime = batch_results[publisher_id]
                     uptime_pct = uptime["uptime_pct"]
                     passes = uptime_pct >= uptime_threshold_pct
                     publisher_uptimes.append(
@@ -430,11 +662,13 @@ def process_work_items(
     worker_count = max(1, min(max_workers, len(work_items)))
     print(f"Processing {len(work_items)} feeds with {worker_count} workers...")
 
-    def evaluate_single(item: tuple[int, str, str]) -> FeedUptimeResult:
+    def evaluate_single(
+        pool: ThreadLocalClients, item: tuple[int, str, str]
+    ) -> FeedUptimeResult:
         feed_id, date, mode = item
         start_time_ts = time.time()
         try:
-            client = get_lazer_client(config)
+            client = pool.get_lazer_client()
             return evaluate_feed_uptime(
                 client=client,
                 feed_id=feed_id,
@@ -459,8 +693,12 @@ def process_work_items(
             )
 
     results: list[FeedUptimeResult] = []
-    with ThreadPoolExecutor(max_workers=worker_count) as executor:
-        futures = {executor.submit(evaluate_single, item): item for item in work_items}
+    with ThreadLocalClients(config, lazer_only=True) as pool, ThreadPoolExecutor(
+        max_workers=worker_count
+    ) as executor:
+        futures = {
+            executor.submit(evaluate_single, pool, item): item for item in work_items
+        }
 
         for future in as_completed(futures):
             feed_id, date, mode = futures[future]
