@@ -291,9 +291,11 @@ def merge_results(
     both_failing_publishers: list[int] = []
     readiness_details: list[PublisherReadinessDetail] = []
 
+    # Exclude publisher 0 from total count — it's the aggregate feed
+    non_agg_publisher_ids = [pid for pid in all_publisher_ids if pid != 0]
+
     for publisher_id in all_publisher_ids:
-        if publisher_id == 0:
-            continue  # Publisher 0 is aggregate — skip from readiness buckets
+        is_aggregate = publisher_id == 0
 
         benchmark_detail = benchmark_by_pub.get(publisher_id)
         regular_uptime = regular_uptime_by_pub.get(publisher_id)
@@ -317,7 +319,11 @@ def merge_results(
             benchmark_n_observations = benchmark_detail.n_observations
             benchmark_error = benchmark_detail.error
 
-        if regular_uptime is None:
+        if is_aggregate:
+            uptime_passes = False
+            uptime_pct = None
+            uptime_error = None
+        elif regular_uptime is None:
             uptime_passes = False
             uptime_pct = None
             uptime_error = (
@@ -332,7 +338,9 @@ def merge_results(
 
         fully_passes = benchmark_passes and uptime_passes
 
-        if fully_passes:
+        if is_aggregate:
+            pass  # Publisher 0 excluded from readiness buckets
+        elif fully_passes:
             fully_passing_publishers.append(publisher_id)
         elif benchmark_passes and not uptime_passes:
             benchmark_only_publishers.append(publisher_id)
@@ -498,7 +506,7 @@ def merge_results(
         benchmark_only_passing_count=len(benchmark_only_publishers),
         uptime_only_passing_count=len(uptime_only_publishers),
         both_failing_count=len(both_failing_publishers),
-        total_publisher_count=len(all_publisher_ids),
+        total_publisher_count=len(non_agg_publisher_ids),
         benchmark_passing_count=benchmark_result.passing_pub_count,
         benchmark_failing_count=benchmark_result.failing_pub_count,
         median_nrmse=benchmark_result.median_nrmse,
