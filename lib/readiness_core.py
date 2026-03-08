@@ -292,6 +292,9 @@ def merge_results(
     readiness_details: list[PublisherReadinessDetail] = []
 
     for publisher_id in all_publisher_ids:
+        if publisher_id == 0:
+            continue  # Publisher 0 is aggregate — skip from readiness buckets
+
         benchmark_detail = benchmark_by_pub.get(publisher_id)
         regular_uptime = regular_uptime_by_pub.get(publisher_id)
 
@@ -580,6 +583,7 @@ def evaluate_feed_readiness(
     uptime_threshold_pct: float = DEFAULT_UPTIME_THRESHOLD_PCT,
     include_detailed: bool = False,
     tolerance_seconds: int = 60,
+    include_agg: bool = True,
 ) -> FeedReadinessResult:
     start_time = time.time()
     normalized_mode = normalize_asset_class(mode)
@@ -598,6 +602,7 @@ def evaluate_feed_readiness(
                 include_overnight=include_overnight,
                 skip_scipy_tests=skip_scipy_tests,
                 include_detailed=True,
+                include_agg=include_agg,
             )
         except Exception as exc:
             benchmark_result = _placeholder_benchmark_result(
@@ -701,6 +706,7 @@ def process_work_items(
     uptime_threshold_pct: float = DEFAULT_UPTIME_THRESHOLD_PCT,
     include_detailed: bool = False,
     tolerance_seconds: int = 60,
+    include_agg: bool = True,
 ) -> list[FeedReadinessResult]:
     if not work_items:
         print("Warning: No feeds to process")
@@ -730,6 +736,7 @@ def process_work_items(
                 uptime_threshold_pct=uptime_threshold_pct,
                 include_detailed=include_detailed,
                 tolerance_seconds=tolerance_seconds,
+                include_agg=include_agg,
             )
         except Exception as exc:
             return _make_error_result(
@@ -792,6 +799,7 @@ def process_csv(
     uptime_threshold_pct: float = DEFAULT_UPTIME_THRESHOLD_PCT,
     include_detailed: bool = False,
     tolerance_seconds: int = 60,
+    include_agg: bool = True,
 ) -> list[FeedReadinessResult]:
     include_normalized = None
     if include_asset_classes:
@@ -872,4 +880,5 @@ def process_csv(
         uptime_threshold_pct=uptime_threshold_pct,
         include_detailed=include_detailed,
         tolerance_seconds=tolerance_seconds,
+        include_agg=include_agg,
     )

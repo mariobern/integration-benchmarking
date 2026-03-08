@@ -1057,6 +1057,7 @@ def process_csv(
     feed_id_filter: set[int] | None = None,
     hit_rate_threshold: float = 95,
     write_results_fn=None,
+    include_agg: bool = True,
 ) -> list[BenchmarkResult]:
     """Process feeds from CSV file with parallel execution.
 
@@ -1138,6 +1139,7 @@ def process_csv(
             skip_scipy_tests=skip_scipy_tests,
             include_detailed=include_detailed,
             hit_rate_threshold=hit_rate_threshold,
+            include_agg=include_agg,
         )
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
