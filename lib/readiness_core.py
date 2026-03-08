@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import csv
 import statistics
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -724,11 +725,21 @@ def process_work_items(
     worker_count = max(1, min(max_workers, len(work_items)))
     print(f"Processing {len(work_items)} feeds with {worker_count} workers...")
 
+    thread_local = threading.local()
+
+    def get_thread_clients():
+        """Get or create ClickHouse clients for the current thread."""
+        if not hasattr(thread_local, "client_lazer"):
+            thread_local.client_lazer, thread_local.client_analytics = get_clients(
+                config
+            )
+        return thread_local.client_lazer, thread_local.client_analytics
+
     def evaluate_single(item: tuple[int, str, str]) -> FeedReadinessResult:
         feed_id, date, mode = item
         start_time = time.time()
         try:
-            client_lazer, client_analytics = get_clients(config)
+            client_lazer, client_analytics = get_thread_clients()
             return evaluate_feed_readiness(
                 client_lazer=client_lazer,
                 client_analytics=client_analytics,

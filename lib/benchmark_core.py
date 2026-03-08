@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import csv
 import statistics
+import threading
 import time
 from bisect import bisect_left
 from collections import Counter
@@ -1125,9 +1126,19 @@ def process_csv(
 
     results = []
 
+    thread_local = threading.local()
+
+    def get_thread_clients():
+        """Get or create ClickHouse clients for the current thread."""
+        if not hasattr(thread_local, "client_lazer"):
+            thread_local.client_lazer, thread_local.client_analytics = get_clients(
+                config
+            )
+        return thread_local.client_lazer, thread_local.client_analytics
+
     def evaluate_single(args):
         feed_id, date, mode = args
-        client_lazer, client_analytics = get_clients(config)
+        client_lazer, client_analytics = get_thread_clients()
         return evaluate_feed_two_queries(
             client_lazer,
             client_analytics,
