@@ -60,6 +60,7 @@ python feed_readiness.py --csv price_id_list.csv --summary
 | `--include-asset-class`       | Only these classes (CSV mode)                          | All                          |
 | `--exclude-asset-class`       | Exclude these classes (CSV mode)                       | None                         |
 | `--filter-feed-id`            | Only these feed IDs (CSV mode)                         | All                          |
+| `--no-agg`                    | Disable aggregate feed (publisher 0) evaluation        | Off (agg enabled)            |
 | `--summary`                   | Write a summary CSV of READY feeds only                | Off                          |
 | `--list-asset-classes`        | List asset classes in CSV and exit                     | Off                          |
 
@@ -108,6 +109,18 @@ For non-benchmarkable modes:
 - `benchmark_error` is set to `Asset class not benchmarkable`
 - uptime still runs
 - combined `ready` is `False`
+
+## Aggregate Feed (Publisher 0)
+
+By default, the script evaluates the aggregated price feed from the `price_feeds` table as **publisher 0**. This provides a quality check on the combined feed output alongside individual publishers.
+
+- Publisher 0 appears in console output and in `--detailed` CSV rows.
+- Publisher 0 is **excluded** from readiness buckets (`fully_passing`, `benchmark_only`, `uptime_only`, `both_failing`) and does not affect the `ready` verdict.
+- Use `--no-agg` to skip aggregate feed evaluation entirely.
+
+## US Equities Qualifier Filter
+
+For `us-equities` mode, benchmark queries automatically filter out irregular trade conditions from Datascope data. Trades with IRGCOND qualifiers (`CON`, `ODD`, `378`, `2315`, `DAP`, `PD_*` pattern) are excluded to ensure benchmarks reflect normal market conditions. This filter is applied automatically and requires no CLI flag.
 
 ## Output
 

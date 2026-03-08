@@ -291,7 +291,12 @@ def merge_results(
     both_failing_publishers: list[int] = []
     readiness_details: list[PublisherReadinessDetail] = []
 
+    # Exclude publisher 0 from total count — it's the aggregate feed
+    non_agg_publisher_ids = [pid for pid in all_publisher_ids if pid != 0]
+
     for publisher_id in all_publisher_ids:
+        is_aggregate = publisher_id == 0
+
         benchmark_detail = benchmark_by_pub.get(publisher_id)
         regular_uptime = regular_uptime_by_pub.get(publisher_id)
 
@@ -314,7 +319,11 @@ def merge_results(
             benchmark_n_observations = benchmark_detail.n_observations
             benchmark_error = benchmark_detail.error
 
-        if regular_uptime is None:
+        if is_aggregate:
+            uptime_passes = False
+            uptime_pct = None
+            uptime_error = None
+        elif regular_uptime is None:
             uptime_passes = False
             uptime_pct = None
             uptime_error = (
@@ -329,7 +338,9 @@ def merge_results(
 
         fully_passes = benchmark_passes and uptime_passes
 
-        if fully_passes:
+        if is_aggregate:
+            pass  # Publisher 0 excluded from readiness buckets
+        elif fully_passes:
             fully_passing_publishers.append(publisher_id)
         elif benchmark_passes and not uptime_passes:
             benchmark_only_publishers.append(publisher_id)
@@ -495,7 +506,7 @@ def merge_results(
         benchmark_only_passing_count=len(benchmark_only_publishers),
         uptime_only_passing_count=len(uptime_only_publishers),
         both_failing_count=len(both_failing_publishers),
-        total_publisher_count=len(all_publisher_ids),
+        total_publisher_count=len(non_agg_publisher_ids),
         benchmark_passing_count=benchmark_result.passing_pub_count,
         benchmark_failing_count=benchmark_result.failing_pub_count,
         median_nrmse=benchmark_result.median_nrmse,
@@ -580,6 +591,7 @@ def evaluate_feed_readiness(
     uptime_threshold_pct: float = DEFAULT_UPTIME_THRESHOLD_PCT,
     include_detailed: bool = False,
     tolerance_seconds: int = 60,
+    include_agg: bool = True,
 ) -> FeedReadinessResult:
     start_time = time.time()
     normalized_mode = normalize_asset_class(mode)
@@ -598,6 +610,7 @@ def evaluate_feed_readiness(
                 include_overnight=include_overnight,
                 skip_scipy_tests=skip_scipy_tests,
                 include_detailed=True,
+                include_agg=include_agg,
             )
         except Exception as exc:
             benchmark_result = _placeholder_benchmark_result(
@@ -701,6 +714,7 @@ def process_work_items(
     uptime_threshold_pct: float = DEFAULT_UPTIME_THRESHOLD_PCT,
     include_detailed: bool = False,
     tolerance_seconds: int = 60,
+    include_agg: bool = True,
 ) -> list[FeedReadinessResult]:
     if not work_items:
         print("Warning: No feeds to process")
@@ -730,6 +744,7 @@ def process_work_items(
                 uptime_threshold_pct=uptime_threshold_pct,
                 include_detailed=include_detailed,
                 tolerance_seconds=tolerance_seconds,
+                include_agg=include_agg,
             )
         except Exception as exc:
             return _make_error_result(
@@ -792,6 +807,7 @@ def process_csv(
     uptime_threshold_pct: float = DEFAULT_UPTIME_THRESHOLD_PCT,
     include_detailed: bool = False,
     tolerance_seconds: int = 60,
+    include_agg: bool = True,
 ) -> list[FeedReadinessResult]:
     include_normalized = None
     if include_asset_classes:
@@ -872,4 +888,5 @@ def process_csv(
         uptime_threshold_pct=uptime_threshold_pct,
         include_detailed=include_detailed,
         tolerance_seconds=tolerance_seconds,
+        include_agg=include_agg,
     )

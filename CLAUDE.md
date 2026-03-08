@@ -164,3 +164,5 @@ Always run `pre-commit run --files <changed files>` before committing. Hooks: bl
 - **Publisher 71** may fail due to infinite t_statistic values (numeric precision edge case)
 - **ClickHouse parameterized queries** use `{param_name:String}` syntax with `parameters=dict`
 - **`docs/asset-classes.md`** — update the `Last updated:` date at the top every time this file is modified
+- **US equities qualifier filter** — benchmark queries for `us-equities` mode filter out irregular trade conditions (IRGCOND qualifiers) from Datascope data
+- **Aggregate feed (publisher 0)** — `feed_readiness.py` and `quick_benchmark.py` evaluate the aggregated price feed as publisher 0 by default; disable with `--no-agg`. Publisher 0 is excluded from passing/failing counts and readiness determination.

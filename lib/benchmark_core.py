@@ -44,6 +44,7 @@ from lib.sql_filters import (
     get_extended_hours_filter_sql,
     get_market_hours_filter_sql,
     get_overnight_hours_filter_sql,
+    get_qualifier_filter_sql,
 )
 from lib.statistics import compute_statistical_metrics
 from lib.thresholds import passes_benchmark
@@ -126,6 +127,7 @@ def evaluate_session_for_all_publishers(
     price_col, bid_col, ask_col = get_benchmark_columns(mode)
     publisher_time_filter = get_extended_hours_filter_sql(session, date, "publish_time")
     benchmark_time_filter = get_extended_hours_filter_sql(session, date, "date_time")
+    qualifier_filter = get_qualifier_filter_sql(mode)
 
     publisher_query = f"""
         SELECT
@@ -155,6 +157,7 @@ def evaluate_session_for_all_publishers(
           AND ({bid_col} IS NOT NULL AND {ask_col} IS NOT NULL
                OR {price_col} IS NOT NULL)
           {benchmark_time_filter}
+          {qualifier_filter}
         GROUP BY ts_second
         ORDER BY ts_second
     """
@@ -541,6 +544,45 @@ def evaluate_overnight_for_all_publishers(
         )
 
 
+def query_aggregate_feed(
+    client_lazer,
+    feed_id: int,
+    date: str,
+    divisor: float,
+    market_filter: str,
+) -> tuple:
+    """Query price_feeds table as publisher 0, trying channels 1, 2, 3.
+
+    Returns (result, channel) where result is a ClickHouse query result
+    with rows of (publisher_id=0, ts_second, avg_price, update_count),
+    or (None, None) if no data found on any channel.
+    """
+    for channel in [1, 2, 3]:
+        query = f"""
+            SELECT
+                0 AS publisher_id,
+                toStartOfSecond(publish_time) AS ts_second,
+                avg(price) / {divisor} AS avg_price,
+                count() AS update_count
+            FROM price_feeds
+            WHERE price_feed_id = {feed_id}
+              AND toDate(publish_time) = '{date}'
+              AND price IS NOT NULL
+              AND channel = {channel}
+              {market_filter}
+            GROUP BY ts_second
+            ORDER BY ts_second
+        """
+        try:
+            result = client_lazer.query(query)
+            if result.result_rows:
+                return result, channel
+        except Exception as exc:
+            print(f"  Warning: aggregate feed query failed (channel {channel}): {exc}")
+            continue
+    return None, None
+
+
 def evaluate_feed_two_queries(
     client_lazer,
     client_analytics,
@@ -554,6 +596,7 @@ def evaluate_feed_two_queries(
     skip_scipy_tests: bool = False,
     include_detailed: bool = False,
     hit_rate_threshold: float = 95,
+    include_agg: bool = True,
 ) -> BenchmarkResult:
     """Evaluate a feed across all publishers using aggregated one-second buckets."""
 
@@ -583,6 +626,7 @@ def evaluate_feed_two_queries(
 
     publisher_market_filter = get_market_hours_filter_sql(mode, date, "publish_time")
     benchmark_market_filter = get_market_hours_filter_sql(mode, date, "date_time")
+    qualifier_filter = get_qualifier_filter_sql(mode, symbol)
 
     publisher_query = f"""
         SELECT
@@ -612,6 +656,7 @@ def evaluate_feed_two_queries(
           AND ({bid_col} IS NOT NULL AND {ask_col} IS NOT NULL
                OR {price_col} IS NOT NULL)
           {benchmark_market_filter}
+          {qualifier_filter}
         GROUP BY ts_second
         ORDER BY ts_second
     """
@@ -659,6 +704,22 @@ def evaluate_feed_two_queries(
         }
         sorted_bench_ts = sorted(benchmark_by_ts.keys())
 
+        # Query aggregate feed (publisher 0) if enabled
+        agg_result = None
+        if include_agg:
+            agg_result, agg_channel = query_aggregate_feed(
+                client_lazer,
+                feed_id,
+                date,
+                divisor,
+                publisher_market_filter,
+            )
+            if agg_result and agg_channel:
+                print(
+                    f"  Aggregate feed: using channel {agg_channel} "
+                    f"({len(agg_result.result_rows):,} rows)"
+                )
+
         all_publishers = {row[0] for row in pub_result.result_rows}
         publisher_metrics: dict[int, dict[str, list[float]]] = {
             pub_id: {
@@ -671,6 +732,36 @@ def evaluate_feed_two_queries(
             }
             for pub_id in all_publishers
         }
+
+        # Add aggregate feed rows to publisher metrics (as publisher 0)
+        if agg_result and agg_result.result_rows:
+            all_publishers.add(0)
+            publisher_metrics[0] = {
+                "squared_errors": [],
+                "spreads": [],
+                "benchmark_prices": [],
+                "pct_diffs": [],
+                "diffs": [],
+                "signed_pct_diffs": [],
+            }
+            for _, ts, pub_price, _ in agg_result.result_rows:
+                match = find_nearest_benchmark(
+                    sorted_bench_ts, benchmark_by_ts, ts, tolerance_seconds
+                )
+                if match is None:
+                    continue
+                bench_price, spread = match
+                diff = pub_price - bench_price
+                pct_diff = abs(diff / bench_price) * 100 if bench_price else 0
+                signed_pct_diff = (diff / bench_price) * 100 if bench_price else 0
+                m = publisher_metrics[0]
+                m["squared_errors"].append(diff**2)
+                if spread is not None:
+                    m["spreads"].append(spread)
+                m["benchmark_prices"].append(bench_price)
+                m["pct_diffs"].append(pct_diff)
+                m["diffs"].append(diff)
+                m["signed_pct_diffs"].append(signed_pct_diff)
 
         for pub_id, ts, pub_price, _ in pub_result.result_rows:
             match = find_nearest_benchmark(
@@ -711,7 +802,8 @@ def evaluate_feed_two_queries(
                     if n_observations == 0
                     else f"Insufficient observations ({n_observations} < {REGULAR_MIN_OBSERVATIONS})"
                 )
-                failing_publishers.append(pub_id)
+                if pub_id != 0:
+                    failing_publishers.append(pub_id)
                 publisher_details_internal.append(
                     PublisherFeedMetrics(
                         publisher_id=pub_id,
@@ -765,7 +857,9 @@ def evaluate_feed_two_queries(
                     metrics["diffs"], metrics["signed_pct_diffs"]
                 )
 
-            if pub_passes:
+            if pub_id == 0:
+                pass  # Publisher 0 is aggregate — evaluated but not counted
+            elif pub_passes:
                 passing_publishers.append(pub_id)
             else:
                 failing_publishers.append(pub_id)
@@ -794,6 +888,13 @@ def evaluate_feed_two_queries(
                     mean_abs_z_score=stat_metrics["mean_abs_z_score"],
                 )
             )
+
+        # Extract agg_metrics (publisher 0) — evaluated but excluded from counts
+        agg_metrics_result = None
+        for detail in publisher_details_internal:
+            if detail.publisher_id == 0:
+                agg_metrics_result = detail
+                break
 
         details_by_pub = {
             detail.publisher_id: detail for detail in publisher_details_internal
@@ -922,6 +1023,7 @@ def evaluate_feed_two_queries(
             overnight_passing_count=overnight_passing_count,
             overnight_failing_count=overnight_failing_count,
             overnight_reference_publisher_id=overnight_reference_publisher_id,
+            agg_metrics=agg_metrics_result,
             execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
@@ -956,6 +1058,7 @@ def process_csv(
     feed_id_filter: set[int] | None = None,
     hit_rate_threshold: float = 95,
     write_results_fn=None,
+    include_agg: bool = True,
 ) -> list[BenchmarkResult]:
     """Process feeds from CSV file with parallel execution.
 
@@ -1037,6 +1140,7 @@ def process_csv(
             skip_scipy_tests=skip_scipy_tests,
             include_detailed=include_detailed,
             hit_rate_threshold=hit_rate_threshold,
+            include_agg=include_agg,
         )
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:

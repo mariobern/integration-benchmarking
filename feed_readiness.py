@@ -178,6 +178,12 @@ Examples:
         action="store_true",
         help="List unique asset classes in the CSV file and exit",
     )
+    parser.add_argument(
+        "--no-agg",
+        action="store_true",
+        default=False,
+        help="Disable aggregate feed (publisher 0) evaluation",
+    )
 
     args = parser.parse_args()
     single_feed_dates: list[str] = []
@@ -298,6 +304,7 @@ Examples:
             uptime_threshold_pct=args.uptime_threshold,
             include_detailed=args.detailed,
             tolerance_seconds=args.alignment_tolerance_sec,
+            include_agg=not args.no_agg,
         )
     else:
         work_items = [
@@ -317,6 +324,7 @@ Examples:
             uptime_threshold_pct=args.uptime_threshold,
             include_detailed=args.detailed,
             tolerance_seconds=args.alignment_tolerance_sec,
+            include_agg=not args.no_agg,
         )
 
     write_results_csv(

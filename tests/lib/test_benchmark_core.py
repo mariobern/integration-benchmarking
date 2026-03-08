@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from lib.benchmark_core import evaluate_feed_two_queries, query_aggregate_feed
 from lib.models import (
     BenchmarkResult,
     ExtendedHoursMetrics,
@@ -775,3 +776,235 @@ class TestFindNearestBenchmark:
             )
             is None
         )
+
+
+# ---------------------------------------------------------------------------
+# 9. Qualifier filter injection into benchmark queries
+# ---------------------------------------------------------------------------
+class TestQualifierFilterInQueries:
+    """Verify qualifier filter is injected into benchmark SQL for us-equities."""
+
+    @patch("lib.benchmark_core.get_feed_metadata")
+    def test_us_equities_includes_qualifier_filter(self, mock_meta) -> None:
+        mock_meta.return_value = ("Equity.US.AAPL/USD", -8)
+        client_lazer = _make_client([])
+        client_analytics = _make_client([])
+
+        evaluate_feed_two_queries(
+            client_lazer,
+            client_analytics,
+            feed_id=327,
+            date="2025-10-06",
+            mode="us-equities",
+        )
+
+        analytics_call = client_analytics.query.call_args
+        assert analytics_call is not None, "Analytics client should have been queried"
+        query_sql = analytics_call[0][0]
+        assert "qualifiers" in query_sql
+        assert "IRGCOND" in query_sql
+
+    @patch("lib.benchmark_core.get_feed_metadata")
+    def test_fx_excludes_qualifier_filter(self, mock_meta) -> None:
+        mock_meta.return_value = ("FX.EUR/USD", -8)
+        client_lazer = _make_client([])
+        client_analytics = _make_client([])
+
+        evaluate_feed_two_queries(
+            client_lazer,
+            client_analytics,
+            feed_id=327,
+            date="2025-10-06",
+            mode="fx",
+        )
+
+        analytics_call = client_analytics.query.call_args
+        assert analytics_call is not None, "Analytics client should have been queried"
+        query_sql = analytics_call[0][0]
+        assert "qualifiers" not in query_sql
+
+
+# ---------------------------------------------------------------------------
+# 10. query_aggregate_feed — price_feeds table query
+# ---------------------------------------------------------------------------
+class TestQueryAggregateFeed:
+    def test_returns_data_from_channel_1(self):
+        rows = [(0, _make_timestamps(1)[0], 100.0, 5)]
+        client = _make_client(rows)
+        result, channel = query_aggregate_feed(
+            client,
+            feed_id=327,
+            date="2025-10-06",
+            divisor=100000000,
+            market_filter="",
+        )
+        assert result is not None
+        assert channel == 1
+        assert client.query.call_count == 1
+
+    def test_falls_through_to_channel_2(self):
+        def side_effect(query):
+            if "channel = 1" in query:
+                return MockQueryResult(result_rows=[])
+            return MockQueryResult(result_rows=[(0, _make_timestamps(1)[0], 100.0, 5)])
+
+        client = MagicMock()
+        client.query.side_effect = side_effect
+
+        result, channel = query_aggregate_feed(
+            client,
+            feed_id=327,
+            date="2025-10-06",
+            divisor=100000000,
+            market_filter="",
+        )
+        assert result is not None
+        assert channel == 2
+
+    def test_returns_none_when_no_channels_have_data(self):
+        client = _make_client([])
+        result, channel = query_aggregate_feed(
+            client,
+            feed_id=327,
+            date="2025-10-06",
+            divisor=100000000,
+            market_filter="",
+        )
+        assert result is None
+        assert channel is None
+        assert client.query.call_count == 3
+
+    def test_query_contains_price_feeds_table(self):
+        client = _make_client([])
+        query_aggregate_feed(
+            client,
+            feed_id=327,
+            date="2025-10-06",
+            divisor=100000000,
+            market_filter="",
+        )
+        query_sql = client.query.call_args_list[0][0][0]
+        assert "price_feeds" in query_sql
+
+    def test_query_uses_publisher_id_zero(self):
+        client = _make_client([])
+        query_aggregate_feed(
+            client,
+            feed_id=327,
+            date="2025-10-06",
+            divisor=100000000,
+            market_filter="",
+        )
+        query_sql = client.query.call_args_list[0][0][0]
+        assert "0 AS publisher_id" in query_sql
+
+    def test_graceful_on_exception(self):
+        """If all channels throw, tries all 3 then returns (None, None)."""
+        client = MagicMock()
+        client.query.side_effect = Exception("table not found")
+        result, channel = query_aggregate_feed(
+            client,
+            feed_id=327,
+            date="2025-10-06",
+            divisor=100000000,
+            market_filter="",
+        )
+        assert result is None
+        assert channel is None
+        assert client.query.call_count == 3  # tried all channels despite exceptions
+
+
+# ---------------------------------------------------------------------------
+# 11. Aggregate feed integration in evaluate_feed_two_queries
+# ---------------------------------------------------------------------------
+class TestAggregateInEvaluateFeed:
+    @patch("lib.benchmark_core.query_aggregate_feed")
+    @patch("lib.benchmark_core.get_feed_metadata")
+    def test_agg_metrics_populated_when_data_exists(self, mock_meta, mock_agg):
+        mock_meta.return_value = ("Equity.US.AAPL/USD", -8)
+        timestamps = _make_timestamps(200)
+        pub_rows = [(55, ts, 150.0, 1) for ts in timestamps]
+        bench_rows = [(ts, 150.0, 0.01) for ts in timestamps]
+        agg_rows = [(0, ts, 150.0, 1) for ts in timestamps]
+        mock_agg.return_value = (MockQueryResult(result_rows=agg_rows), 1)
+
+        client_lazer = _make_client(pub_rows)
+        client_analytics = _make_client(bench_rows)
+
+        result = evaluate_feed_two_queries(
+            client_lazer,
+            client_analytics,
+            feed_id=327,
+            date="2025-10-06",
+            mode="us-equities",
+            include_agg=True,
+        )
+        assert result.agg_metrics is not None
+        assert result.agg_metrics.publisher_id == 0
+
+    @patch("lib.benchmark_core.query_aggregate_feed")
+    @patch("lib.benchmark_core.get_feed_metadata")
+    def test_agg_excluded_from_passing_publishers(self, mock_meta, mock_agg):
+        mock_meta.return_value = ("Equity.US.AAPL/USD", -8)
+        timestamps = _make_timestamps(200)
+        pub_rows = [(55, ts, 150.0, 1) for ts in timestamps]
+        bench_rows = [(ts, 150.0, 0.01) for ts in timestamps]
+        agg_rows = [(0, ts, 150.0, 1) for ts in timestamps]
+        mock_agg.return_value = (MockQueryResult(result_rows=agg_rows), 1)
+
+        client_lazer = _make_client(pub_rows)
+        client_analytics = _make_client(bench_rows)
+
+        result = evaluate_feed_two_queries(
+            client_lazer,
+            client_analytics,
+            feed_id=327,
+            date="2025-10-06",
+            mode="us-equities",
+            include_agg=True,
+        )
+        assert 0 not in result.passing_publishers
+        assert 0 not in result.failing_publishers
+
+    @patch("lib.benchmark_core.get_feed_metadata")
+    def test_no_agg_when_disabled(self, mock_meta):
+        mock_meta.return_value = ("FX.EUR/USD", -8)
+        timestamps = _make_timestamps(200)
+        pub_rows = [(55, ts, 1.05, 1) for ts in timestamps]
+        bench_rows = [(ts, 1.05, 0.0001) for ts in timestamps]
+
+        client_lazer = _make_client(pub_rows)
+        client_analytics = _make_client(bench_rows)
+
+        result = evaluate_feed_two_queries(
+            client_lazer,
+            client_analytics,
+            feed_id=327,
+            date="2025-10-06",
+            mode="fx",
+            include_agg=False,
+        )
+        assert result.agg_metrics is None
+
+    @patch("lib.benchmark_core.query_aggregate_feed")
+    @patch("lib.benchmark_core.get_feed_metadata")
+    def test_agg_failure_graceful(self, mock_meta, mock_agg):
+        mock_meta.return_value = ("Equity.US.AAPL/USD", -8)
+        mock_agg.return_value = (None, None)
+        timestamps = _make_timestamps(200)
+        pub_rows = [(55, ts, 150.0, 1) for ts in timestamps]
+        bench_rows = [(ts, 150.0, 0.01) for ts in timestamps]
+
+        client_lazer = _make_client(pub_rows)
+        client_analytics = _make_client(bench_rows)
+
+        result = evaluate_feed_two_queries(
+            client_lazer,
+            client_analytics,
+            feed_id=327,
+            date="2025-10-06",
+            mode="us-equities",
+            include_agg=True,
+        )
+        assert result.agg_metrics is None
+        assert result.passing_pub_count > 0 or result.failing_pub_count > 0

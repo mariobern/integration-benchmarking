@@ -143,6 +143,47 @@ class TestPublisherBenchmarkResult:
             PublisherBenchmarkResult(publisher_id=55, feed_id=327)
 
 
+class TestBenchmarkResultAggMetrics:
+    def test_agg_metrics_defaults_to_none(self):
+        result = BenchmarkResult(
+            feed_id=1,
+            date="2025-01-01",
+            mode="fx",
+            symbol=None,
+            ready=True,
+            target_pub_count=4,
+            passing_pub_count=4,
+            failing_pub_count=0,
+            passing_publishers=[1, 2, 3, 4],
+            failing_publishers=[],
+        )
+        assert result.agg_metrics is None
+
+    def test_agg_metrics_can_be_set(self):
+        agg = PublisherFeedMetrics(
+            publisher_id=0,
+            n_observations=1000,
+            passes=True,
+            nrmse=0.005,
+            hit_rate=98.0,
+        )
+        result = BenchmarkResult(
+            feed_id=1,
+            date="2025-01-01",
+            mode="fx",
+            symbol=None,
+            ready=True,
+            target_pub_count=4,
+            passing_pub_count=4,
+            failing_pub_count=0,
+            passing_publishers=[1, 2, 3, 4],
+            failing_publishers=[],
+            agg_metrics=agg,
+        )
+        assert result.agg_metrics.publisher_id == 0
+        assert result.agg_metrics.nrmse == 0.005
+
+
 class TestPublisherSessionUptime:
     def test_frozen(self):
         u = PublisherSessionUptime(

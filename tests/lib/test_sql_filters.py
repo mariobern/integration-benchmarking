@@ -24,6 +24,7 @@ from lib.sql_filters import (
     get_extended_hours_filter_sql,
     get_market_hours_filter_sql,
     get_overnight_hours_filter_sql,
+    get_qualifier_filter_sql,
     is_futures_symbol,
 )
 
@@ -317,3 +318,50 @@ class TestGetOvernightHoursFilterSql:
         sql = get_overnight_hours_filter_sql("2026-01-05")
         # Both start and end fall on Jan 6 in UTC (since Jan 5 8PM EST = Jan 6 1AM UTC)
         assert "2026-01-06" in sql
+
+
+# ---------------------------------------------------------------------------
+# get_qualifier_filter_sql
+# ---------------------------------------------------------------------------
+class TestGetQualifierFilterSql:
+    def test_us_equities_returns_filter(self):
+        """US equities should produce a non-empty qualifier filter with all patterns."""
+        sql = get_qualifier_filter_sql("us-equities")
+        assert "CON[IRGCOND]" in sql
+        assert "ODD[IRGCOND]" in sql
+        assert "378[IRGCOND]" in sql
+        assert "2315[IRGCOND]" in sql
+        assert "DAP[IRGCOND]" in sql
+        assert "PD_[A-Za-z0-9_]*" in sql
+
+    def test_us_equities_allows_null_qualifiers(self):
+        """Filter should allow rows where qualifiers IS NULL."""
+        sql = get_qualifier_filter_sql("us-equities")
+        assert "qualifiers IS NULL" in sql
+
+    def test_fx_returns_empty(self):
+        assert get_qualifier_filter_sql("fx") == ""
+
+    def test_metals_returns_empty(self):
+        assert get_qualifier_filter_sql("metals") == ""
+
+    def test_commodity_returns_empty(self):
+        assert get_qualifier_filter_sql("commodity") == ""
+
+    def test_us_treasuries_returns_empty(self):
+        assert get_qualifier_filter_sql("us-treasuries") == ""
+
+    def test_equity_us_alias(self):
+        """equity-us should also produce the qualifier filter."""
+        sql = get_qualifier_filter_sql("equity-us")
+        assert "qualifiers IS NULL" in sql
+        assert "CON[IRGCOND]" in sql
+
+    def test_us_equities_futures_returns_empty(self):
+        """Futures symbols in us-equities mode should NOT get the qualifier filter."""
+        assert get_qualifier_filter_sql("us-equities", "Equity.US.EMH6/USD") == ""
+
+    def test_us_equities_spot_with_symbol(self):
+        """Spot symbols in us-equities mode should get the filter."""
+        sql = get_qualifier_filter_sql("us-equities", "Equity.US.AAPL/USD")
+        assert "qualifiers" in sql
