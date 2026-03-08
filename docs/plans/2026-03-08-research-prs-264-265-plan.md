@@ -13,6 +13,7 @@
 ## Task 1: Add `get_qualifier_filter_sql()` to sql_filters.py
 
 **Files:**
+
 - Modify: `lib/sql_filters.py:192` (append after `get_benchmark_columns`)
 - Test: `tests/lib/test_sql_filters.py`
 
@@ -115,6 +116,7 @@ git commit -m "feat: add qualifier filter for US equities benchmark data"
 ## Task 2: Inject qualifier filter into benchmark_core.py
 
 **Files:**
+
 - Modify: `lib/benchmark_core.py` (lines 581-617 in `evaluate_feed_two_queries`, lines 126-160 in `evaluate_session_for_all_publishers`)
 - Test: `tests/lib/test_benchmark_core.py`
 
@@ -184,16 +186,19 @@ Expected: FAIL — qualifier filter not in query
 In `lib/benchmark_core.py`:
 
 1. Add import (top of file, alongside existing sql_filters imports):
+
 ```python
 from lib.sql_filters import get_qualifier_filter_sql
 ```
 
 2. In `evaluate_feed_two_queries()` (after line 585, where `benchmark_market_filter` is set):
+
 ```python
 qualifier_filter = get_qualifier_filter_sql(mode)
 ```
 
 3. In the benchmark query (line 614, after `{benchmark_market_filter}`):
+
 ```python
           {qualifier_filter}
 ```
@@ -223,6 +228,7 @@ git commit -m "feat: inject qualifier filter into benchmark_core queries"
 ## Task 3: Inject qualifier filter into publisher_eval.py
 
 **Files:**
+
 - Modify: `lib/publisher_eval.py` (lines 120-134 in `evaluate_session_metrics`, lines 470-484 in `evaluate_publisher_feed`)
 
 **Step 1: Write the implementation**
@@ -230,20 +236,25 @@ git commit -m "feat: inject qualifier filter into benchmark_core queries"
 In `lib/publisher_eval.py`:
 
 1. Add import:
+
 ```python
 from lib.sql_filters import get_qualifier_filter_sql
 ```
 
 2. In `evaluate_session_metrics()` (around line 102, after getting price_col/bid_col/ask_col):
+
 ```python
 qualifier_filter = get_qualifier_filter_sql(mode)
 ```
+
 Then inject `{qualifier_filter}` after `{benchmark_time_filter}` in the benchmark query (line 131).
 
 3. In `evaluate_publisher_feed()` (around line 449, after getting benchmark_table):
+
 ```python
 qualifier_filter = get_qualifier_filter_sql(mode)
 ```
+
 Then inject `{qualifier_filter}` after `{benchmark_market_filter}` in the benchmark query (line 481).
 
 4. In extended hours benchmark queries within `evaluate_publisher_feed()` — these call `evaluate_session_metrics()` which already handles the filter.
@@ -268,6 +279,7 @@ git commit -m "feat: inject qualifier filter into publisher_eval queries"
 ## Task 4: Add `agg_metrics` field to BenchmarkResult model
 
 **Files:**
+
 - Modify: `lib/models.py:114` (add field to BenchmarkResult)
 - Test: `tests/lib/test_models.py`
 
@@ -339,6 +351,7 @@ git commit -m "feat: add agg_metrics field to BenchmarkResult model"
 ## Task 5: Add `query_aggregate_feed()` to benchmark_core.py
 
 **Files:**
+
 - Modify: `lib/benchmark_core.py` (add new function before `evaluate_feed_two_queries`)
 - Test: `tests/lib/test_benchmark_core.py`
 
@@ -500,6 +513,7 @@ git commit -m "feat: add query_aggregate_feed() for price_feeds table"
 ## Task 6: Integrate publisher 0 into `evaluate_feed_two_queries()`
 
 **Files:**
+
 - Modify: `lib/benchmark_core.py` (lines 544-926 — signature, body, result construction)
 - Test: `tests/lib/test_benchmark_core.py`
 
@@ -619,11 +633,13 @@ Expected: FAIL — `include_agg` parameter not recognized
 Modify `evaluate_feed_two_queries()` in `lib/benchmark_core.py`:
 
 1. **Add parameter** to signature (after `hit_rate_threshold`, line 556):
+
 ```python
     include_agg: bool = True,
 ```
 
 2. **After the publisher + benchmark queries succeed and data is validated** (after line 659, after `sorted_bench_ts`), add aggregate feed query:
+
 ```python
         # Query aggregate feed (publisher 0) if enabled
         agg_result = None
@@ -637,6 +653,7 @@ Modify `evaluate_feed_two_queries()` in `lib/benchmark_core.py`:
 ```
 
 3. **Add publisher 0 data to the metrics loop** (after line 673, after `publisher_metrics` dict init):
+
 ```python
         # Add aggregate feed rows to publisher metrics (as publisher 0)
         if agg_result and agg_result.result_rows:
@@ -699,6 +716,7 @@ Also, in the per-publisher loop (line 704), skip publisher 0 from passing/failin
 ```
 
 5. **Set agg_metrics in the return** (line 917, add to BenchmarkResult constructor):
+
 ```python
             agg_metrics=agg_metrics_result,
 ```
@@ -731,6 +749,7 @@ git commit -m "feat: integrate aggregate feed (publisher 0) into evaluate_feed_t
 ## Task 7: Thread `include_agg` through process_csv in benchmark_core.py
 
 **Files:**
+
 - Modify: `lib/benchmark_core.py` (lines 945-1081 — `process_csv` signature and `evaluate_single` closure)
 
 **Step 1: Write the implementation**
@@ -738,6 +757,7 @@ git commit -m "feat: integrate aggregate feed (publisher 0) into evaluate_feed_t
 1. Add `include_agg: bool = True` parameter to `process_csv()` signature (after `hit_rate_threshold`, line 957).
 
 2. Pass it through in `evaluate_single()` (line 1028-1040):
+
 ```python
         return evaluate_feed_two_queries(
             ...
@@ -766,6 +786,7 @@ git commit -m "feat: thread include_agg through benchmark_core.process_csv"
 ## Task 8: Thread `include_agg` through readiness_core.py
 
 **Files:**
+
 - Modify: `lib/readiness_core.py` (lines 568-646 `evaluate_feed_readiness`, lines 692-777 `process_work_items`, lines 780-831 `process_csv`)
 - Modify: `lib/readiness_core.py` (lines 228-565 `merge_results` — exclude publisher 0 from readiness buckets)
 
@@ -774,6 +795,7 @@ git commit -m "feat: thread include_agg through benchmark_core.process_csv"
 1. Add `include_agg: bool = True` to `evaluate_feed_readiness()` signature (after `tolerance_seconds`, line 582).
 
 2. Pass it through to `evaluate_feed_two_queries()` (line 589-601):
+
 ```python
             benchmark_result = evaluate_feed_two_queries(
                 ...
@@ -785,6 +807,7 @@ git commit -m "feat: thread include_agg through benchmark_core.process_csv"
 3. Add `include_agg: bool = True` to `process_work_items()` signature (after `tolerance_seconds`, line 703).
 
 4. Pass it through to `evaluate_feed_readiness()` (line 718-732):
+
 ```python
             return evaluate_feed_readiness(
                 ...
@@ -798,6 +821,7 @@ git commit -m "feat: thread include_agg through benchmark_core.process_csv"
 6. Pass it through to `process_work_items()` call inside `process_csv()`.
 
 7. In `merge_results()` — publisher 0 exclusion. Add at the start of the publisher classification loop (around line 294):
+
 ```python
         if publisher_id == 0:
             # Publisher 0 is the aggregate feed — skip from readiness buckets
@@ -824,11 +848,13 @@ git commit -m "feat: thread include_agg through readiness_core, exclude pub 0 fr
 ## Task 9: Add `--no-agg` CLI flag to quick_benchmark.py
 
 **Files:**
+
 - Modify: `quick_benchmark.py` (argparse + pass to process_csv / evaluate_feed_two_queries)
 
 **Step 1: Write the implementation**
 
 1. Add argument (after `--hit-rate-threshold`, around line 187):
+
 ```python
     parser.add_argument(
         "--no-agg",
@@ -839,11 +865,13 @@ git commit -m "feat: thread include_agg through readiness_core, exclude pub 0 fr
 ```
 
 2. In CSV path (around line 273-287), pass to `process_csv()`:
+
 ```python
     include_agg=not args.no_agg,
 ```
 
 3. In single-feed path (around line 322-338), pass to `evaluate_feed_two_queries()`:
+
 ```python
     include_agg=not args.no_agg,
 ```
@@ -868,11 +896,13 @@ git commit -m "feat: add --no-agg flag to quick_benchmark.py"
 ## Task 10: Add `--no-agg` CLI flag to feed_readiness.py
 
 **Files:**
+
 - Modify: `feed_readiness.py` (argparse + pass to process_csv / process_work_items)
 
 **Step 1: Write the implementation**
 
 1. Add argument (after `--summary`, around line 176):
+
 ```python
     parser.add_argument(
         "--no-agg",
@@ -883,11 +913,13 @@ git commit -m "feat: add --no-agg flag to quick_benchmark.py"
 ```
 
 2. In CSV path (around line 286-301), pass to `process_csv()`:
+
 ```python
     include_agg=not args.no_agg,
 ```
 
 3. In single-feed path (around line 303-320), pass to `process_work_items()`:
+
 ```python
     include_agg=not args.no_agg,
 ```
@@ -912,6 +944,7 @@ git commit -m "feat: add --no-agg flag to feed_readiness.py"
 ## Task 11: Update output modules for publisher 0
 
 **Files:**
+
 - Modify: `lib/quick_benchmark_output.py` — include publisher 0 in CSV output rows
 - Modify: `lib/readiness_output.py` — include publisher 0 in CSV output rows
 
@@ -940,6 +973,7 @@ No pop needed. Publisher 0 appears in CSV output automatically.
 **Step 3: Verify CSV output includes publisher 0**
 
 Run a quick manual check after integration:
+
 ```bash
 source venv/bin/activate && python3 quick_benchmark.py --feed-id 327 --date 2025-10-06 --mode fx
 # Check output CSV for publisher_id=0 row
@@ -983,11 +1017,13 @@ git add -u && git commit -m "style: apply pre-commit formatting"
 ## Task 13: Update CLAUDE.md documentation
 
 **Files:**
+
 - Modify: `CLAUDE.md`
 
 **Step 1: Add qualifier filter note**
 
 Under the "Key Gotchas" section, add:
+
 ```
 - **US equities qualifier filter** — benchmark queries for `us-equities` mode filter out irregular trade conditions (IRGCOND qualifiers) from Datascope data
 ```
@@ -995,6 +1031,7 @@ Under the "Key Gotchas" section, add:
 **Step 2: Add aggregate feed note**
 
 Under the "Scripts" table or "Feed Readiness" section, add:
+
 ```
 - **Aggregate feed (publisher 0)** — `feed_readiness.py` and `quick_benchmark.py` evaluate the aggregated price feed as publisher 0 by default; disable with `--no-agg`
 ```

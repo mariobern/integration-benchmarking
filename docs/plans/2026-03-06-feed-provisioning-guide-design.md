@@ -134,10 +134,10 @@ Each phase section follows: Purpose → Tools → Example Commands → What Happ
 
 ## Pass/Fail Criteria Reference
 
-| Session                          | nrmse_auto_pass | nrmse_conditional | hit_rate_threshold |
-| -------------------------------- | --------------- | ----------------- | ------------------ |
-| Regular (fx, equities, rates)    | 0.01            | 0.05              | 95%                |
-| Relaxed (commodity, metals)      | 0.05            | 0.15              | 85%                |
-| Extended (pre/after/overnight)   | 0.05            | 0.15              | 85%                |
+| Session                        | nrmse_auto_pass | nrmse_conditional | hit_rate_threshold |
+| ------------------------------ | --------------- | ----------------- | ------------------ |
+| Regular (fx, equities, rates)  | 0.01            | 0.05              | 95%                |
+| Relaxed (commodity, metals)    | 0.05            | 0.15              | 85%                |
+| Extended (pre/after/overnight) | 0.05            | 0.15              | 85%                |
 
 Feed is READY when: `fully_passing_count >= target_pub_count` (default: 4).
