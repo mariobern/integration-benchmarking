@@ -191,14 +191,18 @@ def get_benchmark_columns(mode: str) -> tuple[str, str, str]:
     return ("price", "bid_price", "ask_price")
 
 
-def get_qualifier_filter_sql(mode: str) -> str:
+def get_qualifier_filter_sql(mode: str, symbol: Optional[str] = None) -> str:
     """Return SQL WHERE clause fragment to exclude irregular trade qualifiers.
 
-    Only applies to US equities benchmark data. For all other asset classes,
-    returns an empty string (no filtering needed).
+    Only applies to US equities spot benchmark data. Returns empty string
+    for non-US-equities modes and for futures symbols (futures benchmark
+    table may not have a qualifiers column).
     """
 
     if mode not in ("us-equities", "equity-us"):
+        return ""
+
+    if symbol and is_futures_symbol(symbol):
         return ""
 
     return """

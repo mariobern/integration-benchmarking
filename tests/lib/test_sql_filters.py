@@ -356,3 +356,12 @@ class TestGetQualifierFilterSql:
         sql = get_qualifier_filter_sql("equity-us")
         assert "qualifiers IS NULL" in sql
         assert "CON[IRGCOND]" in sql
+
+    def test_us_equities_futures_returns_empty(self):
+        """Futures symbols in us-equities mode should NOT get the qualifier filter."""
+        assert get_qualifier_filter_sql("us-equities", "Equity.US.EMH6/USD") == ""
+
+    def test_us_equities_spot_with_symbol(self):
+        """Spot symbols in us-equities mode should get the filter."""
+        sql = get_qualifier_filter_sql("us-equities", "Equity.US.AAPL/USD")
+        assert "qualifiers" in sql

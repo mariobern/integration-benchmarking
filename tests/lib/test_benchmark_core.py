@@ -799,10 +799,10 @@ class TestQualifierFilterInQueries:
         )
 
         analytics_call = client_analytics.query.call_args
-        if analytics_call:
-            query_sql = analytics_call[0][0]
-            assert "qualifiers" in query_sql
-            assert "IRGCOND" in query_sql
+        assert analytics_call is not None, "Analytics client should have been queried"
+        query_sql = analytics_call[0][0]
+        assert "qualifiers" in query_sql
+        assert "IRGCOND" in query_sql
 
     @patch("lib.benchmark_core.get_feed_metadata")
     def test_fx_excludes_qualifier_filter(self, mock_meta) -> None:
@@ -819,9 +819,9 @@ class TestQualifierFilterInQueries:
         )
 
         analytics_call = client_analytics.query.call_args
-        if analytics_call:
-            query_sql = analytics_call[0][0]
-            assert "qualifiers" not in query_sql
+        assert analytics_call is not None, "Analytics client should have been queried"
+        query_sql = analytics_call[0][0]
+        assert "qualifiers" not in query_sql
 
 
 # ---------------------------------------------------------------------------
@@ -899,6 +899,7 @@ class TestQueryAggregateFeed:
         assert "0 AS publisher_id" in query_sql
 
     def test_graceful_on_exception(self):
+        """If all channels throw, tries all 3 then returns (None, None)."""
         client = MagicMock()
         client.query.side_effect = Exception("table not found")
         result, channel = query_aggregate_feed(
@@ -910,6 +911,7 @@ class TestQueryAggregateFeed:
         )
         assert result is None
         assert channel is None
+        assert client.query.call_count == 3  # tried all channels despite exceptions
 
 
 # ---------------------------------------------------------------------------

@@ -577,8 +577,9 @@ def query_aggregate_feed(
             result = client_lazer.query(query)
             if result.result_rows:
                 return result, channel
-        except Exception:
-            return None, None
+        except Exception as exc:
+            print(f"  Warning: aggregate feed query failed (channel {channel}): {exc}")
+            continue
     return None, None
 
 
@@ -625,7 +626,7 @@ def evaluate_feed_two_queries(
 
     publisher_market_filter = get_market_hours_filter_sql(mode, date, "publish_time")
     benchmark_market_filter = get_market_hours_filter_sql(mode, date, "date_time")
-    qualifier_filter = get_qualifier_filter_sql(mode)
+    qualifier_filter = get_qualifier_filter_sql(mode, symbol)
 
     publisher_query = f"""
         SELECT

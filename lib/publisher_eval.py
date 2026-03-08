@@ -450,7 +450,7 @@ def evaluate_publisher_feed(
     divisor = 10 ** abs(exponent)
     benchmark_table = get_benchmark_table(mode, symbol)
     price_col, bid_col, ask_col = get_benchmark_columns(mode)
-    qualifier_filter = get_qualifier_filter_sql(mode)
+    qualifier_filter = get_qualifier_filter_sql(mode, symbol)
 
     publisher_market_filter = get_market_hours_filter_sql(mode, date, "publish_time")
     benchmark_market_filter = get_market_hours_filter_sql(mode, date, "date_time")
