@@ -185,6 +185,12 @@ Examples:
         default=95,
         help="Hit rate pass threshold percentage (default: 95). Use 98 for strict mode.",
     )
+    parser.add_argument(
+        "--no-agg",
+        action="store_true",
+        default=False,
+        help="Disable aggregate feed (publisher 0) evaluation",
+    )
 
     args = parser.parse_args()
 
@@ -284,6 +290,7 @@ Examples:
             feed_id_filter=feed_id_filter,
             hit_rate_threshold=args.hit_rate_threshold,
             write_results_fn=write_results_csv,
+            include_agg=not args.no_agg,
         )
     else:
         config = load_config()
@@ -308,6 +315,7 @@ Examples:
                     skip_scipy_tests=args.skip_scipy_tests,
                     include_detailed=args.detailed,
                     hit_rate_threshold=args.hit_rate_threshold,
+                    include_agg=not args.no_agg,
                 )
 
             worker_count = min(args.workers, len(feed_date_pairs))
@@ -334,6 +342,7 @@ Examples:
                         skip_scipy_tests=args.skip_scipy_tests,
                         include_detailed=args.detailed,
                         hit_rate_threshold=args.hit_rate_threshold,
+                        include_agg=not args.no_agg,
                     )
                 )
 
