@@ -20,6 +20,7 @@ import argparse
 from dataclasses import dataclass
 from datetime import datetime, date, timedelta
 from typing import Optional
+from zoneinfo import ZoneInfo
 import sys
 
 import clickhouse_connect
@@ -309,6 +310,23 @@ def compute_uptime_200ms_gap(
     }
 
 
+def _et_to_utc(
+    target_date: date, hour: int, minute: int, day_offset: int = 0
+) -> datetime:
+    """Convert an ET time on a given date to a naive UTC datetime.
+
+    Uses ZoneInfo("America/New_York") so EST/EDT is handled automatically.
+    Returns a naive datetime (no tzinfo) since ClickHouse queries use naive UTC strings.
+    """
+    et = ZoneInfo("America/New_York")
+    local_dt = datetime.combine(
+        target_date + timedelta(days=day_offset),
+        datetime.min.time().replace(hour=hour, minute=minute),
+        tzinfo=et,
+    )
+    return local_dt.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+
+
 def get_trading_sessions(
     target_date: date, asset_class: str = "us-equities"
 ) -> list[dict]:
@@ -327,57 +345,40 @@ def get_trading_sessions(
             }
         )
     else:
-        # US Equities sessions (times in UTC, adjust from EST)
-        # Regular: 9:30 AM - 4:00 PM EST = 14:30 - 21:00 UTC
+        # US Equities sessions (times in ET, auto-adjusts for EST/EDT)
+        # Regular: 9:30 AM - 4:00 PM ET
         sessions.append(
             {
                 "name": "regular",
-                "start": datetime.combine(
-                    target_date, datetime.min.time().replace(hour=14, minute=30)
-                ),
-                "end": datetime.combine(
-                    target_date, datetime.min.time().replace(hour=21, minute=0)
-                ),
+                "start": _et_to_utc(target_date, 9, 30),
+                "end": _et_to_utc(target_date, 16, 0),
             }
         )
 
-        # Pre-market: 4:00 AM - 9:30 AM EST = 09:00 - 14:30 UTC
+        # Pre-market: 4:00 AM - 9:30 AM ET
         sessions.append(
             {
                 "name": "premarket",
-                "start": datetime.combine(
-                    target_date, datetime.min.time().replace(hour=9, minute=0)
-                ),
-                "end": datetime.combine(
-                    target_date, datetime.min.time().replace(hour=14, minute=30)
-                ),
+                "start": _et_to_utc(target_date, 4, 0),
+                "end": _et_to_utc(target_date, 9, 30),
             }
         )
 
-        # After-hours: 4:00 PM - 8:00 PM EST = 21:00 - 01:00 UTC (next day)
+        # After-hours: 4:00 PM - 8:00 PM ET
         sessions.append(
             {
                 "name": "afterhours",
-                "start": datetime.combine(
-                    target_date, datetime.min.time().replace(hour=21, minute=0)
-                ),
-                "end": datetime.combine(
-                    target_date + timedelta(days=1),
-                    datetime.min.time().replace(hour=1, minute=0),
-                ),
+                "start": _et_to_utc(target_date, 16, 0),
+                "end": _et_to_utc(target_date, 20, 0),
             }
         )
 
-        # Overnight: 8:00 PM - 4:00 AM EST = 01:00 - 09:00 UTC
+        # Overnight: 8:00 PM - 4:00 AM ET (next day)
         sessions.append(
             {
                 "name": "overnight",
-                "start": datetime.combine(
-                    target_date, datetime.min.time().replace(hour=1, minute=0)
-                ),
-                "end": datetime.combine(
-                    target_date, datetime.min.time().replace(hour=9, minute=0)
-                ),
+                "start": _et_to_utc(target_date, 20, 0),
+                "end": _et_to_utc(target_date, 4, 0, day_offset=1),
             }
         )
 
