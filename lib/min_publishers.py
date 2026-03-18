@@ -10,6 +10,7 @@ Rule engine:
 Boundaries configurable via floor and cutoff parameters.
 """
 
+import csv as csv_module
 import re
 from dataclasses import dataclass
 
@@ -327,3 +328,35 @@ def modify_config(
         "needs_attention": sum(1 for c in changes if c.status == "NEEDS_ATTENTION"),
         "changes": changes,
     }
+
+
+def write_csv_report(changes: list[FeedChange], output_path: str) -> None:
+    """Write the change report CSV."""
+    fieldnames = [
+        "feed_id",
+        "symbol",
+        "asset_type",
+        "old_min_publishers",
+        "new_min_publishers",
+        "allowed_publisher_count",
+        "status",
+    ]
+    with open(output_path, "w", newline="") as f:
+        writer = csv_module.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for change in changes:
+            writer.writerow(
+                {
+                    "feed_id": change.feed_id,
+                    "symbol": change.symbol,
+                    "asset_type": change.asset_type,
+                    "old_min_publishers": change.old_min_publishers,
+                    "new_min_publishers": (
+                        change.new_min_publishers
+                        if change.new_min_publishers is not None
+                        else ""
+                    ),
+                    "allowed_publisher_count": change.allowed_publisher_count,
+                    "status": change.status,
+                }
+            )

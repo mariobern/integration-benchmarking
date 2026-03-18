@@ -9,6 +9,7 @@ from lib.min_publishers import (
     compute_target_min_publishers,
     evaluate_feeds,
     modify_config,
+    write_csv_report,
 )
 
 
@@ -472,3 +473,66 @@ class TestModifyConfig:
         result = modify_config(str(config_file), dry_run=False)
 
         assert result["updated"] == 0
+
+
+# ── Task 5: CSV Report Tests ────────────────────────────────────────────
+
+import csv
+
+
+class TestWriteCsvReport:
+    """CSV audit report generation."""
+
+    def test_csv_columns(self, tmp_path):
+        """CSV has correct headers."""
+        changes = [
+            FeedChange(100, "Equity.US.FOO/USD", "equity", 1, 2, 5, "UPDATED"),
+        ]
+        csv_path = tmp_path / "report.csv"
+        write_csv_report(changes, str(csv_path))
+
+        with open(csv_path) as f:
+            reader = csv.DictReader(f)
+            assert reader.fieldnames == [
+                "feed_id",
+                "symbol",
+                "asset_type",
+                "old_min_publishers",
+                "new_min_publishers",
+                "allowed_publisher_count",
+                "status",
+            ]
+
+    def test_csv_all_statuses(self, tmp_path):
+        """CSV includes all status types."""
+        changes = [
+            FeedChange(100, "A/USD", "equity", 1, 2, 5, "UPDATED"),
+            FeedChange(200, "B/USD", "equity", 1, None, 3, "SKIPPED_LOW_PUBLISHERS"),
+            FeedChange(300, "C/USD", "equity", 2, None, 5, "SKIPPED_EQUAL"),
+            FeedChange(400, "D/USD", "equity", 3, None, 5, "SKIPPED_HIGHER"),
+            FeedChange(500, "E/USD", "equity", 1, None, 1, "NEEDS_ATTENTION"),
+        ]
+        csv_path = tmp_path / "report.csv"
+        write_csv_report(changes, str(csv_path))
+
+        with open(csv_path) as f:
+            rows = list(csv.DictReader(f))
+        assert len(rows) == 5
+        statuses = [r["status"] for r in rows]
+        assert "UPDATED" in statuses
+        assert "SKIPPED_LOW_PUBLISHERS" in statuses
+        assert "SKIPPED_EQUAL" in statuses
+        assert "SKIPPED_HIGHER" in statuses
+        assert "NEEDS_ATTENTION" in statuses
+
+    def test_csv_none_new_min_publishers(self, tmp_path):
+        """Skipped feeds have empty new_min_publishers in CSV."""
+        changes = [
+            FeedChange(100, "A/USD", "equity", 1, None, 3, "SKIPPED_LOW_PUBLISHERS"),
+        ]
+        csv_path = tmp_path / "report.csv"
+        write_csv_report(changes, str(csv_path))
+
+        with open(csv_path) as f:
+            rows = list(csv.DictReader(f))
+        assert rows[0]["new_min_publishers"] == ""
