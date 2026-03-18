@@ -14,11 +14,11 @@
 
 ## File Structure
 
-| File | Purpose |
-|------|---------|
-| `lib/min_publishers.py` | Core logic: rule engine, eligibility, JSON surgery, CSV report |
-| `update_min_publishers.py` | CLI wrapper: argparse, delegates to `lib/min_publishers.py` |
-| `tests/test_min_publishers.py` | All unit tests |
+| File                           | Purpose                                                        |
+| ------------------------------ | -------------------------------------------------------------- |
+| `lib/min_publishers.py`        | Core logic: rule engine, eligibility, JSON surgery, CSV report |
+| `update_min_publishers.py`     | CLI wrapper: argparse, delegates to `lib/min_publishers.py`    |
+| `tests/test_min_publishers.py` | All unit tests                                                 |
 
 ---
 
@@ -27,6 +27,7 @@
 ### Task 1: Rule Engine — compute_target_min_publishers
 
 **Files:**
+
 - Create: `lib/min_publishers.py`
 - Create: `tests/test_min_publishers.py`
 
@@ -156,6 +157,7 @@ git commit -m "feat: add min_publishers rule engine with tests"
 ### Task 2: Eligibility Filters — evaluate_feeds
 
 **Files:**
+
 - Modify: `lib/min_publishers.py`
 - Modify: `tests/test_min_publishers.py`
 
@@ -460,9 +462,10 @@ git commit -m "feat: add feed eligibility evaluation with FeedChange dataclass"
 
 ## Chunk 2: JSON Surgery + File Modification
 
-### Task 3: JSON Surgery — _find_feed_block + _find_market_schedules_end
+### Task 3: JSON Surgery — \_find_feed_block + \_find_market_schedules_end
 
 **Files:**
+
 - Modify: `lib/min_publishers.py`
 - Modify: `tests/test_min_publishers.py`
 
@@ -679,6 +682,7 @@ git commit -m "feat: add JSON surgery helpers for feed block and marketSchedules
 ### Task 4: Apply Changes — modify_config
 
 **Files:**
+
 - Modify: `lib/min_publishers.py`
 - Modify: `tests/test_min_publishers.py`
 
@@ -949,6 +953,7 @@ git commit -m "feat: add modify_config with surgical regex for top-level minPubl
 ### Task 5: CSV Report — write_csv_report
 
 **Files:**
+
 - Modify: `lib/min_publishers.py`
 - Modify: `tests/test_min_publishers.py`
 
@@ -1082,6 +1087,7 @@ git commit -m "feat: add CSV report writer for min_publishers changes"
 ### Task 6: Console Output — print_summary
 
 **Files:**
+
 - Modify: `lib/min_publishers.py`
 - Modify: `tests/test_min_publishers.py`
 
@@ -1211,6 +1217,7 @@ git commit -m "feat: add console summary output for min_publishers"
 ### Task 7: CLI Wrapper — update_min_publishers.py
 
 **Files:**
+
 - Create: `update_min_publishers.py`
 - Modify: `tests/test_min_publishers.py`
 
@@ -1522,6 +1529,7 @@ cd /home/mariobern/integration-benchmarking && python3 update_min_publishers.py 
 ```
 
 Expected output should match spec numbers:
+
 - STABLE feeds: 830
 - Excluded (asset type): 34
 - Excluded (extended-hours): 81

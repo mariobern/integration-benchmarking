@@ -18,12 +18,12 @@ A standalone script (`update_min_publishers.py`) that enforces a minimum `minPub
 
 ## Rule Engine
 
-| `allowedPublisherIds` count | Target `minPublishers` |
-|-----------------------------|------------------------|
-| 0-1                         | Skip (flag as NEEDS_ATTENTION) |
+| `allowedPublisherIds` count | Target `minPublishers`             |
+| --------------------------- | ---------------------------------- |
+| 0-1                         | Skip (flag as NEEDS_ATTENTION)     |
 | 2-4                         | No change (leave at current value) |
-| 5-6                         | 2 |
-| 7+                          | 3 |
+| 5-6                         | 2                                  |
+| 7+                          | 3                                  |
 
 With only 2-4 publishers, setting `minPublishers: 2` would be too aggressive — losing a single publisher could take the feed offline. The risk of single-publisher bias at these low counts is accepted as a lesser concern than feed availability.
 
@@ -56,10 +56,10 @@ Extended-hours equities (feeds with PRE_MARKET/POST_MARKET/OVER_NIGHT sessions i
 
 ### Modification rules:
 
-| Feed type | What to modify | Publisher count source |
-|-----------|----------------|----------------------|
-| Non-extended (crypto, fx, metal, commodity, rates, basic equities) | Top-level `minPublishers` | Top-level `allowedPublisherIds` |
-| Extended-hours equities | **No modification** (excluded from scope) | — |
+| Feed type                                                          | What to modify                            | Publisher count source          |
+| ------------------------------------------------------------------ | ----------------------------------------- | ------------------------------- |
+| Non-extended (crypto, fx, metal, commodity, rates, basic equities) | Top-level `minPublishers`                 | Top-level `allowedPublisherIds` |
+| Extended-hours equities                                            | **No modification** (excluded from scope) | —                               |
 
 ## CLI Interface
 
@@ -69,14 +69,14 @@ python3 update_min_publishers.py --config after.json [options]
 
 ### Flags
 
-| Flag | Required | Default | Description |
-|------|----------|---------|-------------|
-| `--config` | Yes | — | Path to the JSON config file |
-| `--dry-run` | No | False | Preview changes without writing |
-| `--output-csv` | No | `min_publishers_changes.csv` | Path for the change report CSV |
-| `--asset-classes` | No | — | Explicit allowlist of asset types to process (overrides default exclusion list) |
-| `--min-publisher-floor` | No | 5 | Minimum publisher count to start enforcing (below this, feed is left alone) |
-| `--publisher-tier-cutoff` | No | 7 | Publisher count boundary: below → minPublishers=2, at or above → minPublishers=3 |
+| Flag                      | Required | Default                      | Description                                                                      |
+| ------------------------- | -------- | ---------------------------- | -------------------------------------------------------------------------------- |
+| `--config`                | Yes      | —                            | Path to the JSON config file                                                     |
+| `--dry-run`               | No       | False                        | Preview changes without writing                                                  |
+| `--output-csv`            | No       | `min_publishers_changes.csv` | Path for the change report CSV                                                   |
+| `--asset-classes`         | No       | —                            | Explicit allowlist of asset types to process (overrides default exclusion list)  |
+| `--min-publisher-floor`   | No       | 5                            | Minimum publisher count to start enforcing (below this, feed is left alone)      |
+| `--publisher-tier-cutoff` | No       | 7                            | Publisher count boundary: below → minPublishers=2, at or above → minPublishers=3 |
 
 ## CSV Report
 
@@ -85,6 +85,7 @@ Written in both dry-run and real mode for audit trail.
 **Columns:** `feed_id, symbol, asset_type, old_min_publishers, new_min_publishers, allowed_publisher_count, status`
 
 **`status` values:**
+
 - `UPDATED` — minPublishers was increased
 - `SKIPPED_LOW_PUBLISHERS` — 2-4 publishers, left at current value
 - `SKIPPED_EQUAL` — existing minPublishers already equals target
@@ -94,6 +95,7 @@ Written in both dry-run and real mode for audit trail.
 ## Console Output
 
 ### Dry-run mode:
+
 ```
 Scanning after.json...
   STABLE feeds: 830
@@ -113,6 +115,7 @@ Changes:
 ```
 
 ### Write mode:
+
 ```
 Backup: after.json.bak
 Updated 65 feeds in after.json
@@ -137,11 +140,11 @@ No JSON re-serialization — output diff only shows `minPublishers` value change
 
 ## File Structure
 
-| File | Purpose |
-|------|---------|
-| `update_min_publishers.py` | Thin CLI wrapper (argparse + delegation to lib) |
-| `lib/min_publishers.py` | Core logic: rule engine, eligibility checks, change computation, JSON modification |
-| `tests/test_min_publishers.py` | Unit tests |
+| File                           | Purpose                                                                            |
+| ------------------------------ | ---------------------------------------------------------------------------------- |
+| `update_min_publishers.py`     | Thin CLI wrapper (argparse + delegation to lib)                                    |
+| `lib/min_publishers.py`        | Core logic: rule engine, eligibility checks, change computation, JSON modification |
+| `tests/test_min_publishers.py` | Unit tests                                                                         |
 
 ## Test Coverage
 
@@ -152,18 +155,18 @@ Tests in `tests/test_min_publishers.py`:
 3. **Rule engine — custom cutoff:** `--publisher-tier-cutoff 5` changes the upper boundary
 4. **Rule engine — custom floor:** `--min-publisher-floor 3` changes the lower boundary
 5. **No-downgrade:** existing minPublishers=3 with 5 publishers stays at 3
-4. **Eligibility — state:** only STABLE feeds processed
-5. **Eligibility — exclusion list:** funding-rate, crypto-redemption-rate, nav, custom, crypto-index, kalshi skipped
-6. **Eligibility — asset class allowlist:** `--asset-classes` overrides default exclusion
-7. **Eligibility — NEEDS_ATTENTION:** feeds with <2 publishers flagged (both empty array and missing key)
-8. **Extended-hours exclusion:** feeds with PRE_MARKET/POST_MARKET/OVER_NIGHT sessions are entirely skipped
-9. **Non-extended feeds — top-level only:** top-level minPublishers modified, session-level minPublishers inside marketSchedules untouched
-10. **Regex targeting:** for feeds with minPublishers in both marketSchedules and top-level, only the top-level value is changed
-11. **Dry-run:** no file modification occurs
-12. **CSV report:** correct columns, values, and all statuses represented
-13. **Upgrade 2 → 3:** feed with minPublishers=2 and 8 publishers gets upgraded to minPublishers=3
-14. **Backup:** original file backed up before writing
-15. **Idempotency:** running the script twice produces no changes on the second run
+6. **Eligibility — state:** only STABLE feeds processed
+7. **Eligibility — exclusion list:** funding-rate, crypto-redemption-rate, nav, custom, crypto-index, kalshi skipped
+8. **Eligibility — asset class allowlist:** `--asset-classes` overrides default exclusion
+9. **Eligibility — NEEDS_ATTENTION:** feeds with <2 publishers flagged (both empty array and missing key)
+10. **Extended-hours exclusion:** feeds with PRE_MARKET/POST_MARKET/OVER_NIGHT sessions are entirely skipped
+11. **Non-extended feeds — top-level only:** top-level minPublishers modified, session-level minPublishers inside marketSchedules untouched
+12. **Regex targeting:** for feeds with minPublishers in both marketSchedules and top-level, only the top-level value is changed
+13. **Dry-run:** no file modification occurs
+14. **CSV report:** correct columns, values, and all statuses represented
+15. **Upgrade 2 → 3:** feed with minPublishers=2 and 8 publishers gets upgraded to minPublishers=3
+16. **Backup:** original file backed up before writing
+17. **Idempotency:** running the script twice produces no changes on the second run
 
 ## Edge Cases
 
