@@ -124,7 +124,9 @@ class TestEvaluateFeeds:
     def test_stable_equity_updated(self):
         """STABLE equity with 5 publishers and minPublishers=1 -> UPDATED to 2."""
         feeds = [
-            _make_feed(100, "Equity.US.FOO/USD", "equity", "STABLE", 1, [10, 20, 30, 40, 50])
+            _make_feed(
+                100, "Equity.US.FOO/USD", "equity", "STABLE", 1, [10, 20, 30, 40, 50]
+            )
         ]
         changes = evaluate_feeds(feeds)
         assert len(changes) == 1
@@ -145,7 +147,12 @@ class TestEvaluateFeeds:
         """COMING_SOON feeds are not processed."""
         feeds = [
             _make_feed(
-                100, "Equity.US.FOO/USD", "equity", "COMING_SOON", 1, [10, 20, 30, 40, 50]
+                100,
+                "Equity.US.FOO/USD",
+                "equity",
+                "COMING_SOON",
+                1,
+                [10, 20, 30, 40, 50],
             )
         ]
         changes = evaluate_feeds(feeds)
@@ -155,7 +162,12 @@ class TestEvaluateFeeds:
         """Feeds with excluded asset types are not processed."""
         feeds = [
             _make_feed(
-                100, "FundingRate.X/Y", "funding-rate", "STABLE", 1, [10, 20, 30, 40, 50]
+                100,
+                "FundingRate.X/Y",
+                "funding-rate",
+                "STABLE",
+                1,
+                [10, 20, 30, 40, 50],
             )
         ]
         changes = evaluate_feeds(feeds)
@@ -165,7 +177,9 @@ class TestEvaluateFeeds:
         """--asset-classes overrides default exclusion."""
         feeds = [
             _make_feed(100, "FX.EUR/USD", "fx", "STABLE", 1, [10, 20, 30, 40, 50]),
-            _make_feed(200, "Crypto.BTC/USD", "crypto", "STABLE", 1, [10, 20, 30, 40, 50]),
+            _make_feed(
+                200, "Crypto.BTC/USD", "crypto", "STABLE", 1, [10, 20, 30, 40, 50]
+            ),
         ]
         changes = evaluate_feeds(feeds, asset_classes=["fx"])
         assert len(changes) == 1
@@ -180,7 +194,9 @@ class TestEvaluateFeeds:
 
     def test_low_publishers_skipped(self):
         """Feeds with 2-4 publishers get SKIPPED_LOW_PUBLISHERS."""
-        feeds = [_make_feed(100, "Equity.US.X/USD", "equity", "STABLE", 1, [10, 20, 30])]
+        feeds = [
+            _make_feed(100, "Equity.US.X/USD", "equity", "STABLE", 1, [10, 20, 30])
+        ]
         changes = evaluate_feeds(feeds)
         assert len(changes) == 1
         assert changes[0].status == "SKIPPED_LOW_PUBLISHERS"
@@ -188,7 +204,9 @@ class TestEvaluateFeeds:
     def test_no_downgrade(self):
         """Existing minPublishers=3 with 5 publishers stays (SKIPPED_HIGHER)."""
         feeds = [
-            _make_feed(100, "Equity.US.X/USD", "equity", "STABLE", 3, [10, 20, 30, 40, 50])
+            _make_feed(
+                100, "Equity.US.X/USD", "equity", "STABLE", 3, [10, 20, 30, 40, 50]
+            )
         ]
         changes = evaluate_feeds(feeds)
         assert changes[0].status == "SKIPPED_HIGHER"
@@ -196,7 +214,9 @@ class TestEvaluateFeeds:
     def test_skipped_equal(self):
         """Existing minPublishers=2 with 5 publishers (SKIPPED_EQUAL)."""
         feeds = [
-            _make_feed(100, "Equity.US.X/USD", "equity", "STABLE", 2, [10, 20, 30, 40, 50])
+            _make_feed(
+                100, "Equity.US.X/USD", "equity", "STABLE", 2, [10, 20, 30, 40, 50]
+            )
         ]
         changes = evaluate_feeds(feeds)
         assert changes[0].status == "SKIPPED_EQUAL"
@@ -204,7 +224,9 @@ class TestEvaluateFeeds:
     def test_upgrade_2_to_3(self):
         """Existing minPublishers=2 with 8 publishers -> UPDATED to 3."""
         feeds = [
-            _make_feed(100, "Equity.US.X/USD", "equity", "STABLE", 2, list(range(10, 18)))
+            _make_feed(
+                100, "Equity.US.X/USD", "equity", "STABLE", 2, list(range(10, 18))
+            )
         ]
         changes = evaluate_feeds(feeds)
         assert changes[0].status == "UPDATED"
@@ -345,9 +367,7 @@ class TestModifyConfig:
                 {
                     "allowedPublisherIds": [10, 20, 30, 40, 50],
                     "feedId": 100,
-                    "marketSchedules": [
-                        {"marketSchedule": "X", "session": "REGULAR"}
-                    ],
+                    "marketSchedules": [{"marketSchedule": "X", "session": "REGULAR"}],
                     "metadata": {"asset_type": "equity", "name": "FOO"},
                     "minPublishers": 1,
                     "state": "STABLE",
@@ -406,9 +426,7 @@ class TestModifyConfig:
                 {
                     "allowedPublisherIds": [10, 20, 30, 40, 50],
                     "feedId": 100,
-                    "marketSchedules": [
-                        {"marketSchedule": "X", "session": "REGULAR"}
-                    ],
+                    "marketSchedules": [{"marketSchedule": "X", "session": "REGULAR"}],
                     "metadata": {"asset_type": "equity", "name": "FOO"},
                     "minPublishers": 1,
                     "state": "STABLE",
@@ -431,9 +449,7 @@ class TestModifyConfig:
                 {
                     "allowedPublisherIds": [10, 20, 30, 40, 50],
                     "feedId": 100,
-                    "marketSchedules": [
-                        {"marketSchedule": "X", "session": "REGULAR"}
-                    ],
+                    "marketSchedules": [{"marketSchedule": "X", "session": "REGULAR"}],
                     "metadata": {"asset_type": "equity", "name": "FOO"},
                     "minPublishers": 1,
                     "state": "STABLE",
@@ -455,9 +471,7 @@ class TestModifyConfig:
                 {
                     "allowedPublisherIds": [10, 20, 30, 40, 50],
                     "feedId": 100,
-                    "marketSchedules": [
-                        {"marketSchedule": "X", "session": "REGULAR"}
-                    ],
+                    "marketSchedules": [{"marketSchedule": "X", "session": "REGULAR"}],
                     "metadata": {"asset_type": "equity", "name": "FOO"},
                     "minPublishers": 1,
                     "state": "STABLE",
@@ -569,3 +583,114 @@ class TestPrintSummary:
         assert "Excluded (extended-hours): 3" in output
         assert "Needs attention" in output
         assert "DRY RUN" in output
+
+
+# ── Task 7: CLI Integration Tests ───────────────────────────────────────
+
+import subprocess
+import sys
+
+
+class TestCLI:
+    """CLI integration tests."""
+
+    def _make_config_file(self, tmp_path):
+        config = {
+            "feeds": [
+                {
+                    "allowedPublisherIds": [10, 20, 30, 40, 50],
+                    "feedId": 100,
+                    "marketSchedules": [{"marketSchedule": "X", "session": "REGULAR"}],
+                    "metadata": {"asset_type": "equity", "name": "FOO"},
+                    "minPublishers": 1,
+                    "state": "STABLE",
+                    "symbol": "Equity.US.FOO/USD",
+                },
+                {
+                    "allowedPublisherIds": [10, 20],
+                    "feedId": 200,
+                    "marketSchedules": [{"marketSchedule": "X", "session": "REGULAR"}],
+                    "metadata": {"asset_type": "funding-rate", "name": "FR"},
+                    "minPublishers": 1,
+                    "state": "STABLE",
+                    "symbol": "FundingRate.X/Y",
+                },
+            ]
+        }
+        config_file = tmp_path / "after.json"
+        config_file.write_text(json.dumps(config, indent=2))
+        return config_file
+
+    def test_cli_dry_run(self, tmp_path):
+        config_file = self._make_config_file(tmp_path)
+        csv_path = tmp_path / "report.csv"
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                "update_min_publishers.py",
+                "--config",
+                str(config_file),
+                "--dry-run",
+                "--output-csv",
+                str(csv_path),
+            ],
+            capture_output=True,
+            text=True,
+            cwd="/home/mariobern/integration-benchmarking",
+        )
+
+        assert result.returncode == 0
+        assert "DRY RUN" in result.stdout
+        # File unchanged
+        data = json.loads(config_file.read_text())
+        assert data["feeds"][0]["minPublishers"] == 1
+        # CSV created
+        assert csv_path.exists()
+
+    def test_cli_real_run(self, tmp_path):
+        config_file = self._make_config_file(tmp_path)
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                "update_min_publishers.py",
+                "--config",
+                str(config_file),
+                "--output-csv",
+                str(tmp_path / "report.csv"),
+            ],
+            capture_output=True,
+            text=True,
+            cwd="/home/mariobern/integration-benchmarking",
+        )
+
+        assert result.returncode == 0
+        data = json.loads(config_file.read_text())
+        assert data["feeds"][0]["minPublishers"] == 2
+        # funding-rate feed untouched
+        assert data["feeds"][1]["minPublishers"] == 1
+
+    def test_cli_asset_classes_filter(self, tmp_path):
+        config_file = self._make_config_file(tmp_path)
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                "update_min_publishers.py",
+                "--config",
+                str(config_file),
+                "--asset-classes",
+                "funding-rate",
+                "--output-csv",
+                str(tmp_path / "report.csv"),
+            ],
+            capture_output=True,
+            text=True,
+            cwd="/home/mariobern/integration-benchmarking",
+        )
+
+        assert result.returncode == 0
+        # equity feed untouched (not in allowlist)
+        data = json.loads(config_file.read_text())
+        assert data["feeds"][0]["minPublishers"] == 1
