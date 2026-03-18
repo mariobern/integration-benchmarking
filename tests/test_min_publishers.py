@@ -9,6 +9,7 @@ from lib.min_publishers import (
     compute_target_min_publishers,
     evaluate_feeds,
     modify_config,
+    print_summary,
     write_csv_report,
 )
 
@@ -536,3 +537,35 @@ class TestWriteCsvReport:
         with open(csv_path) as f:
             rows = list(csv.DictReader(f))
         assert rows[0]["new_min_publishers"] == ""
+
+
+# ── Task 6: Console Output Tests ────────────────────────────────────────
+
+
+class TestPrintSummary:
+    """Console output formatting."""
+
+    def test_summary_output(self, capsys):
+        """Verify console output format."""
+        changes = [
+            FeedChange(100, "A/USD", "equity", 1, 2, 5, "UPDATED"),
+            FeedChange(200, "B/USD", "equity", 1, 3, 8, "UPDATED"),
+            FeedChange(300, "C/USD", "equity", 2, None, 5, "SKIPPED_EQUAL"),
+            FeedChange(400, "D/USD", "equity", 1, None, 3, "SKIPPED_LOW_PUBLISHERS"),
+            FeedChange(500, "E/USD", "equity", 1, None, 1, "NEEDS_ATTENTION"),
+        ]
+        stats = {
+            "stable_count": 10,
+            "excluded_type_count": 2,
+            "excluded_type_breakdown": {"funding-rate": 2},
+            "excluded_extended_count": 3,
+        }
+
+        print_summary(changes, stats, dry_run=True)
+
+        output = capsys.readouterr().out
+        assert "STABLE feeds: 10" in output
+        assert "Excluded (asset type): 2" in output
+        assert "Excluded (extended-hours): 3" in output
+        assert "Needs attention" in output
+        assert "DRY RUN" in output

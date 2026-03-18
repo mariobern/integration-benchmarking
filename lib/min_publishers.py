@@ -12,6 +12,7 @@ Boundaries configurable via floor and cutoff parameters.
 
 import csv as csv_module
 import re
+from collections import Counter
 from dataclasses import dataclass
 
 # Default exclusion list: non-benchmarkable asset types
@@ -360,3 +361,60 @@ def write_csv_report(changes: list[FeedChange], output_path: str) -> None:
                     "status": change.status,
                 }
             )
+
+
+def print_summary(
+    changes: list[FeedChange],
+    stats: dict,
+    dry_run: bool = False,
+) -> None:
+    """Print human-readable summary to console."""
+    print("Scanning after.json...")
+    print(f"  STABLE feeds: {stats['stable_count']}")
+
+    # Excluded by type
+    exc_type = stats["excluded_type_count"]
+    breakdown = stats["excluded_type_breakdown"]
+    if breakdown:
+        parts = ", ".join(f"{k}: {v}" for k, v in sorted(breakdown.items()))
+        print(f"  Excluded (asset type): {exc_type} ({parts})")
+    else:
+        print(f"  Excluded (asset type): {exc_type}")
+
+    print(f"  Excluded (extended-hours): {stats['excluded_extended_count']}")
+
+    # Count statuses
+    needs_attention = [c for c in changes if c.status == "NEEDS_ATTENTION"]
+    low_pub = [c for c in changes if c.status == "SKIPPED_LOW_PUBLISHERS"]
+    updated = [c for c in changes if c.status == "UPDATED"]
+    skipped = [c for c in changes if c.status in ("SKIPPED_EQUAL", "SKIPPED_HIGHER")]
+
+    print(f"  Needs attention (<2 publishers): {len(needs_attention)}")
+    if needs_attention:
+        for c in needs_attention:
+            print(
+                f"    - {c.symbol} (feedId={c.feed_id},"
+                f" publishers={c.allowed_publisher_count})"
+            )
+
+    print(f"  Skipped (2-4 publishers): {len(low_pub)}")
+    eligible = len(updated) + len(skipped)
+    print(f"  Eligible for rule evaluation: {eligible}")
+
+    print()
+    print("Changes:")
+
+    # Group updates by transition
+    transitions: Counter[str] = Counter()
+    for c in updated:
+        key = f"{c.old_min_publishers} -> {c.new_min_publishers}"
+        transitions[key] += 1
+
+    for transition, count in sorted(transitions.items()):
+        print(f"  {count} feeds: minPublishers {transition}")
+
+    print(f"  {len(skipped)} feeds: skipped (already >= target)")
+
+    if dry_run:
+        print()
+        print("[DRY RUN] No changes written.")
