@@ -10,6 +10,7 @@ Rule engine:
 Boundaries configurable via floor and cutoff parameters.
 """
 
+import re
 from dataclasses import dataclass
 
 # Default exclusion list: non-benchmarkable asset types
@@ -163,3 +164,81 @@ def evaluate_feeds(
         )
 
     return changes
+
+
+def _find_feed_block(raw: str, feed_id: int) -> tuple[int, int] | None:
+    """Find the start/end positions of a feed entry by feedId in the raw JSON.
+
+    Uses the same algorithm as update_config_from_summary.py and
+    update_lazer_symbols.py: regex match on feedId, then bracket-depth
+    scanning with string-awareness.
+    """
+    pattern = rf'"feedId":\s*{feed_id}\s*[,\n}}]'
+    match = re.search(pattern, raw)
+    if not match:
+        return None
+
+    pos = match.start()
+
+    # Scan backward for opening {
+    depth = 0
+    start = pos - 1
+    while start >= 0:
+        c = raw[start]
+        if c == '"':
+            start -= 1
+            while start >= 0 and raw[start] != '"':
+                if raw[start] == "\\" and start > 0:
+                    start -= 1
+                start -= 1
+        elif c == "}":
+            depth += 1
+        elif c == "{":
+            if depth == 0:
+                break
+            depth -= 1
+        start -= 1
+
+    # Scan forward for matching }
+    depth = 1
+    end = start + 1
+    in_string = False
+    while end < len(raw) and depth > 0:
+        c = raw[end]
+        if c == '"' and (end == 0 or raw[end - 1] != "\\"):
+            in_string = not in_string
+        elif not in_string:
+            if c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+        end += 1
+
+    return (start, end)
+
+
+def _find_market_schedules_end(block: str) -> int | None:
+    """Find the position after the closing ] of marketSchedules in a feed block.
+
+    Returns the index immediately after the ']' that closes the
+    marketSchedules array, or None if no marketSchedules key exists.
+    """
+    ms_match = re.search(r'"marketSchedules":\s*\[', block)
+    if not ms_match:
+        return None
+
+    pos = ms_match.end()
+    depth = 1
+    in_string = False
+    while pos < len(block) and depth > 0:
+        c = block[pos]
+        if c == '"' and (pos == 0 or block[pos - 1] != "\\"):
+            in_string = not in_string
+        elif not in_string:
+            if c == "[":
+                depth += 1
+            elif c == "]":
+                depth -= 1
+        pos += 1
+
+    return pos  # position right after closing ]

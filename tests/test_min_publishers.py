@@ -2,7 +2,13 @@ import json
 
 import pytest
 
-from lib.min_publishers import FeedChange, compute_target_min_publishers, evaluate_feeds
+from lib.min_publishers import (
+    FeedChange,
+    _find_feed_block,
+    _find_market_schedules_end,
+    compute_target_min_publishers,
+    evaluate_feeds,
+)
 
 
 class TestComputeTargetMinPublishers:
@@ -228,3 +234,96 @@ class TestEvaluateFeeds:
         del feed["allowedPublisherIds"]
         changes = evaluate_feeds([feed])
         assert changes[0].status == "NEEDS_ATTENTION"
+
+
+# ── Task 3: JSON Surgery Tests ───────────────────────────────────────────
+
+# Sample JSON for testing (formatted like real after.json)
+SAMPLE_CONFIG_RAW = json.dumps(
+    {
+        "feeds": [
+            {
+                "allowedPublisherIds": [10, 20, 30, 40, 50],
+                "feedId": 100,
+                "marketSchedules": [
+                    {
+                        "marketSchedule": "America/New_York;O,O,O,O,O,O,O;",
+                        "session": "REGULAR",
+                    }
+                ],
+                "metadata": {"asset_type": "equity", "name": "FOO"},
+                "minPublishers": 1,
+                "state": "STABLE",
+                "symbol": "Equity.US.FOO/USD",
+            },
+            {
+                "allowedPublisherIds": [10, 20, 30, 40, 50, 60, 70, 80],
+                "feedId": 200,
+                "marketSchedules": [
+                    {
+                        "allowedPublisherIds": [10, 20, 30, 40, 50, 60, 70, 80],
+                        "marketSchedule": "America/New_York;0930-1600,...",
+                        "minPublishers": 3,
+                        "session": "REGULAR",
+                    }
+                ],
+                "metadata": {"asset_type": "equity", "name": "BAR"},
+                "minPublishers": 1,
+                "state": "STABLE",
+                "symbol": "Equity.US.BAR/USD",
+            },
+        ]
+    },
+    indent=2,
+)
+
+
+class TestFindFeedBlock:
+    """Locate feed blocks in raw JSON."""
+
+    def test_finds_feed_block(self):
+        bounds = _find_feed_block(SAMPLE_CONFIG_RAW, 100)
+        assert bounds is not None
+        block = SAMPLE_CONFIG_RAW[bounds[0] : bounds[1]]
+        assert '"feedId": 100' in block
+        assert '"symbol": "Equity.US.FOO/USD"' in block
+
+    def test_returns_none_for_missing_feed(self):
+        assert _find_feed_block(SAMPLE_CONFIG_RAW, 999) is None
+
+    def test_finds_second_feed(self):
+        bounds = _find_feed_block(SAMPLE_CONFIG_RAW, 200)
+        assert bounds is not None
+        block = SAMPLE_CONFIG_RAW[bounds[0] : bounds[1]]
+        assert '"feedId": 200' in block
+
+
+class TestFindMarketSchedulesEnd:
+    """Locate end of marketSchedules array within a feed block."""
+
+    def test_simple_feed(self):
+        bounds = _find_feed_block(SAMPLE_CONFIG_RAW, 100)
+        block = SAMPLE_CONFIG_RAW[bounds[0] : bounds[1]]
+        end_pos = _find_market_schedules_end(block)
+        assert end_pos is not None
+        # Everything after end_pos should contain top-level minPublishers
+        after = block[end_pos:]
+        assert '"minPublishers": 1' in after
+
+    def test_dual_structure_feed(self):
+        """Feed with minPublishers in both marketSchedules and top-level."""
+        bounds = _find_feed_block(SAMPLE_CONFIG_RAW, 200)
+        block = SAMPLE_CONFIG_RAW[bounds[0] : bounds[1]]
+        end_pos = _find_market_schedules_end(block)
+        assert end_pos is not None
+        before = block[:end_pos]
+        after = block[end_pos:]
+        # Session-level minPublishers is BEFORE end_pos
+        assert '"minPublishers": 3' in before
+        # Top-level minPublishers is AFTER end_pos
+        assert '"minPublishers": 1' in after
+
+    def test_no_market_schedules(self):
+        """Feed without marketSchedules key."""
+        block = '{"feedId": 1, "minPublishers": 1, "state": "STABLE"}'
+        assert _find_market_schedules_end(block) is None
