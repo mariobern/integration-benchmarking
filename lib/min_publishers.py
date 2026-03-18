@@ -242,3 +242,88 @@ def _find_market_schedules_end(block: str) -> int | None:
         pos += 1
 
     return pos  # position right after closing ]
+
+
+def modify_config(
+    config_path: str,
+    dry_run: bool = False,
+    floor: int = DEFAULT_FLOOR,
+    cutoff: int = DEFAULT_CUTOFF,
+    asset_classes: list[str] | None = None,
+    excluded_asset_types: frozenset[str] = DEFAULT_EXCLUDED_ASSET_TYPES,
+) -> dict:
+    """Evaluate feeds and apply minPublishers changes to config file.
+
+    Returns summary dict with counts and change list.
+    """
+    import json
+    import shutil
+
+    with open(config_path) as f:
+        raw = f.read()
+
+    data = json.loads(raw)
+    feeds = data["feeds"]
+
+    # Evaluate all feeds
+    changes = evaluate_feeds(
+        feeds,
+        floor=floor,
+        cutoff=cutoff,
+        asset_classes=asset_classes,
+        excluded_asset_types=excluded_asset_types,
+    )
+
+    # Apply UPDATED changes to raw JSON
+    updates_to_apply = [c for c in changes if c.status == "UPDATED"]
+
+    for change in updates_to_apply:
+        bounds = _find_feed_block(raw, change.feed_id)
+        if not bounds:
+            continue
+
+        start, end = bounds
+        block = raw[start:end]
+
+        # Find where marketSchedules ends to target top-level minPublishers
+        ms_end = _find_market_schedules_end(block)
+        if ms_end is not None:
+            # Only apply regex to text after marketSchedules
+            before = block[:ms_end]
+            after = block[ms_end:]
+            after = re.sub(
+                r'"minPublishers": \d+',
+                f'"minPublishers": {change.new_min_publishers}',
+                after,
+                count=1,
+            )
+            block = before + after
+        else:
+            # No marketSchedules — apply to entire block
+            block = re.sub(
+                r'"minPublishers": \d+',
+                f'"minPublishers": {change.new_min_publishers}',
+                block,
+                count=1,
+            )
+
+        raw = raw[:start] + block + raw[end:]
+
+    # Write if not dry run and there are changes
+    if not dry_run and updates_to_apply:
+        backup_path = config_path + ".bak"
+        shutil.copy2(config_path, backup_path)
+        with open(config_path, "w") as f:
+            f.write(raw)
+
+    # Build summary
+    return {
+        "updated": sum(1 for c in changes if c.status == "UPDATED"),
+        "skipped_low_publishers": sum(
+            1 for c in changes if c.status == "SKIPPED_LOW_PUBLISHERS"
+        ),
+        "skipped_equal": sum(1 for c in changes if c.status == "SKIPPED_EQUAL"),
+        "skipped_higher": sum(1 for c in changes if c.status == "SKIPPED_HIGHER"),
+        "needs_attention": sum(1 for c in changes if c.status == "NEEDS_ATTENTION"),
+        "changes": changes,
+    }

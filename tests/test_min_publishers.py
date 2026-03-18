@@ -8,6 +8,7 @@ from lib.min_publishers import (
     _find_market_schedules_end,
     compute_target_min_publishers,
     evaluate_feeds,
+    modify_config,
 )
 
 
@@ -327,3 +328,147 @@ class TestFindMarketSchedulesEnd:
         """Feed without marketSchedules key."""
         block = '{"feedId": 1, "minPublishers": 1, "state": "STABLE"}'
         assert _find_market_schedules_end(block) is None
+
+
+# ── Task 4: modify_config Tests ──────────────────────────────────────────
+
+
+class TestModifyConfig:
+    """End-to-end JSON modification."""
+
+    def test_simple_feed_updated(self, tmp_path):
+        """Non-dual feed: top-level minPublishers changed."""
+        config = {
+            "feeds": [
+                {
+                    "allowedPublisherIds": [10, 20, 30, 40, 50],
+                    "feedId": 100,
+                    "marketSchedules": [
+                        {"marketSchedule": "X", "session": "REGULAR"}
+                    ],
+                    "metadata": {"asset_type": "equity", "name": "FOO"},
+                    "minPublishers": 1,
+                    "state": "STABLE",
+                    "symbol": "Equity.US.FOO/USD",
+                }
+            ]
+        }
+        config_file = tmp_path / "after.json"
+        config_file.write_text(json.dumps(config, indent=2))
+
+        result = modify_config(str(config_file), dry_run=False)
+
+        data = json.loads(config_file.read_text())
+        assert data["feeds"][0]["minPublishers"] == 2
+        assert result["updated"] == 1
+
+    def test_dual_structure_only_top_level_changed(self, tmp_path):
+        """Feed with minPublishers in marketSchedules AND top-level:
+        only top-level is changed, session-level stays at 3."""
+        config = {
+            "feeds": [
+                {
+                    "allowedPublisherIds": list(range(10, 24)),
+                    "feedId": 200,
+                    "marketSchedules": [
+                        {
+                            "allowedPublisherIds": list(range(10, 24)),
+                            "marketSchedule": "X",
+                            "minPublishers": 3,
+                            "session": "REGULAR",
+                        }
+                    ],
+                    "metadata": {"asset_type": "equity", "name": "BAR"},
+                    "minPublishers": 1,
+                    "state": "STABLE",
+                    "symbol": "Equity.US.BAR/USD",
+                }
+            ]
+        }
+        config_file = tmp_path / "after.json"
+        config_file.write_text(json.dumps(config, indent=2))
+
+        modify_config(str(config_file), dry_run=False)
+
+        raw = config_file.read_text()
+        data = json.loads(raw)
+        # Top-level should be 3 now
+        assert data["feeds"][0]["minPublishers"] == 3
+        # Session-level should remain 3
+        assert data["feeds"][0]["marketSchedules"][0]["minPublishers"] == 3
+
+    def test_dry_run_no_write(self, tmp_path):
+        """Dry run does not modify the file."""
+        config = {
+            "feeds": [
+                {
+                    "allowedPublisherIds": [10, 20, 30, 40, 50],
+                    "feedId": 100,
+                    "marketSchedules": [
+                        {"marketSchedule": "X", "session": "REGULAR"}
+                    ],
+                    "metadata": {"asset_type": "equity", "name": "FOO"},
+                    "minPublishers": 1,
+                    "state": "STABLE",
+                    "symbol": "Equity.US.FOO/USD",
+                }
+            ]
+        }
+        config_file = tmp_path / "after.json"
+        original = json.dumps(config, indent=2)
+        config_file.write_text(original)
+
+        modify_config(str(config_file), dry_run=True)
+
+        assert config_file.read_text() == original
+
+    def test_backup_created(self, tmp_path):
+        """Backup file is created on write."""
+        config = {
+            "feeds": [
+                {
+                    "allowedPublisherIds": [10, 20, 30, 40, 50],
+                    "feedId": 100,
+                    "marketSchedules": [
+                        {"marketSchedule": "X", "session": "REGULAR"}
+                    ],
+                    "metadata": {"asset_type": "equity", "name": "FOO"},
+                    "minPublishers": 1,
+                    "state": "STABLE",
+                    "symbol": "Equity.US.FOO/USD",
+                }
+            ]
+        }
+        config_file = tmp_path / "after.json"
+        config_file.write_text(json.dumps(config, indent=2))
+
+        modify_config(str(config_file), dry_run=False)
+
+        assert (tmp_path / "after.json.bak").exists()
+
+    def test_idempotency(self, tmp_path):
+        """Running twice produces no changes on the second run."""
+        config = {
+            "feeds": [
+                {
+                    "allowedPublisherIds": [10, 20, 30, 40, 50],
+                    "feedId": 100,
+                    "marketSchedules": [
+                        {"marketSchedule": "X", "session": "REGULAR"}
+                    ],
+                    "metadata": {"asset_type": "equity", "name": "FOO"},
+                    "minPublishers": 1,
+                    "state": "STABLE",
+                    "symbol": "Equity.US.FOO/USD",
+                }
+            ]
+        }
+        config_file = tmp_path / "after.json"
+        config_file.write_text(json.dumps(config, indent=2))
+
+        # First run
+        modify_config(str(config_file), dry_run=False)
+        # Second run
+        result = modify_config(str(config_file), dry_run=False)
+
+        assert result["updated"] == 0
