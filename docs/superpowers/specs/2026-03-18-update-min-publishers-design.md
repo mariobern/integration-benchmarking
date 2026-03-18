@@ -8,7 +8,7 @@
 
 Many feeds in `after.json` have `minPublishers: 1`, which allows a feed to remain online with only a single publisher. This creates price bias risk — the feed reflects one publisher's price rather than a consensus view of the market.
 
-As of 2026-03-18, there are **830 STABLE feeds** in after.json. After excluding non-benchmarkable asset types (34 feeds) and extended-hours equities (81 feeds), **715 non-extended STABLE feeds** are eligible for evaluation. Of these, **102 need adjustment**: 88 feeds with `minPublishers: 1` (73 equity, 12 commodity, 3 crypto) and 14 feeds with `minPublishers: 2` that have 7+ publishers (target: 3). The remaining 613 already meet or exceed their target.
+As of 2026-03-18, there are **830 STABLE feeds** in after.json. After excluding non-benchmarkable asset types (34 feeds) and extended-hours equities (81 feeds), **715 non-extended STABLE feeds** are eligible for evaluation. Of these, **65 need adjustment**: 19 feeds going from `minPublishers: 1` → 2 (5-6 publishers), 32 feeds going from `minPublishers: 1` → 3 (7+ publishers), and 14 feeds going from `minPublishers: 2` → 3 (7+ publishers). An additional 44 feeds with 2-4 publishers are left at their current `minPublishers` value — the risk of feed unavailability outweighs single-publisher bias at these low counts.
 
 The 67 extended-hours equities with top-level `minPublishers: 1` are excluded — this value is intentional (see "Scope" section).
 
@@ -21,10 +21,13 @@ A standalone script (`update_min_publishers.py`) that enforces a minimum `minPub
 | `allowedPublisherIds` count | Target `minPublishers` |
 |-----------------------------|------------------------|
 | 0-1                         | Skip (flag as NEEDS_ATTENTION) |
-| 2-6                         | 2 |
+| 2-4                         | No change (leave at current value) |
+| 5-6                         | 2 |
 | 7+                          | 3 |
 
-The boundary (default: 7) is configurable via `--publisher-tier-cutoff`.
+With only 2-4 publishers, setting `minPublishers: 2` would be too aggressive — losing a single publisher could take the feed offline. The risk of single-publisher bias at these low counts is accepted as a lesser concern than feed availability.
+
+The upper boundary (default: 7) is configurable via `--publisher-tier-cutoff`. The lower boundary (default: 5) is configurable via `--min-publisher-floor`.
 
 **No-downgrade rule:** Only increase `minPublishers`. The comparison uses the **parsed JSON** top-level `minPublishers` value (from `json.load()`), not any regex-matched value. If a feed already has `minPublishers` >= the target, it is skipped.
 
@@ -33,7 +36,8 @@ The boundary (default: 7) is configurable via `--publisher-tier-cutoff`.
 1. **State:** `STABLE` only (skip `COMING_SOON` and `INACTIVE`)
 2. **Asset type exclusion:** Default exclusion list: `funding-rate`, `crypto-redemption-rate`, `nav`, `custom`, `crypto-index`, `kalshi`
 3. **Asset type override:** `--asset-classes` flag acts as an **explicit allowlist** — only the listed asset types are processed; all others are skipped (bypasses the default exclusion list)
-4. **Publisher count:** Feeds with fewer than 2 `allowedPublisherIds` are skipped and flagged as `NEEDS_ATTENTION`
+4. **Publisher count < 2:** Feeds with fewer than 2 `allowedPublisherIds` are skipped and flagged as `NEEDS_ATTENTION`
+5. **Publisher count 2-4:** Feeds with 2-4 `allowedPublisherIds` are skipped (left at current `minPublishers`) and reported as `SKIPPED_LOW_PUBLISHERS` in the CSV
 
 ## Scope: What Gets Modified
 
@@ -71,6 +75,7 @@ python3 update_min_publishers.py --config after.json [options]
 | `--dry-run` | No | False | Preview changes without writing |
 | `--output-csv` | No | `min_publishers_changes.csv` | Path for the change report CSV |
 | `--asset-classes` | No | — | Explicit allowlist of asset types to process (overrides default exclusion list) |
+| `--min-publisher-floor` | No | 5 | Minimum publisher count to start enforcing (below this, feed is left alone) |
 | `--publisher-tier-cutoff` | No | 7 | Publisher count boundary: below → minPublishers=2, at or above → minPublishers=3 |
 
 ## CSV Report
@@ -81,6 +86,7 @@ Written in both dry-run and real mode for audit trail.
 
 **`status` values:**
 - `UPDATED` — minPublishers was increased
+- `SKIPPED_LOW_PUBLISHERS` — 2-4 publishers, left at current value
 - `SKIPPED_EQUAL` — existing minPublishers already equals target
 - `SKIPPED_HIGHER` — existing minPublishers exceeds target
 - `NEEDS_ATTENTION` — fewer than 2 allowedPublisherIds
@@ -94,13 +100,14 @@ Scanning after.json...
   Excluded (asset type): 34 (funding-rate: 11, crypto-redemption-rate: 15, nav: 3, custom: 5)
   Excluded (extended-hours): 81
   Needs attention (<2 publishers): 0
-  Eligible: 715
+  Skipped (2-4 publishers): 44
+  Eligible for rule evaluation: 671
 
 Changes:
-  56 feeds: minPublishers 1 → 2 (< 7 publishers)
+  19 feeds: minPublishers 1 → 2 (5-6 publishers)
   32 feeds: minPublishers 1 → 3 (>= 7 publishers)
   14 feeds: minPublishers 2 → 3 (>= 7 publishers)
-  613 feeds: skipped (already >= target)
+  606 feeds: skipped (already >= target)
 
 [DRY RUN] No changes written. Review: min_publishers_changes.csv
 ```
@@ -108,7 +115,7 @@ Changes:
 ### Write mode:
 ```
 Backup: after.json.bak
-Updated 102 feeds in after.json
+Updated 65 feeds in after.json
 Report: min_publishers_changes.csv
 ```
 
@@ -140,9 +147,11 @@ No JSON re-serialization — output diff only shows `minPublishers` value change
 
 Tests in `tests/test_min_publishers.py`:
 
-1. **Rule engine:** <7 publishers → 2, >=7 publishers → 3
-2. **Rule engine — custom cutoff:** `--publisher-tier-cutoff 5` changes the boundary
-3. **No-downgrade:** existing minPublishers=3 with 5 publishers stays at 3
+1. **Rule engine:** 5-6 publishers → 2, >=7 publishers → 3
+2. **Rule engine — below floor:** 2-4 publishers → no change (SKIPPED_LOW_PUBLISHERS)
+3. **Rule engine — custom cutoff:** `--publisher-tier-cutoff 5` changes the upper boundary
+4. **Rule engine — custom floor:** `--min-publisher-floor 3` changes the lower boundary
+5. **No-downgrade:** existing minPublishers=3 with 5 publishers stays at 3
 4. **Eligibility — state:** only STABLE feeds processed
 5. **Eligibility — exclusion list:** funding-rate, crypto-redemption-rate, nav, custom, crypto-index, kalshi skipped
 6. **Eligibility — asset class allowlist:** `--asset-classes` overrides default exclusion
