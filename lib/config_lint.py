@@ -69,10 +69,36 @@ def check_duplicates(feeds: list[dict]) -> list[LintFinding]:
     return findings
 
 
+# Required top-level fields on every feed
+_REQUIRED_FIELDS = ("feedId", "symbol", "state", "kind")
+
+
 def check_schema(feeds: list[dict]) -> list[LintFinding]:
     """E007: missing required fields."""
-    # Placeholder — implemented in Task 3
-    return []
+    findings: list[LintFinding] = []
+
+    for feed in feeds:
+        fid = feed.get("feedId")
+        sym = feed.get("symbol")
+        missing = [f for f in _REQUIRED_FIELDS if f not in feed]
+
+        # Check metadata.asset_type separately
+        metadata = feed.get("metadata")
+        if metadata is None or "asset_type" not in metadata:
+            missing.append("metadata.asset_type")
+
+        if missing:
+            findings.append(
+                LintFinding(
+                    rule_id="E007",
+                    severity="ERROR",
+                    message=f"missing required fields: {', '.join(missing)}",
+                    feed_id=fid,
+                    symbol=sym,
+                )
+            )
+
+    return findings
 
 
 def check_publishers(feeds: list[dict], publishers: list[dict]) -> list[LintFinding]:

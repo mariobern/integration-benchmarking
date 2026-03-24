@@ -1,4 +1,4 @@
-from lib.config_lint import LintFinding, lint_config, check_duplicates
+from lib.config_lint import LintFinding, lint_config, check_duplicates, check_schema
 
 
 def _make_feed(
@@ -151,6 +151,41 @@ class TestCheckDuplicates:
     def test_empty_feeds(self):
         findings = check_duplicates([])
         assert findings == []
+
+
+class TestCheckSchema:
+    def test_e007_missing_kind(self):
+        feed = _make_feed(1)
+        del feed["kind"]
+        findings = check_schema([feed])
+        assert len(findings) == 1
+        assert findings[0].rule_id == "E007"
+        assert "kind" in findings[0].message
+
+    def test_e007_missing_metadata_asset_type(self):
+        feed = _make_feed(1)
+        del feed["metadata"]["asset_type"]
+        findings = check_schema([feed])
+        assert len(findings) == 1
+        assert findings[0].rule_id == "E007"
+
+    def test_e007_missing_metadata_entirely(self):
+        feed = _make_feed(1)
+        del feed["metadata"]
+        findings = check_schema([feed])
+        assert len(findings) == 1
+        assert findings[0].rule_id == "E007"
+
+    def test_e007_all_fields_present(self):
+        feed = _make_feed(1)
+        findings = check_schema([feed])
+        assert len(findings) == 0
+
+    def test_e007_multiple_missing(self):
+        feed = {"feedId": 1}
+        findings = check_schema([feed])
+        assert len(findings) == 1
+        assert "symbol" in findings[0].message or "state" in findings[0].message
 
 
 class TestLintConfigOrchestrator:
