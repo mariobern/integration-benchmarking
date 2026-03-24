@@ -6,8 +6,11 @@ and business rules. Pure stdlib — no external dependencies.
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from typing import Optional
+
+from lib.symbol_utils import is_futures_symbol, is_us_equity
 
 
 @dataclass
@@ -321,10 +324,123 @@ def check_publishers(feeds: list[dict], publishers: list[dict]) -> list[LintFind
     return findings
 
 
+_US_EQUITY_EXPECTED_SESSIONS = frozenset(
+    {"REGULAR", "PRE_MARKET", "POST_MARKET", "OVER_NIGHT"}
+)
+
+
+def _get_schedule_signature(schedules: list[dict]) -> tuple:
+    """Create a hashable signature from a feed's marketSchedules for comparison."""
+    return tuple(
+        sorted((s.get("session", ""), s.get("marketSchedule", "")) for s in schedules)
+    )
+
+
+def _extract_timezone(schedule_str: str) -> str:
+    """Extract timezone from a marketSchedule string (first segment before ';')."""
+    return schedule_str.split(";")[0] if ";" in schedule_str else ""
+
+
 def check_schedules(feeds: list[dict]) -> list[LintFinding]:
-    """Schedule validation rules."""
-    # Placeholder — implemented in Task 5
-    return []
+    """E006, W001, W002, W003: schedule validation rules."""
+    findings: list[LintFinding] = []
+
+    # Collect schedule signatures per asset_type for W003 majority detection
+    asset_type_schedules: dict[str, list[tuple[int, str, tuple, bool]]] = {}
+
+    for feed in feeds:
+        fid = feed.get("feedId")
+        sym = feed.get("symbol", "")
+        state = feed.get("state", "")
+        asset_type = feed.get("metadata", {}).get("asset_type", "")
+        schedules = feed.get("marketSchedules", [])
+
+        if state == "INACTIVE":
+            continue
+
+        sessions = {s.get("session", "") for s in schedules}
+
+        # E006: non-equity with extended sessions
+        if asset_type != "equity":
+            extended = sessions & _EXTENDED_SESSIONS
+            if extended:
+                findings.append(
+                    LintFinding(
+                        rule_id="E006",
+                        severity="ERROR",
+                        message=f"non-equity ({asset_type}) has extended sessions: {sorted(extended)}",
+                        feed_id=fid,
+                        symbol=sym,
+                    )
+                )
+
+        # STABLE-only schedule rules
+        if state == "STABLE":
+            # W001: US equity missing extended sessions
+            if is_us_equity(feed):
+                missing = _US_EQUITY_EXPECTED_SESSIONS - sessions
+                if missing:
+                    findings.append(
+                        LintFinding(
+                            rule_id="W001",
+                            severity="WARNING",
+                            message=f"STABLE US equity missing sessions: {sorted(missing)}",
+                            feed_id=fid,
+                            symbol=sym,
+                        )
+                    )
+
+                # W002: US equity wrong timezone
+                for sched in schedules:
+                    tz = _extract_timezone(sched.get("marketSchedule", ""))
+                    if tz and tz != "America/New_York":
+                        findings.append(
+                            LintFinding(
+                                rule_id="W002",
+                                severity="WARNING",
+                                message=f"US equity using timezone '{tz}' instead of 'America/New_York'",
+                                feed_id=fid,
+                                symbol=sym,
+                            )
+                        )
+                        break  # one finding per feed is enough
+
+            # Collect for W003
+            sig = _get_schedule_signature(schedules)
+            is_future = is_futures_symbol(sym)
+            asset_type_schedules.setdefault(asset_type, []).append(
+                (fid, sym, sig, is_future)
+            )
+
+    # W003: schedule deviation from asset-class majority
+    for asset_type, feed_sigs in asset_type_schedules.items():
+        if len(feed_sigs) <= 1:
+            continue
+
+        # Find majority schedule (exclude futures from count)
+        sig_counts: Counter[tuple] = Counter()
+        for _, _, sig, is_future in feed_sigs:
+            if not is_future:
+                sig_counts[sig] += 1
+
+        if not sig_counts:
+            continue
+
+        majority_sig = sig_counts.most_common(1)[0][0]
+
+        for fid, sym, sig, is_future in feed_sigs:
+            if sig != majority_sig and not is_future:
+                findings.append(
+                    LintFinding(
+                        rule_id="W003",
+                        severity="WARNING",
+                        message=f"schedule deviates from {asset_type} majority",
+                        feed_id=fid,
+                        symbol=sym,
+                    )
+                )
+
+    return findings
 
 
 def lint_config(config: dict) -> list[LintFinding]:

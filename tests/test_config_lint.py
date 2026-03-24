@@ -4,6 +4,7 @@ from lib.config_lint import (
     check_duplicates,
     check_schema,
     check_publishers,
+    check_schedules,
 )
 
 
@@ -427,6 +428,233 @@ class TestCheckPublishers:
         # Should not crash; W004 should fire
         w004 = [f for f in findings if f.rule_id == "W004"]
         assert len(w004) == 1
+
+
+def _us_equity_all_sessions():
+    """Return the 4-session schedule set for a properly configured US equity."""
+    return [
+        {"marketSchedule": "America/New_York;0930-1600;", "session": "REGULAR"},
+        {
+            "marketSchedule": "America/New_York;0400-0930;",
+            "session": "PRE_MARKET",
+            "allowedPublisherIds": [1, 2],
+            "minPublishers": 1,
+        },
+        {
+            "marketSchedule": "America/New_York;1600-2000;",
+            "session": "POST_MARKET",
+            "allowedPublisherIds": [1, 2],
+            "minPublishers": 1,
+        },
+        {
+            "marketSchedule": "America/New_York;2000-0400;",
+            "session": "OVER_NIGHT",
+            "allowedPublisherIds": [1, 2],
+            "minPublishers": 1,
+        },
+    ]
+
+
+class TestCheckSchedules:
+    def test_e006_non_equity_with_extended_session(self):
+        feeds = [
+            _make_feed(
+                1,
+                symbol="FX.EUR/USD",
+                asset_type="fx",
+                schedules=[
+                    {"marketSchedule": "America/New_York;O;", "session": "REGULAR"},
+                    {
+                        "marketSchedule": "America/New_York;0400-0930;",
+                        "session": "PRE_MARKET",
+                    },
+                ],
+            )
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E006"]
+        assert len(errors) == 1
+
+    def test_e006_equity_with_extended_ok(self):
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                schedules=_us_equity_all_sessions(),
+            )
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E006"]
+        assert len(errors) == 0
+
+    def test_w001_equity_missing_extended(self):
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[
+                    {
+                        "marketSchedule": "America/New_York;0930-1600;",
+                        "session": "REGULAR",
+                    },
+                ],
+            )
+        ]
+        findings = check_schedules(feeds)
+        warnings = [f for f in findings if f.rule_id == "W001"]
+        assert len(warnings) == 1
+        # Missing all 3 extended sessions
+        assert "PRE_MARKET" in warnings[0].message
+        assert "POST_MARKET" in warnings[0].message
+        assert "OVER_NIGHT" in warnings[0].message
+
+    def test_w001_non_us_equity_not_flagged(self):
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.GB.VOD/GBP",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[
+                    {
+                        "marketSchedule": "Europe/London;0800-1630;",
+                        "session": "REGULAR",
+                    },
+                ],
+            )
+        ]
+        findings = check_schedules(feeds)
+        warnings = [f for f in findings if f.rule_id == "W001"]
+        assert len(warnings) == 0
+
+    def test_w002_us_equity_wrong_timezone(self):
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[
+                    {"marketSchedule": "UTC;0930-1600;", "session": "REGULAR"},
+                ],
+            )
+        ]
+        findings = check_schedules(feeds)
+        warnings = [f for f in findings if f.rule_id == "W002"]
+        assert len(warnings) == 1
+
+    def test_w002_non_us_equity_different_tz_ok(self):
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.GB.VOD/GBP",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[
+                    {
+                        "marketSchedule": "Europe/London;0800-1630;",
+                        "session": "REGULAR",
+                    },
+                ],
+            )
+        ]
+        findings = check_schedules(feeds)
+        warnings = [f for f in findings if f.rule_id == "W002"]
+        assert len(warnings) == 0
+
+    def test_w003_schedule_deviation(self):
+        """One commodity has a different schedule from the majority."""
+        majority_schedule = [
+            {"marketSchedule": "America/New_York;O,O,O,O,O,O,O;", "session": "REGULAR"}
+        ]
+        deviant_schedule = [
+            {
+                "marketSchedule": "America/New_York;0800-1400,0800-1400,0800-1400,0800-1400,0800-1400,C,C;",
+                "session": "REGULAR",
+            }
+        ]
+        feeds = [
+            _make_feed(
+                i,
+                symbol=f"Commodities.GOLD{i}/USD",
+                asset_type="commodity",
+                state="STABLE",
+                schedules=majority_schedule,
+            )
+            for i in range(1, 6)
+        ] + [
+            _make_feed(
+                6,
+                symbol="Commodities.ODD/USD",
+                asset_type="commodity",
+                state="STABLE",
+                schedules=deviant_schedule,
+            )
+        ]
+        findings = check_schedules(feeds)
+        warnings = [f for f in findings if f.rule_id == "W003"]
+        assert len(warnings) == 1
+        assert warnings[0].feed_id == 6
+
+    def test_w003_futures_exempt(self):
+        """Futures contracts are exempt from schedule deviation warnings."""
+        majority_schedule = [
+            {"marketSchedule": "America/New_York;O,O,O,O,O,O,O;", "session": "REGULAR"}
+        ]
+        deviant_schedule = [
+            {"marketSchedule": "America/New_York;0800-1400;", "session": "REGULAR"}
+        ]
+        feeds = [
+            _make_feed(
+                i,
+                symbol=f"Commodities.GOLD{i}/USD",
+                asset_type="commodity",
+                state="STABLE",
+                schedules=majority_schedule,
+            )
+            for i in range(1, 4)
+        ] + [
+            _make_feed(
+                4,
+                symbol="Commodities.CCH6/USD",
+                asset_type="commodity",
+                state="STABLE",
+                schedules=deviant_schedule,
+            )
+        ]
+        findings = check_schedules(feeds)
+        warnings = [f for f in findings if f.rule_id == "W003"]
+        assert len(warnings) == 0
+
+    def test_w003_single_feed_in_class(self):
+        feeds = [
+            _make_feed(1, symbol="Rates.US10Y/USD", asset_type="rates", state="STABLE")
+        ]
+        findings = check_schedules(feeds)
+        warnings = [f for f in findings if f.rule_id == "W003"]
+        assert len(warnings) == 0
+
+    def test_inactive_feeds_skipped(self):
+        feeds = [
+            _make_feed(
+                1,
+                symbol="FX.EUR/USD",
+                asset_type="fx",
+                state="INACTIVE",
+                schedules=[
+                    {"marketSchedule": "America/New_York;O;", "session": "REGULAR"},
+                    {
+                        "marketSchedule": "America/New_York;0400-0930;",
+                        "session": "PRE_MARKET",
+                    },
+                ],
+            )
+        ]
+        findings = check_schedules(feeds)
+        assert len(findings) == 0
 
 
 class TestLintConfigOrchestrator:
