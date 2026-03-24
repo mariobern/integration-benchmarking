@@ -1,4 +1,10 @@
-from lib.config_lint import LintFinding, lint_config, check_duplicates, check_schema
+from lib.config_lint import (
+    LintFinding,
+    lint_config,
+    check_duplicates,
+    check_schema,
+    check_publishers,
+)
 
 
 def _make_feed(
@@ -188,12 +194,257 @@ class TestCheckSchema:
         assert "symbol" in findings[0].message or "state" in findings[0].message
 
 
+def _make_publisher(pub_id, key_type="PRODUCTION"):
+    return {
+        "publisherId": pub_id,
+        "name": f"pub{pub_id}",
+        "keyType": key_type,
+        "isActive": True,
+    }
+
+
+class TestCheckPublishers:
+    def test_e003_invalid_publisher_ref_toplevel(self):
+        feeds = [_make_feed(1, publisher_ids=[1, 2, 999])]
+        publishers = [_make_publisher(1), _make_publisher(2)]
+        findings = check_publishers(feeds, publishers)
+        errors = [f for f in findings if f.rule_id == "E003"]
+        assert len(errors) == 1
+        assert "999" in errors[0].message
+
+    def test_e003_invalid_publisher_ref_session_level(self):
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                publisher_ids=[1, 2],
+                schedules=[
+                    {"marketSchedule": "America/New_York;O;", "session": "REGULAR"},
+                    {
+                        "marketSchedule": "America/New_York;0400-0930;",
+                        "session": "PRE_MARKET",
+                        "allowedPublisherIds": [1, 888],
+                        "minPublishers": 1,
+                    },
+                ],
+            )
+        ]
+        publishers = [_make_publisher(1), _make_publisher(2)]
+        findings = check_publishers(feeds, publishers)
+        errors = [f for f in findings if f.rule_id == "E003"]
+        assert len(errors) == 1
+        assert "888" in errors[0].message
+
+    def test_e003_valid_refs(self):
+        feeds = [_make_feed(1, publisher_ids=[1, 2])]
+        publishers = [_make_publisher(1), _make_publisher(2), _make_publisher(3)]
+        findings = check_publishers(feeds, publishers)
+        errors = [f for f in findings if f.rule_id == "E003"]
+        assert len(errors) == 0
+
+    def test_e004_min_publishers_equals_count(self):
+        feeds = [_make_feed(1, min_publishers=3, publisher_ids=[1, 2, 3])]
+        publishers = [_make_publisher(1), _make_publisher(2), _make_publisher(3)]
+        findings = check_publishers(feeds, publishers)
+        errors = [f for f in findings if f.rule_id == "E004"]
+        assert len(errors) == 1
+
+    def test_e004_min_publishers_exceeds_count(self):
+        feeds = [_make_feed(1, min_publishers=5, publisher_ids=[1, 2, 3])]
+        publishers = [_make_publisher(1), _make_publisher(2), _make_publisher(3)]
+        findings = check_publishers(feeds, publishers)
+        errors = [f for f in findings if f.rule_id == "E004"]
+        assert len(errors) == 1
+
+    def test_e004_exempt_asset_type(self):
+        feeds = [
+            _make_feed(
+                1, asset_type="funding-rate", min_publishers=1, publisher_ids=[1]
+            )
+        ]
+        publishers = [_make_publisher(1)]
+        findings = check_publishers(feeds, publishers)
+        errors = [f for f in findings if f.rule_id == "E004"]
+        assert len(errors) == 0
+
+    def test_e004_session_level(self):
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                min_publishers=3,
+                publisher_ids=[1, 2, 3, 4, 5],
+                schedules=[
+                    {"marketSchedule": "America/New_York;O;", "session": "REGULAR"},
+                    {
+                        "marketSchedule": "America/New_York;0400-0930;",
+                        "session": "PRE_MARKET",
+                        "allowedPublisherIds": [1, 2],
+                        "minPublishers": 2,
+                    },
+                ],
+            )
+        ]
+        publishers = [_make_publisher(i) for i in range(1, 6)]
+        findings = check_publishers(feeds, publishers)
+        errors = [f for f in findings if f.rule_id == "E004"]
+        assert len(errors) == 1
+        assert "PRE_MARKET" in errors[0].message
+
+    def test_e004_min_publishers_zero_not_flagged(self):
+        """minPublishers=0 with publishers should not trigger E004."""
+        feeds = [_make_feed(1, min_publishers=0, publisher_ids=[1, 2, 3, 4, 5])]
+        publishers = [_make_publisher(i) for i in range(1, 6)]
+        findings = check_publishers(feeds, publishers)
+        errors = [f for f in findings if f.rule_id == "E004"]
+        assert len(errors) == 0
+
+    def test_e004_coming_soon_not_checked(self):
+        feeds = [
+            _make_feed(1, state="COMING_SOON", min_publishers=5, publisher_ids=[1])
+        ]
+        publishers = [_make_publisher(1)]
+        findings = check_publishers(feeds, publishers)
+        errors = [f for f in findings if f.rule_id == "E004"]
+        assert len(errors) == 0
+
+    def test_e005_stable_no_publishers(self):
+        feeds = [_make_feed(1, state="STABLE", publisher_ids=[])]
+        publishers = [_make_publisher(1)]
+        findings = check_publishers(feeds, publishers)
+        errors = [f for f in findings if f.rule_id == "E005"]
+        assert len(errors) == 1
+
+    def test_e005_stable_missing_field(self):
+        feeds = [
+            _make_feed(1, state="STABLE")
+        ]  # no publisher_ids kwarg -> field absent
+        publishers = [_make_publisher(1)]
+        findings = check_publishers(feeds, publishers)
+        errors = [f for f in findings if f.rule_id == "E005"]
+        assert len(errors) == 1
+
+    def test_e008_session_publisher_not_in_toplevel(self):
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                publisher_ids=[1, 2, 3],
+                schedules=[
+                    {"marketSchedule": "America/New_York;O;", "session": "REGULAR"},
+                    {
+                        "marketSchedule": "America/New_York;0400-0930;",
+                        "session": "PRE_MARKET",
+                        "allowedPublisherIds": [1, 2, 4],
+                        "minPublishers": 1,
+                    },
+                ],
+            )
+        ]
+        publishers = [_make_publisher(i) for i in range(1, 5)]
+        findings = check_publishers(feeds, publishers)
+        errors = [f for f in findings if f.rule_id == "E008"]
+        assert len(errors) == 1
+        assert "4" in errors[0].message
+
+    def test_w004_coming_soon_no_publishers(self):
+        feeds = [_make_feed(1, state="COMING_SOON")]  # no publisher_ids
+        publishers = [_make_publisher(1)]
+        findings = check_publishers(feeds, publishers)
+        warnings = [f for f in findings if f.rule_id == "W004"]
+        assert len(warnings) == 1
+
+    def test_w005_one_headroom(self):
+        feeds = [_make_feed(1, min_publishers=4, publisher_ids=[1, 2, 3, 4, 5])]
+        publishers = [_make_publisher(i) for i in range(1, 6)]
+        findings = check_publishers(feeds, publishers)
+        warnings = [f for f in findings if f.rule_id == "W005"]
+        assert len(warnings) == 1
+
+    def test_w005_session_level_one_headroom(self):
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                min_publishers=3,
+                publisher_ids=[1, 2, 3, 4, 5, 6],
+                schedules=[
+                    {"marketSchedule": "America/New_York;O;", "session": "REGULAR"},
+                    {
+                        "marketSchedule": "America/New_York;0400-0930;",
+                        "session": "PRE_MARKET",
+                        "allowedPublisherIds": [1, 2, 3],
+                        "minPublishers": 2,
+                    },
+                ],
+            )
+        ]
+        publishers = [_make_publisher(i) for i in range(1, 7)]
+        findings = check_publishers(feeds, publishers)
+        warnings = [f for f in findings if f.rule_id == "W005"]
+        assert len(warnings) == 1
+        assert "PRE_MARKET" in warnings[0].message
+
+    def test_w005_sufficient_headroom(self):
+        feeds = [_make_feed(1, min_publishers=3, publisher_ids=[1, 2, 3, 4, 5])]
+        publishers = [_make_publisher(i) for i in range(1, 6)]
+        findings = check_publishers(feeds, publishers)
+        warnings = [f for f in findings if f.rule_id == "W005"]
+        assert len(warnings) == 0
+
+    def test_w006_duplicate_publisher_in_feed(self):
+        feeds = [_make_feed(1, publisher_ids=[1, 2, 2, 3])]
+        publishers = [_make_publisher(i) for i in range(1, 4)]
+        findings = check_publishers(feeds, publishers)
+        warnings = [f for f in findings if f.rule_id == "W006"]
+        assert len(warnings) == 1
+        assert "2" in warnings[0].message
+
+    def test_w007_stable_test_publisher(self):
+        feeds = [_make_feed(1, state="STABLE", publisher_ids=[1, 2])]
+        publishers = [_make_publisher(1, key_type="TEST"), _make_publisher(2)]
+        findings = check_publishers(feeds, publishers)
+        warnings = [f for f in findings if f.rule_id == "W007"]
+        assert len(warnings) == 1
+        assert "1" in warnings[0].message
+
+    def test_w007_coming_soon_test_publisher_not_flagged(self):
+        feeds = [_make_feed(1, state="COMING_SOON", publisher_ids=[1])]
+        publishers = [_make_publisher(1, key_type="TEST")]
+        findings = check_publishers(feeds, publishers)
+        warnings = [f for f in findings if f.rule_id == "W007"]
+        assert len(warnings) == 0
+
+    def test_missing_allowedPublisherIds_field(self):
+        """Feed without allowedPublisherIds field — null-safe handling."""
+        feed = _make_feed(1, state="COMING_SOON")
+        assert "allowedPublisherIds" not in feed
+        findings = check_publishers([feed], [_make_publisher(1)])
+        # Should not crash; W004 should fire
+        w004 = [f for f in findings if f.rule_id == "W004"]
+        assert len(w004) == 1
+
+
 class TestLintConfigOrchestrator:
     def test_clean_config(self):
         config = _make_config(
             [
-                _make_feed(1, symbol="Crypto.BTC/USD", publisher_ids=[1, 2, 3]),
-                _make_feed(2, symbol="Crypto.ETH/USD", publisher_ids=[1, 2, 3]),
+                _make_feed(
+                    1,
+                    symbol="Crypto.BTC/USD",
+                    min_publishers=2,
+                    publisher_ids=[1, 2, 3],
+                ),
+                _make_feed(
+                    2,
+                    symbol="Crypto.ETH/USD",
+                    min_publishers=2,
+                    publisher_ids=[1, 2, 3],
+                ),
             ]
         )
         findings = lint_config(config)
