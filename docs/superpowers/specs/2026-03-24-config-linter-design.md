@@ -77,36 +77,36 @@ This matches the `DEFAULT_EXCLUDED_ASSET_TYPES` pattern in `lib/min_publishers.p
 
 ### Errors (exit code 1, block PR)
 
-| ID   | Name                             | Description                                                                          | Applies to          |
-| ---- | -------------------------------- | ------------------------------------------------------------------------------------ | ------------------- |
-| E001 | duplicate-feed-id                | Two feeds share the same `feedId`                                                    | All feeds           |
-| E002 | duplicate-symbol                 | Two STABLE or COMING_SOON feeds share the same `symbol`                              | STABLE, COMING_SOON |
-| E003 | invalid-publisher-ref            | `allowedPublisherIds` (top-level or session-level) references unknown publisherId    | All feeds           |
-| E004 | min-publishers-exceeds-count     | `minPublishers >= len(allowedPublisherIds)` at top-level or session-level            | STABLE (non-exempt) |
-| E005 | stable-no-publishers             | STABLE feed with missing or empty top-level `allowedPublisherIds`                    | STABLE              |
-| E006 | non-equity-extended-session      | Non-equity feed has PRE_MARKET, POST_MARKET, or OVER_NIGHT sessions                 | All feeds           |
-| E007 | missing-required-fields          | Feed missing `feedId`, `symbol`, `state`, `kind`, or `metadata.asset_type`           | All feeds           |
-| E008 | session-publisher-not-in-toplevel | Session-level `allowedPublisherIds` contains IDs not in top-level list               | All feeds           |
+| ID   | Name                              | Description                                                                       | Applies to          |
+| ---- | --------------------------------- | --------------------------------------------------------------------------------- | ------------------- |
+| E001 | duplicate-feed-id                 | Two feeds share the same `feedId`                                                 | All feeds           |
+| E002 | duplicate-symbol                  | Two STABLE or COMING_SOON feeds share the same `symbol`                           | STABLE, COMING_SOON |
+| E003 | invalid-publisher-ref             | `allowedPublisherIds` (top-level or session-level) references unknown publisherId | All feeds           |
+| E004 | min-publishers-exceeds-count      | `minPublishers >= len(allowedPublisherIds)` at top-level or session-level         | STABLE (non-exempt) |
+| E005 | stable-no-publishers              | STABLE feed with missing or empty top-level `allowedPublisherIds`                 | STABLE              |
+| E006 | non-equity-extended-session       | Non-equity feed has PRE_MARKET, POST_MARKET, or OVER_NIGHT sessions               | All feeds           |
+| E007 | missing-required-fields           | Feed missing `feedId`, `symbol`, `state`, `kind`, or `metadata.asset_type`        | All feeds           |
+| E008 | session-publisher-not-in-toplevel | Session-level `allowedPublisherIds` contains IDs not in top-level list            | All feeds           |
 
 ### Warnings (exit code 0, unless `--warnings-as-errors`)
 
-| ID   | Name                        | Description                                                                  | Applies to          |
-| ---- | --------------------------- | ---------------------------------------------------------------------------- | ------------------- |
-| W001 | equity-missing-sessions     | STABLE US equity (`Equity.US.` prefix) with incomplete extended-hours set    | STABLE US equity    |
-| W002 | schedule-timezone-mismatch  | US equity (`Equity.US.`) using non-`America/New_York` timezone               | STABLE US equity    |
-| W003 | schedule-deviation          | Feed's schedule differs from majority of its asset class (futures exempt)    | STABLE              |
-| W004 | coming-soon-no-publishers   | COMING_SOON feed with missing or empty `allowedPublisherIds`                 | COMING_SOON         |
-| W005 | high-min-publishers-ratio   | STABLE feed where `minPublishers` leaves only 1 headroom (top or session)   | STABLE (non-exempt) |
-| W006 | duplicate-publisher-in-feed | Same publisherId appears twice in a feed's `allowedPublisherIds`             | All feeds           |
-| W007 | stable-test-publisher       | STABLE feed references a publisher with `keyType: "TEST"`                    | STABLE              |
+| ID   | Name                        | Description                                                               | Applies to          |
+| ---- | --------------------------- | ------------------------------------------------------------------------- | ------------------- |
+| W001 | equity-missing-sessions     | STABLE US equity (`Equity.US.` prefix) with incomplete extended-hours set | STABLE US equity    |
+| W002 | schedule-timezone-mismatch  | US equity (`Equity.US.`) using non-`America/New_York` timezone            | STABLE US equity    |
+| W003 | schedule-deviation          | Feed's schedule differs from majority of its asset class (futures exempt) | STABLE              |
+| W004 | coming-soon-no-publishers   | COMING_SOON feed with missing or empty `allowedPublisherIds`              | COMING_SOON         |
+| W005 | high-min-publishers-ratio   | STABLE feed where `minPublishers` leaves only 1 headroom (top or session) | STABLE (non-exempt) |
+| W006 | duplicate-publisher-in-feed | Same publisherId appears twice in a feed's `allowedPublisherIds`          | All feeds           |
+| W007 | stable-test-publisher       | STABLE feed references a publisher with `keyType: "TEST"`                 | STABLE              |
 
 ### State Scoping
 
-| State       | Rules applied                                        |
-| ----------- | ---------------------------------------------------- |
-| STABLE      | All rules (E001-E008, W001-W007)                     |
-| COMING_SOON | E001-E003, E006-E008, W004, W006                     |
-| INACTIVE    | E001, E007 only (duplicates + schema)                |
+| State       | Rules applied                         |
+| ----------- | ------------------------------------- |
+| STABLE      | All rules (E001-E008, W001-W007)      |
+| COMING_SOON | E001-E003, E006-E008, W004, W006      |
+| INACTIVE    | E001, E007 only (duplicates + schema) |
 
 ## Core Module: `lib/config_lint.py`
 
@@ -185,11 +185,11 @@ python3 config_linter.py --config after.json [--format text|json] [--warnings-as
 
 ### Arguments
 
-| Flag                   | Default  | Description                           |
-| ---------------------- | -------- | ------------------------------------- |
-| `--config`             | required | Path to `after.json`                  |
-| `--format`             | `text`   | Output format: `text` or `json`       |
-| `--warnings-as-errors` | `false`  | Treat warnings as errors (exit 1)     |
+| Flag                   | Default  | Description                       |
+| ---------------------- | -------- | --------------------------------- |
+| `--config`             | required | Path to `after.json`              |
+| `--format`             | `text`   | Output format: `text` or `json`   |
+| `--warnings-as-errors` | `false`  | Treat warnings as errors (exit 1) |
 
 ### Exit Codes
 
