@@ -121,3 +121,93 @@ class TestCLIFileHandling:
         path.write_text("{invalid json")
         result = _run_linter("--config", str(path))
         assert result.returncode == 1
+
+
+class TestCLIOutputFile:
+    """Tests for --output flag with format auto-detection."""
+
+    def test_output_json_writes_file(self, tmp_path):
+        """--output foo.json writes JSON findings to file."""
+        config = _make_clean_config()
+        config["feeds"].append(config["feeds"][0].copy())  # duplicate -> E001
+        config_path = _write_config(tmp_path, config)
+        output_path = str(tmp_path / "results.json")
+        result = _run_linter("--config", config_path, "--output", output_path)
+        assert result.returncode == 1
+        assert Path(output_path).exists()
+        findings = json.loads(Path(output_path).read_text())
+        assert isinstance(findings, list)
+        assert any(f["rule_id"] == "E001" for f in findings)
+
+    def test_output_txt_writes_file(self, tmp_path):
+        """--output foo.txt writes plain text findings to file."""
+        config = _make_clean_config()
+        config["feeds"].append(config["feeds"][0].copy())
+        config_path = _write_config(tmp_path, config)
+        output_path = str(tmp_path / "results.txt")
+        result = _run_linter("--config", config_path, "--output", output_path)
+        assert result.returncode == 1
+        assert Path(output_path).exists()
+        content = Path(output_path).read_text()
+        assert "E001" in content
+        # No ANSI escape codes in file output
+        assert "\033[" not in content
+
+    def test_output_json_stdout_summary(self, tmp_path):
+        """--output prints summary to stdout, not full findings."""
+        config = _make_clean_config()
+        config["feeds"].append(config["feeds"][0].copy())
+        config_path = _write_config(tmp_path, config)
+        output_path = str(tmp_path / "results.json")
+        result = _run_linter("--config", config_path, "--output", output_path)
+        assert "Wrote" in result.stdout
+        assert "results.json" in result.stdout
+        # Full findings should NOT be in stdout
+        assert "E001" not in result.stdout
+
+    def test_output_clean_config(self, tmp_path):
+        """--output with no issues writes file and prints summary."""
+        config_path = _write_config(tmp_path, _make_clean_config())
+        output_path = str(tmp_path / "results.json")
+        result = _run_linter("--config", config_path, "--output", output_path)
+        assert result.returncode == 0
+        assert Path(output_path).exists()
+        findings = json.loads(Path(output_path).read_text())
+        assert len(findings) == 0
+        assert "No issues found" in result.stdout
+
+    def test_output_overrides_format_flag(self, tmp_path):
+        """--output auto-detects format, ignoring --format."""
+        config = _make_clean_config()
+        config["feeds"].append(config["feeds"][0].copy())
+        config_path = _write_config(tmp_path, config)
+        output_path = str(tmp_path / "results.json")
+        # Pass --format text, but .json extension should win
+        result = _run_linter(
+            "--config", config_path, "--output", output_path, "--format", "text"
+        )
+        findings = json.loads(Path(output_path).read_text())
+        assert isinstance(findings, list)
+
+    def test_output_non_json_extension_writes_text(self, tmp_path):
+        """--output with .log extension writes plain text."""
+        config = _make_clean_config()
+        config["feeds"].append(config["feeds"][0].copy())
+        config_path = _write_config(tmp_path, config)
+        output_path = str(tmp_path / "results.log")
+        result = _run_linter("--config", config_path, "--output", output_path)
+        content = Path(output_path).read_text()
+        assert "E001" in content
+        assert "Summary:" in content
+
+    def test_output_warnings_as_errors_still_works(self, tmp_path):
+        """--warnings-as-errors works with --output."""
+        config = _make_clean_config()
+        config["feeds"][0]["minPublishers"] = 4  # W005
+        config_path = _write_config(tmp_path, config)
+        output_path = str(tmp_path / "results.txt")
+        result = _run_linter(
+            "--config", config_path, "--output", output_path, "--warnings-as-errors"
+        )
+        assert result.returncode == 1
+        assert Path(output_path).exists()
