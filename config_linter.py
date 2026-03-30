@@ -112,6 +112,11 @@ def main() -> None:
         action="store_true",
         help="Treat warnings as errors (exit 1)",
     )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="Write findings to file (format auto-detected: .json -> JSON, else text)",
+    )
     args = parser.parse_args()
 
     config_path = Path(args.config)
@@ -128,13 +133,29 @@ def main() -> None:
 
     findings = lint_config(config)
 
-    if args.format == "json":
-        print(_format_json(findings))
-    else:
-        print(_format_text(findings, use_color=_supports_color()))
-
     errors = [f for f in findings if f.severity == "ERROR"]
     warnings = [f for f in findings if f.severity == "WARNING"]
+
+    if args.output:
+        # Auto-detect format from file extension
+        if args.output.suffix.lower() == ".json":
+            content = _format_json(findings)
+        else:
+            content = _format_text(findings, use_color=False)
+        args.output.write_text(content)
+
+        # Print summary to stdout
+        if not errors and not warnings:
+            print(f"No issues found. Wrote results to {args.output}")
+        else:
+            print(
+                f"Wrote {len(errors)} errors, {len(warnings)} warnings to {args.output}"
+            )
+    else:
+        if args.format == "json":
+            print(_format_json(findings))
+        else:
+            print(_format_text(findings, use_color=_supports_color()))
 
     if errors:
         sys.exit(1)
