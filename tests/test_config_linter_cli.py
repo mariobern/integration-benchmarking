@@ -211,3 +211,11 @@ class TestCLIOutputFile:
         )
         assert result.returncode == 1
         assert Path(output_path).exists()
+
+    def test_output_unwritable_path(self, tmp_path):
+        """--output to non-existent directory exits 1 with error."""
+        config_path = _write_config(tmp_path, _make_clean_config())
+        output_path = "/nonexistent/dir/results.json"
+        result = _run_linter("--config", config_path, "--output", output_path)
+        assert result.returncode == 1
+        assert "Cannot write to" in result.stderr

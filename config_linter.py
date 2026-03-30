@@ -142,7 +142,11 @@ def main() -> None:
             content = _format_json(findings)
         else:
             content = _format_text(findings, use_color=False)
-        args.output.write_text(content)
+        try:
+            args.output.write_text(content)
+        except OSError as e:
+            print(f"ERROR: Cannot write to {args.output}: {e}", file=sys.stderr)
+            sys.exit(1)
 
         # Print summary to stdout
         if not errors and not warnings:
