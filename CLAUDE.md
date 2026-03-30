@@ -101,7 +101,7 @@ FX and Metals use 24-hour regular session (with maintenance windows). See indivi
 | `verify_uptime.py`              | Compare uptime calculation methods (1s window vs 200ms gap)           | `python verify_uptime.py --publisher-id 55 --date 2026-01-28`               | -                                                                        |
 | `update_min_publishers.py`      | Enforce minimum minPublishers based on publisher count                | `python3 update_min_publishers.py --config after.json --dry-run`            | [docs/update_min_publishers.md](docs/update_min_publishers.md)           |
 | `volume_profile.py`             | Volume profile analysis for US equities (per-session)                 | `python3 volume_profile.py --tickers AAPL,MSFT --date 2026-03-03`           | [docs/volume_profile.md](docs/volume_profile.md)                         |
-| `config_linter.py`              | Lint after.json for config errors (duplicates, publishers, schedules) | `python3 config_linter.py --config after.json`                              | -                                                                        |
+| `config_linter.py`              | Lint after.json for config errors (duplicates, publishers, schedules) | `python3 config_linter.py --config after.json`                              | [docs/config_linter.md](docs/config_linter.md)                           |
 
 ### Publisher Performance Portal
 
