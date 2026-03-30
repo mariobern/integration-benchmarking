@@ -3,6 +3,8 @@
 Usage:
     python3 config_linter.py --config after.json
     python3 config_linter.py --config after.json --format json
+    python3 config_linter.py --config after.json --output lint_results.json
+    python3 config_linter.py --config after.json --output lint_results.txt
     python3 config_linter.py --config after.json --warnings-as-errors
 """
 
