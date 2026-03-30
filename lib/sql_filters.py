@@ -15,9 +15,7 @@ from typing import Optional
 from zoneinfo import ZoneInfo
 
 from lib.models import TradingSession
-
-# Futures contract month codes
-FUTURES_MONTH_CODES = "FGHJKMNQUVXZ"
+from lib.symbol_utils import FUTURES_MONTH_CODES, is_futures_symbol
 
 # US Equities market hours (EST/EDT) - Regular trading session only
 US_EQUITY_MARKET_OPEN_HOUR = 9
@@ -40,27 +38,6 @@ US_EQUITY_OVERNIGHT_END_MINUTE = 0
 # Observation thresholds
 REGULAR_MIN_OBSERVATIONS = 100
 SESSION_MIN_OBSERVATIONS = 50
-
-
-def is_futures_symbol(symbol: str) -> bool:
-    """Detect if a symbol represents a futures contract."""
-
-    if not symbol:
-        return False
-
-    base = symbol.split("/")[0] if "/" in symbol else symbol
-    parts = base.split(".")
-    if len(parts) < 2:
-        return False
-
-    ticker = parts[-1]
-    if len(ticker) < 2:
-        return False
-
-    month_code = ticker[-2].upper()
-    year_digit = ticker[-1]
-
-    return month_code in FUTURES_MONTH_CODES and year_digit.isdigit()
 
 
 @lru_cache(maxsize=128)

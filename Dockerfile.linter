@@ -1,0 +1,10 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY config_linter.py .
+COPY lib/__init__.py lib/
+COPY lib/config_lint.py lib/
+COPY lib/symbol_utils.py lib/
+
+ENTRYPOINT ["python3", "config_linter.py"]
