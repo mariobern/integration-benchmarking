@@ -83,6 +83,43 @@ def query_pyth_aggregate(lazer_client, divisor: float) -> tuple[pd.DataFrame, in
     return pd.DataFrame(columns=["ts", "agg_price", "n_pyth_updates"]), -1
 
 
+def query_benchmark(analytics_client) -> pd.DataFrame:
+    """Query per-second CLK26 benchmark price from datascope_futures_benchmark_data.
+
+    Uses `lib.sql_filters.get_benchmark_columns("commodity")` to resolve the
+    price/bid/ask column names (`price`, `bid_price`, `ask_price`).
+
+    Returns df with columns [ts, bench_price, avg_spread, n_bench_ticks].
+    """
+    price_col, bid_col, ask_col = get_benchmark_columns(MODE)
+    query = f"""
+        SELECT
+            toStartOfSecond(date_time) AS ts,
+            avg(coalesce({price_col}, ({bid_col} + {ask_col}) / 2)) AS bench_price,
+            avg(CASE
+                    WHEN {ask_col} IS NOT NULL AND {bid_col} IS NOT NULL
+                    THEN {ask_col} - {bid_col}
+                END) AS avg_spread,
+            count() AS n_bench_ticks
+        FROM datascope_futures_benchmark_data
+        WHERE pyth_lazer_id = {FEED_ID}
+          AND date_time >= '{WINDOW_START}'
+          AND date_time <  '{WINDOW_END}'
+          AND ({price_col} IS NOT NULL
+               OR ({bid_col} IS NOT NULL AND {ask_col} IS NOT NULL))
+        GROUP BY ts
+        ORDER BY ts
+    """
+    result = analytics_client.query(query)
+    df = pd.DataFrame(
+        result.result_rows,
+        columns=["ts", "bench_price", "avg_spread", "n_bench_ticks"],
+    )
+    if not df.empty:
+        df["ts"] = pd.to_datetime(df["ts"], utc=True)
+    return df
+
+
 def main() -> None:
     print(
         f"WTIK6 deviation check — feed {FEED_ID}, window {WINDOW_START} .. {WINDOW_END}"
@@ -101,6 +138,18 @@ def main() -> None:
         print(
             f"  price range: {pyth_df['agg_price'].min():.4f} .. "
             f"{pyth_df['agg_price'].max():.4f}"
+        )
+
+    bench_df = query_benchmark(analytics)
+    print(f"CLK26 benchmark: {len(bench_df)} rows")
+    if not bench_df.empty:
+        print(
+            f"  first ts={bench_df['ts'].iloc[0]}, "
+            f"last ts={bench_df['ts'].iloc[-1]}"
+        )
+        print(
+            f"  price range: {bench_df['bench_price'].min():.4f} .. "
+            f"{bench_df['bench_price'].max():.4f}"
         )
 
 
