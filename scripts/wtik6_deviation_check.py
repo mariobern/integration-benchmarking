@@ -15,6 +15,8 @@ from pathlib import Path
 # Add repo root to sys.path so `lib` is importable when run as a script.
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
 import pandas as pd
 
 from lib.benchmark_core import get_feed_metadata
@@ -191,6 +193,48 @@ def write_csv(merged: pd.DataFrame) -> Path:
     return out_path
 
 
+def plot_price_overlay(merged: pd.DataFrame, symbol: str) -> Path:
+    """Render Chart 1 — Pyth aggregate vs CLK26 with a ±1% tolerance band."""
+    out_path = OUTPUT_DIR / f"{OUTPUT_PREFIX}_price_overlay.png"
+
+    fig, ax = plt.subplots(figsize=(11, 5.5))
+
+    ts = merged.index
+    bench = merged["bench_price"]
+    agg = merged["agg_price"]
+
+    # ±1% band around the benchmark
+    lower = bench * (1 - THRESHOLD_PCT / 100)
+    upper = bench * (1 + THRESHOLD_PCT / 100)
+    ax.fill_between(
+        ts,
+        lower,
+        upper,
+        color="tab:red",
+        alpha=0.08,
+        label=f"±{THRESHOLD_PCT:g}% band",
+    )
+
+    ax.plot(ts, bench, color="tab:orange", linewidth=1.4, label="CLK26 (Datascope)")
+    ax.plot(ts, agg, color="tab:blue", linewidth=1.4, label="Pyth aggregate")
+
+    ax.set_title(
+        f"{symbol} (feed {FEED_ID}): Pyth Aggregate vs CLK26 — "
+        f"{DATE} 00:45–01:00 UTC"
+    )
+    ax.set_ylabel("Price (USD)")
+    ax.set_xlabel("Time (UTC)")
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M:%S"))
+    ax.xaxis.set_major_locator(mdates.MinuteLocator(interval=2))
+    fig.autofmt_xdate()
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc="upper right")
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    return out_path
+
+
 def main() -> None:
     print(
         f"WTIK6 deviation check — feed {FEED_ID}, window {WINDOW_START} .. {WINDOW_END}"
@@ -234,6 +278,9 @@ def main() -> None:
 
     csv_path = write_csv(merged)
     print(f"Wrote {csv_path}")
+
+    overlay_path = plot_price_overlay(merged, symbol)
+    print(f"Wrote {overlay_path}")
 
 
 if __name__ == "__main__":
