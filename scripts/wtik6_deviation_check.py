@@ -173,6 +173,24 @@ def build_merged_frame(pyth_df: pd.DataFrame, bench_df: pd.DataFrame) -> pd.Data
     return merged
 
 
+def write_csv(merged: pd.DataFrame) -> Path:
+    """Write the per-second comparison table under OUTPUT_DIR."""
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = OUTPUT_DIR / f"{OUTPUT_PREFIX}.csv"
+    columns = [
+        "agg_price",
+        "bench_price",
+        "deviation_abs",
+        "deviation_pct",
+        "abs_deviation_pct",
+        "breach",
+        "n_pyth_updates",
+        "n_bench_ticks",
+    ]
+    merged[columns].to_csv(out_path, index_label="ts", float_format="%.6f")
+    return out_path
+
+
 def main() -> None:
     print(
         f"WTIK6 deviation check — feed {FEED_ID}, window {WINDOW_START} .. {WINDOW_END}"
@@ -213,6 +231,9 @@ def main() -> None:
         f"Merged: {len(merged)} rows, joint-coverage={both}/900 "
         f"({both/900*100:.1f}%), breaches={breaches}, max_abs_dev={max_dev:.4f}%"
     )
+
+    csv_path = write_csv(merged)
+    print(f"Wrote {csv_path}")
 
 
 if __name__ == "__main__":
