@@ -120,6 +120,59 @@ def query_benchmark(analytics_client) -> pd.DataFrame:
     return df
 
 
+def build_merged_frame(pyth_df: pd.DataFrame, bench_df: pd.DataFrame) -> pd.DataFrame:
+    """Full-outer join Pyth + benchmark onto a complete 900-second UTC index.
+
+    Raises RuntimeError if either input is empty — a silent empty merge would
+    produce a 900-row all-NaN frame and a false "0 breaches" verdict.
+
+    Returns a DataFrame indexed by ts with columns:
+        agg_price, bench_price, avg_spread,
+        n_pyth_updates, n_bench_ticks,
+        deviation_abs, deviation_pct, abs_deviation_pct, breach,
+        has_both
+    """
+    if pyth_df.empty:
+        raise RuntimeError(
+            "Pyth aggregate returned no rows — cannot compute deviation."
+        )
+    if bench_df.empty:
+        raise RuntimeError(
+            "CLK26 benchmark returned no rows — cannot compute deviation."
+        )
+
+    full_index = pd.date_range(
+        start=WINDOW_START,
+        end=WINDOW_END,
+        freq="1s",
+        tz="UTC",
+        inclusive="left",  # exclusive end — matches WHERE clause
+    )
+    assert len(full_index) == 900, f"expected 900 seconds, got {len(full_index)}"
+
+    pyth = pyth_df.set_index("ts")
+    bench = bench_df.set_index("ts")
+
+    merged = pd.DataFrame(index=full_index)
+    merged.index.name = "ts"
+    merged = merged.join(pyth, how="left").join(bench, how="left")
+
+    merged["has_both"] = merged["agg_price"].notna() & merged["bench_price"].notna()
+    merged["deviation_abs"] = merged["agg_price"] - merged["bench_price"]
+    merged["deviation_pct"] = (
+        (merged["agg_price"] - merged["bench_price"]) / merged["bench_price"] * 100
+    )
+    merged["abs_deviation_pct"] = merged["deviation_pct"].abs()
+    merged["breach"] = merged["has_both"] & (
+        merged["abs_deviation_pct"] > THRESHOLD_PCT
+    )
+
+    # Fill update/tick counts where no data was present
+    merged["n_pyth_updates"] = merged["n_pyth_updates"].fillna(0).astype(int)
+    merged["n_bench_ticks"] = merged["n_bench_ticks"].fillna(0).astype(int)
+    return merged
+
+
 def main() -> None:
     print(
         f"WTIK6 deviation check — feed {FEED_ID}, window {WINDOW_START} .. {WINDOW_END}"
@@ -151,6 +204,15 @@ def main() -> None:
             f"  price range: {bench_df['bench_price'].min():.4f} .. "
             f"{bench_df['bench_price'].max():.4f}"
         )
+
+    merged = build_merged_frame(pyth_df, bench_df)
+    both = merged["has_both"].sum()
+    breaches = int(merged["breach"].sum())
+    max_dev = merged.loc[merged["has_both"], "abs_deviation_pct"].max()
+    print(
+        f"Merged: {len(merged)} rows, joint-coverage={both}/900 "
+        f"({both/900*100:.1f}%), breaches={breaches}, max_abs_dev={max_dev:.4f}%"
+    )
 
 
 if __name__ == "__main__":
