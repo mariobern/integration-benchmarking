@@ -289,6 +289,141 @@ def plot_deviation(merged: pd.DataFrame, symbol: str) -> Path:
     return out_path
 
 
+@dataclass
+class DeviationStats:
+    joint_coverage: int
+    joint_coverage_pct: float
+    pyth_gaps: int
+    bench_gaps: int
+    max_abs_dev_pct: float
+    max_abs_dev_ts: pd.Timestamp | None
+    max_abs_dev_signed_pct: float
+    mean_abs_dev_pct: float
+    min_abs_dev_pct: float
+    breach_count: int
+    breach_timestamps: list[pd.Timestamp]
+
+
+def compute_stats(merged: pd.DataFrame) -> DeviationStats:
+    both = merged[merged["has_both"]]
+    joint_coverage = int(merged["has_both"].sum())
+    pyth_gaps = int((merged["agg_price"].isna()).sum())
+    bench_gaps = int((merged["bench_price"].isna()).sum())
+
+    if both.empty:
+        return DeviationStats(
+            joint_coverage=0,
+            joint_coverage_pct=0.0,
+            pyth_gaps=pyth_gaps,
+            bench_gaps=bench_gaps,
+            max_abs_dev_pct=float("nan"),
+            max_abs_dev_ts=None,
+            max_abs_dev_signed_pct=float("nan"),
+            mean_abs_dev_pct=float("nan"),
+            min_abs_dev_pct=float("nan"),
+            breach_count=0,
+            breach_timestamps=[],
+        )
+
+    max_ts = both["abs_deviation_pct"].idxmax()
+    breach_rows = merged[merged["breach"]]
+
+    return DeviationStats(
+        joint_coverage=joint_coverage,
+        joint_coverage_pct=joint_coverage / len(merged) * 100,
+        pyth_gaps=pyth_gaps,
+        bench_gaps=bench_gaps,
+        max_abs_dev_pct=float(both.loc[max_ts, "abs_deviation_pct"]),
+        max_abs_dev_ts=max_ts,
+        max_abs_dev_signed_pct=float(both.loc[max_ts, "deviation_pct"]),
+        mean_abs_dev_pct=float(both["abs_deviation_pct"].mean()),
+        min_abs_dev_pct=float(both["abs_deviation_pct"].min()),
+        breach_count=int(len(breach_rows)),
+        breach_timestamps=list(breach_rows.index),
+    )
+
+
+def write_report(
+    stats: DeviationStats,
+    symbol: str,
+    channel: int,
+) -> Path:
+    """Write the markdown report with verdict, stats, and placeholder narrative."""
+    out_path = OUTPUT_DIR / f"{OUTPUT_PREFIX}_report.md"
+
+    verdict_phrase = "did" if stats.breach_count > 0 else "did not"
+    verdict = (
+        f"Pyth aggregate {verdict_phrase} deviate more than "
+        f"{THRESHOLD_PCT:g}% from CLK26 during "
+        f"{DATE} 00:45:00–01:00:00 UTC."
+    )
+
+    if stats.max_abs_dev_ts is not None:
+        max_dev_line = (
+            f"- **Max absolute deviation:** "
+            f"{stats.max_abs_dev_pct:.4f}% "
+            f"(signed {stats.max_abs_dev_signed_pct:+.4f}%) "
+            f"at {stats.max_abs_dev_ts.strftime('%H:%M:%S')} UTC"
+        )
+        mean_line = f"- **Mean absolute deviation:** {stats.mean_abs_dev_pct:.4f}%"
+        min_line = f"- **Min absolute deviation:** {stats.min_abs_dev_pct:.4f}%"
+    else:
+        max_dev_line = "- **Max absolute deviation:** n/a (no overlapping data)"
+        mean_line = "- **Mean absolute deviation:** n/a"
+        min_line = "- **Min absolute deviation:** n/a"
+
+    if stats.breach_count == 0:
+        breach_line = "- **Breaches:** 0"
+    else:
+        first = stats.breach_timestamps[0].strftime("%H:%M:%S")
+        last = stats.breach_timestamps[-1].strftime("%H:%M:%S")
+        breach_line = (
+            f"- **Breaches:** {stats.breach_count} seconds "
+            f"(first {first} UTC, last {last} UTC)"
+        )
+
+    body = f"""# WTIK6 Pyth Aggregate vs CLK26 — {DATE} 00:45–01:00 UTC
+
+**Feed:** `{FEED_ID}` (`{symbol}`)
+**Benchmark:** CLK26 (`datascope_futures_benchmark_data`, `pyth_lazer_id = {FEED_ID}`)
+**Window:** {WINDOW_START} to {WINDOW_END} UTC
+**Threshold:** ±{THRESHOLD_PCT:g}%
+
+## Verdict
+
+{verdict}
+
+## Summary stats
+
+{max_dev_line}
+{mean_line}
+{min_line}
+{breach_line}
+- **Joint coverage:** {stats.joint_coverage}/900 seconds ({stats.joint_coverage_pct:.1f}%)
+- **Pyth gaps:** {stats.pyth_gaps} seconds with no aggregate data
+- **Benchmark gaps:** {stats.bench_gaps} seconds with no CLK26 data
+- **Pyth channel used:** {channel}
+
+## Charts
+
+![Price overlay]({OUTPUT_PREFIX}_price_overlay.png)
+
+![Deviation curve]({OUTPUT_PREFIX}_deviation.png)
+
+## Narrative
+
+_To be filled in after inspecting the charts._
+
+## Caveats
+
+- Deviation metrics are only computed on seconds where both Pyth and CLK26 had data. Gaps on either side are retained in the CSV but excluded from the breach count.
+- WTIK6 is a futures contract; liquidity around 00:45–01:00 UTC may be thin, which can show up as benchmark gaps or widened spreads.
+- The ±{THRESHOLD_PCT:g}% threshold applies to the absolute per-second deviation of the Pyth aggregate from the CLK26 mid (or trade when available).
+"""
+    out_path.write_text(body)
+    return out_path
+
+
 def main() -> None:
     print(
         f"WTIK6 deviation check — feed {FEED_ID}, window {WINDOW_START} .. {WINDOW_END}"
@@ -338,6 +473,15 @@ def main() -> None:
 
     dev_path = plot_deviation(merged, symbol)
     print(f"Wrote {dev_path}")
+
+    stats = compute_stats(merged)
+    report_path = write_report(stats, symbol, channel)
+    print(f"Wrote {report_path}")
+    print(
+        f"Verdict: max_abs_dev={stats.max_abs_dev_pct:.4f}%, "
+        f"breaches={stats.breach_count}, "
+        f"joint_coverage={stats.joint_coverage}/900"
+    )
 
 
 if __name__ == "__main__":
