@@ -36,6 +36,22 @@ OUTPUT_PREFIX = "2694_wtik6_20260406_0045-0100"
 # --- Entry point -------------------------------------------------------------
 
 
+def resolve_divisor(lazer_client) -> tuple[str, int, float]:
+    """Return (symbol, exponent, divisor) for FEED_ID.
+
+    `divisor = 10 ** abs(exponent)` — matches the convention in
+    lib/benchmark_core.py where prices are stored as scaled integers.
+    """
+    symbol, exponent = get_feed_metadata(lazer_client, FEED_ID)
+    if symbol is None or exponent is None:
+        raise RuntimeError(
+            f"Feed metadata not found for feed_id={FEED_ID}. "
+            "Verify the feed exists in feeds_metadata_latest."
+        )
+    divisor = 10 ** abs(exponent)
+    return symbol, exponent, divisor
+
+
 def main() -> None:
     print(
         f"WTIK6 deviation check — feed {FEED_ID}, window {WINDOW_START} .. {WINDOW_END}"
@@ -43,8 +59,10 @@ def main() -> None:
     config = load_config()
     lazer = get_lazer_client(config)
     analytics = get_analytics_client(config)
-    print("Connected to lazer + analytics clickhouse.")
-    # Further wiring added in Task 10.
+
+    symbol, exponent, divisor = resolve_divisor(lazer)
+    print(f"Feed metadata: symbol={symbol}, exponent={exponent}, divisor={divisor}")
+    # Further wiring added in later tasks.
 
 
 if __name__ == "__main__":
