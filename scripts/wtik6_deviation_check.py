@@ -52,6 +52,37 @@ def resolve_divisor(lazer_client) -> tuple[str, int, float]:
     return symbol, exponent, divisor
 
 
+def query_pyth_aggregate(lazer_client, divisor: float) -> tuple[pd.DataFrame, int]:
+    """Query per-second Pyth aggregate price, trying channels 1 → 2 → 3.
+
+    Returns (df, channel_used). df has columns [ts, agg_price, n_pyth_updates]
+    with ts as UTC-aware datetime. Returns (empty df, -1) if all channels empty.
+    """
+    for channel in (1, 2, 3):
+        query = f"""
+            SELECT
+                toStartOfSecond(publish_time) AS ts,
+                avg(price) / {divisor} AS agg_price,
+                count() AS n_pyth_updates
+            FROM price_feeds
+            WHERE price_feed_id = {FEED_ID}
+              AND publish_time >= '{WINDOW_START}'
+              AND publish_time <  '{WINDOW_END}'
+              AND price IS NOT NULL
+              AND channel = {channel}
+            GROUP BY ts
+            ORDER BY ts
+        """
+        result = lazer_client.query(query)
+        if result.result_rows:
+            df = pd.DataFrame(
+                result.result_rows, columns=["ts", "agg_price", "n_pyth_updates"]
+            )
+            df["ts"] = pd.to_datetime(df["ts"], utc=True)
+            return df, channel
+    return pd.DataFrame(columns=["ts", "agg_price", "n_pyth_updates"]), -1
+
+
 def main() -> None:
     print(
         f"WTIK6 deviation check — feed {FEED_ID}, window {WINDOW_START} .. {WINDOW_END}"
@@ -62,7 +93,15 @@ def main() -> None:
 
     symbol, exponent, divisor = resolve_divisor(lazer)
     print(f"Feed metadata: symbol={symbol}, exponent={exponent}, divisor={divisor}")
-    # Further wiring added in later tasks.
+
+    pyth_df, channel = query_pyth_aggregate(lazer, divisor)
+    print(f"Pyth aggregate: {len(pyth_df)} rows, channel={channel}")
+    if not pyth_df.empty:
+        print(f"  first ts={pyth_df['ts'].iloc[0]}, last ts={pyth_df['ts'].iloc[-1]}")
+        print(
+            f"  price range: {pyth_df['agg_price'].min():.4f} .. "
+            f"{pyth_df['agg_price'].max():.4f}"
+        )
 
 
 if __name__ == "__main__":
