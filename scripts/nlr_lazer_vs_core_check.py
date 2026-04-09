@@ -225,6 +225,42 @@ def write_csv(merged: pd.DataFrame) -> Path:
     return out_path
 
 
+def plot_price_overlay(merged: pd.DataFrame) -> Path:
+    """Render Chart 1 — Hermes vs Lazer price overlay across the hour."""
+    out_path = OUTPUT_DIR / f"{OUTPUT_PREFIX}_price_overlay.png"
+
+    fig, ax = plt.subplots(figsize=(11, 5.5))
+    ax.plot(
+        merged.index,
+        merged["hermes_price"],
+        color="tab:blue",
+        linewidth=1.4,
+        label="Pyth Core (Hermes)",
+    )
+    ax.plot(
+        merged.index,
+        merged["lazer_price"],
+        color="tab:orange",
+        linewidth=1.4,
+        label="Pyth Lazer (Pro)",
+    )
+    ax.set_title(
+        f"NLR.PRE (Lazer feed {LAZER_FEED_ID}): Pyth Core vs Pyth Lazer — "
+        f"2026-04-08 08:00–09:00 UTC"
+    )
+    ax.set_ylabel("Price (USD)")
+    ax.set_xlabel("Time (UTC)")
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M:%S"))
+    ax.xaxis.set_major_locator(mdates.MinuteLocator(interval=10))
+    fig.autofmt_xdate()
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc="upper right")
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    return out_path
+
+
 # --- Entry point -------------------------------------------------------------
 
 
@@ -249,6 +285,10 @@ def main() -> None:
     print("Writing CSV ...")
     csv_path = write_csv(merged)
     print(f"  -> {csv_path}")
+
+    print("Writing Chart 1 — price overlay ...")
+    overlay_path = plot_price_overlay(merged)
+    print(f"  -> {overlay_path}")
 
 
 if __name__ == "__main__":
