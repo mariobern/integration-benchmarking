@@ -305,6 +305,55 @@ def plot_deviation(merged: pd.DataFrame, summary: dict) -> Path:
     return out_path
 
 
+def plot_lazer_diagnostic(merged: pd.DataFrame) -> Path:
+    """Render Chart 3 — Lazer bid/ask band with Core price overlaid.
+
+    The visual proof: Hermes price sits *outside* Lazer's own quoted
+    range for the entire window.
+    """
+    out_path = OUTPUT_DIR / f"{OUTPUT_PREFIX}_lazer_diagnostic.png"
+
+    fig, ax = plt.subplots(figsize=(11, 5.5))
+    ax.fill_between(
+        merged.index,
+        merged["lazer_bid"],
+        merged["lazer_ask"],
+        color="tab:orange",
+        alpha=0.18,
+        label="Lazer bid/ask range",
+    )
+    ax.plot(
+        merged.index,
+        merged["lazer_price"],
+        color="tab:orange",
+        linewidth=1.4,
+        label="Lazer price",
+    )
+    ax.plot(
+        merged.index,
+        merged["hermes_price"],
+        color="tab:blue",
+        linewidth=1.4,
+        label="Core price (Hermes)",
+    )
+
+    ax.set_title(
+        f"NLR.PRE (Lazer feed {LAZER_FEED_ID}) Lazer bid/ask vs Core price — "
+        f"2026-04-08 08:00–09:00 UTC"
+    )
+    ax.set_ylabel("Price (USD)")
+    ax.set_xlabel("Time (UTC)")
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M:%S"))
+    ax.xaxis.set_major_locator(mdates.MinuteLocator(interval=10))
+    fig.autofmt_xdate()
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc="upper right")
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    return out_path
+
+
 # --- Entry point -------------------------------------------------------------
 
 
@@ -337,6 +386,10 @@ def main() -> None:
     print("Writing Chart 2 — deviation curve ...")
     deviation_path = plot_deviation(merged, summary)
     print(f"  -> {deviation_path}")
+
+    print("Writing Chart 3 — Lazer self-diagnostic ...")
+    diagnostic_path = plot_lazer_diagnostic(merged)
+    print(f"  -> {diagnostic_path}")
 
 
 if __name__ == "__main__":
