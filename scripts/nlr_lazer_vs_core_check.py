@@ -191,6 +191,7 @@ def compute_summary(merged: pd.DataFrame) -> dict:
         "mean_hermes_conf_usd": float(merged["hermes_conf"].mean()),
         "hermes_price_min": float(merged["hermes_price"].min()),
         "hermes_price_max": float(merged["hermes_price"].max()),
+        # Denominator excludes row 0, whose lazer_price_step is NaN from .diff().
         "stuck_seconds_pct": float(
             merged["lazer_stuck"].sum() / (len(merged) - 1) * 100
         ),
@@ -310,8 +311,11 @@ def plot_deviation(merged: pd.DataFrame, summary: dict) -> Path:
 def plot_lazer_diagnostic(merged: pd.DataFrame) -> Path:
     """Render Chart 3 — Lazer bid/ask band with Core price overlaid.
 
-    The visual proof: Hermes price sits *outside* Lazer's own quoted
-    range for the entire window.
+    Lazer's published band is so wide (~$20) that Core sits *inside* it
+    for ~95% of the hour — i.e. Lazer was effectively saying "I don't
+    know, it's somewhere in this huge range," not "Core is out of
+    bounds." The chart makes both the stuck-at-$130 price line and the
+    absurdly wide quoted range visually obvious.
     """
     out_path = OUTPUT_DIR / f"{OUTPUT_PREFIX}_lazer_diagnostic.png"
 

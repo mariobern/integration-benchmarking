@@ -151,7 +151,10 @@ Fixed four-section structure (mirrors the wtik6 report):
 2. **Summary stats** — a markdown table with every value from the
    `summary stats` dict above. Include the timestamp of `max_abs_dev_pct`.
 3. **Narrative** — 2–4 sentences that call out:
-   - Hermes price sits _outside_ Lazer's own bid/ask band for the full hour.
+   - Lazer's published price sits ~$8 below Core throughout the window,
+     even though Lazer's own bid/ask band (~$20 wide) is loose enough
+     that Core still falls inside it ~95% of the hour — the band's
+     width is the story, not whether Core breached it.
    - Lazer's confidence was pinned at the maximum (~$10.00), i.e. Lazer
      itself was already advertising "I do not know this price".
    - The `stuck_seconds_pct` measure (expected ~100%) showing Lazer
