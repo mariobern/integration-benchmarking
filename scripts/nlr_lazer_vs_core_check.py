@@ -124,23 +124,131 @@ def load_lazer() -> pd.DataFrame:
     return out.set_index("ts")
 
 
+# --- Merge + derive ----------------------------------------------------------
+
+
+def build_merged(hermes: pd.DataFrame, lazer: pd.DataFrame) -> pd.DataFrame:
+    """Inner-join Hermes and Lazer on second-resolution timestamp.
+
+    Asserts both inputs already align with the expected 3601-second
+    [WINDOW_START, WINDOW_END] inclusive index. Returns a frame with
+    columns:
+        hermes_price, hermes_conf,
+        lazer_price, lazer_conf, lazer_bid, lazer_ask,
+        deviation_abs, deviation_pct,
+        lazer_spread, lazer_price_step, lazer_stuck
+    """
+    full_index = pd.date_range(
+        start=WINDOW_START,
+        end=WINDOW_END,
+        freq="1s",
+        tz="UTC",
+        inclusive="both",
+    )
+    if len(full_index) != EXPECTED_ROWS:
+        raise RuntimeError(
+            f"Expected {EXPECTED_ROWS} index rows, got {len(full_index)}"
+        )
+    if not hermes.index.equals(full_index):
+        raise RuntimeError(
+            "Hermes timestamps do not align with the expected per-second index"
+        )
+    if not lazer.index.equals(full_index):
+        raise RuntimeError(
+            "Lazer timestamps do not align with the expected per-second index"
+        )
+
+    merged = hermes.join(lazer, how="inner")
+    if len(merged) != EXPECTED_ROWS:
+        raise RuntimeError(
+            f"Merged frame has {len(merged)} rows, expected {EXPECTED_ROWS}"
+        )
+
+    merged["deviation_abs"] = merged["lazer_price"] - merged["hermes_price"]
+    merged["deviation_pct"] = (
+        (merged["lazer_price"] - merged["hermes_price"]) / merged["hermes_price"] * 100
+    )
+    merged["lazer_spread"] = merged["lazer_ask"] - merged["lazer_bid"]
+    merged["lazer_price_step"] = merged["lazer_price"].diff().abs()
+    merged["lazer_stuck"] = merged["lazer_price_step"] < STUCKNESS_THRESHOLD_USD
+    return merged
+
+
+def compute_summary(merged: pd.DataFrame) -> dict:
+    """Compute the report summary stats from the merged frame."""
+    abs_dev_pct = merged["deviation_pct"].abs()
+    abs_dev_usd = merged["deviation_abs"].abs()
+    return {
+        "max_abs_dev_pct": float(abs_dev_pct.max()),
+        "min_abs_dev_pct": float(abs_dev_pct.min()),
+        "mean_abs_dev_pct": float(abs_dev_pct.mean()),
+        "max_abs_dev_usd": float(abs_dev_usd.max()),
+        "min_abs_dev_usd": float(abs_dev_usd.min()),
+        "mean_abs_dev_usd": float(abs_dev_usd.mean()),
+        "max_dev_pct_ts": abs_dev_pct.idxmax(),
+        "mean_lazer_spread_usd": float(merged["lazer_spread"].mean()),
+        "mean_lazer_conf_usd": float(merged["lazer_conf"].mean()),
+        "mean_hermes_conf_usd": float(merged["hermes_conf"].mean()),
+        "stuck_seconds_pct": float(
+            merged["lazer_stuck"].sum() / (len(merged) - 1) * 100
+        ),
+        "hermes_price_first": float(merged["hermes_price"].iloc[0]),
+        "hermes_price_last": float(merged["hermes_price"].iloc[-1]),
+        "lazer_price_first": float(merged["lazer_price"].iloc[0]),
+        "lazer_price_last": float(merged["lazer_price"].iloc[-1]),
+        "mean_deviation_pct": float(merged["deviation_pct"].mean()),
+        "mean_deviation_usd": float(merged["deviation_abs"].mean()),
+    }
+
+
+# --- Outputs -----------------------------------------------------------------
+
+
+def write_csv(merged: pd.DataFrame) -> Path:
+    """Write the per-second comparison table under OUTPUT_DIR."""
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = OUTPUT_DIR / f"{OUTPUT_PREFIX}.csv"
+    columns = [
+        "hermes_price",
+        "hermes_conf",
+        "lazer_price",
+        "lazer_conf",
+        "lazer_bid",
+        "lazer_ask",
+        "deviation_abs",
+        "deviation_pct",
+        "lazer_spread",
+        "lazer_price_step",
+        "lazer_stuck",
+    ]
+    merged[columns].to_csv(out_path, index_label="ts", float_format="%.6f")
+    return out_path
+
+
 # --- Entry point -------------------------------------------------------------
 
 
 def main() -> None:
     print(f"Loading {HERMES_CSV} ...")
     hermes = load_hermes()
-    print(f"  -> {len(hermes)} rows, columns={list(hermes.columns)}")
-    print(f"  first ts: {hermes.index[0]}, last ts: {hermes.index[-1]}")
-    print(f"  first hermes_price: {hermes['hermes_price'].iloc[0]:.4f}")
-    print(f"  last hermes_price:  {hermes['hermes_price'].iloc[-1]:.4f}")
+    print(f"  -> {len(hermes)} rows")
 
     print(f"Loading {LAZER_CSV} ...")
     lazer = load_lazer()
-    print(f"  -> {len(lazer)} rows, columns={list(lazer.columns)}")
-    print(f"  first ts: {lazer.index[0]}, last ts: {lazer.index[-1]}")
-    print(f"  first lazer_price: {lazer['lazer_price'].iloc[0]:.4f}")
-    print(f"  last lazer_price:  {lazer['lazer_price'].iloc[-1]:.4f}")
+    print(f"  -> {len(lazer)} rows")
+
+    print("Merging frames ...")
+    merged = build_merged(hermes, lazer)
+    print(f"  -> {len(merged)} rows, columns={list(merged.columns)}")
+
+    print("Computing summary ...")
+    summary = compute_summary(merged)
+    for k, v in summary.items():
+        print(f"  {k}: {v}")
+
+    print("Writing CSV ...")
+    csv_path = write_csv(merged)
+    print(f"  -> {csv_path}")
 
 
 if __name__ == "__main__":
