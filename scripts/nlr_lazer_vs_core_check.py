@@ -261,6 +261,50 @@ def plot_price_overlay(merged: pd.DataFrame) -> Path:
     return out_path
 
 
+def plot_deviation(merged: pd.DataFrame, summary: dict) -> Path:
+    """Render Chart 2 — signed Lazer−Core deviation_pct with mean line.
+
+    No ±X% threshold lines — this report is descriptive, not pass/fail.
+    """
+    out_path = OUTPUT_DIR / f"{OUTPUT_PREFIX}_deviation.png"
+
+    fig, ax = plt.subplots(figsize=(11, 5.0))
+    dev = merged["deviation_pct"]
+    mean_dev = summary["mean_deviation_pct"]
+
+    ax.plot(
+        merged.index,
+        dev,
+        color="tab:blue",
+        linewidth=1.2,
+        label="Lazer − Core (%)",
+    )
+    ax.axhline(0.0, color="black", linewidth=0.8)
+    ax.axhline(
+        mean_dev,
+        color="tab:red",
+        linewidth=0.9,
+        linestyle="--",
+        label=f"mean = {mean_dev:.2f}%",
+    )
+
+    ax.set_title(
+        f"NLR.PRE (Lazer feed {LAZER_FEED_ID}) Lazer − Core deviation — "
+        f"2026-04-08 08:00–09:00 UTC"
+    )
+    ax.set_ylabel("Deviation (%)")
+    ax.set_xlabel("Time (UTC)")
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M:%S"))
+    ax.xaxis.set_major_locator(mdates.MinuteLocator(interval=10))
+    fig.autofmt_xdate()
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc="upper right")
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    return out_path
+
+
 # --- Entry point -------------------------------------------------------------
 
 
@@ -289,6 +333,10 @@ def main() -> None:
     print("Writing Chart 1 — price overlay ...")
     overlay_path = plot_price_overlay(merged)
     print(f"  -> {overlay_path}")
+
+    print("Writing Chart 2 — deviation curve ...")
+    deviation_path = plot_deviation(merged, summary)
+    print(f"  -> {deviation_path}")
 
 
 if __name__ == "__main__":
