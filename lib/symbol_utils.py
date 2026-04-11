@@ -37,3 +37,15 @@ def is_futures_symbol(symbol: str) -> bool:
 def is_us_equity(feed: dict) -> bool:
     """Check if a feed is a US equity by symbol prefix."""
     return feed.get("symbol", "").startswith("Equity.US.")
+
+
+def futures_root(symbol: str) -> str:
+    """Return the root ticker of a futures symbol, or '' if not a future.
+
+    Commodities.WTIK6/USD -> 'WTI'; Equity.US.EMH6/USD -> 'EM'.
+    """
+    if not is_futures_symbol(symbol):
+        return ""
+    base = symbol.split("/")[0] if "/" in symbol else symbol
+    ticker = base.split(".")[-1]
+    return ticker[:-2]
