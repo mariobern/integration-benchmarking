@@ -60,12 +60,12 @@ When `--output` is provided, format is determined by file extension (`--format` 
 | Rule | Name                        | Description                                                                      |
 | ---- | --------------------------- | -------------------------------------------------------------------------------- |
 | W001 | Missing extended sessions   | STABLE US equity missing expected sessions (PRE_MARKET, POST_MARKET, OVER_NIGHT) |
-| W002 | Wrong timezone              | US equity using a timezone other than `America/New_York`                         |
-| W003 | Schedule deviation          | Feed's schedule differs from the majority in its asset class                     |
+| W002 | Wrong timezone              | US equity using a timezone other than `America/New_York`                         | E
+| W003 | Schedule deviation          | Feed's schedule differs from the majority in its asset class                     | E
 | W004 | COMING_SOON no publishers   | COMING_SOON feed with no publishers assigned                                     |
 | W005 | Low headroom                | `minPublishers` is only 1 less than publisher count                              |
-| W006 | Duplicate publisher in feed | Same `publisherId` appears more than once in a feed's list                       |
-| W007 | TEST publisher in STABLE    | STABLE feed references a publisher with `keyType: "TEST"`                        |
+| W006 | Duplicate publisher in feed | Same `publisherId` appears more than once in a feed's list                       | E
+| W007 | TEST publisher in STABLE    | STABLE feed references a publisher with `keyType: "TEST"`                        | E
 
 ### Scope
 

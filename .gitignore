@@ -16,6 +16,7 @@ env/
 *.csv
 !price_id_list.csv
 quick_benchmark_results.csv
+backups/pre-perf-optimization
 
 # Benchmark availability - track summary but ignore daily instrument lists
 !benchmark_availability/SUMMARY.md
