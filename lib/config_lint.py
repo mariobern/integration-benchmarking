@@ -8,9 +8,10 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Optional
 
-from lib.symbol_utils import is_futures_symbol, is_us_equity
+from lib.symbol_utils import futures_root, is_futures_symbol, is_us_equity
 
 
 @dataclass
@@ -124,6 +125,11 @@ def check_publishers(feeds: list[dict], publishers: list[dict]) -> list[LintFind
     findings: list[LintFinding] = []
     valid_pub_ids = {p["publisherId"] for p in publishers}
     test_pub_ids = {p["publisherId"] for p in publishers if p.get("keyType") == "TEST"}
+    name_test_pub_ids = {
+        p["publisherId"]
+        for p in publishers
+        if p.get("name", "").lower().endswith(".test")
+    }
 
     for feed in feeds:
         fid = feed.get("feedId")
@@ -226,6 +232,22 @@ def check_publishers(feeds: list[dict], publishers: list[dict]) -> list[LintFind
                         rule_id="W007",
                         severity="WARNING",
                         message=f"STABLE feed references TEST publishers: {sorted(test_refs)}",
+                        feed_id=fid,
+                        symbol=sym,
+                    )
+                )
+
+            # E009: STABLE referencing .Test-named publishers
+            name_test_refs = set(pub_ids) & name_test_pub_ids
+            if name_test_refs:
+                findings.append(
+                    LintFinding(
+                        rule_id="E009",
+                        severity="ERROR",
+                        message=(
+                            f"STABLE feed references .Test-suffixed publishers:"
+                            f" {sorted(name_test_refs)}"
+                        ),
                         feed_id=fid,
                         symbol=sym,
                     )
@@ -342,11 +364,14 @@ def _extract_timezone(schedule_str: str) -> str:
 
 
 def check_schedules(feeds: list[dict]) -> list[LintFinding]:
-    """E006, W001, W002, W003: schedule validation rules."""
+    """E006, E010, E011, W001, W002, W003: schedule validation rules."""
     findings: list[LintFinding] = []
 
     # Collect schedule signatures per asset_type for W003 majority detection
     asset_type_schedules: dict[str, list[tuple[int, str, tuple, bool]]] = {}
+
+    # Collect signatures per E011 group: (asset_type,) or (asset_type, futures_root)
+    group_signatures: dict[tuple, list[tuple[int, str, tuple]]] = {}
 
     for feed in feeds:
         fid = feed.get("feedId")
@@ -358,11 +383,45 @@ def check_schedules(feeds: list[dict]) -> list[LintFinding]:
         if state == "INACTIVE":
             continue
 
-        sessions = {s.get("session", "") for s in schedules}
+        sessions = [s.get("session", "") for s in schedules]
+
+        # E010: duplicate session within a single feed
+        session_counts = Counter(sessions)
+        dup_sessions = sorted({s for s, c in session_counts.items() if c > 1 and s})
+        if dup_sessions:
+            findings.append(
+                LintFinding(
+                    rule_id="E010",
+                    severity="ERROR",
+                    message=(
+                        f"duplicate session(s) in marketSchedules: {dup_sessions}"
+                    ),
+                    feed_id=fid,
+                    symbol=sym,
+                )
+            )
+
+        # E010: identical (session, marketSchedule) tuple repeated
+        sched_tuples = [
+            (s.get("session", ""), s.get("marketSchedule", "")) for s in schedules
+        ]
+        tuple_counts = Counter(sched_tuples)
+        if any(c > 1 for c in tuple_counts.values()):
+            findings.append(
+                LintFinding(
+                    rule_id="E010",
+                    severity="ERROR",
+                    message="duplicate verbatim marketSchedules entry",
+                    feed_id=fid,
+                    symbol=sym,
+                )
+            )
+
+        sessions_set = set(sessions)
 
         # E006: non-equity with extended sessions
         if asset_type != "equity":
-            extended = sessions & _EXTENDED_SESSIONS
+            extended = sessions_set & _EXTENDED_SESSIONS
             if extended:
                 findings.append(
                     LintFinding(
@@ -374,11 +433,19 @@ def check_schedules(feeds: list[dict]) -> list[LintFinding]:
                     )
                 )
 
+        # E011: collect signature per (asset_type,) or (asset_type, futures_root)
+        sig_for_group = _get_schedule_signature(schedules)
+        if is_futures_symbol(sym):
+            group_key: tuple = (asset_type, futures_root(sym))
+        else:
+            group_key = (asset_type,)
+        group_signatures.setdefault(group_key, []).append((fid, sym, sig_for_group))
+
         # STABLE-only schedule rules
         if state == "STABLE":
             # W001: US equity missing extended sessions
             if is_us_equity(feed):
-                missing = _US_EQUITY_EXPECTED_SESSIONS - sessions
+                missing = _US_EQUITY_EXPECTED_SESSIONS - sessions_set
                 if missing:
                     findings.append(
                         LintFinding(
@@ -440,18 +507,156 @@ def check_schedules(feeds: list[dict]) -> list[LintFinding]:
                     )
                 )
 
+    # E011: strict schedule inconsistency across asset groups
+    for group_key, feed_sigs in group_signatures.items():
+        if len(feed_sigs) < 2:
+            continue
+        distinct_sigs = {sig for _, _, sig in feed_sigs}
+        if len(distinct_sigs) < 2:
+            continue
+
+        sig_counter: Counter[tuple] = Counter(sig for _, _, sig in feed_sigs)
+        reference_sig = sig_counter.most_common(1)[0][0]
+        group_label = ", ".join(str(k) for k in group_key)
+
+        for fid, sym, sig in feed_sigs:
+            if sig != reference_sig:
+                findings.append(
+                    LintFinding(
+                        rule_id="E011",
+                        severity="ERROR",
+                        message=(
+                            f"schedule disagrees with other feeds in group"
+                            f" ({group_label}): {len(distinct_sigs)} distinct"
+                            f" schedules across {len(feed_sigs)} feeds"
+                        ),
+                        feed_id=fid,
+                        symbol=sym,
+                    )
+                )
+
     return findings
 
 
-def lint_config(config: dict) -> list[LintFinding]:
+def check_hermes_ids(feeds: list[dict]) -> list[LintFinding]:
+    """E012: duplicate metadata.hermes_id across non-INACTIVE feeds."""
+    findings: list[LintFinding] = []
+    by_hermes: dict[str, list[dict]] = {}
+
+    for feed in feeds:
+        if feed.get("state", "") == "INACTIVE":
+            continue
+        hermes_id = feed.get("metadata", {}).get("hermes_id", "")
+        if not hermes_id:
+            continue
+        by_hermes.setdefault(hermes_id, []).append(feed)
+
+    for hermes_id, group in by_hermes.items():
+        if len(group) < 2:
+            continue
+        first = group[0]
+        feed_ids = [f.get("feedId") for f in group]
+        findings.append(
+            LintFinding(
+                rule_id="E012",
+                severity="ERROR",
+                message=(
+                    f"hermes_id '{hermes_id}' duplicated across feedIds:"
+                    f" {', '.join(str(fid) for fid in feed_ids)}"
+                ),
+                feed_id=first.get("feedId"),
+                symbol=first.get("symbol"),
+            )
+        )
+
+    return findings
+
+
+def _parse_iso(value: str) -> Optional[datetime]:
+    """Parse an ISO-8601 string (with trailing Z and up to 9 fractional digits)."""
+    if not value:
+        return None
+    s = value.replace("Z", "+00:00")
+    # datetime.fromisoformat accepts up to 6 fractional-second digits.
+    # Trim nanoseconds to microseconds if present.
+    if "." in s:
+        head, sep, tail = s.partition(".")
+        # split off timezone offset from tail
+        if "+" in tail:
+            frac, tzsep, tz = tail.partition("+")
+            tz = tzsep + tz
+        elif "-" in tail:
+            frac, tzsep, tz = tail.partition("-")
+            tz = tzsep + tz
+        else:
+            frac, tz = tail, ""
+        frac = frac[:6]
+        s = f"{head}{sep}{frac}{tz}"
+    try:
+        return datetime.fromisoformat(s)
+    except ValueError:
+        return None
+
+
+def check_expired_coming_soon_futures(
+    feeds: list[dict], now: datetime
+) -> list[LintFinding]:
+    """E013: COMING_SOON futures whose every validTo is in the past."""
+    findings: list[LintFinding] = []
+
+    for feed in feeds:
+        if feed.get("state", "") != "COMING_SOON":
+            continue
+        sym = feed.get("symbol", "")
+        if not is_futures_symbol(sym):
+            continue
+
+        valid_tos: list[datetime] = []
+        for sched in feed.get("marketSchedules", []):
+            bm = sched.get("benchmarkMapping", {}) or {}
+            for vendor_obj in bm.values():
+                if not isinstance(vendor_obj, dict):
+                    continue
+                for idf in vendor_obj.get("identifiers", []) or []:
+                    vt = idf.get("validTo")
+                    parsed = _parse_iso(vt) if vt else None
+                    if parsed is not None:
+                        valid_tos.append(parsed)
+
+        if not valid_tos:
+            continue
+
+        if all(vt < now for vt in valid_tos):
+            latest = max(valid_tos)
+            findings.append(
+                LintFinding(
+                    rule_id="E013",
+                    severity="ERROR",
+                    message=(
+                        f"COMING_SOON futures feed has expired"
+                        f" (latest validTo: {latest.isoformat()});"
+                        f" change state to INACTIVE"
+                    ),
+                    feed_id=feed.get("feedId"),
+                    symbol=sym,
+                )
+            )
+
+    return findings
+
+
+def lint_config(config: dict, now: Optional[datetime] = None) -> list[LintFinding]:
     """Orchestrator. Takes the full parsed after.json root object."""
     feeds = config.get("feeds", [])
     publishers = config.get("publishers", [])
+    now = now or datetime.now(timezone.utc)
 
     findings: list[LintFinding] = []
     findings.extend(check_duplicates(feeds))
     findings.extend(check_schema(feeds))
     findings.extend(check_publishers(feeds, publishers))
     findings.extend(check_schedules(feeds))
+    findings.extend(check_hermes_ids(feeds))
+    findings.extend(check_expired_coming_soon_futures(feeds, now))
 
     return findings
