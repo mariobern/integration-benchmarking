@@ -51,18 +51,22 @@ python3 config_linter.py --config after.json --warnings-as-errors
 | E011 | Schedule inconsistency within asset group                                           | non-INACTIVE, grouped by `asset_type` (+ futures root) |
 | E012 | Duplicate `metadata.hermes_id`                                                      | non-INACTIVE                                           |
 | E013 | COMING_SOON futures past every `validTo`                                            | COMING_SOON futures only                               |
+| E014 | STABLE benchmarkable feed missing `benchmarkMapping`                                | STABLE, benchmarkable asset types, non-OVERNIGHT       |
+| E015 | `corporateActions` schema violation (missing fields, invalid formats)               | any feed with `corporateActions`                       |
+| E016 | Identifier date range overlap within same vendor/session                            | non-INACTIVE, 2+ identifiers per vendor                |
 
 ## Warnings
 
-| ID   | Rule                                                                          | Scope               |
-| ---- | ----------------------------------------------------------------------------- | ------------------- |
-| W001 | US equity missing extended sessions (`PRE_MARKET`/`POST_MARKET`/`OVER_NIGHT`) | STABLE US equities  |
-| W002 | US equity using a non-`America/New_York` timezone                             | STABLE US equities  |
-| W003 | Schedule deviates from the asset-class majority                               | STABLE, non-futures |
-| W004 | COMING_SOON feed with no publishers                                           | COMING_SOON         |
-| W005 | `minPublishers` leaves only 1 headroom publisher                              | STABLE, non-exempt  |
-| W006 | Duplicate `publisherId` in feed                                               | non-INACTIVE        |
-| W007 | STABLE feed references a `TEST` key-type publisher                            | STABLE              |
+| ID   | Rule                                                                          | Scope                            |
+| ---- | ----------------------------------------------------------------------------- | -------------------------------- |
+| W001 | US equity missing extended sessions (`PRE_MARKET`/`POST_MARKET`/`OVER_NIGHT`) | STABLE US equities               |
+| W002 | US equity using a non-`America/New_York` timezone                             | STABLE US equities               |
+| W003 | Schedule deviates from the asset-class majority                               | STABLE, non-futures              |
+| W004 | COMING_SOON feed with no publishers                                           | COMING_SOON                      |
+| W005 | `minPublishers` leaves only 1 headroom publisher                              | STABLE, non-exempt               |
+| W006 | Duplicate `publisherId` in feed                                               | non-INACTIVE                     |
+| W007 | STABLE feed references a `TEST` key-type publisher                            | STABLE                           |
+| W009 | Unknown `corporateActions` event type (schema not validated)                  | any feed with `corporateActions` |
 
 ### E011 vs W003
 
@@ -89,6 +93,30 @@ These exemptions apply only to the publisher-count headroom rules, not to any ot
 ## Notes on E013 (Expired COMING_SOON Futures)
 
 A COMING_SOON futures feed is considered expired if **every** `validTo` timestamp found under `marketSchedules[*].benchmarkMapping.*.identifiers[*].validTo` is earlier than the current UTC time. Feeds with no `validTo` identifiers are skipped — E013 only fires when there is evidence that every mapped contract has already rolled off. The fix is usually to flip the feed to `INACTIVE`.
+
+## Notes on E014 (Benchmark Mapping)
+
+Benchmarkable asset types are: `equity`, `fx`, `metal`, `commodity`, `rates`. All other asset types are skipped. The `OVER_NIGHT` session is always exempt since it uses publisher 32 peer comparison rather than Datascope benchmarks.
+
+## Notes on E015 / W009 (Corporate Actions)
+
+E015 validates the full schema for known event types. Currently the only known type is `SPLIT`. When a new event type is added to `after.json` before the linter is updated, W009 fires as a warning instead of E015, allowing the config change to pass CI while signaling the linter needs updating.
+
+To add support for a new event type, add an entry to `_CORPORATE_ACTION_SCHEMAS` in `lib/config_lint.py` and add the event type string to `_KNOWN_EVENT_TYPES`.
+
+### SPLIT schema
+
+| Field                         | Location                           | Format                  |
+| ----------------------------- | ---------------------------------- | ----------------------- |
+| `adjustmentFactorNumerator`   | top-level                          | positive integer string |
+| `adjustmentFactorDenominator` | top-level                          | positive integer string |
+| `rejectionThresholdBips`      | top-level                          | positive integer string |
+| `rejectionWindow`             | top-level                          | `N.Ns` duration string  |
+| `exDate`                      | `activation.usEquityExDate.exDate` | `YYYY-MM-DD` date       |
+
+## Notes on E016 (Identifier Continuity)
+
+Checks for date range overlaps when a vendor has multiple identifiers in a single session (e.g., futures contract rolls). Identifiers are sorted by `validFrom` and consecutive pairs are checked. A non-last identifier missing `validTo` is flagged because it creates an unbounded range that logically conflicts with its successor. The last identifier in the chain may omit `validTo` (open-ended current contract).
 
 ## Output Formats
 
