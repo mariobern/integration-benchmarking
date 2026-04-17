@@ -105,6 +105,8 @@ def check_schema(feeds: list[dict]) -> list[LintFinding]:
     return findings
 
 
+_BENCHMARKABLE_ASSET_TYPES = frozenset({"equity", "fx", "metal", "commodity", "rates"})
+
 # Asset types exempt from E004/W005 (single-source feeds)
 _EXEMPT_ASSET_TYPES = frozenset(
     {
@@ -568,6 +570,39 @@ def check_hermes_ids(feeds: list[dict]) -> list[LintFinding]:
                 symbol=first.get("symbol"),
             )
         )
+
+    return findings
+
+
+def check_benchmark_mapping(feeds: list[dict]) -> list[LintFinding]:
+    """E014: STABLE benchmarkable feed missing benchmarkMapping on non-OVERNIGHT session."""
+    findings: list[LintFinding] = []
+
+    for feed in feeds:
+        if feed.get("state") != "STABLE":
+            continue
+        asset_type = feed.get("metadata", {}).get("asset_type", "")
+        if asset_type not in _BENCHMARKABLE_ASSET_TYPES:
+            continue
+
+        fid = feed.get("feedId")
+        sym = feed.get("symbol", "")
+
+        for schedule in feed.get("marketSchedules", []):
+            session_name = schedule.get("session", "")
+            if session_name == "OVER_NIGHT":
+                continue
+            bm = schedule.get("benchmarkMapping")
+            if not bm:
+                findings.append(
+                    LintFinding(
+                        rule_id="E014",
+                        severity="ERROR",
+                        message=f"{session_name} session missing benchmarkMapping",
+                        feed_id=fid,
+                        symbol=sym,
+                    )
+                )
 
     return findings
 

@@ -9,6 +9,7 @@ from lib.config_lint import (
     check_schedules,
     check_hermes_ids,
     check_expired_coming_soon_futures,
+    check_benchmark_mapping,
 )
 
 
@@ -457,6 +458,146 @@ def _us_equity_all_sessions():
             "minPublishers": 1,
         },
     ]
+
+
+def _schedule_with_bm(session="REGULAR"):
+    """Return a schedule entry with a benchmarkMapping."""
+    return {
+        "marketSchedule": "America/New_York;0930-1600;",
+        "session": session,
+        "benchmarkMapping": {
+            "datascope_ric": {
+                "identifiers": [
+                    {
+                        "identifier": "AAPL.O",
+                        "validFrom": "1970-01-01T00:00:00.000000000Z",
+                    }
+                ]
+            }
+        },
+    }
+
+
+def _schedule_without_bm(session="REGULAR"):
+    """Return a schedule entry without benchmarkMapping."""
+    return {
+        "marketSchedule": "America/New_York;0930-1600;",
+        "session": session,
+    }
+
+
+class TestCheckE014BenchmarkMapping:
+    def test_e014_stable_equity_with_bm_no_finding(self):
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.AAPL/USD",
+            state="STABLE",
+            asset_type="equity",
+            schedules=[_schedule_with_bm("REGULAR")],
+        )
+        findings = check_benchmark_mapping([feed])
+        assert findings == []
+
+    def test_e014_stable_equity_missing_bm_on_regular(self):
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.AAPL/USD",
+            state="STABLE",
+            asset_type="equity",
+            schedules=[_schedule_without_bm("REGULAR")],
+        )
+        findings = check_benchmark_mapping([feed])
+        errors = [f for f in findings if f.rule_id == "E014"]
+        assert len(errors) == 1
+        assert "REGULAR" in errors[0].message
+
+    def test_e014_overnight_exempt(self):
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.AAPL/USD",
+            state="STABLE",
+            asset_type="equity",
+            schedules=[_schedule_without_bm("OVER_NIGHT")],
+        )
+        findings = check_benchmark_mapping([feed])
+        assert findings == []
+
+    def test_e014_coming_soon_skipped(self):
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.AAPL/USD",
+            state="COMING_SOON",
+            asset_type="equity",
+            schedules=[_schedule_without_bm("REGULAR")],
+        )
+        findings = check_benchmark_mapping([feed])
+        assert findings == []
+
+    def test_e014_inactive_skipped(self):
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.AAPL/USD",
+            state="INACTIVE",
+            asset_type="equity",
+            schedules=[_schedule_without_bm("REGULAR")],
+        )
+        findings = check_benchmark_mapping([feed])
+        assert findings == []
+
+    def test_e014_crypto_not_benchmarkable(self):
+        feed = _make_feed(
+            1,
+            symbol="Crypto.BTC/USD",
+            state="STABLE",
+            asset_type="crypto",
+            schedules=[_schedule_without_bm("REGULAR")],
+        )
+        findings = check_benchmark_mapping([feed])
+        assert findings == []
+
+    def test_e014_stable_fx_missing_bm(self):
+        feed = _make_feed(
+            1,
+            symbol="FX.EUR/USD",
+            state="STABLE",
+            asset_type="fx",
+            schedules=[_schedule_without_bm("REGULAR")],
+        )
+        findings = check_benchmark_mapping([feed])
+        errors = [f for f in findings if f.rule_id == "E014"]
+        assert len(errors) == 1
+
+    def test_e014_empty_bm_dict_flagged(self):
+        schedule = {
+            "marketSchedule": "America/New_York;0930-1600;",
+            "session": "REGULAR",
+            "benchmarkMapping": {},
+        }
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.AAPL/USD",
+            state="STABLE",
+            asset_type="equity",
+            schedules=[schedule],
+        )
+        findings = check_benchmark_mapping([feed])
+        errors = [f for f in findings if f.rule_id == "E014"]
+        assert len(errors) == 1
+
+    def test_e014_multiple_sessions_missing(self):
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.AAPL/USD",
+            state="STABLE",
+            asset_type="equity",
+            schedules=[
+                _schedule_without_bm("REGULAR"),
+                _schedule_without_bm("PRE_MARKET"),
+            ],
+        )
+        findings = check_benchmark_mapping([feed])
+        errors = [f for f in findings if f.rule_id == "E014"]
+        assert len(errors) == 2
 
 
 class TestCheckSchedules:
