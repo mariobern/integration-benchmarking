@@ -10,6 +10,7 @@ from lib.config_lint import (
     check_hermes_ids,
     check_expired_coming_soon_futures,
     check_benchmark_mapping,
+    check_corporate_actions,
 )
 
 
@@ -1208,3 +1209,159 @@ class TestLintConfigOrchestrator:
         config = _make_config([])
         findings = lint_config(config)
         assert findings == []
+
+
+def _valid_split_action():
+    """Return a valid SPLIT corporate action."""
+    return {
+        "eventType": "SPLIT",
+        "adjustmentFactorNumerator": "25",
+        "adjustmentFactorDenominator": "1",
+        "rejectionThresholdBips": "1000",
+        "rejectionWindow": "600.000000000s",
+        "activation": {
+            "usEquityExDate": {
+                "exDate": "2026-04-06",
+            }
+        },
+    }
+
+
+class TestCheckE015CorporateActions:
+    def test_e015_valid_split_no_finding(self):
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [_valid_split_action()]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert errors == []
+
+    def test_e015_missing_event_type(self):
+        action = _valid_split_action()
+        del action["eventType"]
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) == 1
+        assert "eventType" in errors[0].message
+
+    def test_e015_missing_numerator(self):
+        action = _valid_split_action()
+        del action["adjustmentFactorNumerator"]
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) == 1
+        assert "adjustmentFactorNumerator" in errors[0].message
+
+    def test_e015_missing_nested_exdate(self):
+        action = _valid_split_action()
+        del action["activation"]["usEquityExDate"]["exDate"]
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) == 1
+        assert "exDate" in errors[0].message
+
+    def test_e015_missing_activation_entirely(self):
+        action = _valid_split_action()
+        del action["activation"]
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) >= 1
+        assert any("activation" in e.message for e in errors)
+
+    def test_e015_missing_usEquityExDate(self):
+        action = _valid_split_action()
+        action["activation"] = {}
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) >= 1
+        assert any("usEquityExDate" in e.message for e in errors)
+
+    def test_e015_denominator_zero(self):
+        action = _valid_split_action()
+        action["adjustmentFactorDenominator"] = "0"
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) == 1
+        assert "adjustmentFactorDenominator" in errors[0].message
+        assert "invalid" in errors[0].message
+
+    def test_e015_rejection_window_missing_decimal(self):
+        action = _valid_split_action()
+        action["rejectionWindow"] = "600s"
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) == 1
+        assert "rejectionWindow" in errors[0].message
+
+    def test_e015_invalid_exdate(self):
+        action = _valid_split_action()
+        action["activation"]["usEquityExDate"]["exDate"] = "2026-13-01"
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) == 1
+        assert "exDate" in errors[0].message
+
+    def test_e015_multiple_violations_same_action(self):
+        action = _valid_split_action()
+        action["adjustmentFactorNumerator"] = "0"
+        action["rejectionWindow"] = "bad"
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) == 2
+
+    def test_e015_no_corporate_actions_no_finding(self):
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        findings = check_corporate_actions([feed])
+        assert findings == []
+
+    def test_e015_empty_corporate_actions_no_finding(self):
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = []
+        findings = check_corporate_actions([feed])
+        assert findings == []
+
+    def test_e015_numerator_non_numeric(self):
+        action = _valid_split_action()
+        action["adjustmentFactorNumerator"] = "abc"
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) == 1
+
+
+class TestCheckW009UnknownEventType:
+    def test_w009_unknown_event_type(self):
+        action = {"eventType": "DIVIDEND"}
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        w009 = [f for f in findings if f.rule_id == "W009"]
+        e015 = [f for f in findings if f.rule_id == "E015"]
+        assert len(w009) == 1
+        assert len(e015) == 0
+        assert "DIVIDEND" in w009[0].message
+
+    def test_w009_known_event_type_no_warning(self):
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [_valid_split_action()]
+        findings = check_corporate_actions([feed])
+        w009 = [f for f in findings if f.rule_id == "W009"]
+        assert w009 == []

@@ -6,6 +6,7 @@ and business rules. Pure stdlib — no external dependencies.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -106,6 +107,54 @@ def check_schema(feeds: list[dict]) -> list[LintFinding]:
 
 
 _BENCHMARKABLE_ASSET_TYPES = frozenset({"equity", "fx", "metal", "commodity", "rates"})
+
+
+def _is_positive_numeric(value: str) -> bool:
+    """Check if value is a positive integer string (non-zero)."""
+    return bool(re.match(r"^\d+$", value)) and int(value) > 0
+
+
+def _is_duration_string(value: str) -> bool:
+    """Check if value matches duration format N.Ns (e.g. '600.000000000s')."""
+    return bool(re.match(r"^\d+\.\d+s$", value))
+
+
+def _is_date_string(value: str) -> bool:
+    """Check if value is a valid YYYY-MM-DD date."""
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+        return True
+    except (ValueError, TypeError):
+        return False
+
+
+_KNOWN_EVENT_TYPES = frozenset({"SPLIT"})
+
+_CORPORATE_ACTION_SCHEMAS: dict[str, dict] = {
+    "SPLIT": {
+        "required": [
+            "adjustmentFactorNumerator",
+            "adjustmentFactorDenominator",
+            "rejectionThresholdBips",
+            "rejectionWindow",
+        ],
+        "nested_required": {"activation": {"usEquityExDate": ["exDate"]}},
+        "validators": {
+            "adjustmentFactorNumerator": (
+                "positive numeric string",
+                _is_positive_numeric,
+            ),
+            "adjustmentFactorDenominator": (
+                "positive numeric string",
+                _is_positive_numeric,
+            ),
+            "rejectionThresholdBips": ("positive numeric string", _is_positive_numeric),
+            "rejectionWindow": ("N.Ns", _is_duration_string),
+            "exDate": ("YYYY-MM-DD", _is_date_string),
+        },
+    },
+}
+
 
 # Asset types exempt from E004/W005 (single-source feeds)
 _EXEMPT_ASSET_TYPES = frozenset(
@@ -603,6 +652,145 @@ def check_benchmark_mapping(feeds: list[dict]) -> list[LintFinding]:
                         symbol=sym,
                     )
                 )
+
+    return findings
+
+
+def check_corporate_actions(feeds: list[dict]) -> list[LintFinding]:
+    """E015: corporateActions schema violation. W009: unknown eventType."""
+    findings: list[LintFinding] = []
+
+    for feed in feeds:
+        fid = feed.get("feedId")
+        sym = feed.get("symbol", "")
+        actions = feed.get("corporateActions") or []
+
+        for idx, action in enumerate(actions):
+            prefix = f"corporateActions[{idx}]"
+            event_type = action.get("eventType")
+
+            # Missing eventType is always E015
+            if event_type is None:
+                findings.append(
+                    LintFinding(
+                        rule_id="E015",
+                        severity="ERROR",
+                        message=f"{prefix}: missing required field 'eventType'",
+                        feed_id=fid,
+                        symbol=sym,
+                    )
+                )
+                continue
+
+            # Unknown eventType -> W009, skip schema validation
+            if event_type not in _KNOWN_EVENT_TYPES:
+                findings.append(
+                    LintFinding(
+                        rule_id="W009",
+                        severity="WARNING",
+                        message=(
+                            f"{prefix}: unknown eventType '{event_type}',"
+                            f" schema not validated"
+                        ),
+                        feed_id=fid,
+                        symbol=sym,
+                    )
+                )
+                continue
+
+            schema = _CORPORATE_ACTION_SCHEMAS[event_type]
+
+            # Check required top-level fields
+            for field in schema["required"]:
+                if field not in action:
+                    findings.append(
+                        LintFinding(
+                            rule_id="E015",
+                            severity="ERROR",
+                            message=f"{prefix}: missing required field '{field}'",
+                            feed_id=fid,
+                            symbol=sym,
+                        )
+                    )
+
+            # Check nested required fields
+            for level1, level2_dict in schema.get("nested_required", {}).items():
+                l1_obj = action.get(level1)
+                if not isinstance(l1_obj, dict):
+                    findings.append(
+                        LintFinding(
+                            rule_id="E015",
+                            severity="ERROR",
+                            message=f"{prefix}: missing required field '{level1}'",
+                            feed_id=fid,
+                            symbol=sym,
+                        )
+                    )
+                    continue
+                for level2, fields in level2_dict.items():
+                    l2_obj = l1_obj.get(level2)
+                    if not isinstance(l2_obj, dict):
+                        findings.append(
+                            LintFinding(
+                                rule_id="E015",
+                                severity="ERROR",
+                                message=f"{prefix}: missing required field '{level2}'",
+                                feed_id=fid,
+                                symbol=sym,
+                            )
+                        )
+                        continue
+                    for field in fields:
+                        if field not in l2_obj:
+                            findings.append(
+                                LintFinding(
+                                    rule_id="E015",
+                                    severity="ERROR",
+                                    message=f"{prefix}: missing required field '{field}'",
+                                    feed_id=fid,
+                                    symbol=sym,
+                                )
+                            )
+
+            # Validate field formats
+            validators = schema.get("validators", {})
+            for field, (expected_fmt, validator_fn) in validators.items():
+                # Get value — may be top-level or nested
+                if field in action:
+                    value = action[field]
+                else:
+                    # Walk nested structure to find the field
+                    value = None
+                    for nested_key, nested_dict in schema.get(
+                        "nested_required", {}
+                    ).items():
+                        nested_obj = action.get(nested_key)
+                        if not isinstance(nested_obj, dict):
+                            break
+                        for sub_key, sub_fields in nested_dict.items():
+                            sub_obj = nested_obj.get(sub_key)
+                            if (
+                                isinstance(sub_obj, dict)
+                                and field in sub_fields
+                                and field in sub_obj
+                            ):
+                                value = sub_obj[field]
+                    if value is None:
+                        continue  # Already flagged as missing
+
+                if not validator_fn(str(value)):
+                    findings.append(
+                        LintFinding(
+                            rule_id="E015",
+                            severity="ERROR",
+                            message=(
+                                f"{prefix}: '{field}' has invalid format"
+                                f" '{value}' (expected {expected_fmt})"
+                            ),
+                            feed_id=fid,
+                            symbol=sym,
+                        )
+                    )
 
     return findings
 
