@@ -1211,6 +1211,42 @@ class TestLintConfigOrchestrator:
         findings = lint_config(config)
         assert findings == []
 
+    def test_e014_through_orchestrator(self):
+        config = _make_config(
+            [
+                _make_feed(
+                    1,
+                    symbol="Equity.US.AAPL/USD",
+                    asset_type="equity",
+                    state="STABLE",
+                    min_publishers=2,
+                    publisher_ids=[1, 2, 3],
+                    schedules=[_schedule_without_bm("REGULAR")],
+                ),
+            ]
+        )
+        findings = lint_config(config)
+        e014 = [f for f in findings if f.rule_id == "E014"]
+        assert len(e014) == 1
+
+    def test_e015_through_orchestrator(self):
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.BKNG/USD",
+            asset_type="equity",
+            state="STABLE",
+            min_publishers=2,
+            publisher_ids=[1, 2, 3],
+            schedules=[_schedule_with_bm("REGULAR")],
+        )
+        action = _valid_split_action()
+        action["adjustmentFactorDenominator"] = "0"
+        feed["corporateActions"] = [action]
+        config = _make_config([feed])
+        findings = lint_config(config)
+        e015 = [f for f in findings if f.rule_id == "E015"]
+        assert len(e015) == 1
+
 
 def _valid_split_action():
     """Return a valid SPLIT corporate action."""

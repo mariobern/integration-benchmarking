@@ -952,5 +952,8 @@ def lint_config(config: dict, now: Optional[datetime] = None) -> list[LintFindin
     findings.extend(check_schedules(feeds))
     findings.extend(check_hermes_ids(feeds))
     findings.extend(check_expired_coming_soon_futures(feeds, now))
+    findings.extend(check_benchmark_mapping(feeds))
+    findings.extend(check_corporate_actions(feeds))
+    findings.extend(check_identifier_continuity(feeds))
 
     return findings
