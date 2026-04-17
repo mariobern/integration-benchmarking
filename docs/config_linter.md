@@ -5,14 +5,21 @@ Lints `after.json` for structural mistakes, publisher-reference errors, schedule
 ## Usage
 
 ```bash
-# Human-readable output
+# Basic lint (colored text output to terminal)
 python3 config_linter.py --config after.json
 
-# Machine-readable output (array of findings)
+# JSON output to terminal
 python3 config_linter.py --config after.json --format json
 
-# Treat warnings as errors (strict mode)
+# Write results to file (format auto-detected from extension)
+python3 config_linter.py --config after.json --output lint_results.json
+python3 config_linter.py --config after.json --output lint_results.txt
+
+# Treat warnings as errors (exit 1 on warnings)
 python3 config_linter.py --config after.json --warnings-as-errors
+
+# CI usage: JSON output + fail on warnings
+python3 config_linter.py --config after.json --output lint.json --warnings-as-errors
 ```
 
 ## Arguments
