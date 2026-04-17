@@ -11,6 +11,7 @@ from lib.config_lint import (
     check_expired_coming_soon_futures,
     check_benchmark_mapping,
     check_corporate_actions,
+    check_identifier_continuity,
 )
 
 
@@ -1365,3 +1366,146 @@ class TestCheckW009UnknownEventType:
         findings = check_corporate_actions([feed])
         w009 = [f for f in findings if f.rule_id == "W009"]
         assert w009 == []
+
+
+def _feed_with_identifiers(feed_id, identifiers, state="STABLE", session="REGULAR"):
+    """Build a feed with specific identifiers in benchmarkMapping."""
+    return _make_feed(
+        feed_id,
+        symbol=f"Commodities.TEST{feed_id}/USD",
+        asset_type="commodity",
+        state=state,
+        schedules=[
+            {
+                "marketSchedule": "America/New_York;O;",
+                "session": session,
+                "benchmarkMapping": {
+                    "datascope_ric": {
+                        "identifiers": identifiers,
+                    }
+                },
+            }
+        ],
+    )
+
+
+class TestCheckE016IdentifierContinuity:
+    def test_e016_single_identifier_no_finding(self):
+        """1 identifier → no finding."""
+        feed = _feed_with_identifiers(
+            1,
+            [
+                {
+                    "identifier": "CLK26",
+                    "validFrom": "2026-01-01T00:00:00.000000000Z",
+                }
+            ],
+        )
+        findings = check_identifier_continuity([feed])
+        assert findings == []
+
+    def test_e016_two_identifiers_no_overlap(self):
+        """CLK26 validTo=2026-03-20, CLM26 validFrom=2026-03-20 → no finding."""
+        feed = _feed_with_identifiers(
+            2,
+            [
+                {
+                    "identifier": "CLK26",
+                    "validFrom": "2026-01-01T00:00:00.000000000Z",
+                    "validTo": "2026-03-20T17:00:00.000000000Z",
+                },
+                {
+                    "identifier": "CLM26",
+                    "validFrom": "2026-03-20T17:00:00.000000000Z",
+                },
+            ],
+        )
+        findings = check_identifier_continuity([feed])
+        assert findings == []
+
+    def test_e016_overlap_detected(self):
+        """CLK26 validTo=2026-03-25, CLM26 validFrom=2026-03-20 → E016, both names in message."""
+        feed = _feed_with_identifiers(
+            3,
+            [
+                {
+                    "identifier": "CLK26",
+                    "validFrom": "2026-01-01T00:00:00.000000000Z",
+                    "validTo": "2026-03-25T17:00:00.000000000Z",
+                },
+                {
+                    "identifier": "CLM26",
+                    "validFrom": "2026-03-20T17:00:00.000000000Z",
+                },
+            ],
+        )
+        findings = check_identifier_continuity([feed])
+        assert len(findings) == 1
+        assert findings[0].rule_id == "E016"
+        assert "CLK26" in findings[0].message
+        assert "CLM26" in findings[0].message
+
+    def test_e016_missing_validto_on_non_last(self):
+        """CLK26 has no validTo but is followed by CLM26 → E016, 'CLK26' in msg."""
+        feed = _feed_with_identifiers(
+            4,
+            [
+                {
+                    "identifier": "CLK26",
+                    "validFrom": "2026-01-01T00:00:00.000000000Z",
+                },
+                {
+                    "identifier": "CLM26",
+                    "validFrom": "2026-03-20T17:00:00.000000000Z",
+                },
+            ],
+        )
+        findings = check_identifier_continuity([feed])
+        assert len(findings) == 1
+        assert findings[0].rule_id == "E016"
+        assert "CLK26" in findings[0].message
+
+    def test_e016_inactive_skipped(self):
+        """INACTIVE state with overlap → no finding."""
+        feed = _feed_with_identifiers(
+            5,
+            [
+                {
+                    "identifier": "CLK26",
+                    "validFrom": "2026-01-01T00:00:00.000000000Z",
+                    "validTo": "2026-03-25T17:00:00.000000000Z",
+                },
+                {
+                    "identifier": "CLM26",
+                    "validFrom": "2026-03-20T17:00:00.000000000Z",
+                },
+            ],
+            state="INACTIVE",
+        )
+        findings = check_identifier_continuity([feed])
+        assert findings == []
+
+    def test_e016_no_benchmark_mapping_no_finding(self):
+        """crypto feed with no benchmarkMapping → no finding."""
+        feed = _make_feed(6, symbol="Crypto.BTC/USD", asset_type="crypto")
+        findings = check_identifier_continuity([feed])
+        assert findings == []
+
+    def test_e016_last_identifier_no_validto_ok(self):
+        """CLK26 has validTo, CLM26 has no validTo (last, open-ended) → no finding."""
+        feed = _feed_with_identifiers(
+            7,
+            [
+                {
+                    "identifier": "CLK26",
+                    "validFrom": "2026-01-01T00:00:00.000000000Z",
+                    "validTo": "2026-03-20T17:00:00.000000000Z",
+                },
+                {
+                    "identifier": "CLM26",
+                    "validFrom": "2026-03-20T17:00:00.000000000Z",
+                },
+            ],
+        )
+        findings = check_identifier_continuity([feed])
+        assert findings == []

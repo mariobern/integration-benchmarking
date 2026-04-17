@@ -795,6 +795,77 @@ def check_corporate_actions(feeds: list[dict]) -> list[LintFinding]:
     return findings
 
 
+def check_identifier_continuity(feeds: list[dict]) -> list[LintFinding]:
+    """E016: identifier date range overlap within same vendor/session."""
+    findings: list[LintFinding] = []
+
+    for feed in feeds:
+        if feed.get("state") == "INACTIVE":
+            continue
+
+        fid = feed.get("feedId")
+        sym = feed.get("symbol", "")
+
+        for schedule in feed.get("marketSchedules", []):
+            session_name = schedule.get("session", "")
+            bm = schedule.get("benchmarkMapping", {}) or {}
+
+            for vendor, vendor_obj in bm.items():
+                if not isinstance(vendor_obj, dict):
+                    continue
+                identifiers = vendor_obj.get("identifiers") or []
+                if len(identifiers) < 2:
+                    continue
+
+                # Parse and sort by validFrom
+                parsed = []
+                for idf in identifiers:
+                    vf = _parse_iso(idf.get("validFrom", ""))
+                    vt_raw = idf.get("validTo")
+                    vt = _parse_iso(vt_raw) if vt_raw else None
+                    ident = idf.get("identifier", "?")
+                    parsed.append((vf, vt, ident))
+
+                parsed.sort(
+                    key=lambda x: x[0] or datetime.min.replace(tzinfo=timezone.utc)
+                )
+
+                for i in range(len(parsed) - 1):
+                    _, end_i, ident_i = parsed[i]
+                    start_j, _, ident_j = parsed[i + 1]
+
+                    if end_i is None:
+                        findings.append(
+                            LintFinding(
+                                rule_id="E016",
+                                severity="ERROR",
+                                message=(
+                                    f"session {session_name}: {vendor} identifier"
+                                    f" '{ident_i}' has no validTo but is followed"
+                                    f" by '{ident_j}'"
+                                ),
+                                feed_id=fid,
+                                symbol=sym,
+                            )
+                        )
+                    elif start_j is not None and end_i > start_j:
+                        findings.append(
+                            LintFinding(
+                                rule_id="E016",
+                                severity="ERROR",
+                                message=(
+                                    f"session {session_name}: {vendor} identifiers"
+                                    f" '{ident_i}' and '{ident_j}' have overlapping"
+                                    f" date ranges"
+                                ),
+                                feed_id=fid,
+                                symbol=sym,
+                            )
+                        )
+
+    return findings
+
+
 def _parse_iso(value: str) -> Optional[datetime]:
     """Parse an ISO-8601 string (with trailing Z and up to 9 fractional digits)."""
     if not value:
