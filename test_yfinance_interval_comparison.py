@@ -24,16 +24,27 @@ def fetch_all_intervals(tickers: list[str], d: date) -> dict[str, pd.DataFrame]:
     print(f"Downloading data for {d} ...", file=sys.stderr)
 
     data_1m = yf.download(
-        tickers=tickers, start=start, end=end,
-        interval="1m", prepost=True, progress=False,
+        tickers=tickers,
+        start=start,
+        end=end,
+        interval="1m",
+        prepost=True,
+        progress=False,
     )
     data_5m = yf.download(
-        tickers=tickers, start=start, end=end,
-        interval="5m", prepost=True, progress=False,
+        tickers=tickers,
+        start=start,
+        end=end,
+        interval="5m",
+        prepost=True,
+        progress=False,
     )
     data_1d = yf.download(
-        tickers=tickers, start=start, end=end,
-        interval="1d", progress=False,
+        tickers=tickers,
+        start=start,
+        end=end,
+        interval="1d",
+        progress=False,
     )
 
     return {"1m": data_1m, "5m": data_5m, "1d": data_1d}
@@ -90,9 +101,7 @@ def get_1d_volume(data_1d: pd.DataFrame, ticker: str, is_multi: bool) -> int:
     return 0
 
 
-def current_approach_volumes(
-    vol_5m: dict[str, int], daily_vol: int
-) -> dict[str, int]:
+def current_approach_volumes(vol_5m: dict[str, int], daily_vol: int) -> dict[str, int]:
     """Replicate the current volume_profile.py estimation logic.
 
     regular_vol from 5m bars; extended = daily - regular, split evenly.
@@ -130,7 +139,9 @@ def main() -> None:
 
     is_multi_1m = isinstance(data["1m"].columns, pd.MultiIndex)
     is_multi_5m = isinstance(data["5m"].columns, pd.MultiIndex)
-    is_multi_1d = isinstance(data["1d"].columns, pd.MultiIndex) if not data["1d"].empty else False
+    is_multi_1d = (
+        isinstance(data["1d"].columns, pd.MultiIndex) if not data["1d"].empty else False
+    )
 
     print(f"\n{'=' * 90}")
     print(f"  yfinance Volume Comparison — {d}")
@@ -144,27 +155,31 @@ def main() -> None:
         daily_vol = get_1d_volume(data["1d"], ticker, is_multi_1d)
         est = current_approach_volumes(vol_5m, daily_vol)
 
-        rows.append({
-            "ticker": ticker,
-            "daily_1d": daily_vol,
-            "total_1m": vol_1m["total"],
-            "total_5m": vol_5m["total"],
-            "match_1m_pct": vol_1m["total"] / daily_vol * 100 if daily_vol else 0,
-            "match_5m_pct": vol_5m["total"] / daily_vol * 100 if daily_vol else 0,
-            "pre_1m": vol_1m["pre_market"],
-            "pre_5m": vol_5m["pre_market"],
-            "pre_est": est["pre_market"],
-            "reg_1m": vol_1m["regular"],
-            "reg_5m": vol_5m["regular"],
-            "reg_est": est["regular"],
-            "ah_1m": vol_1m["after_hours"],
-            "ah_5m": vol_5m["after_hours"],
-            "ah_est": est["after_hours"],
-        })
+        rows.append(
+            {
+                "ticker": ticker,
+                "daily_1d": daily_vol,
+                "total_1m": vol_1m["total"],
+                "total_5m": vol_5m["total"],
+                "match_1m_pct": vol_1m["total"] / daily_vol * 100 if daily_vol else 0,
+                "match_5m_pct": vol_5m["total"] / daily_vol * 100 if daily_vol else 0,
+                "pre_1m": vol_1m["pre_market"],
+                "pre_5m": vol_5m["pre_market"],
+                "pre_est": est["pre_market"],
+                "reg_1m": vol_1m["regular"],
+                "reg_5m": vol_5m["regular"],
+                "reg_est": est["regular"],
+                "ah_1m": vol_1m["after_hours"],
+                "ah_5m": vol_5m["after_hours"],
+                "ah_est": est["after_hours"],
+            }
+        )
 
     # --- Table 1: Total volume comparison ---
     print(f"\n  1. TOTAL VOLUME: Do intraday bars match the 1-day total?")
-    print(f"  {'Ticker':<8} {'1d Total':>12} {'1m Total':>12} {'1m %':>7} {'5m Total':>12} {'5m %':>7}")
+    print(
+        f"  {'Ticker':<8} {'1d Total':>12} {'1m Total':>12} {'1m %':>7} {'5m Total':>12} {'5m %':>7}"
+    )
     print(f"  {'-'*8} {'-'*12} {'-'*12} {'-'*7} {'-'*12} {'-'*7}")
     for r in rows:
         print(
@@ -181,9 +196,15 @@ def main() -> None:
     print(f"  {'Ticker':<8} {'':8} {'Pre-Mkt':>12} {'Regular':>12} {'After-Hrs':>12}")
     print(f"  {'-'*8} {'-'*8} {'-'*12} {'-'*12} {'-'*12}")
     for r in rows:
-        print(f"  {r['ticker']:<8} {'1m bars':8}{fmt_vol(r['pre_1m'])}{fmt_vol(r['reg_1m'])}{fmt_vol(r['ah_1m'])}")
-        print(f"  {'':8} {'5m bars':8}{fmt_vol(r['pre_5m'])}{fmt_vol(r['reg_5m'])}{fmt_vol(r['ah_5m'])}")
-        print(f"  {'':8} {'est.':8}{fmt_vol(r['pre_est'])}{fmt_vol(r['reg_est'])}{fmt_vol(r['ah_est'])}")
+        print(
+            f"  {r['ticker']:<8} {'1m bars':8}{fmt_vol(r['pre_1m'])}{fmt_vol(r['reg_1m'])}{fmt_vol(r['ah_1m'])}"
+        )
+        print(
+            f"  {'':8} {'5m bars':8}{fmt_vol(r['pre_5m'])}{fmt_vol(r['reg_5m'])}{fmt_vol(r['ah_5m'])}"
+        )
+        print(
+            f"  {'':8} {'est.':8}{fmt_vol(r['pre_est'])}{fmt_vol(r['reg_est'])}{fmt_vol(r['ah_est'])}"
+        )
         print()
 
     # --- Summary ---
@@ -194,11 +215,17 @@ def main() -> None:
     print(f"  Avg 5m coverage of 1d total: {avg_5m:.1f}%")
 
     if avg_1m > 98:
-        print(f"\n  CONCLUSION: 1m bars capture ~all daily volume. Safe to use direct session sums.")
+        print(
+            f"\n  CONCLUSION: 1m bars capture ~all daily volume. Safe to use direct session sums."
+        )
     elif avg_1m > 90:
-        print(f"\n  CONCLUSION: 1m bars capture most volume but ~{100-avg_1m:.0f}% is missing. Investigate.")
+        print(
+            f"\n  CONCLUSION: 1m bars capture most volume but ~{100-avg_1m:.0f}% is missing. Investigate."
+        )
     else:
-        print(f"\n  CONCLUSION: 1m bars miss significant volume ({100-avg_1m:.0f}%). Stick with current approach.")
+        print(
+            f"\n  CONCLUSION: 1m bars miss significant volume ({100-avg_1m:.0f}%). Stick with current approach."
+        )
 
     print(f"{'=' * 90}\n")
 

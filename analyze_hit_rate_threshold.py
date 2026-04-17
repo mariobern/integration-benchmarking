@@ -92,9 +92,7 @@ def read_feeds(csv_path: Path) -> list[tuple[int, str]]:
     return feeds
 
 
-def get_session_filter_sql(
-    session: str, date: str, column: str
-) -> str:
+def get_session_filter_sql(session: str, date: str, column: str) -> str:
     """Generate UTC time filter for premarket or afterhours."""
     dt = datetime.strptime(date, "%Y-%m-%d")
     est = ZoneInfo("America/New_York")
@@ -181,16 +179,24 @@ def evaluate_session(
     if not bench_result.result_rows:
         return [
             SessionMetrics(
-                feed_id=feed_id, ticker=ticker, session=session,
-                publisher_id=p, n_observations=0, nrmse=None, hit_rate=None,
-                pass_at_95=False, pass_at_90=False,
+                feed_id=feed_id,
+                ticker=ticker,
+                session=session,
+                publisher_id=p,
+                n_observations=0,
+                nrmse=None,
+                hit_rate=None,
+                pass_at_95=False,
+                pass_at_90=False,
                 error="No benchmark data",
             )
             for p in all_pubs
         ]
 
     bench_by_ts = {
-        row[0]: (row[1], row[2]) for row in bench_result.result_rows if row[1] is not None
+        row[0]: (row[1], row[2])
+        for row in bench_result.result_rows
+        if row[1] is not None
     }
 
     # Accumulate per-publisher
@@ -221,10 +227,16 @@ def evaluate_session(
             )
             results.append(
                 SessionMetrics(
-                    feed_id=feed_id, ticker=ticker, session=session,
-                    publisher_id=pub_id, n_observations=n,
-                    nrmse=None, hit_rate=None,
-                    pass_at_95=False, pass_at_90=False, error=err,
+                    feed_id=feed_id,
+                    ticker=ticker,
+                    session=session,
+                    publisher_id=pub_id,
+                    n_observations=n,
+                    nrmse=None,
+                    hit_rate=None,
+                    pass_at_95=False,
+                    pass_at_90=False,
+                    error=err,
                 )
             )
             continue
@@ -244,10 +256,15 @@ def evaluate_session(
 
         results.append(
             SessionMetrics(
-                feed_id=feed_id, ticker=ticker, session=session,
-                publisher_id=pub_id, n_observations=n,
-                nrmse=nrmse, hit_rate=hit_rate,
-                pass_at_95=pass_95, pass_at_90=pass_90,
+                feed_id=feed_id,
+                ticker=ticker,
+                session=session,
+                publisher_id=pub_id,
+                n_observations=n,
+                nrmse=nrmse,
+                hit_rate=hit_rate,
+                pass_at_95=pass_95,
+                pass_at_90=pass_90,
             )
         )
 
@@ -278,11 +295,18 @@ def main():
             continue
 
         for session in ("premarket", "afterhours"):
-            print(f"\n  Querying {ticker} ({feed_id}) - {session}...", end=" ", flush=True)
+            print(
+                f"\n  Querying {ticker} ({feed_id}) - {session}...", end=" ", flush=True
+            )
             start = time.time()
             metrics = evaluate_session(
-                client_lazer, client_analytics,
-                feed_id, ticker, DATE, session, divisor,
+                client_lazer,
+                client_analytics,
+                feed_id,
+                ticker,
+                DATE,
+                session,
+                divisor,
             )
             elapsed = time.time() - start
             print(f"{len(metrics)} publishers ({elapsed:.1f}s)")
@@ -290,8 +314,10 @@ def main():
 
     # --- Print detailed table ---
     print("\n" + "=" * 72)
-    print(f"{'Ticker':<8} {'Session':<12} {'Pub':>5} {'nObs':>6} "
-          f"{'nrmse':>8} {'hit_rate':>9} {'@95%':>6} {'@90%':>6} {'Flip?':>6}")
+    print(
+        f"{'Ticker':<8} {'Session':<12} {'Pub':>5} {'nObs':>6} "
+        f"{'nrmse':>8} {'hit_rate':>9} {'@95%':>6} {'@90%':>6} {'Flip?':>6}"
+    )
     print("-" * 72)
 
     flipped = []
@@ -303,9 +329,11 @@ def main():
 
     for m in sorted(all_metrics, key=lambda x: (x.ticker, x.session, x.publisher_id)):
         if m.error:
-            print(f"{m.ticker:<8} {m.session:<12} {m.publisher_id:>5} "
-                  f"{m.n_observations:>6} {'--':>8} {'--':>9} "
-                  f"{'FAIL':>6} {'FAIL':>6} {'ERR':>6}  ({m.error})")
+            print(
+                f"{m.ticker:<8} {m.session:<12} {m.publisher_id:>5} "
+                f"{m.n_observations:>6} {'--':>8} {'--':>9} "
+                f"{'FAIL':>6} {'FAIL':>6} {'ERR':>6}  ({m.error})"
+            )
             continue
 
         total_evaluated += 1
@@ -328,9 +356,11 @@ def main():
         p90 = "PASS" if m.pass_at_90 else "FAIL"
         flip_str = "<<YES" if did_flip else ""
 
-        print(f"{m.ticker:<8} {m.session:<12} {m.publisher_id:>5} "
-              f"{m.n_observations:>6} {nrmse_str:>8} {hr_str:>9} "
-              f"{p95:>6} {p90:>6} {flip_str:>6}")
+        print(
+            f"{m.ticker:<8} {m.session:<12} {m.publisher_id:>5} "
+            f"{m.n_observations:>6} {nrmse_str:>8} {hr_str:>9} "
+            f"{p95:>6} {p90:>6} {flip_str:>6}"
+        )
 
     # --- Summary ---
     print("\n" + "=" * 72)
@@ -339,14 +369,18 @@ def main():
     print(f"Total publisher-session combos evaluated: {total_evaluated}")
     print(f"Pass @95%: {total_pass_95}")
     print(f"Pass @90%: {total_pass_90}")
-    print(f"Flipped FAIL->PASS: {len(flipped)} "
-          f"(premarket: {premarket_flips}, afterhours: {afterhours_flips})")
+    print(
+        f"Flipped FAIL->PASS: {len(flipped)} "
+        f"(premarket: {premarket_flips}, afterhours: {afterhours_flips})"
+    )
 
     if flipped:
         print("\nFlipped publishers:")
         for m in flipped:
-            print(f"  {m.ticker} ({m.feed_id}) | {m.session} | pub {m.publisher_id} "
-                  f"| nrmse={m.nrmse:.5f} | hit_rate={m.hit_rate:.1f}%")
+            print(
+                f"  {m.ticker} ({m.feed_id}) | {m.session} | pub {m.publisher_id} "
+                f"| nrmse={m.nrmse:.5f} | hit_rate={m.hit_rate:.1f}%"
+            )
 
 
 if __name__ == "__main__":

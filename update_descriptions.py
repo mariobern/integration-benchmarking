@@ -33,8 +33,8 @@ def main():
     for feed_id, new_desc in feed_descriptions.items():
         # Pattern: find "feedId": <id> followed (within ~500 chars) by "description": "..."
         pattern = re.compile(
-            r'("feedId":\s*' + str(feed_id) + r'\b)'
-            r'(.*?)'
+            r'("feedId":\s*' + str(feed_id) + r"\b)"
+            r"(.*?)"
             r'("description":\s*")(.*?)(")',
             re.DOTALL,
         )
@@ -49,8 +49,14 @@ def main():
 
         # Escape any special chars in new description for JSON
         escaped_new = new_desc.replace("\\", "\\\\").replace('"', '\\"')
-        replacement = match.group(1) + match.group(2) + match.group(3) + escaped_new + match.group(5)
-        text = text[:match.start()] + replacement + text[match.end():]
+        replacement = (
+            match.group(1)
+            + match.group(2)
+            + match.group(3)
+            + escaped_new
+            + match.group(5)
+        )
+        text = text[: match.start()] + replacement + text[match.end() :]
 
         print(f"  Feed {feed_id}: {old_desc!r} -> {new_desc!r}")
         updated += 1

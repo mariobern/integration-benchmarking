@@ -1,6 +1,6 @@
 # Config Linter (config_linter.py)
 
-Validates `after.json` for common configuration errors before deployment. Catches duplicate feeds, invalid publisher references, insufficient fault tolerance, missing required fields, and schedule inconsistencies. Pure stdlib -- no ClickHouse or external API access required.
+Lints `after.json` for structural mistakes, publisher-reference errors, schedule inconsistencies, and stale state. Pure stdlib — no ClickHouse or network access required. Exits non-zero when any **ERROR** finding is present so it can gate CI.
 
 ## Usage
 
@@ -24,105 +24,135 @@ python3 config_linter.py --config after.json --output lint.json --warnings-as-er
 
 ## Arguments
 
-| Argument               | Description                                                               | Required | Default |
-| ---------------------- | ------------------------------------------------------------------------- | -------- | ------- |
-| `--config`             | Path to after.json config file                                            | Yes      | --      |
-| `--format`             | Output format for stdout: `text` or `json`                                | No       | `text`  |
-| `--output`             | Write findings to file (format auto-detected: `.json` -> JSON, else text) | No       | --      |
-| `--warnings-as-errors` | Treat warnings as errors (exit code 1)                                    | No       | False   |
-
-When `--output` is provided, format is determined by file extension (`--format` is ignored). Stdout prints a one-line summary instead of full findings.
+| Argument               | Description                                              | Required | Default |
+| ---------------------- | -------------------------------------------------------- | -------- | ------- |
+| `--config`             | Path to `after.json` config file                         | Yes      | —       |
+| `--format`             | Output format: `text` or `json`                          | No       | `text`  |
+| `--warnings-as-errors` | Exit 1 if any warning is present (in addition to errors) | No       | False   |
 
 ## Exit Codes
 
-| Code | Meaning                                                    |
-| ---- | ---------------------------------------------------------- |
-| `0`  | No errors (warnings allowed unless `--warnings-as-errors`) |
-| `1`  | Errors found, or warnings with `--warnings-as-errors`      |
+- `0` — no errors (warnings allowed unless `--warnings-as-errors`)
+- `1` — at least one **ERROR** finding (or any finding when `--warnings-as-errors`)
 
-## Lint Rules
+## Rule Scope
 
-### Errors
+- **INACTIVE feeds are skipped** by all publisher, schedule, hermes-id, and expiry checks. Only structural duplicate-ID/duplicate-symbol checks look at them.
+- E010/E011 are schedule-integrity checks that run on every non-INACTIVE feed.
+- E013 requires the linter's current UTC clock; it is evaluated against `datetime.now(timezone.utc)` at runtime.
 
-| Rule | Name                               | Description                                                                           |
-| ---- | ---------------------------------- | ------------------------------------------------------------------------------------- |
-| E001 | Duplicate feedId                   | Two or more feeds share the same `feedId`                                             |
-| E002 | Duplicate symbol                   | Same `symbol` appears in multiple STABLE or COMING_SOON feeds                         |
-| E003 | Invalid publisher reference        | `allowedPublisherIds` references a `publisherId` not in the `publishers` array        |
-| E004 | No fault tolerance                 | `minPublishers` >= publisher count (feed cannot tolerate any publisher going offline) |
-| E005 | STABLE with no publishers          | STABLE feed has empty or missing `allowedPublisherIds`                                |
-| E006 | Non-equity extended sessions       | Non-equity feed has PRE_MARKET, POST_MARKET, or OVER_NIGHT sessions                   |
-| E007 | Missing required fields            | Feed missing `feedId`, `symbol`, `state`, `kind`, or `metadata.asset_type`            |
-| E008 | Session publisher not in top-level | Session-level `allowedPublisherIds` contains IDs not in the top-level list            |
+## Errors
 
-### Warnings
+| ID   | Rule                                                                                | Scope                                                  |
+| ---- | ----------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| E001 | Duplicate `feedId`                                                                  | all feeds                                              |
+| E002 | Duplicate `symbol` within STABLE/COMING_SOON                                        | active-pipeline feeds                                  |
+| E003 | References unknown `publisherId`                                                    | non-INACTIVE (top-level and session-level)             |
+| E004 | `minPublishers >= publisher count` (no headroom)                                    | STABLE, non-exempt asset types                         |
+| E005 | STABLE feed with no publishers                                                      | STABLE                                                 |
+| E006 | Non-equity feed has extended sessions                                               | non-INACTIVE, non-equity                               |
+| E007 | Missing required field (`feedId`, `symbol`, `state`, `kind`, `metadata.asset_type`) | all feeds                                              |
+| E008 | Session-level publisher not in top-level list                                       | non-INACTIVE                                           |
+| E009 | STABLE feed references a `.Test`-named publisher                                    | STABLE                                                 |
+| E010 | Duplicate session in `marketSchedules`                                              | non-INACTIVE                                           |
+| E011 | Schedule inconsistency within asset group                                           | non-INACTIVE, grouped by `asset_type` (+ futures root) |
+| E012 | Duplicate `metadata.hermes_id`                                                      | non-INACTIVE                                           |
+| E013 | COMING_SOON futures past every `validTo`                                            | COMING_SOON futures only                               |
+| E014 | STABLE benchmarkable feed missing `benchmarkMapping`                                | STABLE, benchmarkable asset types, non-OVERNIGHT       |
+| E015 | `corporateActions` schema violation (missing fields, invalid formats)               | any feed with `corporateActions`                       |
+| E016 | Identifier date range overlap within same vendor/session                            | non-INACTIVE, 2+ identifiers per vendor                |
 
-| Rule | Name                        | Description                                                                      |
-| ---- | --------------------------- | -------------------------------------------------------------------------------- |
-| W001 | Missing extended sessions   | STABLE US equity missing expected sessions (PRE_MARKET, POST_MARKET, OVER_NIGHT) |
-| W002 | Wrong timezone              | US equity using a timezone other than `America/New_York`                         | E
-| W003 | Schedule deviation          | Feed's schedule differs from the majority in its asset class                     | E
-| W004 | COMING_SOON no publishers   | COMING_SOON feed with no publishers assigned                                     |
-| W005 | Low headroom                | `minPublishers` is only 1 less than publisher count                              |
-| W006 | Duplicate publisher in feed | Same `publisherId` appears more than once in a feed's list                       | E
-| W007 | TEST publisher in STABLE    | STABLE feed references a publisher with `keyType: "TEST"`                        | E
+## Warnings
 
-### Scope
+| ID   | Rule                                                                          | Scope                            |
+| ---- | ----------------------------------------------------------------------------- | -------------------------------- |
+| W001 | US equity missing extended sessions (`PRE_MARKET`/`POST_MARKET`/`OVER_NIGHT`) | STABLE US equities               |
+| W002 | US equity using a non-`America/New_York` timezone                             | STABLE US equities               |
+| W003 | Schedule deviates from the asset-class majority                               | STABLE, non-futures              |
+| W004 | COMING_SOON feed with no publishers                                           | COMING_SOON                      |
+| W005 | `minPublishers` leaves only 1 headroom publisher                              | STABLE, non-exempt               |
+| W006 | Duplicate `publisherId` in feed                                               | non-INACTIVE                     |
+| W007 | STABLE feed references a `TEST` key-type publisher                            | STABLE                           |
+| W009 | Unknown `corporateActions` event type (schema not validated)                  | any feed with `corporateActions` |
 
-Rules E003, E004, E005, E008, W005, and W006 are checked at both the top-level `allowedPublisherIds` and within each `marketSchedules` session entry. INACTIVE feeds are skipped entirely. Futures symbols are excluded from W003 schedule deviation checks.
+### E011 vs W003
 
-### Exempt Asset Types
+Both flag schedule drift, but with different strictness:
 
-E004 and W005 are skipped for single-source asset types: `funding-rate`, `custom`, `crypto-redemption-rate`, `nav`, `crypto-index`, `kalshi`.
+- **E011 (ERROR)** fires whenever two feeds in the same asset group (`asset_type` for spot, `(asset_type, futures_root)` for futures) have **any** distinct schedule signature. It is the hard failure.
+- **W003 (WARNING)** only fires on minority deviation from an obvious majority in a given asset type, and exempts futures entirely. It is the soft heads-up.
+
+They intentionally overlap. A future that disagrees with a sibling on the same root will fire E011 but not W003.
+
+## Asset Types Exempt from E004 / W005
+
+Single-source asset types where `minPublishers >= publisher count` is acceptable:
+
+- `funding-rate`
+- `custom`
+- `crypto-redemption-rate`
+- `nav`
+- `crypto-index`
+- `kalshi`
+
+These exemptions apply only to the publisher-count headroom rules, not to any other check.
+
+## Notes on E013 (Expired COMING_SOON Futures)
+
+A COMING_SOON futures feed is considered expired if **every** `validTo` timestamp found under `marketSchedules[*].benchmarkMapping.*.identifiers[*].validTo` is earlier than the current UTC time. Feeds with no `validTo` identifiers are skipped — E013 only fires when there is evidence that every mapped contract has already rolled off. The fix is usually to flip the feed to `INACTIVE`.
+
+## Notes on E014 (Benchmark Mapping)
+
+Benchmarkable asset types are: `equity`, `fx`, `metal`, `commodity`, `rates`. All other asset types are skipped. The `OVER_NIGHT` session is always exempt since it uses publisher 32 peer comparison rather than Datascope benchmarks.
+
+## Notes on E015 / W009 (Corporate Actions)
+
+E015 validates the full schema for known event types. Currently the only known type is `SPLIT`. When a new event type is added to `after.json` before the linter is updated, W009 fires as a warning instead of E015, allowing the config change to pass CI while signaling the linter needs updating.
+
+To add support for a new event type, add an entry to `_CORPORATE_ACTION_SCHEMAS` in `lib/config_lint.py` and add the event type string to `_KNOWN_EVENT_TYPES`.
+
+### SPLIT schema
+
+| Field                         | Location                           | Format                  |
+| ----------------------------- | ---------------------------------- | ----------------------- |
+| `adjustmentFactorNumerator`   | top-level                          | positive integer string |
+| `adjustmentFactorDenominator` | top-level                          | positive integer string |
+| `rejectionThresholdBips`      | top-level                          | positive integer string |
+| `rejectionWindow`             | top-level                          | `N.Ns` duration string  |
+| `exDate`                      | `activation.usEquityExDate.exDate` | `YYYY-MM-DD` date       |
+
+## Notes on E016 (Identifier Continuity)
+
+Checks for date range overlaps when a vendor has multiple identifiers in a single session (e.g., futures contract rolls). Identifiers are sorted by `validFrom` and consecutive pairs are checked. A non-last identifier missing `validTo` is flagged because it creates an unbounded range that logically conflicts with its successor. The last identifier in the chain may omit `validTo` (open-ended current contract).
 
 ## Output Formats
 
 ### Text (default)
 
 ```
-ERRORS (2 found):
-  E001  Feed 327 (Crypto.BTC/USD): feedId 327 is duplicated (feeds[0], feeds[5])
-  E004  Feed 1163 (Equity.US.AAPL/USD): minPublishers (5) >= publisher count (5), no fault tolerance
+ERRORS (3 found):
+  E009  Feed 458 (Crypto.JITOSOL/USD): STABLE feed references .Test-suffixed publishers: [49]
+  E012  Feed 964 (Equity.US.APTV/USD): hermes_id 'abc...' duplicated across feedIds: 964, 3126
+  E013  Feed 2973 (Commodities.ALH6/USD): COMING_SOON futures feed has expired (latest validTo: 2026-03-27T17:00:00+00:00); change state to INACTIVE
 
 WARNINGS (1 found):
-  W005  Feed 340 (FX.EUR/USD): minPublishers (4) leaves only 1 headroom (5 publishers)
+  W003  Feed 1775 (Equity.US.XLK/USD): schedule deviates from equity majority
 
-Summary: 2 errors, 1 warnings
+Summary: 3 errors, 1 warnings
 ```
 
-Terminal output includes ANSI colors (red for errors, yellow for warnings). File output (`--output *.txt`) strips colors.
-
 ### JSON
+
+A flat array of finding objects:
 
 ```json
 [
   {
-    "rule_id": "E001",
+    "rule_id": "E009",
     "severity": "ERROR",
-    "message": "feedId 327 is duplicated (feeds[0], feeds[5])",
-    "feed_id": 327,
-    "symbol": "Crypto.BTC/USD"
+    "message": "STABLE feed references .Test-suffixed publishers: [49]",
+    "feed_id": 458,
+    "symbol": "Crypto.JITOSOL/USD"
   }
 ]
-```
-
-Each finding includes `rule_id`, `severity`, `message`, `feed_id` (nullable), and `symbol` (nullable).
-
-## File Output (`--output`)
-
-When `--output` is used, the format is auto-detected from the file extension:
-
-- `.json` -> JSON array of findings
-- Anything else (`.txt`, `.log`, etc.) -> plain text without ANSI colors
-
-Stdout prints a summary instead of full findings:
-
-```
-Wrote 2 errors, 1 warnings to lint_results.json
-```
-
-Or if clean:
-
-```
-No issues found. Wrote results to lint_results.txt
 ```

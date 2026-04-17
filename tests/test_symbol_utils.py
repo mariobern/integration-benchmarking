@@ -1,4 +1,4 @@
-from lib.symbol_utils import is_futures_symbol, is_us_equity
+from lib.symbol_utils import futures_root, is_futures_symbol, is_us_equity
 
 
 class TestIsFuturesSymbol:
@@ -43,3 +43,23 @@ class TestIsUsEquity:
 
     def test_us_equity_future(self):
         assert is_us_equity({"symbol": "Equity.US.EMH6/USD"}) is True
+
+
+class TestFuturesRoot:
+    def test_commodity_future(self):
+        assert futures_root("Commodities.WTIK6/USD") == "WTI"
+
+    def test_equity_future(self):
+        assert futures_root("Equity.US.EMH6/USD") == "EM"
+
+    def test_longer_root(self):
+        assert futures_root("Commodities.BRENTJ6/USD") == "BRENT"
+
+    def test_non_futures_returns_empty(self):
+        assert futures_root("Equity.US.AAPL/USD") == ""
+
+    def test_crypto_returns_empty(self):
+        assert futures_root("Crypto.BTC/USD") == ""
+
+    def test_empty_string(self):
+        assert futures_root("") == ""

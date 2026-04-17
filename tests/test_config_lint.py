@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from lib.config_lint import (
     LintFinding,
     lint_config,
@@ -5,6 +7,11 @@ from lib.config_lint import (
     check_schema,
     check_publishers,
     check_schedules,
+    check_hermes_ids,
+    check_expired_coming_soon_futures,
+    check_benchmark_mapping,
+    check_corporate_actions,
+    check_identifier_continuity,
 )
 
 
@@ -455,6 +462,146 @@ def _us_equity_all_sessions():
     ]
 
 
+def _schedule_with_bm(session="REGULAR"):
+    """Return a schedule entry with a benchmarkMapping."""
+    return {
+        "marketSchedule": "America/New_York;0930-1600;",
+        "session": session,
+        "benchmarkMapping": {
+            "datascope_ric": {
+                "identifiers": [
+                    {
+                        "identifier": "AAPL.O",
+                        "validFrom": "1970-01-01T00:00:00.000000000Z",
+                    }
+                ]
+            }
+        },
+    }
+
+
+def _schedule_without_bm(session="REGULAR"):
+    """Return a schedule entry without benchmarkMapping."""
+    return {
+        "marketSchedule": "America/New_York;0930-1600;",
+        "session": session,
+    }
+
+
+class TestCheckE014BenchmarkMapping:
+    def test_e014_stable_equity_with_bm_no_finding(self):
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.AAPL/USD",
+            state="STABLE",
+            asset_type="equity",
+            schedules=[_schedule_with_bm("REGULAR")],
+        )
+        findings = check_benchmark_mapping([feed])
+        assert findings == []
+
+    def test_e014_stable_equity_missing_bm_on_regular(self):
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.AAPL/USD",
+            state="STABLE",
+            asset_type="equity",
+            schedules=[_schedule_without_bm("REGULAR")],
+        )
+        findings = check_benchmark_mapping([feed])
+        errors = [f for f in findings if f.rule_id == "E014"]
+        assert len(errors) == 1
+        assert "REGULAR" in errors[0].message
+
+    def test_e014_overnight_exempt(self):
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.AAPL/USD",
+            state="STABLE",
+            asset_type="equity",
+            schedules=[_schedule_without_bm("OVER_NIGHT")],
+        )
+        findings = check_benchmark_mapping([feed])
+        assert findings == []
+
+    def test_e014_coming_soon_skipped(self):
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.AAPL/USD",
+            state="COMING_SOON",
+            asset_type="equity",
+            schedules=[_schedule_without_bm("REGULAR")],
+        )
+        findings = check_benchmark_mapping([feed])
+        assert findings == []
+
+    def test_e014_inactive_skipped(self):
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.AAPL/USD",
+            state="INACTIVE",
+            asset_type="equity",
+            schedules=[_schedule_without_bm("REGULAR")],
+        )
+        findings = check_benchmark_mapping([feed])
+        assert findings == []
+
+    def test_e014_crypto_not_benchmarkable(self):
+        feed = _make_feed(
+            1,
+            symbol="Crypto.BTC/USD",
+            state="STABLE",
+            asset_type="crypto",
+            schedules=[_schedule_without_bm("REGULAR")],
+        )
+        findings = check_benchmark_mapping([feed])
+        assert findings == []
+
+    def test_e014_stable_fx_missing_bm(self):
+        feed = _make_feed(
+            1,
+            symbol="FX.EUR/USD",
+            state="STABLE",
+            asset_type="fx",
+            schedules=[_schedule_without_bm("REGULAR")],
+        )
+        findings = check_benchmark_mapping([feed])
+        errors = [f for f in findings if f.rule_id == "E014"]
+        assert len(errors) == 1
+
+    def test_e014_empty_bm_dict_flagged(self):
+        schedule = {
+            "marketSchedule": "America/New_York;0930-1600;",
+            "session": "REGULAR",
+            "benchmarkMapping": {},
+        }
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.AAPL/USD",
+            state="STABLE",
+            asset_type="equity",
+            schedules=[schedule],
+        )
+        findings = check_benchmark_mapping([feed])
+        errors = [f for f in findings if f.rule_id == "E014"]
+        assert len(errors) == 1
+
+    def test_e014_multiple_sessions_missing(self):
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.AAPL/USD",
+            state="STABLE",
+            asset_type="equity",
+            schedules=[
+                _schedule_without_bm("REGULAR"),
+                _schedule_without_bm("PRE_MARKET"),
+            ],
+        )
+        findings = check_benchmark_mapping([feed])
+        errors = [f for f in findings if f.rule_id == "E014"]
+        assert len(errors) == 2
+
+
 class TestCheckSchedules:
     def test_e006_non_equity_with_extended_session(self):
         feeds = [
@@ -657,6 +804,386 @@ class TestCheckSchedules:
         assert len(findings) == 0
 
 
+class TestCheckE009TestPublishers:
+    def test_e009_stable_with_test_named_publisher(self):
+        feeds = [_make_feed(1, state="STABLE", publisher_ids=[1, 2])]
+        publishers = [
+            {
+                "publisherId": 1,
+                "name": "LoTech.Test",
+                "keyType": "PRODUCTION",
+                "isActive": True,
+            },
+            _make_publisher(2),
+        ]
+        findings = check_publishers(feeds, publishers)
+        errors = [f for f in findings if f.rule_id == "E009"]
+        assert len(errors) == 1
+        assert "1" in errors[0].message
+
+    def test_e009_production_name_not_flagged(self):
+        feeds = [_make_feed(1, state="STABLE", publisher_ids=[1])]
+        publishers = [
+            {
+                "publisherId": 1,
+                "name": "LoTech.Production",
+                "keyType": "PRODUCTION",
+                "isActive": True,
+            }
+        ]
+        findings = check_publishers(feeds, publishers)
+        errors = [f for f in findings if f.rule_id == "E009"]
+        assert len(errors) == 0
+
+    def test_e009_coming_soon_not_flagged(self):
+        feeds = [_make_feed(1, state="COMING_SOON", publisher_ids=[1])]
+        publishers = [
+            {
+                "publisherId": 1,
+                "name": "LoTech.Test",
+                "keyType": "PRODUCTION",
+                "isActive": True,
+            }
+        ]
+        findings = check_publishers(feeds, publishers)
+        errors = [f for f in findings if f.rule_id == "E009"]
+        assert len(errors) == 0
+
+    def test_e009_case_insensitive(self):
+        feeds = [_make_feed(1, state="STABLE", publisher_ids=[1])]
+        publishers = [
+            {
+                "publisherId": 1,
+                "name": "Foo.test",
+                "keyType": "PRODUCTION",
+                "isActive": True,
+            }
+        ]
+        findings = check_publishers(feeds, publishers)
+        errors = [f for f in findings if f.rule_id == "E009"]
+        assert len(errors) == 1
+
+
+class TestCheckE010DuplicateSession:
+    def test_e010_duplicate_session_name(self):
+        feeds = [
+            _make_feed(
+                1,
+                schedules=[
+                    {
+                        "marketSchedule": "America/New_York;O,O,O,O,O,O,O;",
+                        "session": "REGULAR",
+                    },
+                    {
+                        "marketSchedule": "America/New_York;0800-1400;",
+                        "session": "REGULAR",
+                    },
+                ],
+            )
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E010"]
+        assert len(errors) == 1
+        assert "REGULAR" in errors[0].message
+
+    def test_e010_identical_tuple_repeated(self):
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                schedules=[
+                    {
+                        "marketSchedule": "America/New_York;0930-1600;",
+                        "session": "REGULAR",
+                    },
+                    {
+                        "marketSchedule": "America/New_York;0930-1600;",
+                        "session": "REGULAR",
+                    },
+                ],
+            )
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E010"]
+        # Duplicate session name fires AND verbatim duplicate fires
+        assert len(errors) >= 1
+        assert any("duplicate verbatim" in e.message for e in errors)
+
+    def test_e010_inactive_skipped(self):
+        feeds = [
+            _make_feed(
+                1,
+                state="INACTIVE",
+                schedules=[
+                    {"marketSchedule": "A", "session": "REGULAR"},
+                    {"marketSchedule": "B", "session": "REGULAR"},
+                ],
+            )
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E010"]
+        assert len(errors) == 0
+
+
+class TestCheckE011ScheduleInconsistency:
+    def test_e011_equity_group_disagrees(self):
+        sched_a = [
+            {"marketSchedule": "America/New_York;0930-1600;", "session": "REGULAR"}
+        ]
+        sched_b = [
+            {"marketSchedule": "America/New_York;0800-1500;", "session": "REGULAR"}
+        ]
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                2,
+                symbol="Equity.US.MSFT/USD",
+                asset_type="equity",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                3,
+                symbol="Equity.US.GOOG/USD",
+                asset_type="equity",
+                schedules=sched_b,
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 1
+        assert errors[0].feed_id == 3
+
+    def test_e011_futures_same_root_disagree(self):
+        sched_a = [{"marketSchedule": "America/New_York;O;", "session": "REGULAR"}]
+        sched_b = [
+            {"marketSchedule": "America/New_York;0800-1400;", "session": "REGULAR"}
+        ]
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Commodities.WTIK6/USD",
+                asset_type="commodity",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                2,
+                symbol="Commodities.WTIM6/USD",
+                asset_type="commodity",
+                schedules=sched_b,
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 1
+
+    def test_e011_different_futures_roots_not_flagged(self):
+        sched_a = [{"marketSchedule": "America/New_York;O;", "session": "REGULAR"}]
+        sched_b = [
+            {"marketSchedule": "America/New_York;0800-1400;", "session": "REGULAR"}
+        ]
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Commodities.WTIK6/USD",
+                asset_type="commodity",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                2,
+                symbol="Commodities.CLK6/USD",
+                asset_type="commodity",
+                schedules=sched_b,
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 0
+
+    def test_e011_spot_and_futures_different_groups(self):
+        sched_a = [
+            {"marketSchedule": "America/New_York;0930-1600;", "session": "REGULAR"}
+        ]
+        sched_b = [{"marketSchedule": "America/New_York;O;", "session": "REGULAR"}]
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                2,
+                symbol="Equity.US.EMH6/USD",
+                asset_type="equity",
+                schedules=sched_b,
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 0
+
+
+class TestCheckE012HermesId:
+    def test_e012_duplicate_hermes_id(self):
+        f1 = _make_feed(1, symbol="Crypto.BTC/USD")
+        f1["metadata"]["hermes_id"] = "abc123"
+        f2 = _make_feed(2, symbol="Crypto.ETH/USD")
+        f2["metadata"]["hermes_id"] = "abc123"
+        findings = check_hermes_ids([f1, f2])
+        errors = [f for f in findings if f.rule_id == "E012"]
+        assert len(errors) == 1
+        assert "1" in errors[0].message and "2" in errors[0].message
+
+    def test_e012_distinct_hermes_ids(self):
+        f1 = _make_feed(1)
+        f1["metadata"]["hermes_id"] = "abc123"
+        f2 = _make_feed(2, symbol="Crypto.ETH/USD")
+        f2["metadata"]["hermes_id"] = "def456"
+        findings = check_hermes_ids([f1, f2])
+        assert findings == []
+
+    def test_e012_inactive_skipped(self):
+        f1 = _make_feed(1, state="STABLE")
+        f1["metadata"]["hermes_id"] = "abc123"
+        f2 = _make_feed(2, symbol="Crypto.ETH/USD", state="INACTIVE")
+        f2["metadata"]["hermes_id"] = "abc123"
+        findings = check_hermes_ids([f1, f2])
+        assert findings == []
+
+    def test_e012_missing_hermes_id_skipped(self):
+        f1 = _make_feed(1)
+        f2 = _make_feed(2, symbol="Crypto.ETH/USD")
+        # neither has hermes_id
+        findings = check_hermes_ids([f1, f2])
+        assert findings == []
+
+
+def _futures_feed_with_validto(feed_id, symbol, valid_to, state="COMING_SOON"):
+    feed = _make_feed(
+        feed_id,
+        symbol=symbol,
+        state=state,
+        asset_type="commodity",
+        schedules=[
+            {
+                "marketSchedule": "America/New_York;O;",
+                "session": "REGULAR",
+                "benchmarkMapping": {
+                    "datascope_ric": {
+                        "identifiers": [
+                            {
+                                "identifier": "CLK26",
+                                "validFrom": "1970-01-01T00:00:00.000000000Z",
+                                "validTo": valid_to,
+                            }
+                        ]
+                    }
+                },
+            }
+        ],
+    )
+    return feed
+
+
+_NOW = datetime(2026, 4, 11, tzinfo=timezone.utc)
+
+
+class TestCheckE013ExpiredFutures:
+    def test_e013_expired_coming_soon_futures(self):
+        feed = _futures_feed_with_validto(
+            1, "Commodities.WTIK6/USD", "2026-01-01T00:00:00.000000000Z"
+        )
+        findings = check_expired_coming_soon_futures([feed], _NOW)
+        errors = [f for f in findings if f.rule_id == "E013"]
+        assert len(errors) == 1
+
+    def test_e013_not_yet_expired(self):
+        feed = _futures_feed_with_validto(
+            1, "Commodities.WTIK6/USD", "2026-12-01T00:00:00.000000000Z"
+        )
+        findings = check_expired_coming_soon_futures([feed], _NOW)
+        assert findings == []
+
+    def test_e013_stable_state_not_flagged(self):
+        feed = _futures_feed_with_validto(
+            1,
+            "Commodities.WTIK6/USD",
+            "2026-01-01T00:00:00.000000000Z",
+            state="STABLE",
+        )
+        findings = check_expired_coming_soon_futures([feed], _NOW)
+        assert findings == []
+
+    def test_e013_non_futures_not_flagged(self):
+        feed = _futures_feed_with_validto(
+            1, "Crypto.BTC/USD", "2026-01-01T00:00:00.000000000Z"
+        )
+        findings = check_expired_coming_soon_futures([feed], _NOW)
+        assert findings == []
+
+    def test_e013_no_validto_skipped(self):
+        feed = _make_feed(
+            1,
+            symbol="Commodities.WTIK6/USD",
+            state="COMING_SOON",
+            asset_type="commodity",
+            schedules=[
+                {
+                    "marketSchedule": "America/New_York;O;",
+                    "session": "REGULAR",
+                    "benchmarkMapping": {
+                        "datascope_ric": {
+                            "identifiers": [
+                                {
+                                    "identifier": "CLK26",
+                                    "validFrom": "1970-01-01T00:00:00.000000000Z",
+                                }
+                            ]
+                        }
+                    },
+                }
+            ],
+        )
+        findings = check_expired_coming_soon_futures([feed], _NOW)
+        assert findings == []
+
+    def test_e013_mixed_expired_and_future_not_flagged(self):
+        feed = _make_feed(
+            1,
+            symbol="Commodities.WTIK6/USD",
+            state="COMING_SOON",
+            asset_type="commodity",
+            schedules=[
+                {
+                    "marketSchedule": "America/New_York;O;",
+                    "session": "REGULAR",
+                    "benchmarkMapping": {
+                        "datascope_ric": {
+                            "identifiers": [
+                                {
+                                    "identifier": "CLK26-past",
+                                    "validTo": "2026-01-01T00:00:00.000000000Z",
+                                },
+                                {
+                                    "identifier": "CLK26-future",
+                                    "validTo": "2026-12-01T00:00:00.000000000Z",
+                                },
+                            ]
+                        }
+                    },
+                }
+            ],
+        )
+        findings = check_expired_coming_soon_futures([feed], _NOW)
+        assert findings == []
+
+
 class TestLintConfigOrchestrator:
     def test_clean_config(self):
         config = _make_config(
@@ -682,4 +1209,339 @@ class TestLintConfigOrchestrator:
     def test_empty_feeds(self):
         config = _make_config([])
         findings = lint_config(config)
+        assert findings == []
+
+    def test_e014_through_orchestrator(self):
+        config = _make_config(
+            [
+                _make_feed(
+                    1,
+                    symbol="Equity.US.AAPL/USD",
+                    asset_type="equity",
+                    state="STABLE",
+                    min_publishers=2,
+                    publisher_ids=[1, 2, 3],
+                    schedules=[_schedule_without_bm("REGULAR")],
+                ),
+            ]
+        )
+        findings = lint_config(config)
+        e014 = [f for f in findings if f.rule_id == "E014"]
+        assert len(e014) == 1
+
+    def test_e015_through_orchestrator(self):
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.BKNG/USD",
+            asset_type="equity",
+            state="STABLE",
+            min_publishers=2,
+            publisher_ids=[1, 2, 3],
+            schedules=[_schedule_with_bm("REGULAR")],
+        )
+        action = _valid_split_action()
+        action["adjustmentFactorDenominator"] = "0"
+        feed["corporateActions"] = [action]
+        config = _make_config([feed])
+        findings = lint_config(config)
+        e015 = [f for f in findings if f.rule_id == "E015"]
+        assert len(e015) == 1
+
+
+def _valid_split_action():
+    """Return a valid SPLIT corporate action."""
+    return {
+        "eventType": "SPLIT",
+        "adjustmentFactorNumerator": "25",
+        "adjustmentFactorDenominator": "1",
+        "rejectionThresholdBips": "1000",
+        "rejectionWindow": "600.000000000s",
+        "activation": {
+            "usEquityExDate": {
+                "exDate": "2026-04-06",
+            }
+        },
+    }
+
+
+class TestCheckE015CorporateActions:
+    def test_e015_valid_split_no_finding(self):
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [_valid_split_action()]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert errors == []
+
+    def test_e015_missing_event_type(self):
+        action = _valid_split_action()
+        del action["eventType"]
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) == 1
+        assert "eventType" in errors[0].message
+
+    def test_e015_missing_numerator(self):
+        action = _valid_split_action()
+        del action["adjustmentFactorNumerator"]
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) == 1
+        assert "adjustmentFactorNumerator" in errors[0].message
+
+    def test_e015_missing_nested_exdate(self):
+        action = _valid_split_action()
+        del action["activation"]["usEquityExDate"]["exDate"]
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) == 1
+        assert "exDate" in errors[0].message
+
+    def test_e015_missing_activation_entirely(self):
+        action = _valid_split_action()
+        del action["activation"]
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) >= 1
+        assert any("activation" in e.message for e in errors)
+
+    def test_e015_missing_usEquityExDate(self):
+        action = _valid_split_action()
+        action["activation"] = {}
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) >= 1
+        assert any("usEquityExDate" in e.message for e in errors)
+
+    def test_e015_denominator_zero(self):
+        action = _valid_split_action()
+        action["adjustmentFactorDenominator"] = "0"
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) == 1
+        assert "adjustmentFactorDenominator" in errors[0].message
+        assert "invalid" in errors[0].message
+
+    def test_e015_rejection_window_missing_decimal(self):
+        action = _valid_split_action()
+        action["rejectionWindow"] = "600s"
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) == 1
+        assert "rejectionWindow" in errors[0].message
+
+    def test_e015_invalid_exdate(self):
+        action = _valid_split_action()
+        action["activation"]["usEquityExDate"]["exDate"] = "2026-13-01"
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) == 1
+        assert "exDate" in errors[0].message
+
+    def test_e015_multiple_violations_same_action(self):
+        action = _valid_split_action()
+        action["adjustmentFactorNumerator"] = "0"
+        action["rejectionWindow"] = "bad"
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) == 2
+
+    def test_e015_no_corporate_actions_no_finding(self):
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        findings = check_corporate_actions([feed])
+        assert findings == []
+
+    def test_e015_empty_corporate_actions_no_finding(self):
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = []
+        findings = check_corporate_actions([feed])
+        assert findings == []
+
+    def test_e015_numerator_non_numeric(self):
+        action = _valid_split_action()
+        action["adjustmentFactorNumerator"] = "abc"
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        errors = [f for f in findings if f.rule_id == "E015"]
+        assert len(errors) == 1
+
+
+class TestCheckW009UnknownEventType:
+    def test_w009_unknown_event_type(self):
+        action = {"eventType": "DIVIDEND"}
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [action]
+        findings = check_corporate_actions([feed])
+        w009 = [f for f in findings if f.rule_id == "W009"]
+        e015 = [f for f in findings if f.rule_id == "E015"]
+        assert len(w009) == 1
+        assert len(e015) == 0
+        assert "DIVIDEND" in w009[0].message
+
+    def test_w009_known_event_type_no_warning(self):
+        feed = _make_feed(1, publisher_ids=[1, 2, 3])
+        feed["corporateActions"] = [_valid_split_action()]
+        findings = check_corporate_actions([feed])
+        w009 = [f for f in findings if f.rule_id == "W009"]
+        assert w009 == []
+
+
+def _feed_with_identifiers(feed_id, identifiers, state="STABLE", session="REGULAR"):
+    """Build a feed with specific identifiers in benchmarkMapping."""
+    return _make_feed(
+        feed_id,
+        symbol=f"Commodities.TEST{feed_id}/USD",
+        asset_type="commodity",
+        state=state,
+        schedules=[
+            {
+                "marketSchedule": "America/New_York;O;",
+                "session": session,
+                "benchmarkMapping": {
+                    "datascope_ric": {
+                        "identifiers": identifiers,
+                    }
+                },
+            }
+        ],
+    )
+
+
+class TestCheckE016IdentifierContinuity:
+    def test_e016_single_identifier_no_finding(self):
+        """1 identifier → no finding."""
+        feed = _feed_with_identifiers(
+            1,
+            [
+                {
+                    "identifier": "CLK26",
+                    "validFrom": "2026-01-01T00:00:00.000000000Z",
+                }
+            ],
+        )
+        findings = check_identifier_continuity([feed])
+        assert findings == []
+
+    def test_e016_two_identifiers_no_overlap(self):
+        """CLK26 validTo=2026-03-20, CLM26 validFrom=2026-03-20 → no finding."""
+        feed = _feed_with_identifiers(
+            2,
+            [
+                {
+                    "identifier": "CLK26",
+                    "validFrom": "2026-01-01T00:00:00.000000000Z",
+                    "validTo": "2026-03-20T17:00:00.000000000Z",
+                },
+                {
+                    "identifier": "CLM26",
+                    "validFrom": "2026-03-20T17:00:00.000000000Z",
+                },
+            ],
+        )
+        findings = check_identifier_continuity([feed])
+        assert findings == []
+
+    def test_e016_overlap_detected(self):
+        """CLK26 validTo=2026-03-25, CLM26 validFrom=2026-03-20 → E016, both names in message."""
+        feed = _feed_with_identifiers(
+            3,
+            [
+                {
+                    "identifier": "CLK26",
+                    "validFrom": "2026-01-01T00:00:00.000000000Z",
+                    "validTo": "2026-03-25T17:00:00.000000000Z",
+                },
+                {
+                    "identifier": "CLM26",
+                    "validFrom": "2026-03-20T17:00:00.000000000Z",
+                },
+            ],
+        )
+        findings = check_identifier_continuity([feed])
+        assert len(findings) == 1
+        assert findings[0].rule_id == "E016"
+        assert "CLK26" in findings[0].message
+        assert "CLM26" in findings[0].message
+
+    def test_e016_missing_validto_on_non_last(self):
+        """CLK26 has no validTo but is followed by CLM26 → E016, 'CLK26' in msg."""
+        feed = _feed_with_identifiers(
+            4,
+            [
+                {
+                    "identifier": "CLK26",
+                    "validFrom": "2026-01-01T00:00:00.000000000Z",
+                },
+                {
+                    "identifier": "CLM26",
+                    "validFrom": "2026-03-20T17:00:00.000000000Z",
+                },
+            ],
+        )
+        findings = check_identifier_continuity([feed])
+        assert len(findings) == 1
+        assert findings[0].rule_id == "E016"
+        assert "CLK26" in findings[0].message
+
+    def test_e016_inactive_skipped(self):
+        """INACTIVE state with overlap → no finding."""
+        feed = _feed_with_identifiers(
+            5,
+            [
+                {
+                    "identifier": "CLK26",
+                    "validFrom": "2026-01-01T00:00:00.000000000Z",
+                    "validTo": "2026-03-25T17:00:00.000000000Z",
+                },
+                {
+                    "identifier": "CLM26",
+                    "validFrom": "2026-03-20T17:00:00.000000000Z",
+                },
+            ],
+            state="INACTIVE",
+        )
+        findings = check_identifier_continuity([feed])
+        assert findings == []
+
+    def test_e016_no_benchmark_mapping_no_finding(self):
+        """crypto feed with no benchmarkMapping → no finding."""
+        feed = _make_feed(6, symbol="Crypto.BTC/USD", asset_type="crypto")
+        findings = check_identifier_continuity([feed])
+        assert findings == []
+
+    def test_e016_last_identifier_no_validto_ok(self):
+        """CLK26 has validTo, CLM26 has no validTo (last, open-ended) → no finding."""
+        feed = _feed_with_identifiers(
+            7,
+            [
+                {
+                    "identifier": "CLK26",
+                    "validFrom": "2026-01-01T00:00:00.000000000Z",
+                    "validTo": "2026-03-20T17:00:00.000000000Z",
+                },
+                {
+                    "identifier": "CLM26",
+                    "validFrom": "2026-03-20T17:00:00.000000000Z",
+                },
+            ],
+        )
+        findings = check_identifier_continuity([feed])
         assert findings == []
