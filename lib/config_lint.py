@@ -407,16 +407,21 @@ _US_EQUITY_EXPECTED_SESSIONS = frozenset(
 )
 
 
-def _get_schedule_signature(schedules: list[dict]) -> tuple:
-    """Create a hashable signature from a feed's marketSchedules for comparison."""
-    return tuple(
-        sorted((s.get("session", ""), s.get("marketSchedule", "")) for s in schedules)
-    )
-
-
 def _extract_timezone(schedule_str: str) -> str:
     """Extract timezone from a marketSchedule string (first segment before ';')."""
     return schedule_str.split(";")[0] if ";" in schedule_str else ""
+
+
+def _format_group_label(group_key: tuple) -> str:
+    """Render a group key for a finding message.
+
+    Single-part keys read naturally ("commodity"); multi-part keys like
+    ("equity", "US") are parenthesized to avoid awkward "X, Y majority"
+    phrasing.
+    """
+    if len(group_key) == 1:
+        return str(group_key[0])
+    return "(" + ", ".join(str(k) for k in group_key) + ")"
 
 
 def check_schedules(feeds: list[dict]) -> list[LintFinding]:
@@ -424,16 +429,22 @@ def check_schedules(feeds: list[dict]) -> list[LintFinding]:
 
     E011 fires on STABLE feeds only (CI blocker).
     W003 fires on STABLE + COMING_SOON feeds (advisory).
-    Both rules use the same group_signatures dict, keyed by:
+    Both rules use a single session_groups dict keyed by:
+        bucket_key = group_key + (session,)
+    where group_key is one of:
         - ("equity", listing_prefix)             for equity spot feeds
         - ("equity", listing_prefix, futures_root) for equity futures
         - (asset_type, futures_root)             for non-equity futures
         - (asset_type,)                          for non-equity spot feeds
+
+    A feed contributes one entry per (session, marketSchedule) row in its
+    marketSchedules list. A feed missing a session is not penalized; it
+    simply does not participate in that bucket.
     """
     findings: list[LintFinding] = []
 
-    # group_key -> list of (feed_id, symbol, signature, state)
-    group_signatures: dict[tuple, list[tuple[int, str, tuple, str]]] = {}
+    # bucket_key (group_key + (session,)) -> list of (fid, sym, schedule_str, state)
+    session_groups: dict[tuple, list[tuple[int, str, str, str]]] = {}
 
     for feed in feeds:
         fid = feed.get("feedId")
@@ -495,7 +506,7 @@ def check_schedules(feeds: list[dict]) -> list[LintFinding]:
                     )
                 )
 
-        # Build the group key for E011 / W003.
+        # Build the group key for E011 / W003 (without session).
         if asset_type == "equity":
             prefix = equity_listing_prefix(sym)
             if is_futures_symbol(sym):
@@ -508,12 +519,17 @@ def check_schedules(feeds: list[dict]) -> list[LintFinding]:
             else:
                 group_key = (asset_type,)
 
-        sig = _get_schedule_signature(schedules)
-        group_signatures.setdefault(group_key, []).append((fid, sym, sig, state))
+        # Push one bucket entry per (session, marketSchedule) row.
+        for sched in schedules:
+            session = sched.get("session", "")
+            sched_str = sched.get("marketSchedule", "")
+            bucket_key = group_key + (session,)
+            session_groups.setdefault(bucket_key, []).append(
+                (fid, sym, sched_str, state)
+            )
 
-        # STABLE-only single-feed schedule rules
+        # STABLE-only single-feed schedule rules (W001, W002 unchanged)
         if state == "STABLE":
-            # W001: US equity missing extended sessions
             if is_us_equity(feed):
                 missing = _US_EQUITY_EXPECTED_SESSIONS - sessions_set
                 if missing:
@@ -527,7 +543,6 @@ def check_schedules(feeds: list[dict]) -> list[LintFinding]:
                         )
                     )
 
-                # W002: US equity wrong timezone
                 for sched in schedules:
                     tz = _extract_timezone(sched.get("marketSchedule", ""))
                     if tz and tz != "America/New_York":
@@ -540,34 +555,37 @@ def check_schedules(feeds: list[dict]) -> list[LintFinding]:
                                 symbol=sym,
                             )
                         )
-                        break  # one finding per feed is enough
+                        break
 
-    # E011: STABLE-only strict schedule inconsistency.
-    # Reference signature is the most common signature among STABLE feeds in
-    # the group; any STABLE feed with a different signature fires.
-    for group_key, entries in group_signatures.items():
+    # E011: STABLE-only strict per-session schedule inconsistency.
+    for bucket_key, entries in session_groups.items():
         stable_entries = [
-            (fid, sym, sig) for fid, sym, sig, st in entries if st == "STABLE"
+            (fid, sym, sched_str)
+            for fid, sym, sched_str, st in entries
+            if st == "STABLE"
         ]
         if len(stable_entries) < 2:
             continue
-        distinct_sigs = {sig for _, _, sig in stable_entries}
-        if len(distinct_sigs) < 2:
+        distinct = {sched_str for _, _, sched_str in stable_entries}
+        if len(distinct) < 2:
             continue
 
-        sig_counter: Counter[tuple] = Counter(sig for _, _, sig in stable_entries)
-        reference_sig = sig_counter.most_common(1)[0][0]
-        group_label = ", ".join(str(k) for k in group_key)
+        sig_counter: Counter[str] = Counter(
+            sched_str for _, _, sched_str in stable_entries
+        )
+        reference = sig_counter.most_common(1)[0][0]
+        session = bucket_key[-1]
+        group_label = _format_group_label(bucket_key[:-1])
 
-        for fid, sym, sig in stable_entries:
-            if sig != reference_sig:
+        for fid, sym, sched_str in stable_entries:
+            if sched_str != reference:
                 findings.append(
                     LintFinding(
                         rule_id="E011",
                         severity="ERROR",
                         message=(
-                            f"schedule disagrees with other feeds in group"
-                            f" ({group_label}): {len(distinct_sigs)} distinct"
+                            f"{session} schedule disagrees with group"
+                            f" {group_label}: {len(distinct)} distinct"
                             f" schedules across {len(stable_entries)} STABLE feeds"
                         ),
                         feed_id=fid,
@@ -575,38 +593,34 @@ def check_schedules(feeds: list[dict]) -> list[LintFinding]:
                     )
                 )
 
-    # W003: schedule deviation from group majority across STABLE + COMING_SOON.
-    # Majority is the most common signature among all entries in the group.
-    for group_key, entries in group_signatures.items():
+    # W003: per-session schedule deviation across STABLE + COMING_SOON.
+    for bucket_key, entries in session_groups.items():
         active_entries = [
-            (fid, sym, sig)
-            for fid, sym, sig, st in entries
+            (fid, sym, sched_str)
+            for fid, sym, sched_str, st in entries
             if st in ("STABLE", "COMING_SOON")
         ]
         if len(active_entries) <= 1:
             continue
 
-        sig_counts: Counter[tuple] = Counter(sig for _, _, sig in active_entries)
-        majority_sig = sig_counts.most_common(1)[0][0]
-        # If every signature is unique, there is no majority -> skip.
-        if sig_counts[majority_sig] == 1:
+        counts: Counter[str] = Counter(sched_str for _, _, sched_str in active_entries)
+        majority = counts.most_common(1)[0][0]
+        if counts[majority] == 1:
             continue
 
-        # Single-part keys read naturally ("commodity"); multi-part keys
-        # like ("equity", "US") are parenthesized to avoid awkward
-        # "deviates from equity, US majority" phrasing.
-        if len(group_key) == 1:
-            group_label = str(group_key[0])
-        else:
-            group_label = "(" + ", ".join(str(k) for k in group_key) + ")"
+        session = bucket_key[-1]
+        group_label = _format_group_label(bucket_key[:-1])
 
-        for fid, sym, sig in active_entries:
-            if sig != majority_sig:
+        for fid, sym, sched_str in active_entries:
+            if sched_str != majority:
                 findings.append(
                     LintFinding(
                         rule_id="W003",
                         severity="WARNING",
-                        message=f"schedule deviates from {group_label} majority",
+                        message=(
+                            f"{session} schedule deviates from {group_label}"
+                            f" majority"
+                        ),
                         feed_id=fid,
                         symbol=sym,
                     )

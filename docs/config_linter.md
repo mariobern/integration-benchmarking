@@ -80,8 +80,8 @@ python3 config_linter.py --config after.json --output lint.json --warnings-as-er
 
 Both flag schedule drift, but with different scopes and severity:
 
-- **E011 (ERROR)** is the CI-blocking rule. It fires when two **STABLE** feeds in the same group have any distinct schedule signature. Groups are `(asset_type, equity_listing_prefix, futures_root?)` for equities and `(asset_type, futures_root?)` for everything else. Equity futures are sub-grouped by both listing prefix and root.
-- **W003 (WARNING)** is the soft heads-up. It fires on minority deviation from the group majority across **STABLE + COMING_SOON** feeds. It uses the same group key as E011, including futures sub-grouping.
+- **E011 (ERROR)** is the CI-blocking rule. It fires when two **STABLE** feeds in the same group have any distinct schedule signature. Groups are `(asset_type, equity_listing_prefix, futures_root?)` for equities and `(asset_type, futures_root?)` for everything else. Equity futures are sub-grouped by both listing prefix and root. Comparison is per-session within a group; a feed missing a session is not penalized.
+- **W003 (WARNING)** is the soft heads-up. It fires on minority deviation from the group majority across **STABLE + COMING_SOON** feeds. It uses the same group key as E011, including futures sub-grouping. Comparison is per-session within a group; a feed missing a session is not penalized.
 
 They intentionally overlap on STABLE feeds. W003 additionally surfaces drift that E011 cannot see — namely COMING_SOON spot or futures feeds that disagree with their STABLE peers — without blocking CI.
 
@@ -137,7 +137,7 @@ ERRORS (3 found):
   E013  Feed 2973 (Commodities.ALH6/USD): COMING_SOON futures feed has expired (latest validTo: 2026-03-27T17:00:00+00:00); change state to INACTIVE
 
 WARNINGS (1 found):
-  W003  Feed 1775 (Equity.US.XLK/USD): schedule deviates from (equity, US) majority
+  W003  Feed 1775 (Equity.US.XLK/USD): REGULAR schedule deviates from (equity, US) majority
 
 Summary: 3 errors, 1 warnings
 ```
