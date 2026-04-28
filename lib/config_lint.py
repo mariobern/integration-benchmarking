@@ -592,12 +592,13 @@ def check_schedules(feeds: list[dict]) -> list[LintFinding]:
         if sig_counts[majority_sig] == 1:
             continue
 
-        # Match group label format used elsewhere in the linter: just the
-        # asset_type for non-equity spot, otherwise the joined key.
+        # Single-part keys read naturally ("commodity"); multi-part keys
+        # like ("equity", "US") are parenthesized to avoid awkward
+        # "deviates from equity, US majority" phrasing.
         if len(group_key) == 1:
-            group_label = group_key[0]
+            group_label = str(group_key[0])
         else:
-            group_label = ", ".join(str(k) for k in group_key)
+            group_label = "(" + ", ".join(str(k) for k in group_key) + ")"
 
         for fid, sym, sig in active_entries:
             if sig != majority_sig:
