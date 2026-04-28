@@ -1,6 +1,5 @@
 import json
 import subprocess
-from unittest.mock import MagicMock, patch
 
 import pytest
 
