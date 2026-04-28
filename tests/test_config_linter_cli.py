@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -267,3 +268,122 @@ class TestCLIBaseline:
         result = _run_linter("--config", config_path, "--baseline", str(baseline_path))
         assert result.returncode == 1
         assert "must contain a JSON object" in result.stderr
+        assert "list" in result.stderr
+
+
+class TestCLIGitAutoDetect:
+    def _init_repo_with_after(self, tmp_path, after_config, baseline_config):
+        """Create a tmp git repo, commit baseline_config to a 'main' branch,
+        then create a feature branch with after_config staged.
+        Returns the repo path.
+        """
+        repo = Path(tmp_path) / "repo"
+        repo.mkdir()
+        env = {
+            **os.environ,
+            "GIT_AUTHOR_NAME": "Test",
+            "GIT_AUTHOR_EMAIL": "t@example.com",
+            "GIT_COMMITTER_NAME": "Test",
+            "GIT_COMMITTER_EMAIL": "t@example.com",
+        }
+
+        def run(cmd):
+            subprocess.run(cmd, cwd=repo, env=env, check=True, capture_output=True)
+
+        run(["git", "init", "-b", "main"])
+        (repo / "after.json").write_text(json.dumps(baseline_config))
+        run(["git", "add", "after.json"])
+        run(["git", "commit", "-m", "baseline"])
+        # Simulate origin/main by creating a remote-tracking ref.
+        run(["git", "update-ref", "refs/remotes/origin/main", "HEAD"])
+        # Create feature branch and make an empty commit so HEAD diverges from
+        # origin/main (merge-base != HEAD). The linter reads the working-tree
+        # file, not the committed version, so after.json at merge-base still
+        # holds baseline_config.
+        run(["git", "checkout", "-b", "feat/test"])
+        run(["git", "commit", "--allow-empty", "-m", "wip"])
+        # Overwrite the working tree with after_config (uncommitted); this is
+        # what the linter will read.
+        (repo / "after.json").write_text(json.dumps(after_config))
+        return repo
+
+    def test_auto_detect_suppresses_preexisting(self, tmp_path):
+        bad = _make_clean_config()
+        bad["feeds"].append(bad["feeds"][0].copy())  # pre-existing E001
+        repo = self._init_repo_with_after(
+            tmp_path, after_config=bad, baseline_config=bad
+        )
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(Path(PROJECT_DIR) / "config_linter.py"),
+                "--config",
+                "after.json",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(repo),
+        )
+        assert result.returncode == 0
+        assert "No new issues found" in result.stdout
+        assert "pre-existing" in result.stdout
+
+    def test_auto_detect_reports_new_finding(self, tmp_path):
+        clean = _make_clean_config()
+        with_dup = _make_clean_config()
+        # Use a different symbol so only E001 (duplicate feedId) fires, not E002.
+        dup_feed = with_dup["feeds"][0].copy()
+        dup_feed["symbol"] = "Crypto.ETH/USD"
+        with_dup["feeds"].append(dup_feed)
+        repo = self._init_repo_with_after(
+            tmp_path, after_config=with_dup, baseline_config=clean
+        )
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(Path(PROJECT_DIR) / "config_linter.py"),
+                "--config",
+                "after.json",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(repo),
+        )
+        assert result.returncode == 1
+        assert "ERRORS (1 new)" in result.stdout
+        assert "E001" in result.stdout
+
+    def test_auto_detect_on_main_falls_back(self, tmp_path):
+        # No feature branch; HEAD is on main, so merge-base == HEAD.
+        clean = _make_clean_config()
+        repo = Path(tmp_path) / "repo"
+        repo.mkdir()
+        env = {
+            **os.environ,
+            "GIT_AUTHOR_NAME": "Test",
+            "GIT_AUTHOR_EMAIL": "t@example.com",
+            "GIT_COMMITTER_NAME": "Test",
+            "GIT_COMMITTER_EMAIL": "t@example.com",
+        }
+
+        def run(cmd):
+            subprocess.run(cmd, cwd=repo, env=env, check=True, capture_output=True)
+
+        run(["git", "init", "-b", "main"])
+        (repo / "after.json").write_text(json.dumps(clean))
+        run(["git", "add", "after.json"])
+        run(["git", "commit", "-m", "baseline"])
+        run(["git", "update-ref", "refs/remotes/origin/main", "HEAD"])
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(Path(PROJECT_DIR) / "config_linter.py"),
+                "--config",
+                "after.json",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(repo),
+        )
+        assert "on baseline ref" in result.stderr
+        assert "running full lint" in result.stderr
