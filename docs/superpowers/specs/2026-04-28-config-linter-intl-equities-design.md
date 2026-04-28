@@ -160,3 +160,64 @@ The IE/NL findings are arguably correct — multi-venue ETFs _do_ have different
 - Sub-grouping by timezone within a listing prefix (would silence the IE/NL multi-venue ETF findings, which we want to surface).
 - Changes to other rules (E006, E010, E014, …).
 - Changes to the CLI, output formats, or exit codes.
+
+---
+
+## Addendum (2026-04-28): Per-session comparison
+
+The smoke test against the real `after.json` (rollout notes file: `2026-04-28-config-linter-intl-equities-rollout-notes.md`) revealed a design gap. `_get_schedule_signature` builds one tuple from a feed's entire `marketSchedules` list. Different feeds within `Equity.US` legitimately have different session sets (some are REGULAR-only, some are OVER_NIGHT-only, some carry all four). Whole-tuple comparison flagged 122 STABLE Equity.US feeds as drift — a CI blocker driven entirely by session-set differences rather than wrong schedules.
+
+### Refinement
+
+Replace whole-tuple comparison with per-session bucketing. The bucket key becomes:
+
+```
+bucket_key = group_key + (session,)
+```
+
+where `group_key` is unchanged (`("equity", prefix)`, `("equity", prefix, futures_root)`, `(asset_type, futures_root)`, or `(asset_type,)`), and `session` is whatever string appears in `marketSchedules[].session` (REGULAR, PRE_MARKET, POST_MARKET, OVER_NIGHT, …).
+
+A feed appears once per session it has. A feed missing a session simply doesn't participate in that bucket — it incurs no penalty for the omission. (W001 still flags STABLE US equities missing extended sessions.)
+
+### Rule semantics
+
+- **E011** fires when a bucket has 2+ STABLE entries with 2+ distinct schedule strings. One finding is emitted per (feed, session) deviation. Message format:
+  ```
+  <SESSION> schedule disagrees with group (<group_label>): N distinct schedules across M STABLE feeds
+  ```
+- **W003** fires when a bucket has 2+ STABLE+COMING_SOON entries with a clear majority (i.e., the most common schedule has count ≥ 2). Message format:
+  ```
+  <SESSION> schedule deviates from (<group_label>) majority
+  ```
+
+`_get_schedule_signature` is removed; only the per-session bucketing remains.
+
+### Behavior change matrix
+
+| Case                                                                | Pre-refinement       | Post-refinement                          |
+| ------------------------------------------------------------------- | -------------------- | ---------------------------------------- |
+| Two feeds, all 4 sessions, REGULAR drifts                           | 1 finding (tuple)    | 1 finding (REGULAR)                      |
+| REGULAR-only feed vs REGULAR+OVER_NIGHT feed, same REGULAR schedule | E011 fires (tuple ≠) | silent (per-session match)               |
+| Two feeds with identical REGULAR but different OVER_NIGHT           | 1 finding (tuple)    | 1 finding tagged OVER_NIGHT              |
+| Feed with 2 wrong sessions                                          | 1 finding            | 2 findings (one per session) — by design |
+
+### Smoke-test prediction
+
+The 122 Equity.US E011 findings should drop to a small residual — only feeds whose REGULAR/PRE_MARKET/POST_MARKET/OVER_NIGHT schedule disagrees with same-session peers in the US group. Comparable drop on the 131 Equity.US W003 findings.
+
+### Test impact
+
+All 14 tests added in the original design continue to pass under per-session bucketing (they are all single-session test cases). Three new tests are added to pin the per-session-set behavior:
+
+- E011 silent when feeds have different session SETS but matching per-session schedules.
+- E011 fires on per-session drift within a single session inside the US group.
+- E011 fires on extended-session drift (e.g., OVER_NIGHT mismatch with REGULAR matched).
+
+### Files touched in the refinement
+
+| File                                                                             | Change                                                                                                                             |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/config_lint.py`                                                             | Replace whole-tuple `group_signatures` with per-session `session_groups`; update message format; remove `_get_schedule_signature`. |
+| `tests/test_config_lint.py`                                                      | Add 3 new tests; existing 14 unchanged.                                                                                            |
+| `docs/config_linter.md`                                                          | Refresh example output and the "E011 vs W003" section to mention per-session granularity.                                          |
+| `docs/superpowers/specs/2026-04-28-config-linter-intl-equities-rollout-notes.md` | Re-run smoke test, replace contents with new findings.                                                                             |
