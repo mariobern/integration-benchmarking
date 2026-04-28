@@ -49,3 +49,19 @@ def futures_root(symbol: str) -> str:
     base = symbol.split("/")[0] if "/" in symbol else symbol
     ticker = base.split(".")[-1]
     return ticker[:-2]
+
+
+def equity_listing_prefix(symbol: str) -> str:
+    """For 'Equity.<X>.<Y>/<Z>' return '<X>', else ''.
+
+    Examples:
+        'Equity.US.AAPL/USD' -> 'US'
+        'Equity.JP.1305/JPY' -> 'JP'
+        'Equity.Index.TSLA/USD' -> 'Index'
+        'Crypto.BTC/USD' -> ''
+        'Equity.US' -> ''  # malformed, two segments only
+    """
+    parts = symbol.split(".")
+    if len(parts) >= 3 and parts[0] == "Equity":
+        return parts[1]
+    return ""
