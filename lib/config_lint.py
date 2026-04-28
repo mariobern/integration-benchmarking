@@ -987,6 +987,65 @@ def check_expired_coming_soon_futures(
     return findings
 
 
+def check_publisher_duplicates(publishers: list[dict]) -> list[LintFinding]:
+    """E017: duplicate publisherId, E018: duplicate publisher name.
+
+    Mirrors the uniqueness invariants the Rust governance tool enforces
+    in `diff_publishers` (publisher ids/names must be globally unique).
+    Catching them here surfaces the violation before the Rust tool's
+    stack-trace error reaches CI.
+
+    The `feed_id` slot of the LintFinding holds the duplicated
+    publisherId for E017; `symbol` holds the duplicated name for E018.
+    This keeps each duplicate distinguishable by `_finding_key` for
+    diff-mode comparisons.
+    """
+    findings: list[LintFinding] = []
+
+    # E017: duplicate publisherId
+    id_counts: dict[int, int] = {}
+    for p in publishers:
+        pid = p.get("publisherId")
+        if pid is not None:
+            id_counts[pid] = id_counts.get(pid, 0) + 1
+
+    for pid, count in id_counts.items():
+        if count > 1:
+            findings.append(
+                LintFinding(
+                    rule_id="E017",
+                    severity="ERROR",
+                    message=(f"publisherId {pid} is duplicated ({count} occurrences)"),
+                    feed_id=pid,
+                    symbol=None,
+                )
+            )
+
+    # E018: duplicate publisher name
+    name_counts: dict[str, int] = {}
+    for p in publishers:
+        name = p.get("name")
+        if name:
+            name_counts[name] = name_counts.get(name, 0) + 1
+
+    for name, count in name_counts.items():
+        if count > 1:
+            findings.append(
+                LintFinding(
+                    rule_id="E018",
+                    severity="ERROR",
+                    message=(
+                        f"publisher name '{name}' is duplicated"
+                        f" ({count} occurrences)"
+                    ),
+                    feed_id=None,
+                    symbol=name,
+                )
+            )
+
+    return findings
+
+
 def lint_config(config: dict, now: Optional[datetime] = None) -> list[LintFinding]:
     """Orchestrator. Takes the full parsed after.json root object."""
     feeds = config.get("feeds", [])
@@ -996,6 +1055,7 @@ def lint_config(config: dict, now: Optional[datetime] = None) -> list[LintFindin
     findings: list[LintFinding] = []
     findings.extend(check_duplicates(feeds))
     findings.extend(check_schema(feeds))
+    findings.extend(check_publisher_duplicates(publishers))
     findings.extend(check_publishers(feeds, publishers))
     findings.extend(check_schedules(feeds))
     findings.extend(check_hermes_ids(feeds))

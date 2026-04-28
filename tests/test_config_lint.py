@@ -6,6 +6,7 @@ from lib.config_lint import (
     check_duplicates,
     check_schema,
     check_publishers,
+    check_publisher_duplicates,
     check_schedules,
     check_hermes_ids,
     check_expired_coming_soon_futures,
@@ -2305,6 +2306,96 @@ class TestIndexSubNamespaceGrouping:
         errors = [f for f in findings if f.rule_id == "E011"]
         assert len(errors) == 1
         assert errors[0].feed_id == 3
+
+
+class TestCheckPublisherDuplicates:
+    def test_no_duplicates_no_findings(self):
+        publishers = [
+            {"publisherId": 1, "name": "alpha", "keyType": "PRODUCTION"},
+            {"publisherId": 2, "name": "beta", "keyType": "PRODUCTION"},
+            {"publisherId": 3, "name": "gamma", "keyType": "PRODUCTION"},
+        ]
+        findings = check_publisher_duplicates(publishers)
+        assert findings == []
+
+    def test_e017_duplicate_publisher_id(self):
+        publishers = [
+            {"publisherId": 1, "name": "alpha", "keyType": "PRODUCTION"},
+            {"publisherId": 1, "name": "beta", "keyType": "PRODUCTION"},
+        ]
+        findings = check_publisher_duplicates(publishers)
+        e017 = [f for f in findings if f.rule_id == "E017"]
+        assert len(e017) == 1
+        assert "1" in e017[0].message
+        assert e017[0].feed_id == 1
+
+    def test_e018_duplicate_publisher_name(self):
+        publishers = [
+            {"publisherId": 1, "name": "alpha", "keyType": "PRODUCTION"},
+            {"publisherId": 2, "name": "alpha", "keyType": "PRODUCTION"},
+        ]
+        findings = check_publisher_duplicates(publishers)
+        e018 = [f for f in findings if f.rule_id == "E018"]
+        assert len(e018) == 1
+        assert "alpha" in e018[0].message
+        assert e018[0].symbol == "alpha"
+
+    def test_e017_and_e018_independent(self):
+        # Two distinct dup classes: id 1 duplicated, name "shared" duplicated
+        publishers = [
+            {"publisherId": 1, "name": "alpha", "keyType": "PRODUCTION"},
+            {"publisherId": 1, "name": "beta", "keyType": "PRODUCTION"},
+            {"publisherId": 2, "name": "shared", "keyType": "PRODUCTION"},
+            {"publisherId": 3, "name": "shared", "keyType": "PRODUCTION"},
+        ]
+        findings = check_publisher_duplicates(publishers)
+        e017 = [f for f in findings if f.rule_id == "E017"]
+        e018 = [f for f in findings if f.rule_id == "E018"]
+        assert len(e017) == 1
+        assert len(e018) == 1
+
+    def test_skips_publishers_with_missing_id_or_name(self):
+        # Missing fields should not crash, no findings produced
+        publishers = [
+            {"name": "alpha", "keyType": "PRODUCTION"},
+            {"publisherId": 1, "keyType": "PRODUCTION"},
+            {"keyType": "PRODUCTION"},
+        ]
+        findings = check_publisher_duplicates(publishers)
+        assert findings == []
+
+    def test_three_way_duplicate_id_emits_one_finding(self):
+        publishers = [
+            {"publisherId": 7, "name": "a", "keyType": "PRODUCTION"},
+            {"publisherId": 7, "name": "b", "keyType": "PRODUCTION"},
+            {"publisherId": 7, "name": "c", "keyType": "PRODUCTION"},
+        ]
+        findings = check_publisher_duplicates(publishers)
+        e017 = [f for f in findings if f.rule_id == "E017"]
+        assert len(e017) == 1
+        assert "3" in e017[0].message  # mentions occurrence count
+
+    def test_case_sensitive_name_comparison(self):
+        # 'Alpha' and 'alpha' are distinct — not flagged
+        publishers = [
+            {"publisherId": 1, "name": "Alpha", "keyType": "PRODUCTION"},
+            {"publisherId": 2, "name": "alpha", "keyType": "PRODUCTION"},
+        ]
+        findings = check_publisher_duplicates(publishers)
+        assert findings == []
+
+    def test_lint_config_orchestrator_runs_check(self):
+        # Verify the new check is wired into lint_config
+        config = {
+            "feeds": [],
+            "publishers": [
+                {"publisherId": 1, "name": "alpha", "keyType": "PRODUCTION"},
+                {"publisherId": 1, "name": "beta", "keyType": "PRODUCTION"},
+            ],
+        }
+        findings = lint_config(config)
+        e017 = [f for f in findings if f.rule_id == "E017"]
+        assert len(e017) == 1
 
 
 class TestLintConfigDiff:
