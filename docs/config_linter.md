@@ -5,35 +5,94 @@ Lints `after.json` for structural mistakes, publisher-reference errors, schedule
 ## Usage
 
 ```bash
-# Basic lint (colored text output to terminal)
+# Default: diff mode against origin/main (auto-detected via git)
 python3 config_linter.py --config after.json
 
-# JSON output to terminal
+# Diff against an explicit baseline file
+python3 config_linter.py --config after.json --baseline before.json
+
+# Diff against a different ref (e.g. develop)
+python3 config_linter.py --config after.json --baseline-ref develop
+
+# Force full lint (skip baseline)
+python3 config_linter.py --config after.json --no-baseline
+
+# JSON output
 python3 config_linter.py --config after.json --format json
 
 # Write results to file (format auto-detected from extension)
-python3 config_linter.py --config after.json --output lint_results.json
-python3 config_linter.py --config after.json --output lint_results.txt
+python3 config_linter.py --config after.json --output lint.json
 
-# Treat warnings as errors (exit 1 on warnings)
+# Treat warnings as errors (in diff mode applies to NEW warnings only)
 python3 config_linter.py --config after.json --warnings-as-errors
-
-# CI usage: JSON output + fail on warnings
-python3 config_linter.py --config after.json --output lint.json --warnings-as-errors
 ```
 
 ## Arguments
 
-| Argument               | Description                                              | Required | Default |
-| ---------------------- | -------------------------------------------------------- | -------- | ------- |
-| `--config`             | Path to `after.json` config file                         | Yes      | —       |
-| `--format`             | Output format: `text` or `json`                          | No       | `text`  |
-| `--warnings-as-errors` | Exit 1 if any warning is present (in addition to errors) | No       | False   |
+| Argument               | Description                                                                                        | Required | Default       |
+| ---------------------- | -------------------------------------------------------------------------------------------------- | -------- | ------------- |
+| `--config`             | Path to `after.json` config file                                                                   | Yes      | —             |
+| `--baseline`           | Path to baseline config file (overrides git auto-detect). Mutually exclusive with `--no-baseline`. | No       | (auto-detect) |
+| `--baseline-ref`       | Git ref used for auto-detect. Ignored when `--baseline` or `--no-baseline` is provided.            | No       | `origin/main` |
+| `--no-baseline`        | Force full lint, skipping baseline-diff mode entirely. Mutually exclusive with `--baseline`.       | No       | False         |
+| `--format`             | Output format: `text` or `json`                                                                    | No       | `text`        |
+| `--warnings-as-errors` | Exit 1 if any warning is present (in diff mode, applies to **new** warnings only)                  | No       | False         |
+| `--output`             | Write findings to file (format auto-detected from extension)                                       | No       | —             |
+
+## Default Behavior (Diff Mode)
+
+By default the linter compares the current working-tree config against the version that existed at the merge-base of the current branch and `origin/main`, and reports only findings introduced by changes on the current branch. Pre-existing findings are silently suppressed.
+
+The baseline is discovered automatically via:
+
+1. `git rev-parse --is-inside-work-tree`
+2. `git rev-parse <baseline-ref>` (default: `origin/main`)
+3. `git merge-base HEAD <baseline-ref>` (must be different from HEAD)
+4. `git show <merge-base>:<config-path>`
+
+If any step fails, the linter prints `NOTE: baseline unavailable (<reason>); running full lint` to stderr and falls back to the legacy full-lint behavior.
+
+### Auto-detect failure modes
+
+| Situation                                             | `<reason>`                                      |
+| ----------------------------------------------------- | ----------------------------------------------- |
+| Not inside a git work tree                            | `not a git repository`                          |
+| Baseline ref does not exist locally                   | `ref 'origin/main' not found`                   |
+| Current `HEAD` is on the baseline ref (no divergence) | `on baseline ref, no diff to compute`           |
+| Config path was not tracked at the merge-base         | `path 'after.json' not present at <merge-base>` |
+| `git` binary not on PATH                              | `git command not available`                     |
+| Baseline JSON fails to parse                          | `baseline JSON invalid: <error>`                |
+
+### Diff-mode output
+
+```
+ERRORS (1 new):
+  E004  Feed 1163 (Equity.US.NVDA/USD): minPublishers (5) >= publisher count (5), no fault tolerance
+
+WARNINGS (1 new):
+  W003  Feed 999 (Commodities.GCH6/USD): REGULAR schedule deviates from (commodity, GC) majority
+
+Summary: 1 new errors, 1 new warnings (12 pre-existing findings suppressed)
+```
+
+When zero new findings are reported:
+
+```
+No new issues found. (12 pre-existing findings suppressed)
+```
+
+JSON output is unchanged in shape — a flat array of finding objects, just filtered. Pre-existing-count metadata appears only in text output.
+
+### Comparison key
+
+A finding is considered pre-existing when its `(rule_id, feed_id, symbol)` tuple matches any finding produced by linting the baseline. Message text is intentionally excluded from the key, so magnitude changes within a rule (e.g. a publisher count dropping further on E004) do not surface as new findings. If you want to address those, run with `--no-baseline` periodically.
 
 ## Exit Codes
 
 - `0` — no errors (warnings allowed unless `--warnings-as-errors`)
 - `1` — at least one **ERROR** finding (or any finding when `--warnings-as-errors`)
+
+In diff mode, exit code reflects only **new** findings. Pre-existing findings never affect exit code.
 
 ## Rule Scope
 

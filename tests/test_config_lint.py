@@ -2305,3 +2305,202 @@ class TestIndexSubNamespaceGrouping:
         errors = [f for f in findings if f.rule_id == "E011"]
         assert len(errors) == 1
         assert errors[0].feed_id == 3
+
+
+class TestLintConfigDiff:
+    def test_suppresses_preexisting_finding(self):
+        # Both before and after have feed 100 with E005 (STABLE, no publishers).
+        feed = _make_feed(
+            100,
+            symbol="Equity.US.AAPL/USD",
+            asset_type="equity",
+            publisher_ids=[],
+        )
+        before = _make_config([feed])
+        after = _make_config([dict(feed)])
+        from lib.config_lint import lint_config_diff
+
+        result = lint_config_diff(after, before)
+        assert result == []
+
+    def test_reports_newly_introduced_finding(self):
+        clean = _make_feed(
+            100,
+            symbol="Equity.US.AAPL/USD",
+            asset_type="equity",
+            publisher_ids=[1, 2, 3],
+        )
+        broken = dict(clean)
+        broken["allowedPublisherIds"] = []  # E005
+        before = _make_config([clean])
+        after = _make_config([broken])
+        from lib.config_lint import lint_config_diff
+
+        result = lint_config_diff(after, before)
+        assert len(result) == 1
+        assert result[0].rule_id == "E005"
+        assert result[0].feed_id == 100
+
+    def test_reports_finding_on_brand_new_feed(self):
+        existing = _make_feed(
+            100,
+            symbol="Equity.US.AAPL/USD",
+            asset_type="equity",
+            publisher_ids=[1, 2, 3],
+        )
+        new_broken = _make_feed(
+            999,
+            symbol="Equity.US.NVDA/USD",
+            asset_type="equity",
+            publisher_ids=[],
+        )
+        before = _make_config([existing])
+        after = _make_config([existing, new_broken])
+        from lib.config_lint import lint_config_diff
+
+        result = lint_config_diff(after, before)
+        e005 = [f for f in result if f.rule_id == "E005"]
+        assert len(e005) == 1
+        assert e005[0].feed_id == 999
+
+    def test_drops_findings_for_removed_feed(self):
+        keep = _make_feed(
+            100,
+            symbol="Equity.US.AAPL/USD",
+            asset_type="equity",
+            publisher_ids=[1, 2, 3],
+        )
+        removed = _make_feed(
+            200,
+            symbol="Equity.US.MSFT/USD",
+            asset_type="equity",
+            publisher_ids=[],  # E005
+        )
+        before = _make_config([keep, removed])
+        after = _make_config([keep])
+        from lib.config_lint import lint_config_diff
+
+        result = lint_config_diff(after, before)
+        assert result == []
+
+    def test_treats_symbol_rename_as_new(self):
+        before_feed = _make_feed(
+            100,
+            symbol="Equity.US.OLD/USD",
+            asset_type="equity",
+            publisher_ids=[],  # E005
+        )
+        after_feed = _make_feed(
+            100,
+            symbol="Equity.US.NEW/USD",
+            asset_type="equity",
+            publisher_ids=[],  # E005
+        )
+        before = _make_config([before_feed])
+        after = _make_config([after_feed])
+        from lib.config_lint import lint_config_diff
+
+        result = lint_config_diff(after, before)
+        e005 = [
+            f for f in result if f.rule_id == "E005" and f.symbol == "Equity.US.NEW/USD"
+        ]
+        assert len(e005) == 1
+        assert e005[0].symbol == "Equity.US.NEW/USD"
+
+    def test_handles_group_rule_cascade(self):
+        # Three STABLE equity feeds with identical schedule. Adding a 4th
+        # with a deviating schedule should fire E011 only on the new feed.
+        sched_us = [
+            {
+                "marketSchedule": "America/New_York;O,O,O,O,O,O,O;",
+                "session": "REGULAR",
+            }
+        ]
+        sched_other = [
+            {
+                "marketSchedule": "America/Chicago;O,O,O,O,O,O,O;",
+                "session": "REGULAR",
+            }
+        ]
+        existing = [
+            _make_feed(
+                fid,
+                symbol=f"Equity.US.SYM{fid}/USD",
+                asset_type="equity",
+                publisher_ids=[1, 2, 3],
+                schedules=sched_us,
+            )
+            for fid in (1, 2, 3)
+        ]
+        deviant = _make_feed(
+            4,
+            symbol="Equity.US.SYM4/USD",
+            asset_type="equity",
+            publisher_ids=[1, 2, 3],
+            schedules=sched_other,
+        )
+        before = _make_config(existing)
+        after = _make_config(existing + [deviant])
+        from lib.config_lint import lint_config_diff
+
+        result = lint_config_diff(after, before)
+        e011 = [f for f in result if f.rule_id == "E011"]
+        assert len(e011) == 1
+        assert e011[0].feed_id == 4
+
+    def test_uses_consistent_now_for_e013(self):
+        # COMING_SOON futures feed with all validTo in the past.
+        # Same feed in before and after — E013 fires identically.
+        feed = {
+            "feedId": 500,
+            "symbol": "Commodities.GCH5/USD",
+            "state": "COMING_SOON",
+            "kind": "PRICE",
+            "minPublishers": 0,
+            "metadata": {"asset_type": "commodity"},
+            "marketSchedules": [
+                {
+                    "marketSchedule": "America/New_York;O,O,O,O,O,O,O;",
+                    "session": "REGULAR",
+                    "benchmarkMapping": {
+                        "datascope": {
+                            "identifiers": [
+                                {
+                                    "identifier": "GCH5",
+                                    "validFrom": "2024-01-01T00:00:00Z",
+                                    "validTo": "2025-03-27T00:00:00Z",
+                                }
+                            ]
+                        }
+                    },
+                }
+            ],
+        }
+        before = _make_config([feed])
+        after = _make_config([dict(feed)])
+        from lib.config_lint import lint_config_diff
+
+        # Now is well after the validTo so E013 fires in both runs.
+        now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        result = lint_config_diff(after, before, now=now)
+        assert result == []
+
+    def test_finding_key_is_rule_feed_symbol(self):
+        from lib.config_lint import _finding_key
+
+        a = LintFinding(
+            rule_id="E001",
+            severity="ERROR",
+            message="msg-A",
+            feed_id=10,
+            symbol="X",
+        )
+        b = LintFinding(
+            rule_id="E001",
+            severity="ERROR",
+            message="msg-B",
+            feed_id=10,
+            symbol="X",
+        )
+        assert _finding_key(a) == _finding_key(b)
+        assert _finding_key(a) == ("E001", 10, "X")
