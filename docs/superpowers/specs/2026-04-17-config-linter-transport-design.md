@@ -26,15 +26,15 @@ The config linter (`config_linter.py` + `lib/config_lint.py`, rules E001–E016 
 
 ## Decisions (from brainstorming)
 
-| Question | Decision |
-| --- | --- |
-| Scope | Copy files **and** add CI integration. |
-| Warnings policy | Errors block, warnings reported but non-blocking. `--warnings-as-errors` not used. |
-| File layout in governance | Contained under `tools/config-linter/`. |
-| Workflow choice | Extend existing `ci-pr.yml`; no new workflow. |
-| Tests | Copy and run in CI on every PR. |
-| Ownership model | Governance is canonical for future edits (1b). The integration-benchmarking copy is kept as a frozen reference — it will drift, and that is acceptable. |
-| Docs | Short `README.md` in `tools/config-linter/`; full rule reference at `docs/config_linter.md` in governance. |
+| Question                  | Decision                                                                                                                                                |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scope                     | Copy files **and** add CI integration.                                                                                                                  |
+| Warnings policy           | Errors block, warnings reported but non-blocking. `--warnings-as-errors` not used.                                                                      |
+| File layout in governance | Contained under `tools/config-linter/`.                                                                                                                 |
+| Workflow choice           | Extend existing `ci-pr.yml`; no new workflow.                                                                                                           |
+| Tests                     | Copy and run in CI on every PR.                                                                                                                         |
+| Ownership model           | Governance is canonical for future edits (1b). The integration-benchmarking copy is kept as a frozen reference — it will drift, and that is acceptable. |
+| Docs                      | Short `README.md` in `tools/config-linter/`; full rule reference at `docs/config_linter.md` in governance.                                              |
 
 ## Architecture
 
@@ -77,6 +77,7 @@ The empty `__init__.py` files are added as a safety belt for pytest discovery; s
 
 ### New steps (appended after the existing "Push changes" step)
 
+<!-- prettier-ignore -->
 ```yaml
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -97,13 +98,13 @@ The empty `__init__.py` files are added as a safety belt for pytest discovery; s
 
 ### Behavior
 
-| PR scenario | `run linter tests` | `lint proposal config` | PR status |
-| --- | --- | --- | --- |
-| Proposal with clean `after.json` | green | green (no issues) | pass |
-| Proposal with warnings only | green | green (prints warnings, exits 0) | pass |
-| Proposal with errors | green | red (exit 1) | **blocked** |
-| PR that edits only `tools/config-linter/` | green | skipped (`if: env.PROPOSAL_DIR != ''`) | pass |
-| PR that breaks a lint rule's tests | **red** | n/a | **blocked** |
+| PR scenario                               | `run linter tests` | `lint proposal config`                 | PR status   |
+| ----------------------------------------- | ------------------ | -------------------------------------- | ----------- |
+| Proposal with clean `after.json`          | green              | green (no issues)                      | pass        |
+| Proposal with warnings only               | green              | green (prints warnings, exits 0)       | pass        |
+| Proposal with errors                      | green              | red (exit 1)                           | **blocked** |
+| PR that edits only `tools/config-linter/` | green              | skipped (`if: env.PROPOSAL_DIR != ''`) | pass        |
+| PR that breaks a lint rule's tests        | **red**            | n/a                                    | **blocked** |
 
 ### Ordering rationale
 

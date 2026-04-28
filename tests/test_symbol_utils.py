@@ -1,4 +1,9 @@
-from lib.symbol_utils import futures_root, is_futures_symbol, is_us_equity
+from lib.symbol_utils import (
+    equity_listing_prefix,
+    futures_root,
+    is_futures_symbol,
+    is_us_equity,
+)
 
 
 class TestIsFuturesSymbol:
@@ -63,3 +68,38 @@ class TestFuturesRoot:
 
     def test_empty_string(self):
         assert futures_root("") == ""
+
+
+class TestEquityListingPrefix:
+    def test_us_equity(self):
+        assert equity_listing_prefix("Equity.US.AAPL/USD") == "US"
+
+    def test_jp_equity(self):
+        assert equity_listing_prefix("Equity.JP.1305/JPY") == "JP"
+
+    def test_kr_equity(self):
+        assert equity_listing_prefix("Equity.KR.000100/KRW") == "KR"
+
+    def test_index_equity(self):
+        assert equity_listing_prefix("Equity.Index.TSLA/USD") == "Index"
+
+    def test_us_equity_future(self):
+        assert equity_listing_prefix("Equity.US.EMH6/USD") == "US"
+
+    def test_non_equity_crypto(self):
+        assert equity_listing_prefix("Crypto.BTC/USD") == ""
+
+    def test_non_equity_fx(self):
+        assert equity_listing_prefix("FX.EUR/USD") == ""
+
+    def test_non_equity_commodity(self):
+        assert equity_listing_prefix("Commodities.WTIK6/USD") == ""
+
+    def test_malformed_two_segments(self):
+        assert equity_listing_prefix("Equity.US") == ""
+
+    def test_malformed_no_dots(self):
+        assert equity_listing_prefix("EquityUSAAPL") == ""
+
+    def test_empty_string(self):
+        assert equity_listing_prefix("") == ""

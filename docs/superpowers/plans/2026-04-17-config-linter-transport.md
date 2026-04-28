@@ -11,6 +11,7 @@
 **Reference spec:** `docs/superpowers/specs/2026-04-17-config-linter-transport-design.md`
 
 **Source file paths (integration-benchmarking):**
+
 - `/home/mariobern/integration-benchmarking/config_linter.py`
 - `/home/mariobern/integration-benchmarking/lib/config_lint.py`
 - `/home/mariobern/integration-benchmarking/lib/symbol_utils.py`
@@ -25,6 +26,7 @@
 ## Task 1: Create branch and directory structure in governance
 
 **Files:**
+
 - Create: `/home/mariobern/pyth-lazer-staging-governance/tools/config-linter/lib/`
 - Create: `/home/mariobern/pyth-lazer-staging-governance/tools/config-linter/tests/`
 - Create: `/home/mariobern/pyth-lazer-staging-governance/docs/`
@@ -32,27 +34,33 @@
 - [ ] **Step 1: Confirm governance repo is clean and on main**
 
 Run:
+
 ```bash
 cd /home/mariobern/pyth-lazer-staging-governance && git status
 ```
+
 Expected: `On branch main`, `nothing to commit, working tree clean`. If not clean, stop and ask the user before continuing.
 
 - [ ] **Step 2: Create branch `feat/config-linter`**
 
 Run:
+
 ```bash
 cd /home/mariobern/pyth-lazer-staging-governance && git checkout -b feat/config-linter
 ```
+
 Expected: `Switched to a new branch 'feat/config-linter'`.
 
 - [ ] **Step 3: Create the directory tree**
 
 Run:
+
 ```bash
 mkdir -p /home/mariobern/pyth-lazer-staging-governance/tools/config-linter/lib
 mkdir -p /home/mariobern/pyth-lazer-staging-governance/tools/config-linter/tests
 mkdir -p /home/mariobern/pyth-lazer-staging-governance/docs
 ```
+
 Expected: no output. Verify with `ls -d /home/mariobern/pyth-lazer-staging-governance/tools/config-linter/{lib,tests} /home/mariobern/pyth-lazer-staging-governance/docs`.
 
 - [ ] **Step 4: No commit yet** — empty directories are not tracked by git; Task 2 creates files that will make them real.
@@ -62,6 +70,7 @@ Expected: no output. Verify with `ls -d /home/mariobern/pyth-lazer-staging-gover
 ## Task 2: Copy linter source files
 
 **Files:**
+
 - Create: `tools/config-linter/config_linter.py` (copy from source)
 - Create: `tools/config-linter/lib/config_lint.py` (copy from source)
 - Create: `tools/config-linter/lib/symbol_utils.py` (copy from source)
@@ -70,18 +79,23 @@ Expected: no output. Verify with `ls -d /home/mariobern/pyth-lazer-staging-gover
 - [ ] **Step 1: Copy the three Python source files**
 
 Run:
+
 ```bash
 cp /home/mariobern/integration-benchmarking/config_linter.py /home/mariobern/pyth-lazer-staging-governance/tools/config-linter/config_linter.py
 cp /home/mariobern/integration-benchmarking/lib/config_lint.py /home/mariobern/pyth-lazer-staging-governance/tools/config-linter/lib/config_lint.py
 cp /home/mariobern/integration-benchmarking/lib/symbol_utils.py /home/mariobern/pyth-lazer-staging-governance/tools/config-linter/lib/symbol_utils.py
 ```
+
 Expected: no output. Verify with:
+
 ```bash
 wc -l /home/mariobern/pyth-lazer-staging-governance/tools/config-linter/config_linter.py \
       /home/mariobern/pyth-lazer-staging-governance/tools/config-linter/lib/config_lint.py \
       /home/mariobern/pyth-lazer-staging-governance/tools/config-linter/lib/symbol_utils.py
 ```
+
 Expected line counts (approximate, match the source):
+
 - `config_linter.py`: 175 lines
 - `lib/config_lint.py`: ~959 lines
 - `lib/symbol_utils.py`: ~60 lines
@@ -89,22 +103,27 @@ Expected line counts (approximate, match the source):
 - [ ] **Step 2: Create empty `lib/__init__.py`**
 
 Run:
+
 ```bash
 touch /home/mariobern/pyth-lazer-staging-governance/tools/config-linter/lib/__init__.py
 ```
+
 Expected: no output. Verify: `test -f /home/mariobern/pyth-lazer-staging-governance/tools/config-linter/lib/__init__.py && echo ok`.
 
 - [ ] **Step 3: Sanity-check imports before committing**
 
 Run:
+
 ```bash
 cd /home/mariobern/pyth-lazer-staging-governance && python3 -c "import sys; sys.path.insert(0, 'tools/config-linter'); from lib.config_lint import lint_config; print('imports ok')"
 ```
+
 Expected: `imports ok`. If this fails, stop and debug — something is wrong with the copy.
 
 - [ ] **Step 4: Commit**
 
 Run:
+
 ```bash
 cd /home/mariobern/pyth-lazer-staging-governance && \
   git add tools/config-linter/config_linter.py \
@@ -113,6 +132,7 @@ cd /home/mariobern/pyth-lazer-staging-governance && \
           tools/config-linter/lib/__init__.py && \
   git commit -m "feat: copy config linter source from integration-benchmarking"
 ```
+
 Expected: `4 files changed, ~1194 insertions(+)`.
 
 ---
@@ -120,6 +140,7 @@ Expected: `4 files changed, ~1194 insertions(+)`.
 ## Task 3: Copy linter tests
 
 **Files:**
+
 - Create: `tools/config-linter/tests/test_config_lint.py` (copy from source)
 - Create: `tools/config-linter/tests/test_config_linter_cli.py` (copy from source)
 - Create: `tools/config-linter/tests/__init__.py` (new, empty)
@@ -127,20 +148,25 @@ Expected: `4 files changed, ~1194 insertions(+)`.
 - [ ] **Step 1: Copy the two test files**
 
 Run:
+
 ```bash
 cp /home/mariobern/integration-benchmarking/tests/test_config_lint.py /home/mariobern/pyth-lazer-staging-governance/tools/config-linter/tests/test_config_lint.py
 cp /home/mariobern/integration-benchmarking/tests/test_config_linter_cli.py /home/mariobern/pyth-lazer-staging-governance/tools/config-linter/tests/test_config_linter_cli.py
 ```
+
 Expected: no output. Verify with:
+
 ```bash
 wc -l /home/mariobern/pyth-lazer-staging-governance/tools/config-linter/tests/test_config_lint.py \
       /home/mariobern/pyth-lazer-staging-governance/tools/config-linter/tests/test_config_linter_cli.py
 ```
+
 Expected: ~1547 and ~123 lines.
 
 - [ ] **Step 2: Create empty `tests/__init__.py`**
 
 Run:
+
 ```bash
 touch /home/mariobern/pyth-lazer-staging-governance/tools/config-linter/tests/__init__.py
 ```
@@ -148,27 +174,33 @@ touch /home/mariobern/pyth-lazer-staging-governance/tools/config-linter/tests/__
 - [ ] **Step 3: Ensure pytest is installed locally**
 
 Run:
+
 ```bash
 python3 -c "import pytest; print(pytest.__version__)"
 ```
+
 Expected: prints a version number (e.g., `7.4.4` or similar). If it errors with `ModuleNotFoundError`, run `pip install pytest` before continuing.
 
 - [ ] **Step 4: Run the test suite locally**
 
 Run:
+
 ```bash
 cd /home/mariobern/pyth-lazer-staging-governance/tools/config-linter && python3 -m pytest tests/ -v
 ```
+
 Expected: all tests pass. There are several hundred tests across `test_config_lint.py` and 7 in `test_config_linter_cli.py`. If any fail, stop and debug — most likely cause is an `__init__.py` / `sys.path` issue (fix by ensuring the `__init__.py` files from Task 2 step 2 and Task 3 step 2 exist).
 
 - [ ] **Step 5: Commit**
 
 Run:
+
 ```bash
 cd /home/mariobern/pyth-lazer-staging-governance && \
   git add tools/config-linter/tests/ && \
   git commit -m "test: copy config linter test suite"
 ```
+
 Expected: `3 files changed, ~1670 insertions(+)`.
 
 ---
@@ -176,19 +208,24 @@ Expected: `3 files changed, ~1670 insertions(+)`.
 ## Task 4: Add rule reference docs and tool README
 
 **Files:**
+
 - Create: `docs/config_linter.md` (copy from source)
 - Create: `tools/config-linter/README.md` (new, short)
 
 - [ ] **Step 1: Copy the full rule reference**
 
 Run:
+
 ```bash
 cp /home/mariobern/integration-benchmarking/docs/config_linter.md /home/mariobern/pyth-lazer-staging-governance/docs/config_linter.md
 ```
+
 Expected: no output. Verify:
+
 ```bash
 wc -l /home/mariobern/pyth-lazer-staging-governance/docs/config_linter.md
 ```
+
 Expected: ~158 lines.
 
 - [ ] **Step 2: Write `tools/config-linter/README.md`**
@@ -229,11 +266,13 @@ Tests have no runtime dependencies beyond `pytest` and the Python standard libra
 - [ ] **Step 3: Commit**
 
 Run:
+
 ```bash
 cd /home/mariobern/pyth-lazer-staging-governance && \
   git add docs/config_linter.md tools/config-linter/README.md && \
   git commit -m "docs: add config linter rule reference and tool README"
 ```
+
 Expected: `2 files changed, ~185 insertions(+)`.
 
 ---
@@ -241,6 +280,7 @@ Expected: `2 files changed, ~185 insertions(+)`.
 ## Task 5: Extend ci-pr.yml with Python setup, tests, and lint steps
 
 **Files:**
+
 - Modify: `.github/workflows/ci-pr.yml` (append 4 steps after the existing `Push changes` step, ending at line 78)
 
 - [ ] **Step 1: Open `.github/workflows/ci-pr.yml`**
@@ -248,8 +288,8 @@ Expected: `2 files changed, ~185 insertions(+)`.
 Read `/home/mariobern/pyth-lazer-staging-governance/.github/workflows/ci-pr.yml`. The last existing step is `Push changes`, which ends with the `env:` block at lines 77–78:
 
 ```yaml
-        env:
-          GH_TOKEN: ${{ secrets.GH_OPS_TOKEN }}
+env:
+  GH_TOKEN: ${{ secrets.GH_OPS_TOKEN }}
 ```
 
 - [ ] **Step 2: Append 4 new steps after the `env:` block**
@@ -257,35 +297,40 @@ Read `/home/mariobern/pyth-lazer-staging-governance/.github/workflows/ci-pr.yml`
 Add exactly these lines to the end of the file, preserving YAML indentation (6 spaces for step keys under `steps:`):
 
 ```yaml
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Install linter dependencies
-        run: pip install pytest
-      - name: Run linter tests
-        working-directory: tools/config-linter
-        run: python3 -m pytest tests/ -v
-      - name: Lint proposal config
-        if: env.PROPOSAL_DIR != ''
-        run: python3 tools/config-linter/config_linter.py --config "${PROPOSAL_DIR}/after.json"
+- name: Set up Python
+  uses: actions/setup-python@v5
+  with:
+    python-version: "3.12"
+- name: Install linter dependencies
+  run: pip install pytest
+- name: Run linter tests
+  working-directory: tools/config-linter
+  run: python3 -m pytest tests/ -v
+- name: Lint proposal config
+  if: env.PROPOSAL_DIR != ''
+  run: python3 tools/config-linter/config_linter.py --config "${PROPOSAL_DIR}/after.json"
 ```
 
 - [ ] **Step 3: Validate YAML parses**
 
 Run:
+
 ```bash
 python3 -c "import yaml; yaml.safe_load(open('/home/mariobern/pyth-lazer-staging-governance/.github/workflows/ci-pr.yml'))" && echo "yaml ok"
 ```
+
 Expected: `yaml ok`. If `yaml` import fails, try `python3 -c "import json; import sys; sys.exit(0)"` as a process check and install pyyaml: `pip install pyyaml`.
 
 - [ ] **Step 4: Verify structure with grep**
 
 Run:
+
 ```bash
 grep -nE "^      - name:" /home/mariobern/pyth-lazer-staging-governance/.github/workflows/ci-pr.yml
 ```
+
 Expected: 9 step names total, in this order:
+
 1. (no name — `uses: actions/checkout@v4`, won't match this grep)
 2. `Login to Docker repository`
 3. `Pull Docker image`
@@ -302,11 +347,13 @@ Exactly 9 matches from `grep`; the checkout step has no `name:` so it is exclude
 - [ ] **Step 5: Commit**
 
 Run:
+
 ```bash
 cd /home/mariobern/pyth-lazer-staging-governance && \
   git add .github/workflows/ci-pr.yml && \
   git commit -m "ci: run config linter and tests on PRs"
 ```
+
 Expected: `1 file changed, 12 insertions(+)`.
 
 ---
@@ -318,24 +365,31 @@ Expected: `1 file changed, 12 insertions(+)`.
 - [ ] **Step 1: Re-run the full test suite**
 
 Run:
+
 ```bash
 cd /home/mariobern/pyth-lazer-staging-governance/tools/config-linter && python3 -m pytest tests/ -v
 ```
+
 Expected: all tests pass, same as Task 3 Step 4. If they no longer pass, something was corrupted between tasks — bisect with `git diff`.
 
 - [ ] **Step 2: Lint a real existing proposal**
 
 Pick an existing proposal directory — use the most recent one:
+
 ```bash
 ls -td /home/mariobern/pyth-lazer-staging-governance/2026-* | head -1
 ```
+
 Then run the linter from repo root against its `after.json`:
+
 ```bash
 cd /home/mariobern/pyth-lazer-staging-governance && \
   PROPOSAL_DIR=$(ls -d 2026-* | tail -1) && \
   python3 tools/config-linter/config_linter.py --config "${PROPOSAL_DIR}/after.json"
 ```
+
 Expected: one of:
+
 - `No issues found.` (exit 0), or
 - Structured ERRORS/WARNINGS output (exit 0 if warnings only, exit 1 if errors).
 
@@ -344,22 +398,26 @@ Expected: one of:
 - [ ] **Step 3: Check exit code is as expected**
 
 Run the previous command again and capture `$?`:
+
 ```bash
 cd /home/mariobern/pyth-lazer-staging-governance && \
   PROPOSAL_DIR=$(ls -d 2026-* | tail -1) && \
   python3 tools/config-linter/config_linter.py --config "${PROPOSAL_DIR}/after.json"; \
   echo "exit=$?"
 ```
+
 Expected: `exit=0` (clean or warnings-only) or `exit=1` (real errors). Either is a valid outcome — we're confirming the CLI doesn't crash, not that every existing proposal is clean.
 
 - [ ] **Step 4: Test JSON output format**
 
 Run:
+
 ```bash
 cd /home/mariobern/pyth-lazer-staging-governance && \
   PROPOSAL_DIR=$(ls -d 2026-* | tail -1) && \
   python3 tools/config-linter/config_linter.py --config "${PROPOSAL_DIR}/after.json" --format json | python3 -m json.tool > /dev/null && echo "json valid"
 ```
+
 Expected: `json valid`. Confirms `--format json` produces parseable JSON.
 
 ---
@@ -371,10 +429,13 @@ Expected: `json valid`. Confirms `--format json` produces parseable JSON.
 - [ ] **Step 1: Inspect commit history**
 
 Run:
+
 ```bash
 cd /home/mariobern/pyth-lazer-staging-governance && git log main..HEAD --oneline
 ```
+
 Expected 4 commits in this order:
+
 1. `feat: copy config linter source from integration-benchmarking`
 2. `test: copy config linter test suite`
 3. `docs: add config linter rule reference and tool README`
@@ -383,14 +444,17 @@ Expected 4 commits in this order:
 - [ ] **Step 2: Push the branch**
 
 Run:
+
 ```bash
 cd /home/mariobern/pyth-lazer-staging-governance && git push -u origin feat/config-linter
 ```
+
 Expected: push succeeds, branch is created on origin.
 
 - [ ] **Step 3: Open a pull request**
 
 Run:
+
 ```bash
 cd /home/mariobern/pyth-lazer-staging-governance && gh pr create \
   --title "Add config linter + CI integration" \
@@ -409,14 +473,17 @@ Governance becomes the canonical home for future linter edits. The copy in `inte
 EOF
 )"
 ```
+
 Expected: PR URL printed to stdout.
 
 - [ ] **Step 4: Wait for CI and report status**
 
 Run:
+
 ```bash
 cd /home/mariobern/pyth-lazer-staging-governance && gh pr checks --watch
 ```
+
 Expected: `Check proposal` passes. The `Lint proposal config` step should show as skipped (not red) because the PR does not modify any `after.json` file. The `Run linter tests` step should be green.
 
 If CI fails on `Run linter tests`, read the logs (`gh run view --log-failed`), fix the root cause, and push a follow-up commit.
@@ -428,6 +495,7 @@ If CI fails on `Run linter tests`, read the logs (`gh run view --log-failed`), f
 Skip this task if the user does not want the note added yet. This is a low-priority cleanup in the source repo.
 
 **Files:**
+
 - Modify: `/home/mariobern/integration-benchmarking/config_linter.py:1`
 - Modify: `/home/mariobern/integration-benchmarking/lib/config_lint.py:1`
 - Modify: `/home/mariobern/integration-benchmarking/CLAUDE.md:104`
@@ -435,6 +503,7 @@ Skip this task if the user does not want the note added yet. This is a low-prior
 - [ ] **Step 1: Create branch in integration-benchmarking**
 
 Run:
+
 ```bash
 cd /home/mariobern/integration-benchmarking && git checkout -b chore/config-linter-reference-note
 ```
@@ -471,22 +540,27 @@ Replace with:
 - [ ] **Step 5: Confirm the files still parse**
 
 Run:
+
 ```bash
 python3 -c "import sys; sys.path.insert(0, '/home/mariobern/integration-benchmarking'); from lib.config_lint import lint_config; print('ok')"
 ```
+
 Expected: `ok`.
 
 - [ ] **Step 6: Run pre-commit on the modified files**
 
 Run:
+
 ```bash
 cd /home/mariobern/integration-benchmarking && pre-commit run --files config_linter.py lib/config_lint.py CLAUDE.md
 ```
+
 Expected: pass (or auto-fix and show the diff). If pre-commit modifies files, re-stage them.
 
 - [ ] **Step 7: Commit and push**
 
 Run:
+
 ```bash
 cd /home/mariobern/integration-benchmarking && \
   git add config_linter.py lib/config_lint.py CLAUDE.md && \
@@ -497,6 +571,7 @@ cd /home/mariobern/integration-benchmarking && \
 - [ ] **Step 8: Open PR**
 
 Run:
+
 ```bash
 cd /home/mariobern/integration-benchmarking && gh pr create \
   --title "Mark config_linter as frozen reference" \
