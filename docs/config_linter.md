@@ -121,6 +121,8 @@ In diff mode, exit code reflects only **new** findings. Pre-existing findings ne
 | E014 | STABLE benchmarkable feed missing `benchmarkMapping`                                | STABLE, benchmarkable asset types, non-OVERNIGHT                              |
 | E015 | `corporateActions` schema violation (missing fields, invalid formats)               | any feed with `corporateActions`                                              |
 | E016 | Identifier date range overlap within same vendor/session                            | non-INACTIVE, 2+ identifiers per vendor                                       |
+| E017 | Duplicate `publisherId` in publishers array                                         | publishers array                                                              |
+| E018 | Duplicate publisher `name` in publishers array                                      | publishers array                                                              |
 
 ## Warnings
 
@@ -184,6 +186,15 @@ To add support for a new event type, add an entry to `_CORPORATE_ACTION_SCHEMAS`
 ## Notes on E016 (Identifier Continuity)
 
 Checks for date range overlaps when a vendor has multiple identifiers in a single session (e.g., futures contract rolls). Identifiers are sorted by `validFrom` and consecutive pairs are checked. A non-last identifier missing `validTo` is flagged because it creates an unbounded range that logically conflicts with its successor. The last identifier in the chain may omit `validTo` (open-ended current contract).
+
+## Notes on E017 / E018 (Publisher Uniqueness)
+
+Both rules mirror invariants the Rust governance tool enforces in `diff_publishers`. The governance tool aborts the proposal pipeline with `Error: publisher ids are not unique` (or `... names are not unique`); catching the same condition in our linter surfaces a readable error message before the Rust tool's stack trace reaches CI.
+
+- **E017** fires when two entries in the top-level `publishers` array share the same `publisherId`. The `feed_id` slot of the finding holds the duplicated id.
+- **E018** fires when two entries share the same `name` (case-sensitive). The `symbol` slot of the finding holds the duplicated name.
+
+Publishers missing either field are skipped by these checks (a separate schema rule would be the right place to flag missing fields).
 
 ## Output Formats
 
