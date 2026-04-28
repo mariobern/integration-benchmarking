@@ -1,8 +1,6 @@
 import json
 import subprocess
 
-import pytest
-
 from lib.baseline_lookup import lookup_baseline_config
 
 
