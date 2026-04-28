@@ -213,6 +213,21 @@ All 14 tests added in the original design continue to pass under per-session buc
 - E011 fires on per-session drift within a single session inside the US group.
 - E011 fires on extended-session drift (e.g., OVER_NIGHT mismatch with REGULAR matched).
 
+### Follow-up: Index sub-namespace generalization
+
+The post-refinement smoke test surfaced 2 E011 + 3 W003 findings on `Metal.Index.*` and `FX.Index.*` feeds. These are the non-equity analogue of `Equity.Index.*` — a separate sub-namespace within the asset class with intentionally different schedules (always-open index quotes vs spot/continuous trading hours). The original design only special-cased `Equity.<X>.*` for sub-prefixing.
+
+The follow-up extends the group-key construction with a generic Index branch:
+
+```python
+elif len(sym_parts) >= 3 and sym_parts[1] == "Index":
+    group_key = (asset_type, "Index", futures_root(sym)) if is_futures_symbol(sym) else (asset_type, "Index")
+```
+
+After this branch, `Metal.Index.GOLD/USD` lands in `("metal", "Index")`, separate from `Metal.XAU/USD`'s `("metal",)` group. Same for `FX.Index.*` and any future `<AssetClass>.Index.*` namespace.
+
+Test coverage: `TestIndexSubNamespaceGrouping` (3 tests).
+
 ### Files touched in the refinement
 
 | File                                                                             | Change                                                                                                                             |

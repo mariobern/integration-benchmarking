@@ -507,12 +507,20 @@ def check_schedules(feeds: list[dict]) -> list[LintFinding]:
                 )
 
         # Build the group key for E011 / W003 (without session).
+        sym_parts = sym.split(".")
         if asset_type == "equity":
             prefix = equity_listing_prefix(sym)
             if is_futures_symbol(sym):
                 group_key: tuple = (asset_type, prefix, futures_root(sym))
             else:
                 group_key = (asset_type, prefix)
+        elif len(sym_parts) >= 3 and sym_parts[1] == "Index":
+            # <AssetClass>.Index.* (Metal.Index, FX.Index, ...) is a separate
+            # sub-namespace from spot/regular feeds in the same asset class.
+            if is_futures_symbol(sym):
+                group_key = (asset_type, "Index", futures_root(sym))
+            else:
+                group_key = (asset_type, "Index")
         else:
             if is_futures_symbol(sym):
                 group_key = (asset_type, futures_root(sym))

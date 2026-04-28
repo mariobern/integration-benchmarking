@@ -2166,3 +2166,142 @@ class TestPerSessionSchedule:
         assert len(errors) == 1
         assert errors[0].feed_id == 3
         assert "OVER_NIGHT" in errors[0].message
+
+
+class TestIndexSubNamespaceGrouping:
+    """Index sub-namespace (Metal.Index, FX.Index, Crypto.Index, ...)
+    gets its own group separate from the asset class's spot/regular feeds.
+    Mirrors how Equity.Index is handled via equity_listing_prefix."""
+
+    def test_e011_metal_index_separate_from_metal_spot(self):
+        """Metal.Index.GOLD (always-open) and Metal.XAU (continuous) must
+        land in different groups; their schedule difference is intentional."""
+        always_open = [
+            {
+                "marketSchedule": "America/New_York;O,O,O,O,O,O,O;",
+                "session": "REGULAR",
+            }
+        ]
+        continuous = [
+            {
+                "marketSchedule": "America/New_York;0000-1700&1800-2400,0000-1700&1800-2400,0000-1700&1800-2400,0000-1700&1800-2400,0000-1700,C,1800-2400;",
+                "session": "REGULAR",
+            }
+        ]
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Metal.Index.GOLD/USD",
+                asset_type="metal",
+                state="STABLE",
+                schedules=always_open,
+            ),
+            _make_feed(
+                2,
+                symbol="Metal.Index.SILVER/USD",
+                asset_type="metal",
+                state="STABLE",
+                schedules=always_open,
+            ),
+            _make_feed(
+                3,
+                symbol="Metal.XAU/USD",
+                asset_type="metal",
+                state="STABLE",
+                schedules=continuous,
+            ),
+            _make_feed(
+                4,
+                symbol="Metal.XAG/USD",
+                asset_type="metal",
+                state="STABLE",
+                schedules=continuous,
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 0
+
+    def test_e011_fx_index_separate_from_fx_spot(self):
+        """FX.Index pairs must not group with FX spot pairs."""
+        sched_index = [
+            {
+                "marketSchedule": "America/New_York;O,O,O,O,O,O,O;",
+                "session": "REGULAR",
+            }
+        ]
+        sched_spot = [
+            {
+                "marketSchedule": "America/New_York;O,O,O,O,0000-1700,C,1700-2400;",
+                "session": "REGULAR",
+            }
+        ]
+        feeds = [
+            _make_feed(
+                1,
+                symbol="FX.Index.EUR/USD",
+                asset_type="fx",
+                state="STABLE",
+                schedules=sched_index,
+            ),
+            _make_feed(
+                2,
+                symbol="FX.EUR/USD",
+                asset_type="fx",
+                state="STABLE",
+                schedules=sched_spot,
+            ),
+            _make_feed(
+                3,
+                symbol="FX.GBP/USD",
+                asset_type="fx",
+                state="STABLE",
+                schedules=sched_spot,
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 0
+
+    def test_e011_intra_metal_index_drift_fires(self):
+        """If Metal.Index feeds disagree with each other, E011 must fire
+        on the minority — confirms the new sub-group is itself active."""
+        sched_a = [
+            {
+                "marketSchedule": "America/New_York;O,O,O,O,O,O,O;",
+                "session": "REGULAR",
+            }
+        ]
+        sched_b = [
+            {
+                "marketSchedule": "America/New_York;0900-1600,0900-1600,0900-1600,0900-1600,0900-1600,C,C;",
+                "session": "REGULAR",
+            }
+        ]
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Metal.Index.GOLD/USD",
+                asset_type="metal",
+                state="STABLE",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                2,
+                symbol="Metal.Index.SILVER/USD",
+                asset_type="metal",
+                state="STABLE",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                3,
+                symbol="Metal.Index.PLATINUM/USD",
+                asset_type="metal",
+                state="STABLE",
+                schedules=sched_b,
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 1
+        assert errors[0].feed_id == 3

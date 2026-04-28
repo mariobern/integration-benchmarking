@@ -1,6 +1,6 @@
-# Config Linter Intl Equities — Rollout Notes (2026-04-28, post-refinement)
+# Config Linter Intl Equities — Rollout Notes (2026-04-28, post-refinement + Index sub-namespace fix)
 
-Captured after `feat/config-linter-intl-equities` merged, including the per-session refinement (addendum in the design doc dated 2026-04-28).
+Captured after `feat/config-linter-intl-equities` merged, including the per-session refinement and the follow-up Index sub-namespace generalization (Metal.Index / FX.Index / Crypto.Index treated as separate sub-groups, mirroring Equity.Index).
 
 ## Finding counts on `after.json`
 
@@ -9,17 +9,17 @@ Captured after `feat/config-linter-intl-equities` merged, including the per-sess
 | E004 | 1     |
 | E008 | 31    |
 | E009 | 11    |
-| E011 | 27    |
+| E011 | 25    |
 | E013 | 1     |
 | E014 | 14    |
 | W001 | 384   |
 | W002 | 3     |
-| W003 | 47    |
+| W003 | 43    |
 | W004 | 1054  |
 | W005 | 6     |
 | W007 | 11    |
 
-Total findings: 1590
+Total findings: 1584
 
 ## Surviving E011 findings
 
@@ -33,8 +33,6 @@ Total findings: 1590
 - feed `1516` (`FX.USD/PHP`): REGULAR schedule disagrees with group fx: 3 distinct schedules across 34 STABLE feeds
 - feed `1518` (`FX.USD/TRY`): REGULAR schedule disagrees with group fx: 3 distinct schedules across 34 STABLE feeds
 - feed `1519` (`FX.USD/TWD`): REGULAR schedule disagrees with group fx: 3 distinct schedules across 34 STABLE feeds
-- feed `3153` (`Metal.Index.GOLD/USD`): REGULAR schedule disagrees with group metal: 2 distinct schedules across 4 STABLE feeds
-- feed `3154` (`Metal.Index.SILVER/USD`): REGULAR schedule disagrees with group metal: 2 distinct schedules across 4 STABLE feeds
 - feed `924` (`Equity.US.ABNB/USD`): OVER_NIGHT schedule disagrees with group (equity, US): 2 distinct schedules across 125 STABLE feeds
 - feed `992` (`Equity.US.BKNG/USD`): OVER_NIGHT schedule disagrees with group (equity, US): 2 distinct schedules across 125 STABLE feeds
 - feed `995` (`Equity.US.BLK/USD`): OVER_NIGHT schedule disagrees with group (equity, US): 2 distinct schedules across 125 STABLE feeds
@@ -69,19 +67,9 @@ Total findings: 1590
 - feed `1518` (`FX.USD/TRY`): REGULAR schedule deviates from fx majority
 - feed `1519` (`FX.USD/TWD`): REGULAR schedule deviates from fx majority
 
-### FX index pairs (2 findings)
-
-- feed `3183` (`FX.Index.EUR/USD`): REGULAR schedule deviates from fx majority
-- feed `3184` (`FX.Index.USD/JPY`): REGULAR schedule deviates from fx majority
-
-### Metal indices (2 findings)
-
-- feed `3153` (`Metal.Index.GOLD/USD`): REGULAR schedule deviates from metal majority
-- feed `3154` (`Metal.Index.SILVER/USD`): REGULAR schedule deviates from metal majority
-
 ### Crypto index (1 finding)
 
-- feed `2393` (`Crypto.Index.GLXY/USD`): REGULAR schedule deviates from crypto-index majority
+- feed `2393` (`Crypto.Index.GLXY/USD`): REGULAR schedule deviates from (crypto-index, Index) majority
 
 ### Equity.IE ETFs (3 findings)
 
@@ -130,35 +118,26 @@ Plus one REGULAR-session finding:
 - feed `3026` (`Commodities.NGDQ6/USD`): REGULAR schedule deviates from (commodity, NGD) majority
 - feed `3027` (`Commodities.NGDU6/USD`): REGULAR schedule deviates from (commodity, NGD) majority
 
-## Comparison to pre-refinement smoke test
+## Comparison across smoke test runs
 
-Pre-refinement finding counts (from the original smoke test prior to the per-session refactor):
+| Stage                                         | E011 | W003 | Notes                                                    |
+| --------------------------------------------- | ---- | ---- | -------------------------------------------------------- |
+| Pre-refactor (whole-tuple comparison)         | 141  | 162  | 122/131 of these were Equity.US cross-session-set tuples |
+| Post per-session refactor                     | 27   | 47   | Cross-session-set noise eliminated                       |
+| Post Index sub-namespace fix (this iteration) | 25   | 43   | Metal.Index + FX.Index findings silenced                 |
 
-- E011: 141 (122 of which were Equity.US cross-session-set tuples)
-- W003: 162 (131 of which were Equity.US cross-session-set tuples)
+**Net change** (whole-tuple → final): E011 dropped 116 findings (82% reduction); W003 dropped 119 findings (73% reduction). Each refinement step targeted a distinct class of false positives:
 
-Post-refinement counts (after per-session refactor):
+1. **Per-session refactor** removed cross-session-set noise within Equity.US.
+2. **Index sub-namespace fix** removed cross-namespace noise between `<AssetClass>.Index.*` feeds and `<AssetClass>.*` spot/regular feeds (Metal.Index vs Metal.X*; FX.Index vs FX.* spot pairs).
 
-- E011: 27 (down from 141)
-- W003: 47 (down from 162)
-
-**Net change:** E011 dropped by 114 findings (81% reduction). The 122 Equity.US cross-session-set E011 findings are entirely gone, replaced by 15 legitimate per-session Equity.US OVER_NIGHT schedule deviations. W003 dropped by 115 findings (71% reduction). The 131 Equity.US cross-session-set W003 findings are entirely gone, replaced by 16 legitimate per-session Equity.US deviations (15 OVER_NIGHT + 1 REGULAR).
-
-The per-session refactor **successfully eliminated cross-session-set noise**. The remaining findings are clean per-session drift signals (15 Equity.US OVER_NIGHT stocks have a different schedule than the OVER_NIGHT majority, FX regional pairs, metal indices, rates, etc.).
+The remaining findings are clean per-session drift signals: 15 Equity.US OVER_NIGHT stocks with a different OVER_NIGHT schedule, FX regional pairs, rates, commodities futures, and a handful of legitimate multi-venue Equity.IE/NL ETFs.
 
 ## Triage decisions
 
 ### FX regional pairs (341, 343, 1506-1519): Accept as-is — legitimate regional variance
 
 These 13 FX pairs have different trading hours due to regional market characteristics (time zones, regional market calendars). Legitimate deviation; no action required.
-
-### FX indices (3183, 3184): Accept as-is
-
-Index calculation times or trading hours may differ. Legitimate variance; accept as permanent configuration.
-
-### Metal indices (3153, 3154): Accept as-is
-
-Gold and Silver may trade on different venues or with different hours. Legitimate variance; accept as-is.
 
 ### Crypto index (2393): Needs human triage
 
@@ -194,14 +173,15 @@ Natural Gas futures contracts have specific trading hours on NYMEX. If NGDQ6 and
 
 ## Summary
 
-**The per-session refactor was successful.** E011 findings dropped from 141 to 27 (81% reduction), and W003 from 162 to 47 (71% reduction). The 122 Equity.US cross-session-set E011 findings and 131 Equity.US cross-session-set W003 findings are completely eliminated — this noise has been silenced by partitioning E011/W003 checks by session.
+The cumulative refactor was successful: E011 findings dropped 141 → 25 (82% reduction); W003 dropped 162 → 43 (73% reduction). Two distinct false-positive classes were eliminated — Equity.US cross-session-set noise (per-session refactor) and `<AssetClass>.Index.*` vs spot noise (Index sub-namespace fix).
 
-The remaining 27 E011 and 47 W003 findings are clean, legitimate per-session drift signals:
+The remaining 25 E011 and 43 W003 findings are clean per-session drift signals:
 
-- **FX regional pairs** (10 E011 + 13 W003): Regional market differences.
-- **Metal indices** (2 E011 + 2 W003): Multi-venue trading.
-- **Equity.US per-session** (15 E011 + 16 W003): OVER_NIGHT and REGULAR session drift (legit per-session signal).
+- **FX regional pairs** (10 E011 + 13 W003): Regional market hour differences.
+- **Equity.US per-session** (15 E011 + 16 W003): OVER_NIGHT and REGULAR session drift.
 - **Equity.IE/NL ETFs** (0 E011 + 4 W003): Multi-venue European listings.
-- **Rates and commodities** (0 E011 + 12 W003): Expected variance in market hours.
+- **Rates** (0 E011 + 7 W003): Expected variance per rate-feed market calendar.
+- **Commodities futures** (0 E011 + 2 W003): Different delivery-month hours possible.
+- **Crypto index** (0 E011 + 1 W003): Single GLXY drift inside the (crypto-index, Index) bucket — needs human triage.
 
-All remaining findings merit review for correctness, but none are false positives from cross-session-set confusion. The linter is now operating as designed.
+All remaining findings merit review for correctness, but none are false positives from grouping artifacts. The linter is now operating as designed.
