@@ -1005,3 +1005,35 @@ def lint_config(config: dict, now: Optional[datetime] = None) -> list[LintFindin
     findings.extend(check_identifier_continuity(feeds))
 
     return findings
+
+
+def _finding_key(f: LintFinding) -> tuple[str, Optional[int], Optional[str]]:
+    """Identity tuple for diff comparison.
+
+    Two findings are considered "the same" iff this tuple matches.
+    Message text is intentionally excluded so magnitude changes within a
+    rule (e.g. publisher count dropping further on E004) do not surface
+    as new findings.
+    """
+    return (f.rule_id, f.feed_id, f.symbol)
+
+
+def lint_config_diff(
+    after_config: dict,
+    before_config: dict,
+    now: Optional[datetime] = None,
+) -> list[LintFinding]:
+    """Lint after_config and return only findings not present in before_config.
+
+    A finding is "pre-existing" when its `_finding_key` tuple matches any
+    finding produced by linting before_config under the same `now`.
+    Pre-existing findings are dropped from the result.
+
+    The same `now` is passed to both runs so that time-dependent rules
+    (E013) are evaluated against a single instant.
+    """
+    now = now or datetime.now(timezone.utc)
+    before_findings = lint_config(before_config, now=now)
+    after_findings = lint_config(after_config, now=now)
+    baseline_keys = {_finding_key(f) for f in before_findings}
+    return [f for f in after_findings if _finding_key(f) not in baseline_keys]
