@@ -184,6 +184,13 @@ def main() -> None:
     except json.JSONDecodeError as e:
         print(f"ERROR: Invalid JSON in {config_path}: {e}", file=sys.stderr)
         sys.exit(1)
+    if not isinstance(config, dict):
+        print(
+            f"ERROR: Config file {config_path} must contain a JSON object,"
+            f" got {type(config).__name__}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     # Resolve baseline.
     baseline_config: Optional[dict] = None
@@ -205,6 +212,13 @@ def main() -> None:
                 file=sys.stderr,
             )
             sys.exit(1)
+        if not isinstance(baseline_config, dict):
+            print(
+                f"ERROR: Baseline file {args.baseline} must contain a JSON"
+                f" object, got {type(baseline_config).__name__}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
     else:
         # Default mode: try git auto-detect.
         baseline_config, reason = lookup_baseline_config(
@@ -216,6 +230,14 @@ def main() -> None:
                 f"NOTE: baseline unavailable ({reason}); running full lint",
                 file=sys.stderr,
             )
+
+    if baseline_config is not None and not isinstance(baseline_config, dict):
+        print(
+            f"ERROR: Baseline config must be a JSON object,"
+            f" got {type(baseline_config).__name__}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     # Run lint (diff or full).
     if baseline_config is not None:

@@ -250,3 +250,20 @@ class TestCLIBaseline:
             "--warnings-as-errors",
         )
         assert result.returncode == 0
+
+    def test_config_with_non_dict_json_fails(self, tmp_path):
+        # Top-level JSON list instead of object — should fail with clean error.
+        path = Path(tmp_path) / "after.json"
+        path.write_text(json.dumps([{"feedId": 1}]))
+        result = _run_linter("--config", str(path), "--no-baseline")
+        assert result.returncode == 1
+        assert "must contain a JSON object" in result.stderr
+        assert "list" in result.stderr
+
+    def test_baseline_with_non_dict_json_fails(self, tmp_path):
+        config_path = _write_config(tmp_path, _make_clean_config())
+        baseline_path = Path(tmp_path) / "before.json"
+        baseline_path.write_text(json.dumps([]))
+        result = _run_linter("--config", config_path, "--baseline", str(baseline_path))
+        assert result.returncode == 1
+        assert "must contain a JSON object" in result.stderr
