@@ -38,51 +38,52 @@ python3 config_linter.py --config after.json --output lint.json --warnings-as-er
 ## Rule Scope
 
 - **INACTIVE feeds are skipped** by all publisher, schedule, hermes-id, and expiry checks. Only structural duplicate-ID/duplicate-symbol checks look at them.
-- E010/E011 are schedule-integrity checks that run on every non-INACTIVE feed.
+- E010 runs on every non-INACTIVE feed. E011 runs on STABLE feeds only (it is a CI blocker).
+- W003 runs on STABLE + COMING_SOON feeds (advisory; not a CI blocker unless `--warnings-as-errors`).
 - E013 requires the linter's current UTC clock; it is evaluated against `datetime.now(timezone.utc)` at runtime.
 
 ## Errors
 
-| ID   | Rule                                                                                | Scope                                                  |
-| ---- | ----------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| E001 | Duplicate `feedId`                                                                  | all feeds                                              |
-| E002 | Duplicate `symbol` within STABLE/COMING_SOON                                        | active-pipeline feeds                                  |
-| E003 | References unknown `publisherId`                                                    | non-INACTIVE (top-level and session-level)             |
-| E004 | `minPublishers >= publisher count` (no headroom)                                    | STABLE, non-exempt asset types                         |
-| E005 | STABLE feed with no publishers                                                      | STABLE                                                 |
-| E006 | Non-equity feed has extended sessions                                               | non-INACTIVE, non-equity                               |
-| E007 | Missing required field (`feedId`, `symbol`, `state`, `kind`, `metadata.asset_type`) | all feeds                                              |
-| E008 | Session-level publisher not in top-level list                                       | non-INACTIVE                                           |
-| E009 | STABLE feed references a `.Test`-named publisher                                    | STABLE                                                 |
-| E010 | Duplicate session in `marketSchedules`                                              | non-INACTIVE                                           |
-| E011 | Schedule inconsistency within asset group                                           | non-INACTIVE, grouped by `asset_type` (+ futures root) |
-| E012 | Duplicate `metadata.hermes_id`                                                      | non-INACTIVE                                           |
-| E013 | COMING_SOON futures past every `validTo`                                            | COMING_SOON futures only                               |
-| E014 | STABLE benchmarkable feed missing `benchmarkMapping`                                | STABLE, benchmarkable asset types, non-OVERNIGHT       |
-| E015 | `corporateActions` schema violation (missing fields, invalid formats)               | any feed with `corporateActions`                       |
-| E016 | Identifier date range overlap within same vendor/session                            | non-INACTIVE, 2+ identifiers per vendor                |
+| ID   | Rule                                                                                | Scope                                                                         |
+| ---- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| E001 | Duplicate `feedId`                                                                  | all feeds                                                                     |
+| E002 | Duplicate `symbol` within STABLE/COMING_SOON                                        | active-pipeline feeds                                                         |
+| E003 | References unknown `publisherId`                                                    | non-INACTIVE (top-level and session-level)                                    |
+| E004 | `minPublishers >= publisher count` (no headroom)                                    | STABLE, non-exempt asset types                                                |
+| E005 | STABLE feed with no publishers                                                      | STABLE                                                                        |
+| E006 | Non-equity feed has extended sessions                                               | non-INACTIVE, non-equity                                                      |
+| E007 | Missing required field (`feedId`, `symbol`, `state`, `kind`, `metadata.asset_type`) | all feeds                                                                     |
+| E008 | Session-level publisher not in top-level list                                       | non-INACTIVE                                                                  |
+| E009 | STABLE feed references a `.Test`-named publisher                                    | STABLE                                                                        |
+| E010 | Duplicate session in `marketSchedules`                                              | non-INACTIVE                                                                  |
+| E011 | Schedule inconsistency within asset group                                           | STABLE only, grouped by `(asset_type, equity_listing_prefix?, futures_root?)` |
+| E012 | Duplicate `metadata.hermes_id`                                                      | non-INACTIVE                                                                  |
+| E013 | COMING_SOON futures past every `validTo`                                            | COMING_SOON futures only                                                      |
+| E014 | STABLE benchmarkable feed missing `benchmarkMapping`                                | STABLE, benchmarkable asset types, non-OVERNIGHT                              |
+| E015 | `corporateActions` schema violation (missing fields, invalid formats)               | any feed with `corporateActions`                                              |
+| E016 | Identifier date range overlap within same vendor/session                            | non-INACTIVE, 2+ identifiers per vendor                                       |
 
 ## Warnings
 
-| ID   | Rule                                                                          | Scope                            |
-| ---- | ----------------------------------------------------------------------------- | -------------------------------- |
-| W001 | US equity missing extended sessions (`PRE_MARKET`/`POST_MARKET`/`OVER_NIGHT`) | STABLE US equities               |
-| W002 | US equity using a non-`America/New_York` timezone                             | STABLE US equities               |
-| W003 | Schedule deviates from the asset-class majority                               | STABLE, non-futures              |
-| W004 | COMING_SOON feed with no publishers                                           | COMING_SOON                      |
-| W005 | `minPublishers` leaves only 1 headroom publisher                              | STABLE, non-exempt               |
-| W006 | Duplicate `publisherId` in feed                                               | non-INACTIVE                     |
-| W007 | STABLE feed references a `TEST` key-type publisher                            | STABLE                           |
-| W009 | Unknown `corporateActions` event type (schema not validated)                  | any feed with `corporateActions` |
+| ID   | Rule                                                                          | Scope                                                                                  |
+| ---- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| W001 | US equity missing extended sessions (`PRE_MARKET`/`POST_MARKET`/`OVER_NIGHT`) | STABLE US equities                                                                     |
+| W002 | US equity using a non-`America/New_York` timezone                             | STABLE US equities                                                                     |
+| W003 | Schedule deviates from the asset-class majority                               | STABLE + COMING_SOON, grouped by `(asset_type, equity_listing_prefix?, futures_root?)` |
+| W004 | COMING_SOON feed with no publishers                                           | COMING_SOON                                                                            |
+| W005 | `minPublishers` leaves only 1 headroom publisher                              | STABLE, non-exempt                                                                     |
+| W006 | Duplicate `publisherId` in feed                                               | non-INACTIVE                                                                           |
+| W007 | STABLE feed references a `TEST` key-type publisher                            | STABLE                                                                                 |
+| W009 | Unknown `corporateActions` event type (schema not validated)                  | any feed with `corporateActions`                                                       |
 
 ### E011 vs W003
 
-Both flag schedule drift, but with different strictness:
+Both flag schedule drift, but with different scopes and severity:
 
-- **E011 (ERROR)** fires whenever two feeds in the same asset group (`asset_type` for spot, `(asset_type, futures_root)` for futures) have **any** distinct schedule signature. It is the hard failure.
-- **W003 (WARNING)** only fires on minority deviation from an obvious majority in a given asset type, and exempts futures entirely. It is the soft heads-up.
+- **E011 (ERROR)** is the CI-blocking rule. It fires when two **STABLE** feeds in the same group have any distinct schedule signature. Groups are `(asset_type, equity_listing_prefix, futures_root?)` for equities and `(asset_type, futures_root?)` for everything else. Equity futures are sub-grouped by both listing prefix and root.
+- **W003 (WARNING)** is the soft heads-up. It fires on minority deviation from the group majority across **STABLE + COMING_SOON** feeds. It uses the same group key as E011, including futures sub-grouping.
 
-They intentionally overlap. A future that disagrees with a sibling on the same root will fire E011 but not W003.
+They intentionally overlap on STABLE feeds. W003 additionally surfaces drift that E011 cannot see — namely COMING_SOON spot or futures feeds that disagree with their STABLE peers — without blocking CI.
 
 ## Asset Types Exempt from E004 / W005
 
@@ -136,7 +137,7 @@ ERRORS (3 found):
   E013  Feed 2973 (Commodities.ALH6/USD): COMING_SOON futures feed has expired (latest validTo: 2026-03-27T17:00:00+00:00); change state to INACTIVE
 
 WARNINGS (1 found):
-  W003  Feed 1775 (Equity.US.XLK/USD): schedule deviates from equity majority
+  W003  Feed 1775 (Equity.US.XLK/USD): schedule deviates from (equity, US) majority
 
 Summary: 3 errors, 1 warnings
 ```
