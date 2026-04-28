@@ -23,6 +23,16 @@ def _run_linter(*args):
     return result
 
 
+def _run_linter_in(repo, *args):
+    """Run config_linter.py with cwd=repo (for tests in tmp git repos)."""
+    return subprocess.run(
+        [sys.executable, str(Path(PROJECT_DIR) / "config_linter.py"), *args],
+        capture_output=True,
+        text=True,
+        cwd=str(repo),
+    )
+
+
 def _make_clean_config():
     return {
         "feeds": [
@@ -219,17 +229,7 @@ class TestCLIBaseline:
         # so auto-detect runs and finds no git, prints a NOTE to stderr,
         # and runs full lint.
         path = _write_config(tmp_path, _make_clean_config())
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(Path(PROJECT_DIR) / "config_linter.py"),
-                "--config",
-                path,
-            ],
-            capture_output=True,
-            text=True,
-            cwd=str(tmp_path),
-        )
+        result = _run_linter_in(tmp_path, "--config", path)
         assert "NOTE: baseline unavailable" in result.stderr
         assert "running full lint" in result.stderr
 
@@ -313,17 +313,7 @@ class TestCLIGitAutoDetect:
         repo = self._init_repo_with_after(
             tmp_path, after_config=bad, baseline_config=bad
         )
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(Path(PROJECT_DIR) / "config_linter.py"),
-                "--config",
-                "after.json",
-            ],
-            capture_output=True,
-            text=True,
-            cwd=str(repo),
-        )
+        result = _run_linter_in(repo, "--config", "after.json")
         assert result.returncode == 0
         assert "No new issues found" in result.stdout
         assert "pre-existing" in result.stdout
@@ -338,17 +328,7 @@ class TestCLIGitAutoDetect:
         repo = self._init_repo_with_after(
             tmp_path, after_config=with_dup, baseline_config=clean
         )
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(Path(PROJECT_DIR) / "config_linter.py"),
-                "--config",
-                "after.json",
-            ],
-            capture_output=True,
-            text=True,
-            cwd=str(repo),
-        )
+        result = _run_linter_in(repo, "--config", "after.json")
         assert result.returncode == 1
         assert "ERRORS (1 new)" in result.stdout
         assert "E001" in result.stdout
@@ -374,16 +354,7 @@ class TestCLIGitAutoDetect:
         run(["git", "add", "after.json"])
         run(["git", "commit", "-m", "baseline"])
         run(["git", "update-ref", "refs/remotes/origin/main", "HEAD"])
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(Path(PROJECT_DIR) / "config_linter.py"),
-                "--config",
-                "after.json",
-            ],
-            capture_output=True,
-            text=True,
-            cwd=str(repo),
-        )
+        result = _run_linter_in(repo, "--config", "after.json")
         assert "on baseline ref" in result.stderr
         assert "running full lint" in result.stderr
+        assert result.returncode == 0
