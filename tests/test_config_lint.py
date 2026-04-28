@@ -747,7 +747,9 @@ class TestCheckSchedules:
         assert warnings[0].feed_id == 6
 
     def test_w003_futures_exempt(self):
-        """Futures contracts are exempt from schedule deviation warnings."""
+        """A lone future is silent because its (asset_type, futures_root)
+        subgroup has only one feed — no peer to disagree with. Spot peers
+        live in a different group and are not compared against it."""
         majority_schedule = [
             {"marketSchedule": "America/New_York;O,O,O,O,O,O,O;", "session": "REGULAR"}
         ]
@@ -1341,10 +1343,11 @@ class TestW003ExpandedScope:
 
     def test_w003_cross_prefix_silent(self):
         """An Equity.JP feed and an Equity.US feed must NOT cross-flag W003."""
+        us_tickers = ["AAPL", "MSFT", "TSLA"]
         feeds = [
             _make_feed(
-                i,
-                symbol=f"Equity.US.SYM{i}/USD",
+                i + 1,
+                symbol=f"Equity.US.{ticker}/USD",
                 asset_type="equity",
                 state="STABLE",
                 schedules=[
@@ -1354,7 +1357,7 @@ class TestW003ExpandedScope:
                     }
                 ],
             )
-            for i in range(1, 4)
+            for i, ticker in enumerate(us_tickers)
         ] + [
             _make_feed(
                 4,
@@ -1378,15 +1381,16 @@ class TestW003ExpandedScope:
         sched_deviant = [
             {"marketSchedule": "America/New_York;0800-1500;", "session": "REGULAR"}
         ]
+        stable_tickers = ["AAPL", "MSFT", "TSLA"]
         feeds = [
             _make_feed(
-                i,
-                symbol=f"Equity.US.SYM{i}/USD",
+                i + 1,
+                symbol=f"Equity.US.{ticker}/USD",
                 asset_type="equity",
                 state="STABLE",
                 schedules=sched_majority,
             )
-            for i in range(1, 4)
+            for i, ticker in enumerate(stable_tickers)
         ] + [
             _make_feed(
                 4,

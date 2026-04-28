@@ -12,7 +12,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 
-from lib.symbol_utils import futures_root, is_futures_symbol, is_us_equity
+from lib.symbol_utils import (
+    equity_listing_prefix,
+    futures_root,
+    is_futures_symbol,
+    is_us_equity,
+)
 
 
 @dataclass
@@ -415,14 +420,20 @@ def _extract_timezone(schedule_str: str) -> str:
 
 
 def check_schedules(feeds: list[dict]) -> list[LintFinding]:
-    """E006, E010, E011, W001, W002, W003: schedule validation rules."""
+    """E006, E010, E011, W001, W002, W003: schedule validation rules.
+
+    E011 fires on STABLE feeds only (CI blocker).
+    W003 fires on STABLE + COMING_SOON feeds (advisory).
+    Both rules use the same group_signatures dict, keyed by:
+        - ("equity", listing_prefix)             for equity spot feeds
+        - ("equity", listing_prefix, futures_root) for equity futures
+        - (asset_type, futures_root)             for non-equity futures
+        - (asset_type,)                          for non-equity spot feeds
+    """
     findings: list[LintFinding] = []
 
-    # Collect schedule signatures per asset_type for W003 majority detection
-    asset_type_schedules: dict[str, list[tuple[int, str, tuple, bool]]] = {}
-
-    # Collect signatures per E011 group: (asset_type,) or (asset_type, futures_root)
-    group_signatures: dict[tuple, list[tuple[int, str, tuple]]] = {}
+    # group_key -> list of (feed_id, symbol, signature, state)
+    group_signatures: dict[tuple, list[tuple[int, str, tuple, str]]] = {}
 
     for feed in feeds:
         fid = feed.get("feedId")
@@ -484,15 +495,23 @@ def check_schedules(feeds: list[dict]) -> list[LintFinding]:
                     )
                 )
 
-        # E011: collect signature per (asset_type,) or (asset_type, futures_root)
-        sig_for_group = _get_schedule_signature(schedules)
-        if is_futures_symbol(sym):
-            group_key: tuple = (asset_type, futures_root(sym))
+        # Build the group key for E011 / W003.
+        if asset_type == "equity":
+            prefix = equity_listing_prefix(sym)
+            if is_futures_symbol(sym):
+                group_key: tuple = (asset_type, prefix, futures_root(sym))
+            else:
+                group_key = (asset_type, prefix)
         else:
-            group_key = (asset_type,)
-        group_signatures.setdefault(group_key, []).append((fid, sym, sig_for_group))
+            if is_futures_symbol(sym):
+                group_key = (asset_type, futures_root(sym))
+            else:
+                group_key = (asset_type,)
 
-        # STABLE-only schedule rules
+        sig = _get_schedule_signature(schedules)
+        group_signatures.setdefault(group_key, []).append((fid, sym, sig, state))
+
+        # STABLE-only single-feed schedule rules
         if state == "STABLE":
             # W001: US equity missing extended sessions
             if is_us_equity(feed):
@@ -523,54 +542,24 @@ def check_schedules(feeds: list[dict]) -> list[LintFinding]:
                         )
                         break  # one finding per feed is enough
 
-            # Collect for W003
-            sig = _get_schedule_signature(schedules)
-            is_future = is_futures_symbol(sym)
-            asset_type_schedules.setdefault(asset_type, []).append(
-                (fid, sym, sig, is_future)
-            )
-
-    # W003: schedule deviation from asset-class majority
-    for asset_type, feed_sigs in asset_type_schedules.items():
-        if len(feed_sigs) <= 1:
+    # E011: STABLE-only strict schedule inconsistency.
+    # Reference signature is the most common signature among STABLE feeds in
+    # the group; any STABLE feed with a different signature fires.
+    for group_key, entries in group_signatures.items():
+        stable_entries = [
+            (fid, sym, sig) for fid, sym, sig, st in entries if st == "STABLE"
+        ]
+        if len(stable_entries) < 2:
             continue
-
-        # Find majority schedule (exclude futures from count)
-        sig_counts: Counter[tuple] = Counter()
-        for _, _, sig, is_future in feed_sigs:
-            if not is_future:
-                sig_counts[sig] += 1
-
-        if not sig_counts:
-            continue
-
-        majority_sig = sig_counts.most_common(1)[0][0]
-
-        for fid, sym, sig, is_future in feed_sigs:
-            if sig != majority_sig and not is_future:
-                findings.append(
-                    LintFinding(
-                        rule_id="W003",
-                        severity="WARNING",
-                        message=f"schedule deviates from {asset_type} majority",
-                        feed_id=fid,
-                        symbol=sym,
-                    )
-                )
-
-    # E011: strict schedule inconsistency across asset groups
-    for group_key, feed_sigs in group_signatures.items():
-        if len(feed_sigs) < 2:
-            continue
-        distinct_sigs = {sig for _, _, sig in feed_sigs}
+        distinct_sigs = {sig for _, _, sig in stable_entries}
         if len(distinct_sigs) < 2:
             continue
 
-        sig_counter: Counter[tuple] = Counter(sig for _, _, sig in feed_sigs)
+        sig_counter: Counter[tuple] = Counter(sig for _, _, sig in stable_entries)
         reference_sig = sig_counter.most_common(1)[0][0]
         group_label = ", ".join(str(k) for k in group_key)
 
-        for fid, sym, sig in feed_sigs:
+        for fid, sym, sig in stable_entries:
             if sig != reference_sig:
                 findings.append(
                     LintFinding(
@@ -579,8 +568,44 @@ def check_schedules(feeds: list[dict]) -> list[LintFinding]:
                         message=(
                             f"schedule disagrees with other feeds in group"
                             f" ({group_label}): {len(distinct_sigs)} distinct"
-                            f" schedules across {len(feed_sigs)} feeds"
+                            f" schedules across {len(stable_entries)} STABLE feeds"
                         ),
+                        feed_id=fid,
+                        symbol=sym,
+                    )
+                )
+
+    # W003: schedule deviation from group majority across STABLE + COMING_SOON.
+    # Majority is the most common signature among all entries in the group.
+    for group_key, entries in group_signatures.items():
+        active_entries = [
+            (fid, sym, sig)
+            for fid, sym, sig, st in entries
+            if st in ("STABLE", "COMING_SOON")
+        ]
+        if len(active_entries) <= 1:
+            continue
+
+        sig_counts: Counter[tuple] = Counter(sig for _, _, sig in active_entries)
+        majority_sig = sig_counts.most_common(1)[0][0]
+        # If every signature is unique, there is no majority -> skip.
+        if sig_counts[majority_sig] == 1:
+            continue
+
+        # Match group label format used elsewhere in the linter: just the
+        # asset_type for non-equity spot, otherwise the joined key.
+        if len(group_key) == 1:
+            group_label = group_key[0]
+        else:
+            group_label = ", ".join(str(k) for k in group_key)
+
+        for fid, sym, sig in active_entries:
+            if sig != majority_sig:
+                findings.append(
+                    LintFinding(
+                        rule_id="W003",
+                        severity="WARNING",
+                        message=f"schedule deviates from {group_label} majority",
                         feed_id=fid,
                         symbol=sym,
                     )
