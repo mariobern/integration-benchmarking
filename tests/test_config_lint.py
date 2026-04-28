@@ -1029,6 +1029,488 @@ class TestCheckE011ScheduleInconsistency:
         assert len(errors) == 0
 
 
+class TestE011IntlEquityGrouping:
+    """E011 must group equities by listing prefix (US, JP, Index, ...) so
+    non-US equities are not compared against the US-majority signature."""
+
+    def test_e011_intra_jp_drift_fires(self):
+        """3 STABLE Equity.JP feeds, 1 with a different schedule -> E011."""
+        sched_a = [{"marketSchedule": "Asia/Tokyo;0900-1500;", "session": "REGULAR"}]
+        sched_b = [{"marketSchedule": "Asia/Tokyo;0900-1530;", "session": "REGULAR"}]
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.JP.1305/JPY",
+                asset_type="equity",
+                state="STABLE",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                2,
+                symbol="Equity.JP.1306/JPY",
+                asset_type="equity",
+                state="STABLE",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                3,
+                symbol="Equity.JP.1308/JPY",
+                asset_type="equity",
+                state="STABLE",
+                schedules=sched_b,
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 1
+        assert errors[0].feed_id == 3
+
+    def test_e011_cross_prefix_silent(self):
+        """An Equity.JP feed and an Equity.US feed with different
+        timezones must NOT trip E011 — they belong to different groups."""
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[
+                    {
+                        "marketSchedule": "America/New_York;0930-1600;",
+                        "session": "REGULAR",
+                    }
+                ],
+            ),
+            _make_feed(
+                2,
+                symbol="Equity.JP.1305/JPY",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[
+                    {"marketSchedule": "Asia/Tokyo;0900-1500;", "session": "REGULAR"}
+                ],
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 0
+
+    def test_e011_index_standalone_from_us(self):
+        """Equity.Index.* must NOT group with Equity.US.* — they are
+        separate prefixes even though both use America/New_York."""
+        sched = [
+            {"marketSchedule": "America/New_York;0930-1600;", "session": "REGULAR"}
+        ]
+        sched_dev = [
+            {"marketSchedule": "America/New_York;0800-1500;", "session": "REGULAR"}
+        ]
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=sched,
+            ),
+            _make_feed(
+                2,
+                symbol="Equity.US.MSFT/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=sched,
+            ),
+            _make_feed(
+                3,
+                symbol="Equity.Index.TSLA/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=sched_dev,
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        # Index is a single-member group; no peer to disagree with.
+        assert len(errors) == 0
+
+    def test_e011_intra_index_drift_fires(self):
+        """If 2+ Equity.Index feeds disagree, E011 must fire on the minority."""
+        sched_a = [
+            {"marketSchedule": "America/New_York;0930-1600;", "session": "REGULAR"}
+        ]
+        sched_b = [
+            {"marketSchedule": "America/New_York;0800-1500;", "session": "REGULAR"}
+        ]
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.Index.TSLA/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                2,
+                symbol="Equity.Index.MSTR/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                3,
+                symbol="Equity.Index.CRCL/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=sched_b,
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 1
+        assert errors[0].feed_id == 3
+
+    def test_e011_intl_futures_subgrouped_by_country(self):
+        """KR equity futures and US equity futures must not cross-compare."""
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.EMH6/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[
+                    {
+                        "marketSchedule": "America/New_York;0930-1600;",
+                        "session": "REGULAR",
+                    }
+                ],
+            ),
+            _make_feed(
+                2,
+                symbol="Equity.KR.KSM6/KRW",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[
+                    {"marketSchedule": "Asia/Seoul;0900-1530;", "session": "REGULAR"}
+                ],
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 0
+
+
+class TestE011StableOnlyScope:
+    """E011 is a CI blocker; it must only fire on STABLE feeds.
+    COMING_SOON drift is W003's responsibility."""
+
+    def test_e011_silent_on_coming_soon_only_drift(self):
+        """A COMING_SOON feed disagreeing with another COMING_SOON feed
+        does NOT fire E011 (no STABLE involvement)."""
+        sched_a = [
+            {"marketSchedule": "America/New_York;0930-1600;", "session": "REGULAR"}
+        ]
+        sched_b = [
+            {"marketSchedule": "America/New_York;0800-1500;", "session": "REGULAR"}
+        ]
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.NEW1/USD",
+                asset_type="equity",
+                state="COMING_SOON",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                2,
+                symbol="Equity.US.NEW2/USD",
+                asset_type="equity",
+                state="COMING_SOON",
+                schedules=sched_b,
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 0
+
+    def test_e011_silent_when_only_coming_soon_deviates(self):
+        """Multiple agreeing STABLE feeds + one COMING_SOON deviant ->
+        E011 must NOT fire (drift is in non-STABLE feed)."""
+        sched_majority = [
+            {"marketSchedule": "America/New_York;0930-1600;", "session": "REGULAR"}
+        ]
+        sched_deviant = [
+            {"marketSchedule": "America/New_York;0800-1500;", "session": "REGULAR"}
+        ]
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=sched_majority,
+            ),
+            _make_feed(
+                2,
+                symbol="Equity.US.MSFT/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=sched_majority,
+            ),
+            _make_feed(
+                3,
+                symbol="Equity.US.NEW1/USD",
+                asset_type="equity",
+                state="COMING_SOON",
+                schedules=sched_deviant,
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 0
+
+    def test_e011_fires_when_stable_deviates_from_stable(self):
+        """Sanity: STABLE-vs-STABLE drift still fires (already covered by
+        TestCheckE011ScheduleInconsistency, repeated here for clarity)."""
+        sched_a = [
+            {"marketSchedule": "America/New_York;0930-1600;", "session": "REGULAR"}
+        ]
+        sched_b = [
+            {"marketSchedule": "America/New_York;0800-1500;", "session": "REGULAR"}
+        ]
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                2,
+                symbol="Equity.US.MSFT/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                3,
+                symbol="Equity.US.GOOG/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=sched_b,
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 1
+        assert errors[0].feed_id == 3
+
+
+class TestW003ExpandedScope:
+    """W003 must:
+    - group equities by listing prefix (same as E011),
+    - cover STABLE + COMING_SOON,
+    - include futures via futures_root sub-grouping (no longer exempt).
+    """
+
+    def test_w003_intl_equity_prefix_grouping(self):
+        """3 STABLE Equity.JP majority + 1 STABLE Equity.JP minority -> W003 fires."""
+        sched_a = [{"marketSchedule": "Asia/Tokyo;0900-1500;", "session": "REGULAR"}]
+        sched_b = [{"marketSchedule": "Asia/Tokyo;0900-1530;", "session": "REGULAR"}]
+        feeds = [
+            _make_feed(
+                i,
+                symbol=f"Equity.JP.130{i}/JPY",
+                asset_type="equity",
+                state="STABLE",
+                schedules=sched_a,
+            )
+            for i in range(1, 4)
+        ] + [
+            _make_feed(
+                4,
+                symbol="Equity.JP.1308/JPY",
+                asset_type="equity",
+                state="STABLE",
+                schedules=sched_b,
+            )
+        ]
+        findings = check_schedules(feeds)
+        warnings = [f for f in findings if f.rule_id == "W003"]
+        assert len(warnings) == 1
+        assert warnings[0].feed_id == 4
+
+    def test_w003_cross_prefix_silent(self):
+        """An Equity.JP feed and an Equity.US feed must NOT cross-flag W003."""
+        feeds = [
+            _make_feed(
+                i,
+                symbol=f"Equity.US.SYM{i}/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[
+                    {
+                        "marketSchedule": "America/New_York;0930-1600;",
+                        "session": "REGULAR",
+                    }
+                ],
+            )
+            for i in range(1, 4)
+        ] + [
+            _make_feed(
+                4,
+                symbol="Equity.JP.1305/JPY",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[
+                    {"marketSchedule": "Asia/Tokyo;0900-1500;", "session": "REGULAR"}
+                ],
+            )
+        ]
+        findings = check_schedules(feeds)
+        warnings = [f for f in findings if f.rule_id == "W003"]
+        assert len(warnings) == 0
+
+    def test_w003_coming_soon_drift_fires(self):
+        """COMING_SOON spot feed drifts from STABLE majority -> W003 fires."""
+        sched_majority = [
+            {"marketSchedule": "America/New_York;0930-1600;", "session": "REGULAR"}
+        ]
+        sched_deviant = [
+            {"marketSchedule": "America/New_York;0800-1500;", "session": "REGULAR"}
+        ]
+        feeds = [
+            _make_feed(
+                i,
+                symbol=f"Equity.US.SYM{i}/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=sched_majority,
+            )
+            for i in range(1, 4)
+        ] + [
+            _make_feed(
+                4,
+                symbol="Equity.US.NEW1/USD",
+                asset_type="equity",
+                state="COMING_SOON",
+                schedules=sched_deviant,
+            )
+        ]
+        findings = check_schedules(feeds)
+        warnings = [f for f in findings if f.rule_id == "W003"]
+        assert len(warnings) == 1
+        assert warnings[0].feed_id == 4
+
+    def test_w003_stable_futures_intra_root_drift_fires(self):
+        """Two STABLE futures with the same root but different schedules ->
+        W003 fires (futures are no longer exempt under the new grouping)."""
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Commodities.WTIK6/USD",
+                asset_type="commodity",
+                state="STABLE",
+                schedules=[
+                    {"marketSchedule": "America/New_York;O;", "session": "REGULAR"}
+                ],
+            ),
+            _make_feed(
+                2,
+                symbol="Commodities.WTIM6/USD",
+                asset_type="commodity",
+                state="STABLE",
+                schedules=[
+                    {"marketSchedule": "America/New_York;O;", "session": "REGULAR"}
+                ],
+            ),
+            _make_feed(
+                3,
+                symbol="Commodities.WTIN6/USD",
+                asset_type="commodity",
+                state="STABLE",
+                schedules=[
+                    {
+                        "marketSchedule": "America/New_York;0800-1400;",
+                        "session": "REGULAR",
+                    }
+                ],
+            ),
+        ]
+        findings = check_schedules(feeds)
+        warnings = [f for f in findings if f.rule_id == "W003"]
+        assert len(warnings) == 1
+        assert warnings[0].feed_id == 3
+
+    def test_w003_coming_soon_futures_drift_fires(self):
+        """COMING_SOON futures drift from STABLE peers in the same root ->
+        W003 fires (was previously silent due to futures exemption)."""
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Commodities.WTIK6/USD",
+                asset_type="commodity",
+                state="STABLE",
+                schedules=[
+                    {"marketSchedule": "America/New_York;O;", "session": "REGULAR"}
+                ],
+            ),
+            _make_feed(
+                2,
+                symbol="Commodities.WTIM6/USD",
+                asset_type="commodity",
+                state="STABLE",
+                schedules=[
+                    {"marketSchedule": "America/New_York;O;", "session": "REGULAR"}
+                ],
+            ),
+            _make_feed(
+                3,
+                symbol="Commodities.WTIQ6/USD",
+                asset_type="commodity",
+                state="COMING_SOON",
+                schedules=[
+                    {
+                        "marketSchedule": "America/New_York;0800-1400;",
+                        "session": "REGULAR",
+                    }
+                ],
+            ),
+        ]
+        findings = check_schedules(feeds)
+        warnings = [f for f in findings if f.rule_id == "W003"]
+        assert len(warnings) == 1
+        assert warnings[0].feed_id == 3
+
+    def test_w003_different_futures_roots_silent(self):
+        """Different futures roots are different groups -> no W003."""
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Commodities.WTIK6/USD",
+                asset_type="commodity",
+                state="STABLE",
+                schedules=[
+                    {"marketSchedule": "America/New_York;O;", "session": "REGULAR"}
+                ],
+            ),
+            _make_feed(
+                2,
+                symbol="Commodities.CLK6/USD",
+                asset_type="commodity",
+                state="STABLE",
+                schedules=[
+                    {
+                        "marketSchedule": "America/New_York;0800-1400;",
+                        "session": "REGULAR",
+                    }
+                ],
+            ),
+        ]
+        findings = check_schedules(feeds)
+        warnings = [f for f in findings if f.rule_id == "W003"]
+        assert len(warnings) == 0
+
+
 class TestCheckE012HermesId:
     def test_e012_duplicate_hermes_id(self):
         f1 = _make_feed(1, symbol="Crypto.BTC/USD")
