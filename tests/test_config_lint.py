@@ -2031,3 +2031,138 @@ class TestCheckE016IdentifierContinuity:
         )
         findings = check_identifier_continuity([feed])
         assert findings == []
+
+
+class TestPerSessionSchedule:
+    """Per-session refinement: schedules are compared bucket-by-bucket
+    (group_key, session). A feed missing a session is not penalized for
+    the omission; it simply doesn't appear in that bucket.
+    Refinement addendum to spec 2026-04-28."""
+
+    def test_e011_silent_when_session_sets_differ_but_per_session_agrees(self):
+        """A REGULAR-only feed and a REGULAR+OVER_NIGHT feed that agree on
+        their REGULAR schedule must NOT trip E011. Their session SETS
+        differ but their REGULAR schedules match."""
+        nyc_regular = {
+            "marketSchedule": "America/New_York;0930-1600;",
+            "session": "REGULAR",
+        }
+        nyc_overnight = {
+            "marketSchedule": "America/New_York;2000-2400;",
+            "session": "OVER_NIGHT",
+        }
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[nyc_regular],
+            ),
+            _make_feed(
+                2,
+                symbol="Equity.US.MSFT/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[nyc_regular, nyc_overnight],
+            ),
+            _make_feed(
+                3,
+                symbol="Equity.US.GOOG/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[nyc_regular],
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 0
+
+    def test_e011_fires_per_session_within_us(self):
+        """Per-session drift on REGULAR (with extended sessions also present)
+        must fire exactly one E011 tagged with the offending session."""
+        nyc_regular = {
+            "marketSchedule": "America/New_York;0930-1600;",
+            "session": "REGULAR",
+        }
+        nyc_regular_wrong = {
+            "marketSchedule": "America/New_York;0800-1500;",
+            "session": "REGULAR",
+        }
+        nyc_pre = {
+            "marketSchedule": "America/New_York;0400-0930;",
+            "session": "PRE_MARKET",
+        }
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[nyc_regular, nyc_pre],
+            ),
+            _make_feed(
+                2,
+                symbol="Equity.US.MSFT/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[nyc_regular, nyc_pre],
+            ),
+            _make_feed(
+                3,
+                symbol="Equity.US.GOOG/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[nyc_regular_wrong, nyc_pre],
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 1
+        assert errors[0].feed_id == 3
+        assert "REGULAR" in errors[0].message
+
+    def test_e011_fires_on_extended_session_drift(self):
+        """REGULAR matches across all 3 STABLE feeds, but one feed's
+        OVER_NIGHT schedule disagrees with the other two's. E011 fires
+        only on OVER_NIGHT, not on REGULAR."""
+        nyc_regular = {
+            "marketSchedule": "America/New_York;0930-1600;",
+            "session": "REGULAR",
+        }
+        nyc_overnight_a = {
+            "marketSchedule": "America/New_York;2000-2400;",
+            "session": "OVER_NIGHT",
+        }
+        nyc_overnight_b = {
+            "marketSchedule": "America/New_York;0000-0400;",
+            "session": "OVER_NIGHT",
+        }
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[nyc_regular, nyc_overnight_a],
+            ),
+            _make_feed(
+                2,
+                symbol="Equity.US.MSFT/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[nyc_regular, nyc_overnight_a],
+            ),
+            _make_feed(
+                3,
+                symbol="Equity.US.GOOG/USD",
+                asset_type="equity",
+                state="STABLE",
+                schedules=[nyc_regular, nyc_overnight_b],
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 1
+        assert errors[0].feed_id == 3
+        assert "OVER_NIGHT" in errors[0].message
