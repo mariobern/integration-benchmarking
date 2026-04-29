@@ -55,4 +55,17 @@ describe("locateFinding", () => {
     expect(range.startOffset).toBe(idx);
     expect(range.endOffset).toBe(idx + '"AcmeMM"'.length);
   });
+
+  it("returns the line-0 fallback when the document does not parse", () => {
+    const text = loadFixture("unparseable.json");
+    const finding: Finding = {
+      rule_id: "E001",
+      severity: "ERROR",
+      message: "feedId 1 is duplicated",
+      feed_id: 1,
+      symbol: null,
+    };
+    const range = locateFinding(text, finding);
+    expect(range).toEqual({ startOffset: 0, endOffset: 1 });
+  });
 });
