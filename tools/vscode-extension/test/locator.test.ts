@@ -39,4 +39,20 @@ describe("locateFinding", () => {
     expect(range.startOffset).toBe(idx);
     expect(range.endOffset).toBe(idx + "55".length);
   });
+
+  it("anchors E018 finding to the matching publishers[*].name value", () => {
+    const text = loadFixture("one-publisher.json");
+    const finding: Finding = {
+      rule_id: "E018",
+      severity: "ERROR",
+      message: "publisher name 'AcmeMM' is duplicated",
+      feed_id: null,
+      symbol: "AcmeMM", // E018 convention: symbol slot holds the duplicated name
+    };
+    const range = locateFinding(text, finding);
+    // The string "AcmeMM" appears once in the fixture (as the publisher's name value).
+    const idx = text.indexOf('"AcmeMM"');
+    expect(range.startOffset).toBe(idx);
+    expect(range.endOffset).toBe(idx + '"AcmeMM"'.length);
+  });
 });

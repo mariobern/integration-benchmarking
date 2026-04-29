@@ -19,6 +19,18 @@ export function locateFinding(text: string, finding: Finding): OffsetRange {
     return FALLBACK;
   }
 
+  // E018: symbol slot holds the duplicated publisher name.
+  if (finding.rule_id === "E018" && finding.symbol != null) {
+    const node = findInArrayByProperty(
+      tree,
+      "publishers",
+      "name",
+      finding.symbol,
+    );
+    if (node) return toRange(node);
+    return FALLBACK;
+  }
+
   // Default: match feeds[*].feedId == finding.feed_id
   if (finding.feed_id != null) {
     const node = findInArrayByProperty(
