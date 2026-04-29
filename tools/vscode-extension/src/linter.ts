@@ -7,6 +7,13 @@ export interface LinterOptions {
   configPath: string;
   baselinePath: string | null;
   timeoutMs: number;
+  signal?: AbortSignal;
+}
+
+function firstLine(text: string): string {
+  const trimmed = text.trim();
+  const newline = trimmed.indexOf("\n");
+  return newline === -1 ? trimmed : trimmed.slice(0, newline);
 }
 
 export function runLinter(options: LinterOptions): Promise<LinterResult> {
@@ -41,6 +48,22 @@ export function runLinter(options: LinterOptions): Promise<LinterResult> {
       settle({ findings: [], error: { kind: "timeout" } });
     }, options.timeoutMs);
 
+    if (options.signal) {
+      const onAbort = () => {
+        try {
+          child.kill("SIGKILL");
+        } catch {
+          // child may already be dead; ignore
+        }
+        settle({ findings: [] });
+      };
+      if (options.signal.aborted) {
+        onAbort();
+      } else {
+        options.signal.addEventListener("abort", onAbort, { once: true });
+      }
+    }
+
     child.stdout?.on("data", (d: Buffer | string) => {
       stdout += d.toString();
     });
@@ -59,9 +82,8 @@ export function runLinter(options: LinterOptions): Promise<LinterResult> {
       }
     });
 
-    child.on("close", (code) => {
-      // Linter exits 0 (no errors), 1 (errors), or 2 (baseline missing).
-      // Stdout in all three cases should be a JSON array.
+    child.on("close", () => {
+      // Linter exits 0 (clean) or 1 (errors and/or input failure).
       try {
         const parsed = JSON.parse(stdout);
         if (Array.isArray(parsed)) {
@@ -71,10 +93,10 @@ export function runLinter(options: LinterOptions): Promise<LinterResult> {
       } catch {
         // fall through
       }
-      // Non-JSON output → either crash or parse_error.
+      // Non-JSON output → prefer stderr presence over exit code for dispatch.
       const error: LinterError =
-        code !== 0 && code !== 1
-          ? { kind: "crashed", stderr: stderr.split("\n")[0] || `exit ${code}` }
+        stderr.trim().length > 0
+          ? { kind: "crashed", stderr: firstLine(stderr) }
           : { kind: "parse_error", output: stdout.slice(0, 200) };
       settle({ findings: [], error });
     });

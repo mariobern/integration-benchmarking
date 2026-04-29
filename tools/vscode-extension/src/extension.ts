@@ -44,10 +44,18 @@ async function handleSave(
   const workspaceRoot = workspaceFolder.uri.fsPath;
 
   // Resolve the linter (explicit setting overrides walk-up).
-  const linterPath =
-    cfg.linterPath && existsSync(cfg.linterPath)
-      ? cfg.linterPath
-      : resolveLinterPath(dirname(fsPath), workspaceRoot);
+  let linterPath: string | null;
+  if (cfg.linterPath) {
+    linterPath = existsSync(cfg.linterPath) ? cfg.linterPath : null;
+    if (linterPath === null) {
+      collection.set(document.uri, [
+        errorToDiagnostic({ kind: "linter_not_found" }),
+      ]);
+      return;
+    }
+  } else {
+    linterPath = resolveLinterPath(dirname(fsPath), workspaceRoot);
+  }
 
   if (!linterPath) {
     collection.set(document.uri, [
@@ -72,6 +80,7 @@ async function handleSave(
       configPath: fsPath,
       baselinePath,
       timeoutMs: cfg.timeoutMs,
+      signal: controller.signal,
     });
 
     // If a newer save kicked off another lint, drop this result.

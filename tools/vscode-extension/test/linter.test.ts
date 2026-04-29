@@ -88,6 +88,56 @@ describe("runLinter", () => {
     }
   });
 
+  it("returns crashed error when linter exits 1 with stderr but no JSON stdout", async () => {
+    const child = makeFakeChild();
+    mockSpawn.mockReturnValue(child as never);
+
+    const promise = runLinter({
+      pythonPath: "python3",
+      linterPath: "/repo/tools/config-linter/config_linter.py",
+      configPath: "/repo/2026-04-29-T123456-foo/after.json",
+      baselinePath: null,
+      timeoutMs: 5000,
+    });
+
+    child.stderr.emit(
+      "data",
+      Buffer.from(
+        "ERROR: Invalid JSON in /path/after.json: line 12 column 5\n",
+      ),
+    );
+    child.emit("close", 1);
+
+    const result = await promise;
+    expect(result.findings).toEqual([]);
+    expect(result.error?.kind).toBe("crashed");
+    if (result.error?.kind === "crashed") {
+      expect(result.error.stderr).toContain("Invalid JSON");
+    }
+  });
+
+  it("kills subprocess and returns empty findings when signal aborts", async () => {
+    const child = makeFakeChild();
+    mockSpawn.mockReturnValue(child as never);
+
+    const controller = new AbortController();
+    const promise = runLinter({
+      pythonPath: "python3",
+      linterPath: "/repo/tools/config-linter/config_linter.py",
+      configPath: "/repo/2026-04-29-T123456-foo/after.json",
+      baselinePath: null,
+      timeoutMs: 5000,
+      signal: controller.signal,
+    });
+
+    controller.abort();
+
+    const result = await promise;
+    expect(result.findings).toEqual([]);
+    expect(result.error).toBeUndefined();
+    expect(child.kill).toHaveBeenCalledWith("SIGKILL");
+  });
+
   it("returns python_not_found when spawn emits ENOENT", async () => {
     const child = makeFakeChild();
     mockSpawn.mockReturnValue(child as never);
