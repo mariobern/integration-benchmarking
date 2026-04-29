@@ -177,14 +177,23 @@ _EXTENDED_SESSIONS = frozenset({"PRE_MARKET", "POST_MARKET", "OVER_NIGHT"})
 
 
 def check_publishers(feeds: list[dict], publishers: list[dict]) -> list[LintFinding]:
-    """Publisher validation: E003, E004, E005, E008, W004, W005, W006, W007."""
+    """Publisher validation: E003, E004, E005, E008, W004, W005, W006, W007.
+
+    Publishers missing `publisherId` are skipped here, mirroring the policy
+    used by `check_publisher_duplicates`. A separate schema rule is the
+    right place to flag missing fields.
+    """
     findings: list[LintFinding] = []
-    valid_pub_ids = {p["publisherId"] for p in publishers}
-    test_pub_ids = {p["publisherId"] for p in publishers if p.get("keyType") == "TEST"}
+    valid_pub_ids = {p["publisherId"] for p in publishers if "publisherId" in p}
+    test_pub_ids = {
+        p["publisherId"]
+        for p in publishers
+        if "publisherId" in p and p.get("keyType") == "TEST"
+    }
     name_test_pub_ids = {
         p["publisherId"]
         for p in publishers
-        if p.get("name", "").lower().endswith(".test")
+        if "publisherId" in p and p.get("name", "").lower().endswith(".test")
     }
 
     for feed in feeds:
