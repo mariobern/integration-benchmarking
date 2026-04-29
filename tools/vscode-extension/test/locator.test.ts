@@ -68,4 +68,17 @@ describe("locateFinding", () => {
     const range = locateFinding(text, finding);
     expect(range).toEqual({ startOffset: 0, endOffset: 1 });
   });
+
+  it("returns the line-0 fallback when no matching entry exists", () => {
+    const text = loadFixture("one-feed.json");
+    const finding: Finding = {
+      rule_id: "E001",
+      severity: "ERROR",
+      message: "feedId 999 is duplicated",
+      feed_id: 999, // not present in fixture (only 327)
+      symbol: null,
+    };
+    const range = locateFinding(text, finding);
+    expect(range).toEqual({ startOffset: 0, endOffset: 1 });
+  });
 });
