@@ -1,0 +1,17 @@
+{
+  "feeds": [
+    {
+      "feedId": 327,
+      "symbol": "FX.EURUSD/USD",
+      "state": "STABLE",
+      "kind": "PRICE",
+      "metadata": { "asset_type": "fx" },
+      "allowedPublisherIds": [1, 2],
+      "minPublishers": 1
+    }
+  ],
+  "publishers": [
+    { "publisherId": 1, "name": "p1", "keyType": "PRODUCTION" },
+    { "publisherId": 2, "name": "p2", "keyType": "PRODUCTION" }
+  ]
+}
