@@ -7,6 +7,18 @@ export function locateFinding(text: string, finding: Finding): OffsetRange {
   const tree = parseTree(text);
   if (!tree) return FALLBACK;
 
+  // E017: feed_id slot holds the duplicated publisherId.
+  if (finding.rule_id === "E017" && finding.feed_id != null) {
+    const node = findInArrayByProperty(
+      tree,
+      "publishers",
+      "publisherId",
+      finding.feed_id,
+    );
+    if (node) return toRange(node);
+    return FALLBACK;
+  }
+
   // Default: match feeds[*].feedId == finding.feed_id
   if (finding.feed_id != null) {
     const node = findInArrayByProperty(

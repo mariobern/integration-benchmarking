@@ -24,4 +24,19 @@ describe("locateFinding", () => {
     expect(range.startOffset).toBe(idx);
     expect(range.endOffset).toBe(idx + "327".length);
   });
+
+  it("anchors E017 finding to the matching publishers[*].publisherId value", () => {
+    const text = loadFixture("one-publisher.json");
+    const finding: Finding = {
+      rule_id: "E017",
+      severity: "ERROR",
+      message: "publisherId 55 is duplicated",
+      feed_id: 55, // E017 convention: feed_id slot holds the publisherId
+      symbol: null,
+    };
+    const range = locateFinding(text, finding);
+    const idx = text.indexOf("55");
+    expect(range.startOffset).toBe(idx);
+    expect(range.endOffset).toBe(idx + "55".length);
+  });
 });
