@@ -8,6 +8,7 @@ Inline diagnostics for pyth-lazer governance proposal `after.json` files. Runs t
 2. Install:
    - Command line: `code --install-extension lazer-config-linter-<version>.vsix`
    - Or in VS Code: `Extensions: Install from VSIX...` command palette action.
+3. After installation, the extension enables automatically. Verify it's loaded by opening Extensions (`Cmd/Ctrl+Shift+X`) and searching for "Lazer Config Linter" — it should appear under "Installed". Reload the window if it doesn't show up immediately.
 
 ## Requirements
 
