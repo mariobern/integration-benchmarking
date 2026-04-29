@@ -16,7 +16,7 @@ Inline diagnostics for pyth-lazer governance proposal `after.json` files. Runs t
 
 ## Activation
 
-The extension activates only on files matching `<date>-T<time>-<slug>/after.json` — the proposal-directory pattern used in `pyth-lazer-governance` and `pyth-lazer-staging-governance`. Other JSON files are silently ignored.
+The extension activates on any JSON file but only processes saves of files matching `<date>-T<time>-<slug>/after.json` — the proposal-directory pattern used in `pyth-lazer-governance` and `pyth-lazer-staging-governance`. Saves of other JSON files are silently ignored.
 
 ## Configuration
 
