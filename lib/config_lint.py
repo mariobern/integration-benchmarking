@@ -1074,8 +1074,52 @@ def _finding_key(f: LintFinding) -> tuple[str, Optional[int], Optional[str]]:
     Message text is intentionally excluded so magnitude changes within a
     rule (e.g. publisher count dropping further on E004) do not surface
     as new findings.
+
+    Several rules emit multiple distinct findings sharing this tuple
+    (E003 top-level vs session-level, E004 top-level vs session-level,
+    E010 duplicate-session vs verbatim-duplicate, E015 with multiple
+    schema violations on one corporate-action entry). Suppression is
+    therefore done by multiplicity (Counter) rather than by set
+    membership, so adding a new finding of one of those rules to a
+    feed that already has another is correctly reported as new.
     """
     return (f.rule_id, f.feed_id, f.symbol)
+
+
+def _compute_diff(
+    after_config: dict,
+    before_config: dict,
+    now: Optional[datetime] = None,
+) -> tuple[list[LintFinding], int]:
+    """Internal helper for diff mode.
+
+    Returns (new_findings, suppressed_count) where suppressed_count is
+    the number of after_findings that were filtered out because they
+    matched a baseline finding by `_finding_key` multiplicity.
+
+    Suppression is Counter-based, not set-based: a baseline with N
+    findings of the same key suppresses up to N after-findings of that
+    key. The (N+1)th and later after-findings of that key are reported
+    as new. This handles the case where a feed gains an additional
+    finding of a rule that can fire multiply (E003/E004/E010/E015).
+    """
+    now = now or datetime.now(timezone.utc)
+    before_findings = lint_config(before_config, now=now)
+    after_findings = lint_config(after_config, now=now)
+
+    baseline_counts: Counter[tuple[str, Optional[int], Optional[str]]] = Counter(
+        _finding_key(f) for f in before_findings
+    )
+    new_findings: list[LintFinding] = []
+    for f in after_findings:
+        k = _finding_key(f)
+        if baseline_counts[k] > 0:
+            baseline_counts[k] -= 1
+        else:
+            new_findings.append(f)
+
+    suppressed_count = len(after_findings) - len(new_findings)
+    return new_findings, suppressed_count
 
 
 def lint_config_diff(
@@ -1085,15 +1129,28 @@ def lint_config_diff(
 ) -> list[LintFinding]:
     """Lint after_config and return only findings not present in before_config.
 
-    A finding is "pre-existing" when its `_finding_key` tuple matches any
+    A finding is "pre-existing" when its `_finding_key` tuple matches a
     finding produced by linting before_config under the same `now`.
     Pre-existing findings are dropped from the result.
 
     The same `now` is passed to both runs so that time-dependent rules
     (E013) are evaluated against a single instant.
     """
-    now = now or datetime.now(timezone.utc)
-    before_findings = lint_config(before_config, now=now)
-    after_findings = lint_config(after_config, now=now)
-    baseline_keys = {_finding_key(f) for f in before_findings}
-    return [f for f in after_findings if _finding_key(f) not in baseline_keys]
+    new_findings, _ = _compute_diff(after_config, before_config, now=now)
+    return new_findings
+
+
+def lint_config_diff_with_count(
+    after_config: dict,
+    before_config: dict,
+    now: Optional[datetime] = None,
+) -> tuple[list[LintFinding], int]:
+    """Same as `lint_config_diff` but also returns how many after-findings
+    were actually suppressed because they matched a baseline finding.
+
+    The CLI uses this to display an accurate "N pre-existing findings
+    suppressed" message: N must be the count of after-findings that were
+    filtered out, not the total baseline finding count (which would
+    overstate suppression whenever the proposal fixes a baseline issue).
+    """
+    return _compute_diff(after_config, before_config, now=now)
