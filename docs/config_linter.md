@@ -6,25 +6,25 @@ Lints `after.json` for structural mistakes, publisher-reference errors, schedule
 
 ```bash
 # Default: diff mode against origin/main (auto-detected via git)
-python3 config_linter.py --config after.json
+python3 tools/config-linter/config_linter.py --config after.json
 
 # Diff against an explicit baseline file
-python3 config_linter.py --config after.json --baseline before.json
+python3 tools/config-linter/config_linter.py --config after.json --baseline before.json
 
 # Diff against a different ref (e.g. develop)
-python3 config_linter.py --config after.json --baseline-ref develop
+python3 tools/config-linter/config_linter.py --config after.json --baseline-ref develop
 
 # Force full lint (skip baseline)
-python3 config_linter.py --config after.json --no-baseline
+python3 tools/config-linter/config_linter.py --config after.json --no-baseline
 
 # JSON output
-python3 config_linter.py --config after.json --format json
+python3 tools/config-linter/config_linter.py --config after.json --format json
 
 # Write results to file (format auto-detected from extension)
-python3 config_linter.py --config after.json --output lint.json
+python3 tools/config-linter/config_linter.py --config after.json --output lint.json
 
 # Treat warnings as errors (in diff mode applies to NEW warnings only)
-python3 config_linter.py --config after.json --warnings-as-errors
+python3 tools/config-linter/config_linter.py --config after.json --warnings-as-errors
 ```
 
 ## Arguments

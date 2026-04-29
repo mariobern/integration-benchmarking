@@ -1,13 +1,13 @@
 """Config linter CLI for after.json validation.
 
 Usage:
-    python3 config_linter.py --config after.json
-    python3 config_linter.py --config after.json --baseline before.json
-    python3 config_linter.py --config after.json --baseline-ref develop
-    python3 config_linter.py --config after.json --no-baseline
-    python3 config_linter.py --config after.json --format json
-    python3 config_linter.py --config after.json --output lint_results.json
-    python3 config_linter.py --config after.json --warnings-as-errors
+    python3 tools/config-linter/config_linter.py --config after.json
+    python3 tools/config-linter/config_linter.py --config after.json --baseline before.json
+    python3 tools/config-linter/config_linter.py --config after.json --baseline-ref develop
+    python3 tools/config-linter/config_linter.py --config after.json --no-baseline
+    python3 tools/config-linter/config_linter.py --config after.json --format json
+    python3 tools/config-linter/config_linter.py --config after.json --output lint_results.json
+    python3 tools/config-linter/config_linter.py --config after.json --warnings-as-errors
 """
 
 import argparse
@@ -17,8 +17,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from lib.baseline_lookup import lookup_baseline_config
-from lib.config_lint import (
+# When invoked as tools/config-linter/config_linter.py, the repo root is two
+# parents above this file. Insert it at sys.path[0] so `from lib.X import ...`
+# resolves the shared lib at the repo root regardless of cwd.
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from lib.baseline_lookup import lookup_baseline_config  # noqa: E402
+from lib.config_lint import (  # noqa: E402
     LintFinding,
     lint_config,
     lint_config_diff_with_count,

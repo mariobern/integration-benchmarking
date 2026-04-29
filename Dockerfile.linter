@@ -2,9 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY config_linter.py .
+COPY tools/config-linter/config_linter.py tools/config-linter/
 COPY lib/__init__.py lib/
+COPY lib/baseline_lookup.py lib/
 COPY lib/config_lint.py lib/
 COPY lib/symbol_utils.py lib/
 
-ENTRYPOINT ["python3", "config_linter.py"]
+ENTRYPOINT ["python3", "tools/config-linter/config_linter.py"]

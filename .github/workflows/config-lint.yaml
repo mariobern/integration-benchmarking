@@ -21,4 +21,4 @@ jobs:
           python-version: "3.11"
 
       - name: Run config linter
-        run: python3 config_linter.py --config after.json
+        run: python3 tools/config-linter/config_linter.py --config after.json

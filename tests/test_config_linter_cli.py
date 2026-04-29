@@ -15,7 +15,7 @@ def _write_config(tmp_dir, config):
 
 def _run_linter(*args):
     result = subprocess.run(
-        [sys.executable, "config_linter.py", *args],
+        [sys.executable, "tools/config-linter/config_linter.py", *args],
         capture_output=True,
         text=True,
         cwd=PROJECT_DIR,
@@ -26,7 +26,11 @@ def _run_linter(*args):
 def _run_linter_in(repo, *args):
     """Run config_linter.py with cwd=repo (for tests in tmp git repos)."""
     return subprocess.run(
-        [sys.executable, str(Path(PROJECT_DIR) / "config_linter.py"), *args],
+        [
+            sys.executable,
+            str(Path(PROJECT_DIR) / "tools" / "config-linter" / "config_linter.py"),
+            *args,
+        ],
         capture_output=True,
         text=True,
         cwd=str(repo),
