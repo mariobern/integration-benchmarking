@@ -199,6 +199,37 @@ def _check_e021(exchanges: list) -> list[LintFinding]:
     return findings
 
 
+def _check_e025(exchanges: list) -> list[LintFinding]:
+    """E025: unknown enum for assetClass / assetSubclass / assetSector
+    on well-formed entries. Missing keys (treated as UNSPECIFIED) are
+    not flagged."""
+    findings: list[LintFinding] = []
+    fields = (
+        ("assetClass", _ASSET_CLASS),
+        ("assetSubclass", _ASSET_SUBCLASS),
+        ("assetSector", _ASSET_SECTOR),
+    )
+    for e in exchanges:
+        if not _is_well_formed(e):
+            continue
+        eid = e["exchangeId"]
+        for fname, allowed in fields:
+            if fname not in e:
+                continue  # default UNSPECIFIED applies
+            val = e[fname]
+            if val not in allowed:
+                findings.append(
+                    LintFinding(
+                        rule_id="E025",
+                        severity="ERROR",
+                        message=f"exchange {eid} field {fname}={val!r} is not a known enum value",
+                        feed_id=None,
+                        symbol=None,
+                    )
+                )
+    return findings
+
+
 def check_exchanges(
     feeds: list[dict],
     exchanges: Any,
@@ -214,6 +245,6 @@ def check_exchanges(
     findings.extend(_check_e024(exchanges))
     findings.extend(_check_e023(exchanges))
     findings.extend(_check_e021(exchanges))
-    # Subsequent tasks add: check_e025,
-    # check_e019_e020_w010_w011, check_e022.
+    findings.extend(_check_e025(exchanges))
+    # Subsequent tasks add: check_e019_e020_w010_w011, check_e022.
     return findings

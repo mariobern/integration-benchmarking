@@ -239,3 +239,100 @@ class TestE021:
         ]
         findings = [f for f in check_exchanges([], ex) if f.rule_id == "E021"]
         assert findings == []
+
+
+class TestE025:
+    _SESS = [{"session": "REGULAR", "marketSchedule": "UTC;O,O,O,O,O,O,O;"}]
+
+    def test_known_values_no_finding(self):
+        ex = [
+            {
+                "exchangeId": 1,
+                "name": "X",
+                "assetClass": "EXCHANGE_ASSET_CLASS_EQUITY",
+                "assetSubclass": "EXCHANGE_ASSET_SUBCLASS_COMMON_STOCK",
+                "assetSector": "EXCHANGE_ASSET_SECTOR_TECHNOLOGY",
+                "sessions": self._SESS,
+            }
+        ]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E025"]
+        assert findings == []
+
+    def test_unspecified_no_finding(self):
+        ex = [
+            {
+                "exchangeId": 1,
+                "name": "X",
+                "assetClass": "EXCHANGE_ASSET_CLASS_UNSPECIFIED",
+                "assetSubclass": "EXCHANGE_ASSET_SUBCLASS_UNSPECIFIED",
+                "assetSector": "EXCHANGE_ASSET_SECTOR_UNSPECIFIED",
+                "sessions": self._SESS,
+            }
+        ]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E025"]
+        assert findings == []
+
+    def test_missing_classification_no_finding(self):
+        # Missing -> default UNSPECIFIED; not flagged
+        ex = [{"exchangeId": 1, "name": "X", "sessions": self._SESS}]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E025"]
+        assert findings == []
+
+    def test_unknown_class(self):
+        ex = [
+            {
+                "exchangeId": 1,
+                "name": "X",
+                "assetClass": "EXCHANGE_ASSET_CLASS_EQUTIY",  # typo
+                "sessions": self._SESS,
+            }
+        ]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E025"]
+        assert len(findings) == 1
+        assert "assetClass" in findings[0].message
+        assert "EQUTIY" in findings[0].message
+
+    def test_unknown_subclass(self):
+        ex = [
+            {
+                "exchangeId": 1,
+                "name": "X",
+                "assetSubclass": "EXCHANGE_ASSET_SUBCLASS_BANANA",
+                "sessions": self._SESS,
+            }
+        ]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E025"]
+        assert len(findings) == 1
+        assert "assetSubclass" in findings[0].message
+
+    def test_unknown_sector(self):
+        ex = [
+            {
+                "exchangeId": 1,
+                "name": "X",
+                "assetSector": "EXCHANGE_ASSET_SECTOR_NONSENSE",
+                "sessions": self._SESS,
+            }
+        ]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E025"]
+        assert len(findings) == 1
+        assert "assetSector" in findings[0].message
+
+    def test_three_unknown_fields_emits_three(self):
+        ex = [
+            {
+                "exchangeId": 1,
+                "name": "X",
+                "assetClass": "WRONG1",
+                "assetSubclass": "WRONG2",
+                "assetSector": "WRONG3",
+                "sessions": self._SESS,
+            }
+        ]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E025"]
+        assert len(findings) == 3
+
+    def test_malformed_entries_excluded(self):
+        ex = [{"name": "X", "assetClass": "WRONG", "sessions": self._SESS}]  # no id
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E025"]
+        assert findings == []
