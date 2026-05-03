@@ -386,3 +386,104 @@ class TestE019:
         feeds = [{"feedId": 100, "symbol": "S", "exchangeId": 1, "marketSchedules": []}]
         findings = [f for f in check_exchanges(feeds, []) if f.rule_id == "E019"]
         assert len(findings) == 1
+
+
+class TestE020:
+    _EX = [
+        {
+            "exchangeId": 1,
+            "name": "X",
+            "sessions": [
+                {"session": "REGULAR", "marketSchedule": "UTC;O,O,O,O,O,O,O;"}
+            ],
+        }
+    ]
+
+    def test_inline_schedule_no_finding(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "marketSchedules": [
+                    {"session": "REGULAR", "marketSchedule": "UTC;O,O,O,O,O,O,O;"},
+                ],
+            }
+        ]
+        findings = [f for f in check_exchanges(feeds, []) if f.rule_id == "E020"]
+        assert findings == []
+
+    def test_inheritance_no_finding(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "exchangeId": 1,
+                "marketSchedules": [
+                    {"session": "REGULAR"},  # no marketSchedule, inherits
+                ],
+            }
+        ]
+        findings = [f for f in check_exchanges(feeds, self._EX) if f.rule_id == "E020"]
+        assert findings == []
+
+    def test_case_1_no_exchange_id(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "marketSchedules": [
+                    {"session": "REGULAR"},  # no marketSchedule, no exchangeId
+                ],
+            }
+        ]
+        findings = [f for f in check_exchanges(feeds, []) if f.rule_id == "E020"]
+        assert len(findings) == 1
+        assert "feed has no exchangeId" in findings[0].message
+        assert findings[0].feed_id == 100
+
+    def test_case_1_empty_string_market_schedule(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "marketSchedules": [
+                    {"session": "REGULAR", "marketSchedule": ""},
+                ],
+            }
+        ]
+        findings = [f for f in check_exchanges(feeds, []) if f.rule_id == "E020"]
+        assert len(findings) == 1
+
+    def test_case_2_exchange_missing_session(self):
+        # Exchange defines REGULAR; feed wants PRE_MARKET
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "exchangeId": 1,
+                "marketSchedules": [
+                    {"session": "PRE_MARKET"},
+                ],
+            }
+        ]
+        findings = [f for f in check_exchanges(feeds, self._EX) if f.rule_id == "E020"]
+        assert len(findings) == 1
+        assert "PRE_MARKET" in findings[0].message
+        assert "exchange 1" in findings[0].message
+
+    def test_e019_suppresses_e020(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "exchangeId": 99999,
+                "marketSchedules": [
+                    {
+                        "session": "REGULAR"
+                    },  # would fire E020 case 2 if E019 didn't suppress
+                ],
+            }
+        ]
+        all_findings = check_exchanges(feeds, self._EX)
+        assert any(f.rule_id == "E019" for f in all_findings)
+        assert not any(f.rule_id == "E020" for f in all_findings)

@@ -267,6 +267,55 @@ def _check_e019(
     return findings, suppressed_feeds
 
 
+def _check_e020(
+    feeds: list[dict],
+    by_id: dict[Any, dict],
+    sessions_by_id: dict[Any, set[str]],
+    e019_suppressed: set[Optional[int]],
+) -> list[LintFinding]:
+    """E020: per-session schedule source missing.
+    Skipped on feeds where E019 fired."""
+    findings: list[LintFinding] = []
+    for feed in feeds:
+        if not isinstance(feed, dict):
+            continue
+        fid = feed.get("feedId")
+        if fid in e019_suppressed:
+            continue
+        eid = feed.get("exchangeId")
+        sessions = feed.get("marketSchedules") or []
+        for ms in sessions:
+            if not isinstance(ms, dict):
+                continue
+            if ms.get("marketSchedule"):  # falsy = missing OR empty string
+                continue
+            session_name = ms.get("session")
+            if eid is None:
+                findings.append(
+                    LintFinding(
+                        rule_id="E020",
+                        severity="ERROR",
+                        message=f"feed session {session_name} has no marketSchedule and feed has no exchangeId — no schedule source",
+                        feed_id=fid,
+                        symbol=feed.get("symbol"),
+                    )
+                )
+            else:
+                # Resolvable (else E019 would have suppressed): check the
+                # exchange defines this session.
+                if session_name not in sessions_by_id.get(eid, set()):
+                    findings.append(
+                        LintFinding(
+                            rule_id="E020",
+                            severity="ERROR",
+                            message=f"feed session {session_name} has no marketSchedule and exchange {eid} does not define a {session_name} session",
+                            feed_id=fid,
+                            symbol=feed.get("symbol"),
+                        )
+                    )
+    return findings
+
+
 def check_exchanges(
     feeds: list[dict],
     exchanges: Any,
@@ -286,6 +335,7 @@ def check_exchanges(
     by_id, sessions_by_id = _build_index(exchanges)
     e019_findings, e019_suppressed = _check_e019(feeds, by_id)
     findings.extend(e019_findings)
+    findings.extend(_check_e020(feeds, by_id, sessions_by_id, e019_suppressed))
     # Subsequent tasks consume: by_id, sessions_by_id, e019_suppressed.
-    # Remaining rules: E020, W010, W011, E022.
+    # Remaining rules: W010, W011, E022.
     return findings
