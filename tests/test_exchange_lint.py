@@ -136,3 +136,106 @@ class TestE023:
         ]
         findings = [f for f in check_exchanges([], ex) if f.rule_id == "E023"]
         assert findings == []
+
+
+class TestE021:
+    _SESS = [{"session": "REGULAR", "marketSchedule": "UTC;O,O,O,O,O,O,O;"}]
+
+    def test_distinct_tuples_no_finding(self):
+        ex = [
+            {
+                "exchangeId": 1,
+                "name": "NASDAQ",
+                "assetClass": "EXCHANGE_ASSET_CLASS_EQUITY",
+                "assetSubclass": "EXCHANGE_ASSET_SUBCLASS_COMMON_STOCK",
+                "assetSector": "EXCHANGE_ASSET_SECTOR_TECHNOLOGY",
+                "sessions": self._SESS,
+            },
+            {
+                "exchangeId": 2,
+                "name": "NASDAQ",
+                "assetClass": "EXCHANGE_ASSET_CLASS_EQUITY",
+                "assetSubclass": "EXCHANGE_ASSET_SUBCLASS_ETF",
+                "assetSector": "EXCHANGE_ASSET_SECTOR_BROAD_MARKET",
+                "sessions": self._SESS,
+            },
+        ]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E021"]
+        assert findings == []
+
+    def test_duplicate_tuple_distinct_ids(self):
+        ex = [
+            {
+                "exchangeId": 1,
+                "name": "NASDAQ",
+                "assetClass": "EXCHANGE_ASSET_CLASS_EQUITY",
+                "assetSubclass": "EXCHANGE_ASSET_SUBCLASS_COMMON_STOCK",
+                "assetSector": "EXCHANGE_ASSET_SECTOR_TECHNOLOGY",
+                "sessions": self._SESS,
+            },
+            {
+                "exchangeId": 2,
+                "name": "NASDAQ",
+                "assetClass": "EXCHANGE_ASSET_CLASS_EQUITY",
+                "assetSubclass": "EXCHANGE_ASSET_SUBCLASS_COMMON_STOCK",
+                "assetSector": "EXCHANGE_ASSET_SECTOR_TECHNOLOGY",
+                "sessions": self._SESS,
+            },
+        ]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E021"]
+        assert len(findings) == 1
+        assert "NASDAQ" in findings[0].message
+        assert "[1, 2]" in findings[0].message
+
+    def test_three_way_duplicate_one_finding(self):
+        common = {
+            "name": "X",
+            "assetClass": "EXCHANGE_ASSET_CLASS_UNSPECIFIED",
+            "assetSubclass": "EXCHANGE_ASSET_SUBCLASS_UNSPECIFIED",
+            "assetSector": "EXCHANGE_ASSET_SECTOR_UNSPECIFIED",
+            "sessions": self._SESS,
+        }
+        ex = [
+            {"exchangeId": 1, **common},
+            {"exchangeId": 2, **common},
+            {"exchangeId": 3, **common},
+        ]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E021"]
+        assert len(findings) == 1
+        assert "[1, 2, 3]" in findings[0].message
+
+    def test_missing_classification_treated_as_unspecified(self):
+        ex = [
+            {"exchangeId": 1, "name": "X", "sessions": self._SESS},
+            {
+                "exchangeId": 2,
+                "name": "X",
+                "assetClass": "EXCHANGE_ASSET_CLASS_UNSPECIFIED",
+                "assetSubclass": "EXCHANGE_ASSET_SUBCLASS_UNSPECIFIED",
+                "assetSector": "EXCHANGE_ASSET_SECTOR_UNSPECIFIED",
+                "sessions": self._SESS,
+            },
+        ]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E021"]
+        assert len(findings) == 1
+
+    def test_same_id_same_tuple_only_e023_not_e021(self):
+        common = {
+            "name": "X",
+            "sessions": self._SESS,
+        }
+        ex = [
+            {"exchangeId": 1, **common},
+            {"exchangeId": 1, **common},
+        ]
+        all_findings = check_exchanges([], ex)
+        assert any(f.rule_id == "E023" for f in all_findings)
+        assert not any(f.rule_id == "E021" for f in all_findings)
+
+    def test_malformed_entries_excluded(self):
+        ex = [
+            {"name": "X", "sessions": self._SESS},  # missing exchangeId
+            {"name": "X", "sessions": self._SESS},
+        ]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E021"]
+        assert findings == []

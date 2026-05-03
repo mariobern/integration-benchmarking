@@ -160,6 +160,45 @@ def _check_e024(exchanges: list) -> list[LintFinding]:
     return findings
 
 
+def _check_e021(exchanges: list) -> list[LintFinding]:
+    """E021: duplicate (name, class, subclass, sector) tuple across
+    well-formed entries with distinct exchangeIds. Same-id duplicates
+    are E023's domain."""
+    groups: dict[tuple, list] = {}
+    for e in exchanges:
+        if not _is_well_formed(e):
+            continue
+        tup = (
+            e["name"],
+            e.get("assetClass") or _DEFAULT_CLASS,
+            e.get("assetSubclass") or _DEFAULT_SUBCLASS,
+            e.get("assetSector") or _DEFAULT_SECTOR,
+        )
+        groups.setdefault(tup, []).append(e["exchangeId"])
+
+    findings: list[LintFinding] = []
+    for tup, ids in groups.items():
+        # Only report duplicates across DISTINCT ids
+        # (same-id duplicates are E023's domain).
+        unique_ids = sorted(set(ids), key=lambda x: (str(type(x)), x))
+        if len(unique_ids) >= 2:
+            name, cls, sub, sec = tup
+            findings.append(
+                LintFinding(
+                    rule_id="E021",
+                    severity="ERROR",
+                    message=(
+                        f"duplicate exchange tuple "
+                        f"(name={name}, class={cls}, subclass={sub}, sector={sec}) "
+                        f"on exchangeIds {unique_ids}"
+                    ),
+                    feed_id=None,
+                    symbol=None,
+                )
+            )
+    return findings
+
+
 def check_exchanges(
     feeds: list[dict],
     exchanges: Any,
@@ -174,6 +213,7 @@ def check_exchanges(
     findings: list[LintFinding] = []
     findings.extend(_check_e024(exchanges))
     findings.extend(_check_e023(exchanges))
-    # Subsequent tasks add: check_e021, check_e025,
+    findings.extend(_check_e021(exchanges))
+    # Subsequent tasks add: check_e025,
     # check_e019_e020_w010_w011, check_e022.
     return findings
