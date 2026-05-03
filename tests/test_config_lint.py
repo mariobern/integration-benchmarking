@@ -437,6 +437,27 @@ class TestCheckPublishers:
         w004 = [f for f in findings if f.rule_id == "W004"]
         assert len(w004) == 1
 
+    def test_publishers_missing_publisherId_skipped(self):
+        """Publishers lacking `publisherId` must not crash check_publishers.
+
+        Mirrors the policy in check_publisher_duplicates: malformed
+        publisher entries are silently skipped here; a separate schema
+        rule is the right place to flag missing fields.
+        """
+        feeds = [_make_feed(1, publisher_ids=[1])]
+        publishers = [
+            _make_publisher(1),
+            {"name": "no-id", "keyType": "PRODUCTION"},  # missing publisherId
+            {"name": "no-id-but-test", "keyType": "TEST"},  # also missing
+            {"name": "evil.test", "keyType": "PRODUCTION"},  # .test name, no id
+        ]
+        # Should not raise.
+        findings = check_publishers(feeds, publishers)
+        # Sanity: the well-formed publisher (id=1) is referenced and valid,
+        # so no E003 should fire for it.
+        e003 = [f for f in findings if f.rule_id == "E003"]
+        assert e003 == []
+
 
 def _us_equity_all_sessions():
     """Return the 4-session schedule set for a properly configured US equity."""
