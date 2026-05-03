@@ -62,7 +62,11 @@ def validate_holiday_token(token: str) -> str | None:
     if kind in ("C", "O"):
         return None
 
-    return _validate_time_range(kind)
+    # If the kind looks like a time range, validate it semantically.
+    # Otherwise it's an unknown kind.
+    if _TIME_RANGE.match(kind):
+        return _validate_time_range(kind)
+    return f"unknown kind {kind!r}"
 
 
 _TIME_RANGE = re.compile(r"^(\d{2})(\d{2})-(\d{2})(\d{2})\Z")

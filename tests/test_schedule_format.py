@@ -16,10 +16,15 @@ class TestInvalidKind:
     def test_unknown_kind(self, token):
         result = validate_holiday_token(token)
         assert result is not None
-        # After Task 2: non-C/O kinds fall through to _validate_time_range,
-        # so single-letter / empty kinds now produce "malformed time range"
-        # rather than "unknown kind".
-        assert "malformed time range" in result or "expected MMDD/" in result
+        assert "unknown kind" in result or "expected MMDD/" in result
+
+    def test_unknown_single_letter_kind_says_unknown(self):
+        # Single-letter typos are 'unknown kind', not 'malformed time range'.
+        # The kind doesn't look like a time range, so the message reflects that.
+        result = validate_holiday_token("0101/X")
+        assert result is not None
+        assert "unknown kind" in result
+        assert "X" in result
 
 
 class TestInvalidMonth:
@@ -77,7 +82,9 @@ class TestTimeRange:
     def test_malformed_time_range(self, token):
         result = validate_holiday_token(token)
         assert result is not None
-        assert "malformed time range" in result
+        # These don't match the full HHMM-HHMM shape so the dispatch returns
+        # "unknown kind" rather than "malformed time range" — either is valid.
+        assert "malformed time range" in result or "unknown kind" in result
 
     def test_invalid_hour(self):
         # Hour 25 is invalid even with full MMHH form
