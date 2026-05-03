@@ -18,7 +18,11 @@ from pathlib import Path
 from typing import Optional
 
 from lib.baseline_lookup import lookup_baseline_config
-from lib.config_lint import LintFinding, lint_config, lint_config_diff
+from lib.config_lint import (
+    LintFinding,
+    lint_config,
+    lint_config_diff_with_count,
+)
 
 # ANSI color codes
 _RED = "\033[91m"
@@ -243,9 +247,16 @@ def main() -> None:
     if baseline_config is not None:
         # Thread the same `now` into both calls so E013 (time-dependent)
         # is evaluated against a single instant in both runs.
+        # `lint_config_diff_with_count` returns the *actually-suppressed*
+        # count: number of after-findings filtered out because they
+        # matched a baseline finding. Using len(lint_config(baseline))
+        # would overstate suppression whenever the proposal fixed any
+        # baseline issue (those findings are absent from after, not
+        # "suppressed").
         now = datetime.now(timezone.utc)
-        findings = lint_config_diff(config, baseline_config, now=now)
-        pre_existing_count = len(lint_config(baseline_config, now=now))
+        findings, pre_existing_count = lint_config_diff_with_count(
+            config, baseline_config, now=now
+        )
     else:
         findings = lint_config(config)
         pre_existing_count = None

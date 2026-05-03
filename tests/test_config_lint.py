@@ -2616,3 +2616,257 @@ class TestLintConfigDiff:
         )
         assert _finding_key(a) == _finding_key(b)
         assert _finding_key(a) == ("E001", 10, "X")
+
+
+class TestLintConfigDiffMultiplicity:
+    """Counter-based suppression: rules that emit multiple findings with the
+    same (rule_id, fid, sym) key (E003/E004/E010/E015) must surface
+    *additional* occurrences as new in diff mode, not silently collapse
+    them into the baseline.
+    """
+
+    def test_e003_session_level_added_to_existing_top_level_is_new(self):
+        # Baseline: feed has top-level E003 (unknown publisher 999).
+        # After: keeps top-level E003, adds session-level E003 with a
+        # different unknown publisher (888). Set-based suppression would
+        # hide the new session E003. Counter-based reveals it.
+        from lib.config_lint import lint_config_diff
+
+        publishers = [{"publisherId": 1, "name": "p1", "keyType": "PRODUCTION"}]
+        before_feed = {
+            "feedId": 1,
+            "symbol": "Crypto.X/USD",
+            "state": "STABLE",
+            "kind": "PRICE",
+            "metadata": {"asset_type": "crypto"},
+            "allowedPublisherIds": [1, 999],
+            "minPublishers": 1,
+            "marketSchedules": [
+                {"session": "REGULAR", "marketSchedule": "America/New_York;O;"}
+            ],
+        }
+        after_feed = {
+            "feedId": 1,
+            "symbol": "Crypto.X/USD",
+            "state": "STABLE",
+            "kind": "PRICE",
+            "metadata": {"asset_type": "crypto"},
+            "allowedPublisherIds": [1, 999],
+            "minPublishers": 1,
+            "marketSchedules": [
+                {
+                    "session": "REGULAR",
+                    "marketSchedule": "America/New_York;O;",
+                    "allowedPublisherIds": [1, 999, 888],
+                    "minPublishers": 1,
+                }
+            ],
+        }
+        before = {"feeds": [before_feed], "publishers": publishers}
+        after = {"feeds": [after_feed], "publishers": publishers}
+        new = lint_config_diff(after, before)
+        e003 = [f for f in new if f.rule_id == "E003"]
+        assert len(e003) == 1
+        assert "888" in e003[0].message
+        assert "session" in e003[0].message.lower()
+
+    def test_e010_verbatim_dup_added_to_existing_dup_session_is_new(self):
+        # Baseline: feed has duplicate session (two REGULAR with different
+        # schedules). After: also adds a verbatim duplicate of one entry,
+        # producing both flavours of E010 on the same feed. The verbatim
+        # E010 must surface as new.
+        from lib.config_lint import lint_config_diff
+
+        before_feed = {
+            "feedId": 1,
+            "symbol": "Crypto.X/USD",
+            "state": "STABLE",
+            "kind": "PRICE",
+            "metadata": {"asset_type": "crypto"},
+            "allowedPublisherIds": [1],
+            "minPublishers": 1,
+            "marketSchedules": [
+                {"session": "REGULAR", "marketSchedule": "A;O;"},
+                {"session": "REGULAR", "marketSchedule": "B;O;"},
+            ],
+        }
+        after_feed = {
+            "feedId": 1,
+            "symbol": "Crypto.X/USD",
+            "state": "STABLE",
+            "kind": "PRICE",
+            "metadata": {"asset_type": "crypto"},
+            "allowedPublisherIds": [1],
+            "minPublishers": 1,
+            "marketSchedules": [
+                {"session": "REGULAR", "marketSchedule": "A;O;"},
+                {"session": "REGULAR", "marketSchedule": "B;O;"},
+                {"session": "REGULAR", "marketSchedule": "A;O;"},  # verbatim dup
+            ],
+        }
+        before = {
+            "feeds": [before_feed],
+            "publishers": [{"publisherId": 1, "name": "p1", "keyType": "PRODUCTION"}],
+        }
+        after = {"feeds": [after_feed], "publishers": before["publishers"]}
+        new = lint_config_diff(after, before)
+        e010 = [f for f in new if f.rule_id == "E010"]
+        # Baseline already had one E010 (duplicate session). After has two
+        # (duplicate session + verbatim dup). Counter-based suppression
+        # reports exactly one new E010 — the additional one.
+        assert len(e010) == 1
+        assert "verbatim" in e010[0].message.lower()
+
+    def test_e015_additional_violation_on_same_feed_is_new(self):
+        # Baseline: feed has one corporate action with a missing field
+        # (one E015). After: same first action, plus a second action
+        # entirely malformed (multiple E015s on the same feed). The
+        # additional E015s must surface as new.
+        from lib.config_lint import lint_config_diff
+
+        publishers = [{"publisherId": 1, "name": "p1", "keyType": "PRODUCTION"}]
+        before_feed = {
+            "feedId": 1,
+            "symbol": "Equity.US.AAPL/USD",
+            "state": "STABLE",
+            "kind": "PRICE",
+            "metadata": {"asset_type": "equity"},
+            "allowedPublisherIds": [1],
+            "minPublishers": 1,
+            "marketSchedules": [{"session": "REGULAR", "marketSchedule": "A;O;"}],
+            "corporateActions": [
+                {"eventType": "SPLIT"}  # missing required fields → E015s
+            ],
+        }
+        after_feed = dict(before_feed)
+        after_feed["corporateActions"] = [
+            {"eventType": "SPLIT"},
+            {"eventType": "SPLIT", "rejectionWindow": "bad-format"},
+        ]
+        before = {"feeds": [before_feed], "publishers": publishers}
+        after = {"feeds": [after_feed], "publishers": publishers}
+        new = lint_config_diff(after, before)
+        e015 = [f for f in new if f.rule_id == "E015"]
+        # The first action's E015s match baseline 1:1 and are suppressed.
+        # The second action is entirely new — its E015s must surface.
+        assert len(e015) >= 1
+        assert any("[1]" in f.message for f in e015)
+
+    def test_persistent_dup_findings_still_suppressed(self):
+        # Sanity: when the same set of multiple findings exists in both
+        # baseline and after, all should be suppressed (no false
+        # positives from the Counter approach).
+        from lib.config_lint import lint_config_diff
+
+        feed = {
+            "feedId": 1,
+            "symbol": "Crypto.X/USD",
+            "state": "STABLE",
+            "kind": "PRICE",
+            "metadata": {"asset_type": "crypto"},
+            "allowedPublisherIds": [1, 999],
+            "minPublishers": 1,
+            "marketSchedules": [
+                {
+                    "session": "REGULAR",
+                    "marketSchedule": "A;O;",
+                    "allowedPublisherIds": [1, 999, 888],
+                    "minPublishers": 1,
+                }
+            ],
+        }
+        publishers = [{"publisherId": 1, "name": "p1", "keyType": "PRODUCTION"}]
+        config = {"feeds": [feed], "publishers": publishers}
+        # Same config on both sides
+        new = lint_config_diff(config, config)
+        assert new == []
+
+
+class TestLintConfigDiffWithCount:
+    """The accurate suppressed-count is the number of after-findings actually
+    filtered out, not the total baseline finding count.
+    """
+
+    def test_count_reflects_suppressions_not_total_baseline(self):
+        from lib.config_lint import lint_config_diff_with_count
+
+        publishers = [{"publisherId": 1, "name": "p1", "keyType": "PRODUCTION"}]
+        # Baseline: 3 distinct issues across 3 feeds.
+        baseline_feeds = [
+            # Feed 1 — E007 (no kind)
+            {
+                "feedId": 1,
+                "symbol": "A/B",
+                "state": "STABLE",
+                "metadata": {"asset_type": "crypto"},
+                "allowedPublisherIds": [1],
+                "minPublishers": 0,
+            },
+            # Feed 2 — E005 (STABLE, no publishers)
+            {
+                "feedId": 2,
+                "symbol": "C/D",
+                "state": "STABLE",
+                "kind": "PRICE",
+                "metadata": {"asset_type": "crypto"},
+                "allowedPublisherIds": [],
+                "minPublishers": 0,
+            },
+            # Feed 3 — E003 (unknown publisher)
+            {
+                "feedId": 3,
+                "symbol": "E/F",
+                "state": "STABLE",
+                "kind": "PRICE",
+                "metadata": {"asset_type": "crypto"},
+                "allowedPublisherIds": [1, 999],
+                "minPublishers": 0,
+            },
+        ]
+        # After: feed 2 is fixed. Feeds 1 and 3 unchanged.
+        after_feeds = [
+            baseline_feeds[0],
+            {
+                "feedId": 2,
+                "symbol": "C/D",
+                "state": "STABLE",
+                "kind": "PRICE",
+                "metadata": {"asset_type": "crypto"},
+                "allowedPublisherIds": [1],
+                "minPublishers": 0,
+            },
+            baseline_feeds[2],
+        ]
+        before = {"feeds": baseline_feeds, "publishers": publishers}
+        after = {"feeds": after_feeds, "publishers": publishers}
+
+        new_findings, suppressed = lint_config_diff_with_count(after, before)
+        # Two findings were carried over (feeds 1 & 3); these are the
+        # ones actually filtered out. The third baseline finding (E005
+        # on feed 2) was *fixed*, not suppressed.
+        assert new_findings == []
+        assert suppressed == 2
+
+    def test_count_is_zero_when_nothing_to_suppress(self):
+        from lib.config_lint import lint_config_diff_with_count
+
+        clean = {
+            "feedId": 1,
+            "symbol": "Crypto.X/USD",
+            "state": "STABLE",
+            "kind": "PRICE",
+            "metadata": {"asset_type": "crypto"},
+            "allowedPublisherIds": [1, 2, 3],
+            "minPublishers": 1,
+            "marketSchedules": [{"session": "REGULAR", "marketSchedule": "A;O;"}],
+        }
+        config = {
+            "feeds": [clean],
+            "publishers": [
+                {"publisherId": i, "name": f"p{i}", "keyType": "PRODUCTION"}
+                for i in (1, 2, 3)
+            ],
+        }
+        new_findings, suppressed = lint_config_diff_with_count(config, config)
+        assert new_findings == []
+        assert suppressed == 0
