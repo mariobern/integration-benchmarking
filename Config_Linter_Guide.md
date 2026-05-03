@@ -238,10 +238,10 @@ For each rule's exact trigger condition and a copy-pasteable example fragment, s
 | E016 | Identifier date range overlap within same vendor/session                                              | non-INACTIVE, 2+ identifiers per vendor |
 | E017 | Duplicate `publisherId` in publishers array                                                           | publishers array                        |
 | E018 | Duplicate publisher `name` in publishers array                                                        | publishers array                        |
-| E019 | feed references `exchangeId` not in `exchanges[]` (dangling reference)                                | non-INACTIVE                            |
-| E020 | session has no schedule source (no inline `marketSchedule`, no resolvable inheritance)                | non-INACTIVE                            |
+| E019 | feed references `exchangeId` not in `exchanges[]` (dangling reference)                                | any feed                                |
+| E020 | session has no schedule source (no inline `marketSchedule`, no resolvable inheritance)                | any feed                                |
 | E021 | duplicate exchange tuple `(name, assetClass, assetSubclass, assetSector)` across distinct exchangeIds | exchanges array                         |
-| E022 | invalid syntax in `scheduleOverrides.holidayOverrides[]` token                                        | non-INACTIVE                            |
+| E022 | invalid syntax in `scheduleOverrides.holidayOverrides[]` token                                        | any feed                                |
 | E023 | duplicate `exchangeId` value in `exchanges[]`                                                         | exchanges array                         |
 | E024 | exchange entry missing required field (`exchangeId`/`name`/non-empty `sessions`)                      | exchanges array                         |
 | E025 | unknown enum value for `assetClass`/`assetSubclass`/`assetSector`                                     | exchanges array                         |
@@ -258,8 +258,8 @@ For each rule's exact trigger condition and a copy-pasteable example fragment, s
 | W006 | Duplicate `publisherId` in feed                                                              | non-INACTIVE                     |
 | W007 | STABLE feed references a `TEST` key-type publisher                                           | STABLE                           |
 | W009 | Unknown `corporateActions` event type (schema not validated)                                 | any feed with `corporateActions` |
-| W010 | feed session has both inline `marketSchedule` and `exchangeId` (inline shadows exchange)     | non-INACTIVE                     |
-| W011 | feed has `exchangeId` but every session has an inline `marketSchedule` (`exchangeId` unused) | non-INACTIVE                     |
+| W010 | feed session has both inline `marketSchedule` and `exchangeId` (inline shadows exchange)     | any feed                         |
+| W011 | feed has `exchangeId` but every session has an inline `marketSchedule` (`exchangeId` unused) | any feed                         |
 
 ### Exchange-aware rules (E019–E025, W010–W011)
 

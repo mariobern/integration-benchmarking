@@ -95,6 +95,16 @@ class TestE024:
         assert len(findings) == 1
         assert "at index 1" in findings[0].message
 
+    def test_non_dict_entry_fires_e024(self):
+        # exchanges = ["NASDAQ"] is an authoring error — should not be silent.
+        ex = ["NASDAQ", {"exchangeId": 1, "name": "X", "sessions": self._SESSIONS_OK}]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E024"]
+        # The string at index 0 should fire E024; the well-formed dict at index 1 should not.
+        assert len(findings) == 1
+        assert "at index 0" in findings[0].message
+        assert "is not an object" in findings[0].message
+        assert "got str" in findings[0].message
+
 
 class TestE023:
     _OK = {"sessions": [{"session": "REGULAR", "marketSchedule": "UTC;O,O,O,O,O,O,O;"}]}

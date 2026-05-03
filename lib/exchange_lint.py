@@ -125,6 +125,15 @@ def _check_e024(exchanges: list) -> list[LintFinding]:
     findings: list[LintFinding] = []
     for i, e in enumerate(exchanges):
         if not isinstance(e, dict):
+            findings.append(
+                LintFinding(
+                    rule_id="E024",
+                    severity="ERROR",
+                    message=f"exchange entry at index {i} is not an object (got {type(e).__name__})",
+                    feed_id=None,
+                    symbol=None,
+                )
+            )
             continue
         if e.get("exchangeId") is None:
             findings.append(

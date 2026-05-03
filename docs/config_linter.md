@@ -87,6 +87,8 @@ JSON output is unchanged in shape — a flat array of finding objects, just filt
 
 A finding is considered pre-existing when its `(rule_id, feed_id, symbol)` tuple matches any finding produced by linting the baseline. Message text is intentionally excluded from the key, so magnitude changes within a rule (e.g. a publisher count dropping further on E004) do not surface as new findings. If you want to address those, run with `--no-baseline` periodically.
 
+**Diff-mode caveat for exchange-array rules:** E017, E018, E021, E023, E024, and E025 emit findings keyed by `(rule_id, None, None)` because they describe issues in the publishers or exchanges arrays rather than a specific feed. In diff mode, the suppression count is correct, but when multiple findings of the same rule co-fire, which specific finding is labeled "new" is non-deterministic.
+
 ## Exit Codes
 
 - `0` — no errors (warnings allowed unless `--warnings-as-errors`)
@@ -123,10 +125,10 @@ In diff mode, exit code reflects only **new** findings. Pre-existing findings ne
 | E016 | Identifier date range overlap within same vendor/session                                              | non-INACTIVE, 2+ identifiers per vendor                                       |
 | E017 | Duplicate `publisherId` in publishers array                                                           | publishers array                                                              |
 | E018 | Duplicate publisher `name` in publishers array                                                        | publishers array                                                              |
-| E019 | feed references `exchangeId` not in `exchanges[]` (dangling reference)                                | non-INACTIVE                                                                  |
-| E020 | session has no schedule source (no inline `marketSchedule`, no resolvable inheritance)                | non-INACTIVE                                                                  |
+| E019 | feed references `exchangeId` not in `exchanges[]` (dangling reference)                                | any feed                                                                      |
+| E020 | session has no schedule source (no inline `marketSchedule`, no resolvable inheritance)                | any feed                                                                      |
 | E021 | duplicate exchange tuple `(name, assetClass, assetSubclass, assetSector)` across distinct exchangeIds | exchanges array                                                               |
-| E022 | invalid syntax in `scheduleOverrides.holidayOverrides[]` token                                        | non-INACTIVE                                                                  |
+| E022 | invalid syntax in `scheduleOverrides.holidayOverrides[]` token                                        | any feed                                                                      |
 | E023 | duplicate `exchangeId` value in `exchanges[]`                                                         | exchanges array                                                               |
 | E024 | exchange entry missing required field (`exchangeId`/`name`/non-empty `sessions`)                      | exchanges array                                                               |
 | E025 | unknown enum value for `assetClass`/`assetSubclass`/`assetSector`                                     | exchanges array                                                               |
@@ -143,8 +145,8 @@ In diff mode, exit code reflects only **new** findings. Pre-existing findings ne
 | W006 | Duplicate `publisherId` in feed                                                              | non-INACTIVE                                                                           |
 | W007 | STABLE feed references a `TEST` key-type publisher                                           | STABLE                                                                                 |
 | W009 | Unknown `corporateActions` event type (schema not validated)                                 | any feed with `corporateActions`                                                       |
-| W010 | feed session has both inline `marketSchedule` and `exchangeId` (inline shadows exchange)     | non-INACTIVE                                                                           |
-| W011 | feed has `exchangeId` but every session has an inline `marketSchedule` (`exchangeId` unused) | non-INACTIVE                                                                           |
+| W010 | feed session has both inline `marketSchedule` and `exchangeId` (inline shadows exchange)     | any feed                                                                               |
+| W011 | feed has `exchangeId` but every session has an inline `marketSchedule` (`exchangeId` unused) | any feed                                                                               |
 
 ### E011 vs W003
 
