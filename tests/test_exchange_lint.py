@@ -487,3 +487,74 @@ class TestE020:
         all_findings = check_exchanges(feeds, self._EX)
         assert any(f.rule_id == "E019" for f in all_findings)
         assert not any(f.rule_id == "E020" for f in all_findings)
+
+
+class TestW010:
+    _EX = [
+        {
+            "exchangeId": 1,
+            "name": "X",
+            "sessions": [
+                {"session": "REGULAR", "marketSchedule": "UTC;O,O,O,O,O,O,O;"}
+            ],
+        }
+    ]
+
+    def test_no_exchange_id_no_finding(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "marketSchedules": [
+                    {"session": "REGULAR", "marketSchedule": "UTC;C,C,C,C,C,C,C;"},
+                ],
+            }
+        ]
+        findings = [f for f in check_exchanges(feeds, []) if f.rule_id == "W010"]
+        assert findings == []
+
+    def test_inline_no_inherit_no_finding(self):
+        # exchange has no PRE_MARKET, feed has inline PRE_MARKET — nothing to shadow
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "exchangeId": 1,
+                "marketSchedules": [
+                    {"session": "PRE_MARKET", "marketSchedule": "UTC;O,O,O,O,O,O,O;"},
+                ],
+            }
+        ]
+        findings = [f for f in check_exchanges(feeds, self._EX) if f.rule_id == "W010"]
+        assert findings == []
+
+    def test_shadow_fires(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "exchangeId": 1,
+                "marketSchedules": [
+                    {"session": "REGULAR", "marketSchedule": "UTC;C,C,C,C,C,C,C;"},
+                ],
+            }
+        ]
+        findings = [f for f in check_exchanges(feeds, self._EX) if f.rule_id == "W010"]
+        assert len(findings) == 1
+        assert findings[0].severity == "WARNING"
+        assert "REGULAR" in findings[0].message
+        assert "exchangeId 1" in findings[0].message
+
+    def test_e019_suppresses_w010(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "exchangeId": 99999,
+                "marketSchedules": [
+                    {"session": "REGULAR", "marketSchedule": "UTC;C,C,C,C,C,C,C;"},
+                ],
+            }
+        ]
+        findings = [f for f in check_exchanges(feeds, self._EX) if f.rule_id == "W010"]
+        assert findings == []

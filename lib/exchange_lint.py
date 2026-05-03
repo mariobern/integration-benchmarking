@@ -316,6 +316,47 @@ def _check_e020(
     return findings
 
 
+def _check_w010(
+    feeds: list[dict],
+    sessions_by_id: dict[Any, set[str]],
+    e019_suppressed: set[Optional[int]],
+    w011_suppressed: set[Optional[int]],
+) -> list[LintFinding]:
+    """W010: inline marketSchedule shadows exchange-provided schedule.
+    Skipped on feeds where E019 or W011 fired."""
+    findings: list[LintFinding] = []
+    for feed in feeds:
+        if not isinstance(feed, dict):
+            continue
+        fid = feed.get("feedId")
+        if fid in e019_suppressed or fid in w011_suppressed:
+            continue
+        eid = feed.get("exchangeId")
+        if eid is None:
+            continue
+        for ms in feed.get("marketSchedules") or []:
+            if not isinstance(ms, dict):
+                continue
+            if not ms.get("marketSchedule"):
+                continue
+            session_name = ms.get("session")
+            if session_name in sessions_by_id.get(eid, set()):
+                findings.append(
+                    LintFinding(
+                        rule_id="W010",
+                        severity="WARNING",
+                        message=(
+                            f"feed session {session_name} has both inline marketSchedule "
+                            f"and exchangeId {eid}; inline takes priority — "
+                            f"exchange schedule unused for this session"
+                        ),
+                        feed_id=fid,
+                        symbol=feed.get("symbol"),
+                    )
+                )
+    return findings
+
+
 def check_exchanges(
     feeds: list[dict],
     exchanges: Any,
@@ -336,6 +377,10 @@ def check_exchanges(
     e019_findings, e019_suppressed = _check_e019(feeds, by_id)
     findings.extend(e019_findings)
     findings.extend(_check_e020(feeds, by_id, sessions_by_id, e019_suppressed))
+    w011_suppressed: set[Optional[int]] = set()  # populated by _check_w011 in Task 11
+    findings.extend(
+        _check_w010(feeds, sessions_by_id, e019_suppressed, w011_suppressed)
+    )
     # Subsequent tasks consume: by_id, sessions_by_id, e019_suppressed.
-    # Remaining rules: W010, W011, E022.
+    # Remaining rules: W011, E022.
     return findings
