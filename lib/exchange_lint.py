@@ -99,6 +99,47 @@ def _build_index(
     return by_id, sessions_by_id
 
 
+def _check_e024(exchanges: list) -> list[LintFinding]:
+    """E024: missing required exchange fields (exchangeId, name, sessions)."""
+    findings: list[LintFinding] = []
+    for i, e in enumerate(exchanges):
+        if not isinstance(e, dict):
+            continue
+        if e.get("exchangeId") is None:
+            findings.append(
+                LintFinding(
+                    rule_id="E024",
+                    severity="ERROR",
+                    message=f"exchange entry at index {i} is missing required field 'exchangeId'",
+                    feed_id=None,
+                    symbol=None,
+                )
+            )
+        name = e.get("name")
+        if not isinstance(name, str) or not name:
+            findings.append(
+                LintFinding(
+                    rule_id="E024",
+                    severity="ERROR",
+                    message=f"exchange entry at index {i} is missing required field 'name'",
+                    feed_id=None,
+                    symbol=None,
+                )
+            )
+        sessions = e.get("sessions")
+        if not isinstance(sessions, list) or len(sessions) == 0:
+            findings.append(
+                LintFinding(
+                    rule_id="E024",
+                    severity="ERROR",
+                    message=f"exchange entry at index {i} has empty sessions list",
+                    feed_id=None,
+                    symbol=None,
+                )
+            )
+    return findings
+
+
 def check_exchanges(
     feeds: list[dict],
     exchanges: Any,
@@ -111,6 +152,7 @@ def check_exchanges(
         exchanges = []
 
     findings: list[LintFinding] = []
-    # Subsequent tasks add: check_e024, check_e023, check_e021, check_e025,
+    findings.extend(_check_e024(exchanges))
+    # Subsequent tasks add: check_e023, check_e021, check_e025,
     # check_e019_e020_w010_w011, check_e022.
     return findings

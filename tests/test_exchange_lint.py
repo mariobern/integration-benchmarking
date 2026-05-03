@@ -35,3 +35,62 @@ class TestBuildIndexFirstWriteWins:
         second = {"exchangeId": 1, "name": "SECOND", "sessions": []}
         by_id, _ = _build_index([first, second])
         assert by_id[1]["name"] == "FIRST"
+
+
+class TestE024:
+    _SESSIONS_OK = [{"session": "REGULAR", "marketSchedule": "UTC;O,O,O,O,O,O,O;"}]
+
+    def test_well_formed_no_finding(self):
+        ex = [{"exchangeId": 1, "name": "X", "sessions": self._SESSIONS_OK}]
+        findings = check_exchanges([], ex)
+        assert [f for f in findings if f.rule_id == "E024"] == []
+
+    def test_missing_exchange_id(self):
+        ex = [{"name": "X", "sessions": self._SESSIONS_OK}]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E024"]
+        assert len(findings) == 1
+        assert "missing required field 'exchangeId'" in findings[0].message
+        assert findings[0].feed_id is None
+        assert findings[0].symbol is None
+
+    def test_missing_name(self):
+        ex = [{"exchangeId": 1, "sessions": self._SESSIONS_OK}]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E024"]
+        assert len(findings) == 1
+        assert "missing required field 'name'" in findings[0].message
+
+    def test_empty_name_string(self):
+        ex = [{"exchangeId": 1, "name": "", "sessions": self._SESSIONS_OK}]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E024"]
+        assert len(findings) == 1
+        assert "missing required field 'name'" in findings[0].message
+
+    def test_missing_sessions(self):
+        ex = [{"exchangeId": 1, "name": "X"}]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E024"]
+        assert len(findings) == 1
+        assert "empty sessions list" in findings[0].message
+
+    @pytest.mark.parametrize("sessions", [[], None, "not a list"])
+    def test_empty_or_invalid_sessions(self, sessions):
+        ex = [{"exchangeId": 1, "name": "X", "sessions": sessions}]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E024"]
+        assert len(findings) == 1
+        assert "empty sessions list" in findings[0].message
+
+    def test_missing_two_fields_emits_two_findings(self):
+        ex = [{"sessions": self._SESSIONS_OK}]  # missing exchangeId AND name
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E024"]
+        assert len(findings) == 2
+        msgs = sorted(f.message for f in findings)
+        assert "exchangeId" in msgs[0]
+        assert "name" in msgs[1]
+
+    def test_index_is_zero_based(self):
+        ex = [
+            {"exchangeId": 1, "name": "OK", "sessions": self._SESSIONS_OK},
+            {"name": "BROKEN", "sessions": self._SESSIONS_OK},  # index 1
+        ]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E024"]
+        assert len(findings) == 1
+        assert "at index 1" in findings[0].message
