@@ -1,0 +1,6 @@
+{
+  "feeds": [],
+  "publishers": [
+    { "publisherId": 55, "name": "AcmeMM", "keyType": "PRODUCTION" }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "name": "lazer-config-linter",
+  "displayName": "Lazer Config Linter",
+  "description": "Inline diagnostics for pyth-lazer governance proposal after.json files. Wraps the Python config linter.",
+  "version": "0.1.0",
+  "publisher": "pyth-network",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters"
+  ],
+  "activationEvents": [
+    "onLanguage:json"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Lazer Config Linter",
+      "properties": {
+        "lazerConfigLinter.pythonPath": {
+          "type": "string",
+          "default": "python3",
+          "description": "Python interpreter path. Use absolute path if Python is not on PATH."
+        },
+        "lazerConfigLinter.linterPath": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "description": "Explicit path to config_linter.py. Set to null for walk-up auto-detect."
+        },
+        "lazerConfigLinter.timeout": {
+          "type": "number",
+          "default": 5000,
+          "description": "Subprocess kill timeout in milliseconds."
+        },
+        "lazerConfigLinter.lintOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Master switch — set to false to disable the extension without uninstalling."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package": "vsce package",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.24.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.2.0"
+  },
+  "dependencies": {
+    "jsonc-parser": "^3.2.0"
+  }
+}

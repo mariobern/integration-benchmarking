@@ -16,13 +16,13 @@ By default the linter runs in **diff mode**: it lints both the working-tree conf
 
 Every issue surfaces as a structured finding with five fields:
 
-| Field      | Meaning                                                                  |
-| ---------- | ------------------------------------------------------------------------ |
-| `rule_id`  | `E###` for errors, `W###` for warnings                                   |
-| `severity` | `ERROR` or `WARNING`                                                     |
+| Field      | Meaning                                                                        |
+| ---------- | ------------------------------------------------------------------------------ |
+| `rule_id`  | `E###` for errors, `W###` for warnings                                         |
+| `severity` | `ERROR` or `WARNING`                                                           |
 | `message`  | Human-readable description (e.g. `"minPublishers (5) >= publisher count (5)"`) |
-| `feed_id`  | The offending `feedId` (or `null` for publisher-array rules)             |
-| `symbol`   | The offending `symbol` (or `null`)                                       |
+| `feed_id`  | The offending `feedId` (or `null` for publisher-array rules)                   |
+| `symbol`   | The offending `symbol` (or `null`)                                             |
 
 ERRORs cause exit code 1. WARNINGs are advisory unless `--warnings-as-errors` is set.
 
@@ -38,13 +38,13 @@ When run with no `--baseline*` flag the linter:
 
 Auto-detect failure modes (printed to stderr, then falls back to full lint):
 
-| Situation                                             | `<reason>`                                      |
-| ----------------------------------------------------- | ----------------------------------------------- |
-| Not inside a git work tree                            | `not a git repository`                          |
-| Baseline ref does not exist locally                   | `ref 'origin/main' not found`                   |
-| Current `HEAD` is on the baseline ref                 | `on baseline ref, no diff to compute`           |
-| Config path was untracked at the merge-base           | `path 'after.json' not present at <merge-base>` |
-| Baseline JSON fails to parse                          | `baseline JSON invalid: <error>`                |
+| Situation                                   | `<reason>`                                      |
+| ------------------------------------------- | ----------------------------------------------- |
+| Not inside a git work tree                  | `not a git repository`                          |
+| Baseline ref does not exist locally         | `ref 'origin/main' not found`                   |
+| Current `HEAD` is on the baseline ref       | `on baseline ref, no diff to compute`           |
+| Config path was untracked at the merge-base | `path 'after.json' not present at <merge-base>` |
+| Baseline JSON fails to parse                | `baseline JSON invalid: <error>`                |
 
 ### Comparison Key
 
@@ -91,15 +91,15 @@ python3 config_linter.py --config after.json --output lint.json
 
 ### Arguments
 
-| Argument               | Default       | Notes                                                                 |
-| ---------------------- | ------------- | --------------------------------------------------------------------- |
-| `--config`             | —             | Required. Path to `after.json`.                                       |
-| `--baseline`           | (auto-detect) | Explicit baseline file. Mutually exclusive with `--no-baseline`.      |
-| `--baseline-ref`       | `origin/main` | Git ref for auto-detect. Ignored when `--baseline`/`--no-baseline`.   |
-| `--no-baseline`        | False         | Force full lint.                                                      |
-| `--format`             | `text`        | `text` or `json`.                                                     |
+| Argument               | Default       | Notes                                                                  |
+| ---------------------- | ------------- | ---------------------------------------------------------------------- |
+| `--config`             | —             | Required. Path to `after.json`.                                        |
+| `--baseline`           | (auto-detect) | Explicit baseline file. Mutually exclusive with `--no-baseline`.       |
+| `--baseline-ref`       | `origin/main` | Git ref for auto-detect. Ignored when `--baseline`/`--no-baseline`.    |
+| `--no-baseline`        | False         | Force full lint.                                                       |
+| `--format`             | `text`        | `text` or `json`.                                                      |
 | `--warnings-as-errors` | False         | Exit 1 if any warning. In diff mode, applies only to **new** warnings. |
-| `--output`             | —             | Write findings to file. Format auto-detected from extension.          |
+| `--output`             | —             | Write findings to file. Format auto-detected from extension.           |
 
 ### Exit Codes
 
@@ -174,13 +174,13 @@ Pre-existing-count metadata appears only in text output.
 
 The five rules that bite most often, with the typical fix:
 
-| Rule | Symptom                                            | Typical fix                                                           |
-| ---- | -------------------------------------------------- | --------------------------------------------------------------------- |
-| E004 | `minPublishers (N) >= publisher count (N)`         | Lower `minPublishers`, or onboard another publisher to add headroom.  |
-| E011 | Two STABLE peers disagree on a session schedule    | Pick one canonical schedule for the asset group and update outliers.  |
-| E014 | STABLE benchmarkable feed missing `benchmarkMapping` | Add `benchmarkMapping` to every non-OVERNIGHT session.                |
-| W003 | Schedule deviates from asset-class majority        | Confirm the deviation is intentional, otherwise align with majority.  |
-| E013 | COMING_SOON futures past every `validTo`           | Flip `state` to `INACTIVE` (the contract has rolled off).             |
+| Rule | Symptom                                              | Typical fix                                                          |
+| ---- | ---------------------------------------------------- | -------------------------------------------------------------------- |
+| E004 | `minPublishers (N) >= publisher count (N)`           | Lower `minPublishers`, or onboard another publisher to add headroom. |
+| E011 | Two STABLE peers disagree on a session schedule      | Pick one canonical schedule for the asset group and update outliers. |
+| E014 | STABLE benchmarkable feed missing `benchmarkMapping` | Add `benchmarkMapping` to every non-OVERNIGHT session.               |
+| W003 | Schedule deviates from asset-class majority          | Confirm the deviation is intentional, otherwise align with majority. |
+| E013 | COMING_SOON futures past every `validTo`             | Flip `state` to `INACTIVE` (the contract has rolled off).            |
 
 For the full set, see [docs/config_linter_examples.md](docs/config_linter_examples.md), which shows the smallest fragment that triggers each rule.
 
@@ -218,38 +218,38 @@ For each rule's exact trigger condition and a copy-pasteable example fragment, s
 
 ### Errors
 
-| ID   | Rule                                                                                | Scope                                                       |
-| ---- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| E001 | Duplicate `feedId`                                                                  | all feeds                                                   |
-| E002 | Duplicate `symbol` within STABLE/COMING_SOON                                        | active-pipeline                                             |
-| E003 | References unknown `publisherId`                                                    | non-INACTIVE                                                |
-| E004 | `minPublishers >= publisher count` (no headroom)                                    | STABLE, non-exempt                                          |
-| E005 | STABLE feed with no publishers                                                      | STABLE                                                      |
-| E006 | Non-equity feed has extended sessions                                               | non-INACTIVE, non-equity                                    |
-| E007 | Missing required field (`feedId`, `symbol`, `state`, `kind`, `metadata.asset_type`) | all feeds                                                   |
-| E008 | Session-level publisher not in top-level list                                       | non-INACTIVE                                                |
-| E009 | STABLE feed references a `.Test`-named publisher                                    | STABLE                                                      |
-| E010 | Duplicate session in `marketSchedules`                                              | non-INACTIVE                                                |
-| E011 | Schedule inconsistency within asset group                                           | STABLE only                                                 |
-| E012 | Duplicate `metadata.hermes_id`                                                      | non-INACTIVE                                                |
-| E013 | COMING_SOON futures past every `validTo`                                            | COMING_SOON futures                                         |
-| E014 | STABLE benchmarkable feed missing `benchmarkMapping`                                | STABLE, benchmarkable, non-OVERNIGHT                        |
-| E015 | `corporateActions` schema violation                                                 | any feed with `corporateActions`                            |
-| E016 | Identifier date range overlap within same vendor/session                            | non-INACTIVE, 2+ identifiers per vendor                     |
-| E017 | Duplicate `publisherId` in publishers array                                         | publishers array                                            |
-| E018 | Duplicate publisher `name` in publishers array                                      | publishers array                                            |
+| ID   | Rule                                                                                | Scope                                   |
+| ---- | ----------------------------------------------------------------------------------- | --------------------------------------- |
+| E001 | Duplicate `feedId`                                                                  | all feeds                               |
+| E002 | Duplicate `symbol` within STABLE/COMING_SOON                                        | active-pipeline                         |
+| E003 | References unknown `publisherId`                                                    | non-INACTIVE                            |
+| E004 | `minPublishers >= publisher count` (no headroom)                                    | STABLE, non-exempt                      |
+| E005 | STABLE feed with no publishers                                                      | STABLE                                  |
+| E006 | Non-equity feed has extended sessions                                               | non-INACTIVE, non-equity                |
+| E007 | Missing required field (`feedId`, `symbol`, `state`, `kind`, `metadata.asset_type`) | all feeds                               |
+| E008 | Session-level publisher not in top-level list                                       | non-INACTIVE                            |
+| E009 | STABLE feed references a `.Test`-named publisher                                    | STABLE                                  |
+| E010 | Duplicate session in `marketSchedules`                                              | non-INACTIVE                            |
+| E011 | Schedule inconsistency within asset group                                           | STABLE only                             |
+| E012 | Duplicate `metadata.hermes_id`                                                      | non-INACTIVE                            |
+| E013 | COMING_SOON futures past every `validTo`                                            | COMING_SOON futures                     |
+| E014 | STABLE benchmarkable feed missing `benchmarkMapping`                                | STABLE, benchmarkable, non-OVERNIGHT    |
+| E015 | `corporateActions` schema violation                                                 | any feed with `corporateActions`        |
+| E016 | Identifier date range overlap within same vendor/session                            | non-INACTIVE, 2+ identifiers per vendor |
+| E017 | Duplicate `publisherId` in publishers array                                         | publishers array                        |
+| E018 | Duplicate publisher `name` in publishers array                                      | publishers array                        |
 
 ### Warnings
 
-| ID   | Rule                                                                          | Scope                       |
-| ---- | ----------------------------------------------------------------------------- | --------------------------- |
-| W001 | US equity missing extended sessions (`PRE_MARKET`/`POST_MARKET`/`OVER_NIGHT`) | STABLE US equities          |
-| W002 | US equity using a non-`America/New_York` timezone                             | STABLE US equities          |
-| W003 | Schedule deviates from asset-class majority                                   | STABLE + COMING_SOON        |
-| W004 | COMING_SOON feed with no publishers                                           | COMING_SOON                 |
-| W005 | `minPublishers` leaves only 1 headroom publisher                              | STABLE, non-exempt          |
-| W006 | Duplicate `publisherId` in feed                                               | non-INACTIVE                |
-| W007 | STABLE feed references a `TEST` key-type publisher                            | STABLE                      |
+| ID   | Rule                                                                          | Scope                            |
+| ---- | ----------------------------------------------------------------------------- | -------------------------------- |
+| W001 | US equity missing extended sessions (`PRE_MARKET`/`POST_MARKET`/`OVER_NIGHT`) | STABLE US equities               |
+| W002 | US equity using a non-`America/New_York` timezone                             | STABLE US equities               |
+| W003 | Schedule deviates from asset-class majority                                   | STABLE + COMING_SOON             |
+| W004 | COMING_SOON feed with no publishers                                           | COMING_SOON                      |
+| W005 | `minPublishers` leaves only 1 headroom publisher                              | STABLE, non-exempt               |
+| W006 | Duplicate `publisherId` in feed                                               | non-INACTIVE                     |
+| W007 | STABLE feed references a `TEST` key-type publisher                            | STABLE                           |
 | W009 | Unknown `corporateActions` event type (schema not validated)                  | any feed with `corporateActions` |
 
 ### E011 vs W003
