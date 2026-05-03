@@ -2870,3 +2870,166 @@ class TestLintConfigDiffWithCount:
         new_findings, suppressed = lint_config_diff_with_count(config, config)
         assert new_findings == []
         assert suppressed == 0
+
+
+class TestParseIso:
+    """_parse_iso must always return tz-aware datetimes (or None).
+
+    Naive inputs are coerced to UTC so downstream comparisons against
+    tz-aware now() do not raise TypeError.
+    """
+
+    def _parse(self, value):
+        from lib.config_lint import _parse_iso
+
+        return _parse_iso(value)
+
+    def test_z_suffix_is_aware(self):
+        dt = self._parse("2026-01-01T00:00:00Z")
+        assert dt is not None
+        assert dt.tzinfo is not None
+        assert dt.utcoffset().total_seconds() == 0
+
+    def test_explicit_utc_offset_is_aware(self):
+        dt = self._parse("2026-01-01T00:00:00+00:00")
+        assert dt is not None
+        assert dt.tzinfo is not None
+
+    def test_non_utc_offset_preserved(self):
+        dt = self._parse("2026-01-01T00:00:00+05:30")
+        assert dt is not None
+        assert dt.utcoffset().total_seconds() == 5.5 * 3600
+
+    def test_z_with_fractional_seconds_is_aware(self):
+        dt = self._parse("2026-01-01T00:00:00.123456Z")
+        assert dt is not None
+        assert dt.tzinfo is not None
+        assert dt.microsecond == 123456
+
+    def test_nanosecond_precision_truncated_to_microseconds(self):
+        dt = self._parse("2026-01-01T00:00:00.123456789Z")
+        assert dt is not None
+        assert dt.tzinfo is not None
+        assert dt.microsecond == 123456
+
+    def test_naive_input_coerced_to_utc(self):
+        """Bare timestamp (no tz indicator) → assumed UTC, tz-aware result."""
+        dt = self._parse("2026-01-01T00:00:00")
+        assert dt is not None
+        assert dt.tzinfo is not None
+        assert dt.utcoffset().total_seconds() == 0
+        assert dt == datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    def test_naive_input_with_fractional_coerced_to_utc(self):
+        dt = self._parse("2026-01-01T00:00:00.123")
+        assert dt is not None
+        assert dt.tzinfo is not None
+        assert dt.microsecond == 123000
+
+    def test_empty_string_returns_none(self):
+        assert self._parse("") is None
+
+    def test_none_returns_none(self):
+        assert self._parse(None) is None
+
+    def test_invalid_string_returns_none(self):
+        assert self._parse("not-a-date") is None
+
+    def test_e013_does_not_crash_on_naive_validto(self):
+        """Regression: naive validTo previously crashed `vt < now` comparison."""
+        feed = _futures_feed_with_validto(
+            1, "Commodities.CLK6/USD", "2026-01-01T00:00:00"
+        )
+        # Should produce E013 (validTo is in the past relative to _NOW)
+        # rather than raising TypeError.
+        findings = check_expired_coming_soon_futures([feed], _NOW)
+        e013 = [f for f in findings if f.rule_id == "E013"]
+        assert len(e013) == 1
+        assert e013[0].feed_id == 1
+
+    def test_e016_does_not_crash_on_mixed_naive_and_aware(self):
+        """Regression: naive validFrom previously crashed list.sort() against aware fallback."""
+        feed = _feed_with_identifiers(
+            1,
+            [
+                {
+                    "identifier": "A",
+                    "validFrom": "2026-01-01T00:00:00",
+                    "validTo": "2026-06-01T00:00:00Z",
+                },
+                {
+                    "identifier": "B",
+                    "validFrom": "2026-06-01T00:00:00Z",
+                    "validTo": "2026-12-01T00:00:00",
+                },
+            ],
+        )
+        # Should sort cleanly and produce no E016 (back-to-back identifiers).
+        findings = check_identifier_continuity([feed])
+        assert findings == []
+
+
+class TestMinPublishersNull:
+    """Defensive: `minPublishers: null` (JSON) must not crash the linter.
+
+    `feed.get("minPublishers", 0)` returns None when the key is present
+    with value null; the default only applies when the key is absent.
+    The fix coerces None to 0 so int comparisons do not raise TypeError.
+    """
+
+    _PUBLISHERS = [
+        {"publisherId": 1, "name": "pub1", "keyType": "PRODUCTION"},
+        {"publisherId": 2, "name": "pub2", "keyType": "PRODUCTION"},
+        {"publisherId": 3, "name": "pub3", "keyType": "PRODUCTION"},
+    ]
+
+    def test_top_level_null_does_not_crash(self):
+        feed = _make_feed(
+            1,
+            symbol="Crypto.BTC/USD",
+            state="STABLE",
+            asset_type="crypto",
+            min_publishers=None,
+            publisher_ids=[1, 2, 3],
+        )
+        # No crash; should not produce E004 (null treated as 0).
+        findings = check_publishers([feed], self._PUBLISHERS)
+        assert all(f.rule_id != "E004" for f in findings)
+
+    def test_top_level_null_with_no_publishers_does_not_crash(self):
+        """Edge case: minPublishers null AND zero publishers → still no crash, no E004."""
+        feed = _make_feed(
+            1,
+            symbol="Crypto.BTC/USD",
+            state="STABLE",
+            asset_type="crypto",
+            min_publishers=None,
+            publisher_ids=[],
+        )
+        findings = check_publishers([feed], self._PUBLISHERS)
+        # E005 is the right rule for empty publisher list, not E004.
+        assert all(f.rule_id != "E004" for f in findings)
+        assert any(f.rule_id == "E005" for f in findings)
+
+    def test_session_level_null_does_not_crash(self):
+        """Session-level null is already guarded by `is not None`; assert no regression."""
+        feed = _make_feed(
+            1,
+            symbol="Crypto.BTC/USD",
+            state="STABLE",
+            asset_type="crypto",
+            min_publishers=1,
+            publisher_ids=[1, 2, 3],
+            schedules=[
+                {
+                    "marketSchedule": "America/New_York;O,O,O,O,O,O,O;",
+                    "session": "REGULAR",
+                    "minPublishers": None,
+                    "allowedPublisherIds": [1, 2],
+                }
+            ],
+        )
+        findings = check_publishers([feed], self._PUBLISHERS)
+        # No crash; the session E004/W005 block is skipped when session_min is None.
+        e004 = [f for f in findings if f.rule_id == "E004"]
+        assert e004 == []

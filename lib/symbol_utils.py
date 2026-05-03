@@ -15,6 +15,14 @@ def is_futures_symbol(symbol: str) -> bool:
 
     Pattern: [ROOT][MONTH_CODE][YEAR_DIGIT] where month code is one of
     FGHJKMNQUVXZ and year digit is 0-9.
+
+    Known limitation: a spot equity ticker that happens to end in
+    [MONTH_CODE][DIGIT] (e.g. a hypothetical "MU2") would be misclassified
+    as futures. No such ticker exists in current Pyth configs; the
+    convention deliberately reuses this pattern for equity-index and
+    single-stock futures (EMH6, US500H6, MUV2, etc.) which are correctly
+    classified. If a real spot-equity collision ever appears, switch to
+    consulting the feed's asset_type alongside the symbol pattern.
     """
     if not symbol:
         return False
