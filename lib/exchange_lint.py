@@ -7,7 +7,7 @@ Public entry point: check_exchanges(feeds, exchanges) -> list[LintFinding].
 from __future__ import annotations
 
 from collections import Counter
-from typing import Any
+from typing import Any, Optional
 
 from lib.config_lint import LintFinding
 
@@ -230,6 +230,43 @@ def _check_e025(exchanges: list) -> list[LintFinding]:
     return findings
 
 
+def _is_resolvable(eid: Any, by_id: dict[Any, dict]) -> bool:
+    """Return True iff eid is hashable and present in by_id."""
+    try:
+        return eid in by_id
+    except TypeError:
+        return False
+
+
+def _check_e019(
+    feeds: list[dict],
+    by_id: dict[Any, dict],
+) -> tuple[list[LintFinding], set[Optional[int]]]:
+    """E019: dangling exchangeId. Returns (findings, set of feed_ids that
+    fired E019) — used downstream to suppress E020 + W010 on those feeds."""
+    findings: list[LintFinding] = []
+    suppressed_feeds: set[Optional[int]] = set()
+    for feed in feeds:
+        if not isinstance(feed, dict):
+            continue
+        eid = feed.get("exchangeId")
+        if eid is None:
+            continue
+        if _is_resolvable(eid, by_id):
+            continue
+        findings.append(
+            LintFinding(
+                rule_id="E019",
+                severity="ERROR",
+                message=f"feed references exchangeId {eid!r} which is not defined in exchanges[]",
+                feed_id=feed.get("feedId"),
+                symbol=feed.get("symbol"),
+            )
+        )
+        suppressed_feeds.add(feed.get("feedId"))
+    return findings, suppressed_feeds
+
+
 def check_exchanges(
     feeds: list[dict],
     exchanges: Any,
@@ -246,5 +283,9 @@ def check_exchanges(
     findings.extend(_check_e023(exchanges))
     findings.extend(_check_e021(exchanges))
     findings.extend(_check_e025(exchanges))
-    # Subsequent tasks add: check_e019_e020_w010_w011, check_e022.
+    by_id, sessions_by_id = _build_index(exchanges)
+    e019_findings, e019_suppressed = _check_e019(feeds, by_id)
+    findings.extend(e019_findings)
+    # Subsequent tasks consume: by_id, sessions_by_id, e019_suppressed.
+    # Remaining rules: E020, W010, W011, E022.
     return findings

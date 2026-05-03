@@ -336,3 +336,53 @@ class TestE025:
         ex = [{"name": "X", "assetClass": "WRONG", "sessions": self._SESS}]  # no id
         findings = [f for f in check_exchanges([], ex) if f.rule_id == "E025"]
         assert findings == []
+
+
+class TestE019:
+    _OK = {"sessions": [{"session": "REGULAR", "marketSchedule": "UTC;O,O,O,O,O,O,O;"}]}
+
+    def test_resolvable_no_finding(self):
+        ex = [{"exchangeId": 1, "name": "X", **self._OK}]
+        feeds = [{"feedId": 100, "symbol": "S", "exchangeId": 1, "marketSchedules": []}]
+        findings = [f for f in check_exchanges(feeds, ex) if f.rule_id == "E019"]
+        assert findings == []
+
+    def test_no_exchange_id_no_finding(self):
+        ex = []
+        feeds = [{"feedId": 100, "symbol": "S", "marketSchedules": []}]
+        findings = [f for f in check_exchanges(feeds, ex) if f.rule_id == "E019"]
+        assert findings == []
+
+    def test_dangling_int_id(self):
+        ex = [{"exchangeId": 1, "name": "X", **self._OK}]
+        feeds = [
+            {"feedId": 100, "symbol": "S", "exchangeId": 99999, "marketSchedules": []}
+        ]
+        findings = [f for f in check_exchanges(feeds, ex) if f.rule_id == "E019"]
+        assert len(findings) == 1
+        assert findings[0].feed_id == 100
+        assert findings[0].symbol == "S"
+        assert "99999" in findings[0].message
+
+    def test_dangling_string_id_distinct_from_int(self):
+        ex = [{"exchangeId": 1, "name": "X", **self._OK}]
+        feeds = [
+            {"feedId": 100, "symbol": "S", "exchangeId": "1", "marketSchedules": []}
+        ]
+        findings = [f for f in check_exchanges(feeds, ex) if f.rule_id == "E019"]
+        assert len(findings) == 1
+        assert "'1'" in findings[0].message  # repr() of string
+
+    def test_unhashable_id_does_not_raise(self):
+        ex = [{"exchangeId": 1, "name": "X", **self._OK}]
+        feeds = [
+            {"feedId": 100, "symbol": "S", "exchangeId": [1, 2], "marketSchedules": []}
+        ]
+        findings = [f for f in check_exchanges(feeds, ex) if f.rule_id == "E019"]
+        assert len(findings) == 1
+        assert "[1, 2]" in findings[0].message
+
+    def test_no_exchanges_array_with_exchange_id_set(self):
+        feeds = [{"feedId": 100, "symbol": "S", "exchangeId": 1, "marketSchedules": []}]
+        findings = [f for f in check_exchanges(feeds, []) if f.rule_id == "E019"]
+        assert len(findings) == 1
