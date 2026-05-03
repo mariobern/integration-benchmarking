@@ -10,6 +10,7 @@ from collections import Counter
 from typing import Any, Optional
 
 from lib.config_lint import LintFinding
+from lib.schedule_format import validate_holiday_token
 
 
 # Enum allowlists (per Exchange_Configuration_Guide.md).
@@ -395,6 +396,60 @@ def _check_w011(
     return findings, suppressed
 
 
+def _check_e022(feeds: list[dict]) -> list[LintFinding]:
+    """E022: invalid holidayOverrides syntax."""
+    findings: list[LintFinding] = []
+    for feed in feeds:
+        if not isinstance(feed, dict):
+            continue
+        fid = feed.get("feedId")
+        sym = feed.get("symbol")
+        for ms in feed.get("marketSchedules") or []:
+            if not isinstance(ms, dict):
+                continue
+            overrides_obj = ms.get("scheduleOverrides")
+            if not isinstance(overrides_obj, dict):
+                continue
+            tokens = overrides_obj.get("holidayOverrides")
+            if tokens is None or tokens == []:
+                continue
+            if not isinstance(tokens, list):
+                findings.append(
+                    LintFinding(
+                        rule_id="E022",
+                        severity="ERROR",
+                        message=f"holidayOverrides must be a list of strings, got {type(tokens).__name__}",
+                        feed_id=fid,
+                        symbol=sym,
+                    )
+                )
+                continue
+            for token in tokens:
+                if not isinstance(token, str):
+                    findings.append(
+                        LintFinding(
+                            rule_id="E022",
+                            severity="ERROR",
+                            message=f"holidayOverrides entry {token!r} has invalid syntax: not a string",
+                            feed_id=fid,
+                            symbol=sym,
+                        )
+                    )
+                    continue
+                reason = validate_holiday_token(token)
+                if reason is not None:
+                    findings.append(
+                        LintFinding(
+                            rule_id="E022",
+                            severity="ERROR",
+                            message=f"holidayOverrides entry {token!r} has invalid syntax: {reason}",
+                            feed_id=fid,
+                            symbol=sym,
+                        )
+                    )
+    return findings
+
+
 def check_exchanges(
     feeds: list[dict],
     exchanges: Any,
@@ -420,6 +475,5 @@ def check_exchanges(
     findings.extend(
         _check_w010(feeds, sessions_by_id, e019_suppressed, w011_suppressed)
     )
-    # Subsequent tasks consume: by_id, sessions_by_id, e019_suppressed.
-    # Remaining rules: E022.
+    findings.extend(_check_e022(feeds))
     return findings

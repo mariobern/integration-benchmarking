@@ -745,3 +745,108 @@ class TestSuppressionMatrix:
         rule_ids = {f.rule_id for f in findings}
         assert "E024" in rule_ids
         assert "E020" in rule_ids
+
+
+class TestE022:
+    def test_no_overrides_no_finding(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "marketSchedules": [
+                    {"session": "REGULAR", "marketSchedule": "UTC;O,O,O,O,O,O,O;"},
+                ],
+            }
+        ]
+        findings = [f for f in check_exchanges(feeds, []) if f.rule_id == "E022"]
+        assert findings == []
+
+    def test_valid_tokens_no_finding(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "marketSchedules": [
+                    {
+                        "session": "REGULAR",
+                        "scheduleOverrides": {
+                            "holidayOverrides": ["0101/C", "0619/O", "0703/0930-1300"]
+                        },
+                    }
+                ],
+            }
+        ]
+        findings = [f for f in check_exchanges(feeds, []) if f.rule_id == "E022"]
+        assert findings == []
+
+    def test_one_bad_token(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "marketSchedules": [
+                    {
+                        "session": "REGULAR",
+                        "scheduleOverrides": {"holidayOverrides": ["0315/X"]},
+                    }
+                ],
+            }
+        ]
+        findings = [f for f in check_exchanges(feeds, []) if f.rule_id == "E022"]
+        assert len(findings) == 1
+        assert "'0315/X'" in findings[0].message
+        assert findings[0].feed_id == 100
+
+    def test_three_bad_tokens_emit_three_findings(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "marketSchedules": [
+                    {
+                        "session": "REGULAR",
+                        "scheduleOverrides": {
+                            "holidayOverrides": ["0315/X", "315/C", "1340/C"]
+                        },
+                    }
+                ],
+            }
+        ]
+        findings = [f for f in check_exchanges(feeds, []) if f.rule_id == "E022"]
+        assert len(findings) == 3
+
+    def test_holiday_overrides_not_a_list(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "marketSchedules": [
+                    {
+                        "session": "REGULAR",
+                        "scheduleOverrides": {
+                            "holidayOverrides": "0315/C"
+                        },  # string, not list
+                    }
+                ],
+            }
+        ]
+        findings = [f for f in check_exchanges(feeds, []) if f.rule_id == "E022"]
+        assert len(findings) == 1
+        assert "must be a list of strings" in findings[0].message
+
+    def test_empty_or_null_overrides_no_finding(self):
+        for overrides in ([], None):
+            feeds = [
+                {
+                    "feedId": 100,
+                    "symbol": "S",
+                    "marketSchedules": [
+                        {
+                            "session": "REGULAR",
+                            "scheduleOverrides": {"holidayOverrides": overrides},
+                        }
+                    ],
+                }
+            ]
+            findings = [f for f in check_exchanges(feeds, []) if f.rule_id == "E022"]
+            assert findings == []
