@@ -8,27 +8,17 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 
+from lib.exchange_lint import check_exchanges
+from lib.lint_finding import LintFinding  # noqa: F401 – re-exported for callers
 from lib.symbol_utils import (
     equity_listing_prefix,
     futures_root,
     is_futures_symbol,
     is_us_equity,
 )
-
-
-@dataclass
-class LintFinding:
-    """A single lint finding."""
-
-    rule_id: str
-    severity: str  # "ERROR" or "WARNING"
-    message: str
-    feed_id: Optional[int]
-    symbol: Optional[str]
 
 
 def check_duplicates(feeds: list[dict]) -> list[LintFinding]:
@@ -1081,6 +1071,7 @@ def lint_config(config: dict, now: Optional[datetime] = None) -> list[LintFindin
     findings.extend(check_benchmark_mapping(feeds))
     findings.extend(check_corporate_actions(feeds))
     findings.extend(check_identifier_continuity(feeds))
+    findings.extend(check_exchanges(feeds, config.get("exchanges", []) or []))
 
     return findings
 

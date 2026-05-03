@@ -3033,3 +3033,57 @@ class TestMinPublishersNull:
         # No crash; the session E004/W005 block is skipped when session_min is None.
         e004 = [f for f in findings if f.rule_id == "E004"]
         assert e004 == []
+
+
+class TestExchangeOrchestratorIntegration:
+    """Verifies that lint_config wires through to check_exchanges."""
+
+    def test_e019_appears_in_lint_config_output(self):
+        from lib.config_lint import lint_config
+
+        config = {
+            "feeds": [
+                {
+                    "feedId": 1,
+                    "symbol": "X",
+                    "state": "STABLE",
+                    "kind": "PRICE",
+                    "metadata": {"asset_type": "equity"},
+                    "exchangeId": 99999,  # dangling
+                    "allowedPublisherIds": [1],
+                    "minPublishers": 1,
+                    "marketSchedules": [
+                        {"session": "REGULAR", "marketSchedule": "UTC;O,O,O,O,O,O,O;"},
+                    ],
+                }
+            ],
+            "publishers": [{"publisherId": 1, "name": "p1", "keyType": "PRODUCTION"}],
+            "exchanges": [
+                {
+                    "exchangeId": 1,
+                    "name": "X",
+                    "sessions": [
+                        {"session": "REGULAR", "marketSchedule": "UTC;O,O,O,O,O,O,O;"}
+                    ],
+                },
+            ],
+        }
+        findings = lint_config(config)
+        assert any(f.rule_id == "E019" for f in findings)
+
+    def test_no_exchanges_key_does_not_break(self):
+        from lib.config_lint import lint_config
+
+        config = {
+            "feeds": [],
+            "publishers": [],
+            # no exchanges key
+        }
+        findings = lint_config(config)
+        # Just confirm no crash; no E0xx exchange rule should fire on empty
+        assert all(
+            not f.rule_id.startswith("E019")
+            and not f.rule_id.startswith("E020")
+            and not f.rule_id.startswith("E021")
+            for f in findings
+        )

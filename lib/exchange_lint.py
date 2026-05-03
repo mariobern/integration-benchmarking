@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any, Optional
 
-from lib.config_lint import LintFinding
+from lib.lint_finding import LintFinding
 from lib.schedule_format import validate_holiday_token
 
 
