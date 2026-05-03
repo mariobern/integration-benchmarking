@@ -6,10 +6,9 @@ Public entry point: check_exchanges(feeds, exchanges) -> list[LintFinding].
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from lib.config_lint import LintFinding
-from lib.schedule_format import validate_holiday_token
 
 
 # Enum allowlists (per Exchange_Configuration_Guide.md).
@@ -73,9 +72,9 @@ def _build_index(
 ) -> tuple[dict[Any, dict], dict[Any, set[str]]]:
     """Build (exchange_by_id, session_set_by_id) from well-formed entries.
 
-    On duplicate id, last-write-wins (deterministic by iteration order).
-    E023 reports the duplicate group; downstream rules use the surviving
-    entry as canonical.
+    On duplicate id, first-write-wins (deterministic by iteration order)
+    — the first entry encountered is canonical. E023 reports the duplicate
+    group; downstream rules (E019/E020/W010/W011) use the canonical entry.
     """
     by_id: dict[Any, dict] = {}
     sessions_by_id: dict[Any, set[str]] = {}
@@ -84,15 +83,19 @@ def _build_index(
             continue
         eid = e["exchangeId"]
         try:
-            by_id[eid] = e
+            if eid not in by_id:
+                by_id[eid] = e
         except TypeError:
-            # Unhashable id — skip; _is_well_formed already requires non-null.
+            # Unhashable id (e.g. list/dict) — well-formed allows any non-null
+            # id, so we get here for non-hashable values. Skip them; E019
+            # will report the consuming feed as dangling.
             continue
-        sessions_by_id[eid] = {
-            s.get("session")
-            for s in (e.get("sessions") or [])
-            if isinstance(s, dict) and s.get("session")
-        }
+        if eid not in sessions_by_id:
+            sessions_by_id[eid] = {
+                s.get("session")
+                for s in (e.get("sessions") or [])
+                if isinstance(s, dict) and s.get("session")
+            }
     return by_id, sessions_by_id
 
 
