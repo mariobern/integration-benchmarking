@@ -26,6 +26,7 @@ _DAYS_PER_MONTH = {
 }
 
 _TOKEN_SHAPE = re.compile(r"^(\d{2})(\d{2})/(.+)\Z")
+_TIME_RANGE = re.compile(r"^(\d{2})(\d{2})-(\d{2})(\d{2})\Z")
 _EXPECTED = "expected MMDD/{C|O|HHMM-HHMM}"
 
 
@@ -69,10 +70,11 @@ def validate_holiday_token(token: str) -> str | None:
     return f"unknown kind {kind!r}"
 
 
-_TIME_RANGE = re.compile(r"^(\d{2})(\d{2})-(\d{2})(\d{2})\Z")
-
-
 def _validate_time_range(kind: str) -> str | None:
+    """Validate a HHMM-HHMM kind string. Caller must pre-check that
+    `kind` matches `_TIME_RANGE`; the defensive branch below exists
+    only for safety if this helper gains additional callers.
+    """
     m = _TIME_RANGE.match(kind)
     if not m:
         return f"malformed time range {kind!r}"

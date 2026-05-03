@@ -79,12 +79,19 @@ class TestTimeRange:
         "token",
         ["0703/0930-1", "0703/0930-25"],
     )
-    def test_malformed_time_range(self, token):
+    def test_short_range_classified_as_unknown_kind(self, token):
+        # Inputs that don't have the strict HHMM-HHMM shape are 'unknown kind',
+        # not 'malformed time range'. The function distinguishes the two.
         result = validate_holiday_token(token)
         assert result is not None
-        # These don't match the full HHMM-HHMM shape so the dispatch returns
-        # "unknown kind" rather than "malformed time range" — either is valid.
-        assert "malformed time range" in result or "unknown kind" in result
+        assert "unknown kind" in result
+
+    def test_malformed_time_range_well_shaped_but_invalid(self):
+        # 0930-2500 has the shape (HHMM-HHMM) but the end hour 25 is invalid.
+        # This MUST return 'malformed time range', not 'unknown kind'.
+        result = validate_holiday_token("0703/0930-2500")
+        assert result is not None
+        assert "malformed time range" in result
 
     def test_invalid_hour(self):
         # Hour 25 is invalid even with full MMHH form
@@ -96,7 +103,7 @@ class TestTimeRange:
         "token",
         [
             "0703/0930-0930",  # zero-length
-            "0703/2400-0000",  # reversed (start would be 24:00 anyway)
+            "0703/2400-0000",  # start HH=24 is invalid → 'malformed time range'
             "0703/1300-0930",  # end < start
         ],
     )
