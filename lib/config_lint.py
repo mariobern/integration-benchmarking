@@ -203,7 +203,10 @@ def check_publishers(feeds: list[dict], publishers: list[dict]) -> list[LintFind
         asset_type = feed.get("metadata", {}).get("asset_type", "")
         is_exempt = asset_type in _EXEMPT_ASSET_TYPES
         pub_ids = feed.get("allowedPublisherIds", [])
-        min_pub = feed.get("minPublishers", 0)
+        # `"minPublishers": null` in JSON returns None from .get() (the
+        # default applies only when the key is absent). Coerce to 0 so the
+        # int comparisons below do not raise TypeError on malformed input.
+        min_pub = feed.get("minPublishers") or 0
 
         # Skip most rules for INACTIVE
         if state == "INACTIVE":
@@ -944,9 +947,15 @@ def _parse_iso(value: str) -> Optional[datetime]:
         frac = frac[:6]
         s = f"{head}{sep}{frac}{tz}"
     try:
-        return datetime.fromisoformat(s)
+        dt = datetime.fromisoformat(s)
     except ValueError:
         return None
+    # Coerce naive timestamps (no Z, no offset) to UTC so callers comparing
+    # against tz-aware now() do not raise TypeError. A linter should produce
+    # an actionable finding, not crash, when input data is mildly malformed.
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 def check_expired_coming_soon_futures(
