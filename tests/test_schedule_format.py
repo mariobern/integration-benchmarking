@@ -47,3 +47,9 @@ class TestMalformedShape:
         result = validate_holiday_token(token)
         assert result is not None
         assert "expected MMDD/" in result
+
+    def test_trailing_newline_rejected(self):
+        # \Z anchor (not $) rejects tokens with a trailing newline.
+        result = validate_holiday_token("0101/C\n")
+        assert result is not None
+        assert "expected MMDD/" in result

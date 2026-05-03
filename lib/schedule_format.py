@@ -7,7 +7,6 @@ to embed reason strings into LintFinding messages.
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 # Days per month (non-leap-year). 0229 is treated as valid since it is a
 # legitimate holiday-override format that may apply on leap years.
@@ -26,21 +25,22 @@ _DAYS_PER_MONTH = {
     12: 31,
 }
 
-_TOKEN_SHAPE = re.compile(r"^(\d{2})(\d{2})/(.+)$")
+_TOKEN_SHAPE = re.compile(r"^(\d{2})(\d{2})/(.+)\Z")
 _EXPECTED = "expected MMDD/{C|O|HHMM-HHMM}"
 
 
-def validate_holiday_token(token: str) -> Optional[str]:
+def validate_holiday_token(token: str) -> str | None:
     """Return None if `token` is valid, else a short reason string.
 
-    Accepted shapes:
+    Currently accepted shapes:
         MMDD/C            (closed)
         MMDD/O            (open)
-        MMDD/HHMM-HHMM    (early close / partial open)
 
-    MM in 01..12. DD must be a real day for the month (0229 always valid).
-    For the time-range form: start has HH in 00..23, end has HH in 00..24
-    (HH=24 requires MM=00); end > start as a 4-digit integer.
+    MM in 01..12. DD must be a real day for the month (0229 always valid,
+    since holiday tokens may apply on leap years).
+
+    The MMDD/HHMM-HHMM (early close / partial open) form is added in a
+    follow-up task; it is currently rejected as an unknown kind.
     """
     if not isinstance(token, str):
         return _EXPECTED
