@@ -433,6 +433,186 @@ Both E017 and E018 mirror invariants enforced by the Rust governance tool's `dif
 
 ---
 
+### E019 — Dangling `exchangeId` reference
+
+A feed sets `exchangeId` to a value that is not defined in the top-level `exchanges[]` array (or `exchanges[]` is missing entirely).
+
+```json
+"exchanges": [
+  { "exchangeId": 1, "name": "NASDAQ", ... }
+]
+
+// feed
+{ "feedId": 922, "symbol": "Equity.US.AAPL/USD", "exchangeId": 99999, ... }
+```
+
+> `E019  feed references exchangeId 99999 which is not defined in exchanges[]`
+
+The id is rendered with `repr()` — string `"1"` and int `1` produce different messages, surfacing accidental type mismatches. When E019 fires for a feed, **E020 and W010 are skipped on the same feed** so the downstream symptoms do not drown out the root cause.
+
+---
+
+### E020 — Session has no schedule source
+
+A feed session has neither an inline `marketSchedule` nor a resolvable inherited schedule. Two flavors:
+
+**Case 1 — feed has no `exchangeId`:**
+
+```json
+{
+  "feedId": 5000,
+  "marketSchedules": [{ "session": "REGULAR", "allowedPublisherIds": [12] }]
+}
+```
+
+> `E020  feed session REGULAR has no marketSchedule and feed has no exchangeId — no schedule source`
+
+**Case 2 — feed has a resolvable `exchangeId`, but the exchange does not define that session:**
+
+```json
+"exchanges": [
+  {
+    "exchangeId": 1, "name": "NASDAQ",
+    "sessions": [{ "session": "REGULAR", "marketSchedule": "America/New_York;..." }]
+  }
+]
+
+// feed
+{
+  "feedId": 922, "exchangeId": 1,
+  "marketSchedules": [
+    { "session": "REGULAR" },
+    { "session": "PRE_MARKET" }
+  ]
+}
+```
+
+> `E020  feed session PRE_MARKET has no marketSchedule and exchange 1 does not define a PRE_MARKET session`
+
+Empty-string `marketSchedule: ""` counts as missing. **Does not trigger** when E019 already fired for the feed (the dangling reference is the underlying problem).
+
+---
+
+### E021 — Duplicate exchange tuple
+
+Two **distinct** entries in `exchanges[]` share the same `(name, assetClass, assetSubclass, assetSector)` 4-tuple. Missing classification keys are normalized to their `…UNSPECIFIED` defaults before comparison.
+
+```json
+"exchanges": [
+  {
+    "exchangeId": 1, "name": "NASDAQ",
+    "assetClass": "EXCHANGE_ASSET_CLASS_EQUITY",
+    "assetSubclass": "EXCHANGE_ASSET_SUBCLASS_COMMON_STOCK",
+    "assetSector": "EXCHANGE_ASSET_SECTOR_TECHNOLOGY",
+    ...
+  },
+  {
+    "exchangeId": 2, "name": "NASDAQ",
+    "assetClass": "EXCHANGE_ASSET_CLASS_EQUITY",
+    "assetSubclass": "EXCHANGE_ASSET_SUBCLASS_COMMON_STOCK",
+    "assetSector": "EXCHANGE_ASSET_SECTOR_TECHNOLOGY",
+    ...
+  }
+]
+```
+
+> `E021  duplicate exchange tuple (name=NASDAQ, class=EXCHANGE_ASSET_CLASS_EQUITY, subclass=EXCHANGE_ASSET_SUBCLASS_COMMON_STOCK, sector=EXCHANGE_ASSET_SECTOR_TECHNOLOGY) on exchangeIds [1, 2]`
+
+Same-id duplicates (two entries sharing both the id **and** the tuple) are reported only by **E021's sibling rule E023** — E021 requires distinct ids. Entries that fail E024 (missing `exchangeId` or `name`) are excluded.
+
+---
+
+### E022 — Invalid `holidayOverrides` syntax
+
+A token inside `scheduleOverrides.holidayOverrides[]` does not match `MMDD/{C|O|HHMM-HHMM}`.
+
+```json
+{
+  "feedId": 2050,
+  "exchangeId": 1,
+  "marketSchedules": [
+    {
+      "session": "REGULAR",
+      "scheduleOverrides": {
+        "holidayOverrides": ["0315/X", "1340/C", "0703/0930-1300"]
+      }
+    }
+  ]
+}
+```
+
+> `E022  holidayOverrides entry '0315/X' has invalid syntax: unknown kind 'X'` > `E022  holidayOverrides entry '1340/C' has invalid syntax: invalid month 13`
+
+One finding **per bad token**. The third token (`0703/0930-1300`) is valid and produces no finding.
+
+If `holidayOverrides` itself is the wrong type:
+
+```json
+"scheduleOverrides": { "holidayOverrides": "0315/C" }
+```
+
+> `E022  holidayOverrides must be a list of strings, got str`
+
+Tokens are validated even when the session has an inline `marketSchedule` (in which case the overrides would actually be ignored at runtime, but typos are typos).
+
+---
+
+### E023 — Duplicate `exchangeId` in `exchanges[]`
+
+Two or more entries share the same `exchangeId` value (regardless of name/class/subclass/sector).
+
+```json
+"exchanges": [
+  { "exchangeId": 1, "name": "NASDAQ", ... },
+  { "exchangeId": 1, "name": "BSE",    ... }
+]
+```
+
+> `E023  duplicate exchangeId 1 appears on 2 entries in exchanges[]`
+
+One finding per duplicate-id group (a 3-way duplicate emits one finding mentioning `appears on 3 entries`). The internal index keeps the **first** entry as canonical, so downstream rules (E019, E020, W010, W011) reason about the first entry while E023 names the collision. Entries that fail E024 are excluded.
+
+---
+
+### E024 — Missing required exchange field
+
+An entry in `exchanges[]` is missing `exchangeId`, `name`, has an empty/missing `sessions` list, or is not an object at all.
+
+```json
+"exchanges": [
+  "NASDAQ",                                          // not an object
+  { "exchangeId": 1 },                               // missing name and sessions
+  { "exchangeId": 2, "name": "X", "sessions": [] }   // empty sessions
+]
+```
+
+> `E024  exchange entry at index 0 is not an object (got str)` > `E024  exchange entry at index 1 is missing required field 'name'` > `E024  exchange entry at index 1 has empty sessions list` > `E024  exchange entry at index 2 has empty sessions list`
+
+One finding **per missing field per entry** — an entry missing both `exchangeId` and `name` produces two findings. Indices are 0-based and address position in the raw `exchanges[]` array (because the entry's own `exchangeId` may be the missing field).
+
+E024 acts as a **gate** for E021/E023/E025: entries lacking `exchangeId` or `name` are excluded from those rules so the report doesn't pile spurious findings on top of a malformed entry. (An entry with empty `sessions` is still well-formed enough for E021/E023/E025 — the inheritance consequences surface as E020 case 2 on each affected feed.)
+
+---
+
+### E025 — Unknown enum value
+
+`assetClass`, `assetSubclass`, or `assetSector` is set to a value not in the documented allowlist (see `Exchange_Configuration_Guide.md` "Classification Enum Reference"). Missing keys default to `…UNSPECIFIED` and are **not** flagged.
+
+```json
+{
+  "exchangeId": 1,
+  "name": "NASDAQ",
+  "assetClass": "EXCHANGE_ASSET_CLASS_EQUTIY", // typo
+  "assetSubclass": "EXCHANGE_ASSET_SUBCLASS_BANANA"
+}
+```
+
+> `E025  exchange 1 field assetClass='EXCHANGE_ASSET_CLASS_EQUTIY' is not a known enum value` > `E025  exchange 1 field assetSubclass='EXCHANGE_ASSET_SUBCLASS_BANANA' is not a known enum value`
+
+One finding per offending field per entry. Entries that fail E024 are excluded.
+
+---
+
 ## Warnings
 
 ### W001 — US equity missing extended sessions
@@ -567,6 +747,54 @@ A `STABLE` feed lists a publisher whose `keyType` is `TEST` in the `publishers` 
 
 ---
 
+### W010 — Inline `marketSchedule` shadows exchange
+
+A feed sets `exchangeId` AND provides an inline `marketSchedule` for a session that the referenced exchange also defines. Per the protocol, the inline schedule takes priority and the exchange's schedule is silently ignored — usually a migration mistake (forgot to remove the inline string after switching to inheritance).
+
+```json
+"exchanges": [{
+  "exchangeId": 1, "name": "NASDAQ",
+  "sessions": [{ "session": "REGULAR", "marketSchedule": "America/New_York;..." }]
+}]
+
+// feed
+{
+  "feedId": 922, "exchangeId": 1,
+  "marketSchedules": [{
+    "session": "REGULAR",
+    "marketSchedule": "America/New_York;...",   // shadows the exchange
+    "allowedPublisherIds": [12, 14]
+  }]
+}
+```
+
+> `W010  feed session REGULAR has both inline marketSchedule and exchangeId 1; inline takes priority — exchange schedule unused for this session`
+
+**Does not trigger** when the referenced exchange does not define that session (nothing to shadow), or when E019 or W011 fired for the feed (those are the cleaner summaries).
+
+---
+
+### W011 — `exchangeId` is dead code
+
+A feed sets `exchangeId` but **every** session has its own inline `marketSchedule` — nothing inherits, so the `exchangeId` is unused noise.
+
+```json
+{
+  "feedId": 922,
+  "exchangeId": 1, // never inherits
+  "marketSchedules": [
+    { "session": "REGULAR", "marketSchedule": "America/New_York;..." },
+    { "session": "PRE_MARKET", "marketSchedule": "America/New_York;..." }
+  ]
+}
+```
+
+> `W011  feed has exchangeId 1 but every session has an inline marketSchedule — exchangeId is unused`
+
+When W011 fires for a feed, **W010 is suppressed on the same feed** to avoid emitting a per-session warning for every shadowed session in addition to the per-feed summary. **Does not trigger** on feeds with zero sessions (vacuous truth).
+
+---
+
 ## Cross-rule cheatsheet
 
 | Symptom in your config                                 | Rule to look for              |
@@ -594,3 +822,12 @@ A `STABLE` feed lists a publisher whose `keyType` is `TEST` in the `publishers` 
 | `corporateActions` entry malformed                     | E015 (known) / W009 (unknown) |
 | Identifier date ranges overlap inside one vendor       | E016                          |
 | Duplicate `publisherId` or publisher `name`            | E017 / E018                   |
+| Feed `exchangeId` not in `exchanges[]`                 | E019                          |
+| Session has no inline schedule and no inheritance      | E020                          |
+| Two exchanges share `(name, class, subclass, sector)`  | E021                          |
+| Bad token in `scheduleOverrides.holidayOverrides[]`    | E022                          |
+| Two exchanges share the same `exchangeId`              | E023                          |
+| Exchange entry missing `exchangeId`/`name`/`sessions`  | E024                          |
+| Unknown `assetClass`/`assetSubclass`/`assetSector`     | E025                          |
+| Inline schedule shadows exchange-provided schedule     | W010                          |
+| `exchangeId` set but every session has inline schedule | W011                          |
