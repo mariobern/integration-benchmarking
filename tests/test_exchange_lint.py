@@ -651,3 +651,97 @@ class TestW011:
         ]
         findings = [f for f in check_exchanges(feeds, self._EX) if f.rule_id == "W011"]
         assert findings == []
+
+
+class TestSuppressionMatrix:
+    """Validates the interaction matrix from the spec:
+    E019 → suppresses E020 + W010 on same feed
+    W011 → suppresses W010 on same feed
+    E024 → gates E021/E023/E025 (entries excluded)
+    """
+
+    _EX = [
+        {
+            "exchangeId": 1,
+            "name": "X",
+            "sessions": [
+                {"session": "REGULAR", "marketSchedule": "UTC;O,O,O,O,O,O,O;"}
+            ],
+        }
+    ]
+
+    def test_e019_blocks_both_e020_and_w010(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "exchangeId": 999,
+                "marketSchedules": [
+                    {"session": "REGULAR", "marketSchedule": "UTC;C,C,C,C,C,C,C;"},
+                    {"session": "PRE_MARKET"},  # would fire E020 case 2
+                ],
+            }
+        ]
+        findings = check_exchanges(feeds, self._EX)
+        rule_ids = {f.rule_id for f in findings}
+        assert "E019" in rule_ids
+        assert "E020" not in rule_ids
+        assert "W010" not in rule_ids
+
+    def test_w011_blocks_w010_only(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "exchangeId": 1,
+                "marketSchedules": [
+                    {"session": "REGULAR", "marketSchedule": "UTC;C,C,C,C,C,C,C;"},
+                ],
+            }
+        ]
+        findings = check_exchanges(feeds, self._EX)
+        rule_ids = {f.rule_id for f in findings}
+        assert "W011" in rule_ids
+        assert "W010" not in rule_ids
+
+    def test_e024_gates_e021_e023_e025(self):
+        # Entries missing 'name' should not appear in tuple/duplicate-id/enum checks.
+        ex = [
+            {
+                "exchangeId": 1,
+                "assetClass": "WRONG_VALUE",
+                "sessions": self._EX[0]["sessions"],
+            },
+            {
+                "exchangeId": 1,
+                "assetClass": "WRONG_VALUE",
+                "sessions": self._EX[0]["sessions"],
+            },
+        ]
+        findings = check_exchanges([], ex)
+        rule_ids = [f.rule_id for f in findings]
+        # Only E024 (twice — missing name on both entries) should appear.
+        assert all(r == "E024" for r in rule_ids), rule_ids
+        assert "E021" not in rule_ids
+        assert "E023" not in rule_ids
+        assert "E025" not in rule_ids
+
+    def test_e024_empty_sessions_does_not_suppress_e020(self):
+        # Exchange exists but has empty sessions (E024 fires).
+        # Feeds inheriting from it should still emit E020 case 2 per session
+        # — the kept-noisy decision per spec.
+        ex = [{"exchangeId": 1, "name": "X", "sessions": []}]
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "exchangeId": 1,
+                "marketSchedules": [
+                    {"session": "REGULAR"},  # would fire E020 case 2
+                ],
+            }
+        ]
+        findings = check_exchanges(feeds, ex)
+        rule_ids = {f.rule_id for f in findings}
+        assert "E024" in rule_ids
+        assert "E020" in rule_ids
