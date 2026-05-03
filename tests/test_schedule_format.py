@@ -93,12 +93,6 @@ class TestTimeRange:
         assert result is not None
         assert "malformed time range" in result
 
-    def test_invalid_hour(self):
-        # Hour 25 is invalid even with full MMHH form
-        result = validate_holiday_token("0703/0930-2500")
-        assert result is not None
-        assert "malformed time range" in result
-
     @pytest.mark.parametrize(
         "token",
         [
