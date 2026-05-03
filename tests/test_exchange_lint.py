@@ -529,6 +529,18 @@ class TestW010:
         assert findings == []
 
     def test_shadow_fires(self):
+        # Exchange defines REGULAR + PRE_MARKET; feed overrides REGULAR inline
+        # and inherits PRE_MARKET — not all inline, so W011 doesn't suppress.
+        ex = [
+            {
+                "exchangeId": 1,
+                "name": "X",
+                "sessions": [
+                    {"session": "REGULAR", "marketSchedule": "UTC;O,O,O,O,O,O,O;"},
+                    {"session": "PRE_MARKET", "marketSchedule": "UTC;O,O,O,O,O,O,O;"},
+                ],
+            }
+        ]
         feeds = [
             {
                 "feedId": 100,
@@ -536,10 +548,11 @@ class TestW010:
                 "exchangeId": 1,
                 "marketSchedules": [
                     {"session": "REGULAR", "marketSchedule": "UTC;C,C,C,C,C,C,C;"},
+                    {"session": "PRE_MARKET"},  # inherits — not all inline
                 ],
             }
         ]
-        findings = [f for f in check_exchanges(feeds, self._EX) if f.rule_id == "W010"]
+        findings = [f for f in check_exchanges(feeds, ex) if f.rule_id == "W010"]
         assert len(findings) == 1
         assert findings[0].severity == "WARNING"
         assert "REGULAR" in findings[0].message
@@ -557,4 +570,84 @@ class TestW010:
             }
         ]
         findings = [f for f in check_exchanges(feeds, self._EX) if f.rule_id == "W010"]
+        assert findings == []
+
+
+class TestW011:
+    _EX = [
+        {
+            "exchangeId": 1,
+            "name": "X",
+            "sessions": [
+                {"session": "REGULAR", "marketSchedule": "UTC;O,O,O,O,O,O,O;"},
+                {"session": "PRE_MARKET", "marketSchedule": "UTC;O,O,O,O,O,O,O;"},
+            ],
+        }
+    ]
+
+    def test_partial_inherit_no_finding(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "exchangeId": 1,
+                "marketSchedules": [
+                    {"session": "REGULAR", "marketSchedule": "UTC;C,C,C,C,C,C,C;"},
+                    {"session": "PRE_MARKET"},  # this one inherits
+                ],
+            }
+        ]
+        findings = [f for f in check_exchanges(feeds, self._EX) if f.rule_id == "W011"]
+        assert findings == []
+
+    def test_all_inline_fires(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "exchangeId": 1,
+                "marketSchedules": [
+                    {"session": "REGULAR", "marketSchedule": "UTC;C,C,C,C,C,C,C;"},
+                    {"session": "PRE_MARKET", "marketSchedule": "UTC;O,O,O,O,O,O,O;"},
+                ],
+            }
+        ]
+        findings = [f for f in check_exchanges(feeds, self._EX) if f.rule_id == "W011"]
+        assert len(findings) == 1
+        assert findings[0].feed_id == 100
+        assert "exchangeId 1" in findings[0].message
+
+    def test_zero_sessions_no_finding(self):
+        feeds = [{"feedId": 100, "symbol": "S", "exchangeId": 1, "marketSchedules": []}]
+        findings = [f for f in check_exchanges(feeds, self._EX) if f.rule_id == "W011"]
+        assert findings == []
+
+    def test_w011_suppresses_w010(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "exchangeId": 1,
+                "marketSchedules": [
+                    {"session": "REGULAR", "marketSchedule": "UTC;C,C,C,C,C,C,C;"},
+                    {"session": "PRE_MARKET", "marketSchedule": "UTC;O,O,O,O,O,O,O;"},
+                ],
+            }
+        ]
+        all_findings = check_exchanges(feeds, self._EX)
+        assert any(f.rule_id == "W011" for f in all_findings)
+        assert not any(f.rule_id == "W010" for f in all_findings)
+
+    def test_e019_suppresses_w011(self):
+        feeds = [
+            {
+                "feedId": 100,
+                "symbol": "S",
+                "exchangeId": 99999,
+                "marketSchedules": [
+                    {"session": "REGULAR", "marketSchedule": "UTC;C,C,C,C,C,C,C;"},
+                ],
+            }
+        ]
+        findings = [f for f in check_exchanges(feeds, self._EX) if f.rule_id == "W011"]
         assert findings == []

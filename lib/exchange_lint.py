@@ -357,6 +357,44 @@ def _check_w010(
     return findings
 
 
+def _check_w011(
+    feeds: list[dict],
+    e019_suppressed: set[Optional[int]],
+) -> tuple[list[LintFinding], set[Optional[int]]]:
+    """W011: feed has exchangeId but every session uses inline marketSchedule.
+    Returns (findings, set of feed_ids that fired W011) for downstream W010
+    suppression."""
+    findings: list[LintFinding] = []
+    suppressed: set[Optional[int]] = set()
+    for feed in feeds:
+        if not isinstance(feed, dict):
+            continue
+        fid = feed.get("feedId")
+        if fid in e019_suppressed:
+            continue
+        eid = feed.get("exchangeId")
+        if eid is None:
+            continue
+        sessions = feed.get("marketSchedules") or []
+        if not sessions:  # zero sessions: vacuous, do not fire
+            continue
+        all_inline = all(
+            isinstance(ms, dict) and ms.get("marketSchedule") for ms in sessions
+        )
+        if all_inline:
+            findings.append(
+                LintFinding(
+                    rule_id="W011",
+                    severity="WARNING",
+                    message=f"feed has exchangeId {eid} but every session has an inline marketSchedule — exchangeId is unused",
+                    feed_id=fid,
+                    symbol=feed.get("symbol"),
+                )
+            )
+            suppressed.add(fid)
+    return findings, suppressed
+
+
 def check_exchanges(
     feeds: list[dict],
     exchanges: Any,
@@ -377,10 +415,11 @@ def check_exchanges(
     e019_findings, e019_suppressed = _check_e019(feeds, by_id)
     findings.extend(e019_findings)
     findings.extend(_check_e020(feeds, by_id, sessions_by_id, e019_suppressed))
-    w011_suppressed: set[Optional[int]] = set()  # populated by _check_w011 in Task 11
+    w011_findings, w011_suppressed = _check_w011(feeds, e019_suppressed)
+    findings.extend(w011_findings)
     findings.extend(
         _check_w010(feeds, sessions_by_id, e019_suppressed, w011_suppressed)
     )
     # Subsequent tasks consume: by_id, sessions_by_id, e019_suppressed.
-    # Remaining rules: W011, E022.
+    # Remaining rules: E022.
     return findings
