@@ -1,0 +1,488 @@
+"""Exchange-aware lint rules: E019, E020, E021, E022, E023, E024, E025,
+W010, W011.
+
+Public entry point: check_exchanges(feeds, exchanges) -> list[LintFinding].
+"""
+
+from __future__ import annotations
+
+from collections import Counter
+from typing import Any, Optional
+
+from lib.lint_finding import LintFinding
+from lib.schedule_format import validate_holiday_token
+
+
+# Enum allowlists (per Exchange_Configuration_Guide.md).
+_ASSET_CLASS = frozenset(
+    {
+        "EXCHANGE_ASSET_CLASS_UNSPECIFIED",
+        "EXCHANGE_ASSET_CLASS_EQUITY",
+        "EXCHANGE_ASSET_CLASS_FUTURE",
+    }
+)
+_ASSET_SUBCLASS = frozenset(
+    {
+        "EXCHANGE_ASSET_SUBCLASS_UNSPECIFIED",
+        "EXCHANGE_ASSET_SUBCLASS_COMMON_STOCK",
+        "EXCHANGE_ASSET_SUBCLASS_ETF",
+        "EXCHANGE_ASSET_SUBCLASS_ENERGY",
+        "EXCHANGE_ASSET_SUBCLASS_METALS",
+        "EXCHANGE_ASSET_SUBCLASS_EQUITY",
+        "EXCHANGE_ASSET_SUBCLASS_FIXED_INCOME",
+        "EXCHANGE_ASSET_SUBCLASS_FX",
+        "EXCHANGE_ASSET_SUBCLASS_AGRICULTURAL",
+    }
+)
+_ASSET_SECTOR = frozenset(
+    {
+        "EXCHANGE_ASSET_SECTOR_UNSPECIFIED",
+        "EXCHANGE_ASSET_SECTOR_TECHNOLOGY",
+        "EXCHANGE_ASSET_SECTOR_FINANCIALS",
+        "EXCHANGE_ASSET_SECTOR_BROAD_MARKET",
+        "EXCHANGE_ASSET_SECTOR_OIL",
+        "EXCHANGE_ASSET_SECTOR_METALS",
+        "EXCHANGE_ASSET_SECTOR_INDEX",
+        "EXCHANGE_ASSET_SECTOR_RATES",
+        "EXCHANGE_ASSET_SECTOR_FX",
+        "EXCHANGE_ASSET_SECTOR_AGRICULTURAL",
+    }
+)
+
+_DEFAULT_CLASS = "EXCHANGE_ASSET_CLASS_UNSPECIFIED"
+_DEFAULT_SUBCLASS = "EXCHANGE_ASSET_SUBCLASS_UNSPECIFIED"
+_DEFAULT_SECTOR = "EXCHANGE_ASSET_SECTOR_UNSPECIFIED"
+
+
+def _is_well_formed(entry: dict) -> bool:
+    """An entry is well-formed iff exchangeId is non-null AND name is a
+    non-empty string. E021/E023/E025 only consider well-formed entries.
+    Entries with empty/missing sessions are still well-formed for those
+    rules (E020 handles the inheritance consequence per affected feed)."""
+    if not isinstance(entry, dict):
+        return False
+    if entry.get("exchangeId") is None:
+        return False
+    name = entry.get("name")
+    if not isinstance(name, str) or not name:
+        return False
+    return True
+
+
+def _build_index(
+    exchanges: list[dict],
+) -> tuple[dict[Any, dict], dict[Any, set[str]]]:
+    """Build (exchange_by_id, session_set_by_id) from well-formed entries.
+
+    On duplicate id, first-write-wins (deterministic by iteration order)
+    — the first entry encountered is canonical. E023 reports the duplicate
+    group; downstream rules (E019/E020/W010/W011) use the canonical entry.
+    """
+    by_id: dict[Any, dict] = {}
+    sessions_by_id: dict[Any, set[str]] = {}
+    for e in exchanges:
+        if not _is_well_formed(e):
+            continue
+        eid = e["exchangeId"]
+        try:
+            if eid not in by_id:
+                by_id[eid] = e
+        except TypeError:
+            # Unhashable id (e.g. list/dict) — well-formed allows any non-null
+            # id, so we get here for non-hashable values. Skip them; E019
+            # will report the consuming feed as dangling.
+            continue
+        if eid not in sessions_by_id:
+            sessions_by_id[eid] = {
+                s.get("session")
+                for s in (e.get("sessions") or [])
+                if isinstance(s, dict) and s.get("session")
+            }
+    return by_id, sessions_by_id
+
+
+def _check_e023(exchanges: list) -> list[LintFinding]:
+    """E023: duplicate exchangeId across well-formed entries."""
+    ids = [e["exchangeId"] for e in exchanges if _is_well_formed(e)]
+    counts = Counter(ids)
+    findings: list[LintFinding] = []
+    for eid, n in counts.items():
+        if n >= 2:
+            findings.append(
+                LintFinding(
+                    rule_id="E023",
+                    severity="ERROR",
+                    message=f"duplicate exchangeId {eid!r} appears on {n} entries in exchanges[]",
+                    feed_id=None,
+                    symbol=None,
+                )
+            )
+    return findings
+
+
+def _check_e024(exchanges: list) -> list[LintFinding]:
+    """E024: missing required exchange fields (exchangeId, name, sessions)."""
+    findings: list[LintFinding] = []
+    for i, e in enumerate(exchanges):
+        if not isinstance(e, dict):
+            findings.append(
+                LintFinding(
+                    rule_id="E024",
+                    severity="ERROR",
+                    message=f"exchange entry at index {i} is not an object (got {type(e).__name__})",
+                    feed_id=None,
+                    symbol=None,
+                )
+            )
+            continue
+        if e.get("exchangeId") is None:
+            findings.append(
+                LintFinding(
+                    rule_id="E024",
+                    severity="ERROR",
+                    message=f"exchange entry at index {i} is missing required field 'exchangeId'",
+                    feed_id=None,
+                    symbol=None,
+                )
+            )
+        name = e.get("name")
+        if not isinstance(name, str) or not name:
+            findings.append(
+                LintFinding(
+                    rule_id="E024",
+                    severity="ERROR",
+                    message=f"exchange entry at index {i} is missing required field 'name'",
+                    feed_id=None,
+                    symbol=None,
+                )
+            )
+        sessions = e.get("sessions")
+        if not isinstance(sessions, list) or len(sessions) == 0:
+            findings.append(
+                LintFinding(
+                    rule_id="E024",
+                    severity="ERROR",
+                    message=f"exchange entry at index {i} has empty sessions list",
+                    feed_id=None,
+                    symbol=None,
+                )
+            )
+    return findings
+
+
+def _check_e021(exchanges: list) -> list[LintFinding]:
+    """E021: duplicate (name, class, subclass, sector) tuple across
+    well-formed entries with distinct exchangeIds. Same-id duplicates
+    are E023's domain."""
+    groups: dict[tuple, list] = {}
+    for e in exchanges:
+        if not _is_well_formed(e):
+            continue
+        tup = (
+            e["name"],
+            e.get("assetClass") or _DEFAULT_CLASS,
+            e.get("assetSubclass") or _DEFAULT_SUBCLASS,
+            e.get("assetSector") or _DEFAULT_SECTOR,
+        )
+        groups.setdefault(tup, []).append(e["exchangeId"])
+
+    findings: list[LintFinding] = []
+    for tup, ids in groups.items():
+        # Only report duplicates across DISTINCT ids
+        # (same-id duplicates are E023's domain).
+        unique_ids = sorted(set(ids), key=lambda x: (str(type(x)), x))
+        if len(unique_ids) >= 2:
+            name, cls, sub, sec = tup
+            findings.append(
+                LintFinding(
+                    rule_id="E021",
+                    severity="ERROR",
+                    message=(
+                        f"duplicate exchange tuple "
+                        f"(name={name}, class={cls}, subclass={sub}, sector={sec}) "
+                        f"on exchangeIds {unique_ids}"
+                    ),
+                    feed_id=None,
+                    symbol=None,
+                )
+            )
+    return findings
+
+
+def _check_e025(exchanges: list) -> list[LintFinding]:
+    """E025: unknown enum for assetClass / assetSubclass / assetSector
+    on well-formed entries. Missing keys (treated as UNSPECIFIED) are
+    not flagged."""
+    findings: list[LintFinding] = []
+    fields = (
+        ("assetClass", _ASSET_CLASS),
+        ("assetSubclass", _ASSET_SUBCLASS),
+        ("assetSector", _ASSET_SECTOR),
+    )
+    for e in exchanges:
+        if not _is_well_formed(e):
+            continue
+        eid = e["exchangeId"]
+        for fname, allowed in fields:
+            if fname not in e:
+                continue  # default UNSPECIFIED applies
+            val = e[fname]
+            if val not in allowed:
+                findings.append(
+                    LintFinding(
+                        rule_id="E025",
+                        severity="ERROR",
+                        message=f"exchange {eid} field {fname}={val!r} is not a known enum value",
+                        feed_id=None,
+                        symbol=None,
+                    )
+                )
+    return findings
+
+
+def _is_resolvable(eid: Any, by_id: dict[Any, dict]) -> bool:
+    """Return True iff eid is hashable and present in by_id."""
+    try:
+        return eid in by_id
+    except TypeError:
+        return False
+
+
+def _check_e019(
+    feeds: list[dict],
+    by_id: dict[Any, dict],
+) -> tuple[list[LintFinding], set[Optional[int]]]:
+    """E019: dangling exchangeId. Returns (findings, set of feed_ids that
+    fired E019) — used downstream to suppress E020 + W010 on those feeds."""
+    findings: list[LintFinding] = []
+    suppressed_feeds: set[Optional[int]] = set()
+    for feed in feeds:
+        if not isinstance(feed, dict):
+            continue
+        eid = feed.get("exchangeId")
+        if eid is None:
+            continue
+        if _is_resolvable(eid, by_id):
+            continue
+        findings.append(
+            LintFinding(
+                rule_id="E019",
+                severity="ERROR",
+                message=f"feed references exchangeId {eid!r} which is not defined in exchanges[]",
+                feed_id=feed.get("feedId"),
+                symbol=feed.get("symbol"),
+            )
+        )
+        suppressed_feeds.add(feed.get("feedId"))
+    return findings, suppressed_feeds
+
+
+def _check_e020(
+    feeds: list[dict],
+    by_id: dict[Any, dict],
+    sessions_by_id: dict[Any, set[str]],
+    e019_suppressed: set[Optional[int]],
+) -> list[LintFinding]:
+    """E020: per-session schedule source missing.
+    Skipped on feeds where E019 fired."""
+    findings: list[LintFinding] = []
+    for feed in feeds:
+        if not isinstance(feed, dict):
+            continue
+        fid = feed.get("feedId")
+        if fid in e019_suppressed:
+            continue
+        eid = feed.get("exchangeId")
+        sessions = feed.get("marketSchedules") or []
+        for ms in sessions:
+            if not isinstance(ms, dict):
+                continue
+            if ms.get("marketSchedule"):  # falsy = missing OR empty string
+                continue
+            session_name = ms.get("session")
+            if eid is None:
+                findings.append(
+                    LintFinding(
+                        rule_id="E020",
+                        severity="ERROR",
+                        message=f"feed session {session_name} has no marketSchedule and feed has no exchangeId — no schedule source",
+                        feed_id=fid,
+                        symbol=feed.get("symbol"),
+                    )
+                )
+            else:
+                # Resolvable (else E019 would have suppressed): check the
+                # exchange defines this session.
+                if session_name not in sessions_by_id.get(eid, set()):
+                    findings.append(
+                        LintFinding(
+                            rule_id="E020",
+                            severity="ERROR",
+                            message=f"feed session {session_name} has no marketSchedule and exchange {eid} does not define a {session_name} session",
+                            feed_id=fid,
+                            symbol=feed.get("symbol"),
+                        )
+                    )
+    return findings
+
+
+def _check_w010(
+    feeds: list[dict],
+    sessions_by_id: dict[Any, set[str]],
+    e019_suppressed: set[Optional[int]],
+    w011_suppressed: set[Optional[int]],
+) -> list[LintFinding]:
+    """W010: inline marketSchedule shadows exchange-provided schedule.
+    Skipped on feeds where E019 or W011 fired."""
+    findings: list[LintFinding] = []
+    for feed in feeds:
+        if not isinstance(feed, dict):
+            continue
+        fid = feed.get("feedId")
+        if fid in e019_suppressed or fid in w011_suppressed:
+            continue
+        eid = feed.get("exchangeId")
+        if eid is None:
+            continue
+        for ms in feed.get("marketSchedules") or []:
+            if not isinstance(ms, dict):
+                continue
+            if not ms.get("marketSchedule"):
+                continue
+            session_name = ms.get("session")
+            if session_name in sessions_by_id.get(eid, set()):
+                findings.append(
+                    LintFinding(
+                        rule_id="W010",
+                        severity="WARNING",
+                        message=(
+                            f"feed session {session_name} has both inline marketSchedule "
+                            f"and exchangeId {eid}; inline takes priority — "
+                            f"exchange schedule unused for this session"
+                        ),
+                        feed_id=fid,
+                        symbol=feed.get("symbol"),
+                    )
+                )
+    return findings
+
+
+def _check_w011(
+    feeds: list[dict],
+    e019_suppressed: set[Optional[int]],
+) -> tuple[list[LintFinding], set[Optional[int]]]:
+    """W011: feed has exchangeId but every session uses inline marketSchedule.
+    Returns (findings, set of feed_ids that fired W011) for downstream W010
+    suppression."""
+    findings: list[LintFinding] = []
+    suppressed: set[Optional[int]] = set()
+    for feed in feeds:
+        if not isinstance(feed, dict):
+            continue
+        fid = feed.get("feedId")
+        if fid in e019_suppressed:
+            continue
+        eid = feed.get("exchangeId")
+        if eid is None:
+            continue
+        sessions = feed.get("marketSchedules") or []
+        if not sessions:  # zero sessions: vacuous, do not fire
+            continue
+        all_inline = all(
+            isinstance(ms, dict) and ms.get("marketSchedule") for ms in sessions
+        )
+        if all_inline:
+            findings.append(
+                LintFinding(
+                    rule_id="W011",
+                    severity="WARNING",
+                    message=f"feed has exchangeId {eid} but every session has an inline marketSchedule — exchangeId is unused",
+                    feed_id=fid,
+                    symbol=feed.get("symbol"),
+                )
+            )
+            suppressed.add(fid)
+    return findings, suppressed
+
+
+def _check_e022(feeds: list[dict]) -> list[LintFinding]:
+    """E022: invalid holidayOverrides syntax."""
+    findings: list[LintFinding] = []
+    for feed in feeds:
+        if not isinstance(feed, dict):
+            continue
+        fid = feed.get("feedId")
+        sym = feed.get("symbol")
+        for ms in feed.get("marketSchedules") or []:
+            if not isinstance(ms, dict):
+                continue
+            overrides_obj = ms.get("scheduleOverrides")
+            if not isinstance(overrides_obj, dict):
+                continue
+            tokens = overrides_obj.get("holidayOverrides")
+            if tokens is None or tokens == []:
+                continue
+            if not isinstance(tokens, list):
+                findings.append(
+                    LintFinding(
+                        rule_id="E022",
+                        severity="ERROR",
+                        message=f"holidayOverrides must be a list of strings, got {type(tokens).__name__}",
+                        feed_id=fid,
+                        symbol=sym,
+                    )
+                )
+                continue
+            for token in tokens:
+                if not isinstance(token, str):
+                    findings.append(
+                        LintFinding(
+                            rule_id="E022",
+                            severity="ERROR",
+                            message=f"holidayOverrides entry {token!r} has invalid syntax: not a string",
+                            feed_id=fid,
+                            symbol=sym,
+                        )
+                    )
+                    continue
+                reason = validate_holiday_token(token)
+                if reason is not None:
+                    findings.append(
+                        LintFinding(
+                            rule_id="E022",
+                            severity="ERROR",
+                            message=f"holidayOverrides entry {token!r} has invalid syntax: {reason}",
+                            feed_id=fid,
+                            symbol=sym,
+                        )
+                    )
+    return findings
+
+
+def check_exchanges(
+    feeds: list[dict],
+    exchanges: Any,
+) -> list[LintFinding]:
+    """Run E019, E020, E021, E022, E023, E024, E025, W010, W011.
+
+    `exchanges` is defensively coerced to [] if not a list.
+    """
+    if not isinstance(exchanges, list):
+        exchanges = []
+
+    findings: list[LintFinding] = []
+    findings.extend(_check_e024(exchanges))
+    findings.extend(_check_e023(exchanges))
+    findings.extend(_check_e021(exchanges))
+    findings.extend(_check_e025(exchanges))
+    by_id, sessions_by_id = _build_index(exchanges)
+    e019_findings, e019_suppressed = _check_e019(feeds, by_id)
+    findings.extend(e019_findings)
+    findings.extend(_check_e020(feeds, by_id, sessions_by_id, e019_suppressed))
+    w011_findings, w011_suppressed = _check_w011(feeds, e019_suppressed)
+    findings.extend(w011_findings)
+    findings.extend(
+        _check_w010(feeds, sessions_by_id, e019_suppressed, w011_suppressed)
+    )
+    findings.extend(_check_e022(feeds))
+    return findings

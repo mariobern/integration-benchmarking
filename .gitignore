@@ -30,6 +30,12 @@ benchmark_availability/instruments_*.csv
 .isin_cache/
 .nasdaq_cache/
 
+# Local working copy of after.json (generated per governance proposal)
+after.json
+
+# Local governance-proposal snapshots (before.json / after.json under staging/)
+staging/
+
 # IDE
 .idea/
 .vscode/

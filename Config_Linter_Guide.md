@@ -218,39 +218,58 @@ For each rule's exact trigger condition and a copy-pasteable example fragment, s
 
 ### Errors
 
-| ID   | Rule                                                                                | Scope                                   |
-| ---- | ----------------------------------------------------------------------------------- | --------------------------------------- |
-| E001 | Duplicate `feedId`                                                                  | all feeds                               |
-| E002 | Duplicate `symbol` within STABLE/COMING_SOON                                        | active-pipeline                         |
-| E003 | References unknown `publisherId`                                                    | non-INACTIVE                            |
-| E004 | `minPublishers >= publisher count` (no headroom)                                    | STABLE, non-exempt                      |
-| E005 | STABLE feed with no publishers                                                      | STABLE                                  |
-| E006 | Non-equity feed has extended sessions                                               | non-INACTIVE, non-equity                |
-| E007 | Missing required field (`feedId`, `symbol`, `state`, `kind`, `metadata.asset_type`) | all feeds                               |
-| E008 | Session-level publisher not in top-level list                                       | non-INACTIVE                            |
-| E009 | STABLE feed references a `.Test`-named publisher                                    | STABLE                                  |
-| E010 | Duplicate session in `marketSchedules`                                              | non-INACTIVE                            |
-| E011 | Schedule inconsistency within asset group                                           | STABLE only                             |
-| E012 | Duplicate `metadata.hermes_id`                                                      | non-INACTIVE                            |
-| E013 | COMING_SOON futures past every `validTo`                                            | COMING_SOON futures                     |
-| E014 | STABLE benchmarkable feed missing `benchmarkMapping`                                | STABLE, benchmarkable, non-OVERNIGHT    |
-| E015 | `corporateActions` schema violation                                                 | any feed with `corporateActions`        |
-| E016 | Identifier date range overlap within same vendor/session                            | non-INACTIVE, 2+ identifiers per vendor |
-| E017 | Duplicate `publisherId` in publishers array                                         | publishers array                        |
-| E018 | Duplicate publisher `name` in publishers array                                      | publishers array                        |
+| ID   | Rule                                                                                                  | Scope                                   |
+| ---- | ----------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| E001 | Duplicate `feedId`                                                                                    | all feeds                               |
+| E002 | Duplicate `symbol` within STABLE/COMING_SOON                                                          | active-pipeline                         |
+| E003 | References unknown `publisherId`                                                                      | non-INACTIVE                            |
+| E004 | `minPublishers >= publisher count` (no headroom)                                                      | STABLE, non-exempt                      |
+| E005 | STABLE feed with no publishers                                                                        | STABLE                                  |
+| E006 | Non-equity feed has extended sessions                                                                 | non-INACTIVE, non-equity                |
+| E007 | Missing required field (`feedId`, `symbol`, `state`, `kind`, `metadata.asset_type`)                   | all feeds                               |
+| E008 | Session-level publisher not in top-level list                                                         | non-INACTIVE                            |
+| E009 | STABLE feed references a `.Test`-named publisher                                                      | STABLE                                  |
+| E010 | Duplicate session in `marketSchedules`                                                                | non-INACTIVE                            |
+| E011 | Schedule inconsistency within asset group                                                             | STABLE only                             |
+| E012 | Duplicate `metadata.hermes_id`                                                                        | non-INACTIVE                            |
+| E013 | COMING_SOON futures past every `validTo`                                                              | COMING_SOON futures                     |
+| E014 | STABLE benchmarkable feed missing `benchmarkMapping`                                                  | STABLE, benchmarkable, non-OVERNIGHT    |
+| E015 | `corporateActions` schema violation                                                                   | any feed with `corporateActions`        |
+| E016 | Identifier date range overlap within same vendor/session                                              | non-INACTIVE, 2+ identifiers per vendor |
+| E017 | Duplicate `publisherId` in publishers array                                                           | publishers array                        |
+| E018 | Duplicate publisher `name` in publishers array                                                        | publishers array                        |
+| E019 | feed references `exchangeId` not in `exchanges[]` (dangling reference)                                | any feed                                |
+| E020 | session has no schedule source (no inline `marketSchedule`, no resolvable inheritance)                | any feed                                |
+| E021 | duplicate exchange tuple `(name, assetClass, assetSubclass, assetSector)` across distinct exchangeIds | exchanges array                         |
+| E022 | invalid syntax in `scheduleOverrides.holidayOverrides[]` token                                        | any feed                                |
+| E023 | duplicate `exchangeId` value in `exchanges[]`                                                         | exchanges array                         |
+| E024 | exchange entry missing required field (`exchangeId`/`name`/non-empty `sessions`)                      | exchanges array                         |
+| E025 | unknown enum value for `assetClass`/`assetSubclass`/`assetSector`                                     | exchanges array                         |
 
 ### Warnings
 
-| ID   | Rule                                                                          | Scope                            |
-| ---- | ----------------------------------------------------------------------------- | -------------------------------- |
-| W001 | US equity missing extended sessions (`PRE_MARKET`/`POST_MARKET`/`OVER_NIGHT`) | STABLE US equities               |
-| W002 | US equity using a non-`America/New_York` timezone                             | STABLE US equities               |
-| W003 | Schedule deviates from asset-class majority                                   | STABLE + COMING_SOON             |
-| W004 | COMING_SOON feed with no publishers                                           | COMING_SOON                      |
-| W005 | `minPublishers` leaves only 1 headroom publisher                              | STABLE, non-exempt               |
-| W006 | Duplicate `publisherId` in feed                                               | non-INACTIVE                     |
-| W007 | STABLE feed references a `TEST` key-type publisher                            | STABLE                           |
-| W009 | Unknown `corporateActions` event type (schema not validated)                  | any feed with `corporateActions` |
+| ID   | Rule                                                                                         | Scope                            |
+| ---- | -------------------------------------------------------------------------------------------- | -------------------------------- |
+| W001 | US equity missing extended sessions (`PRE_MARKET`/`POST_MARKET`/`OVER_NIGHT`)                | STABLE US equities               |
+| W002 | US equity using a non-`America/New_York` timezone                                            | STABLE US equities               |
+| W003 | Schedule deviates from asset-class majority                                                  | STABLE + COMING_SOON             |
+| W004 | COMING_SOON feed with no publishers                                                          | COMING_SOON                      |
+| W005 | `minPublishers` leaves only 1 headroom publisher                                             | STABLE, non-exempt               |
+| W006 | Duplicate `publisherId` in feed                                                              | non-INACTIVE                     |
+| W007 | STABLE feed references a `TEST` key-type publisher                                           | STABLE                           |
+| W009 | Unknown `corporateActions` event type (schema not validated)                                 | any feed with `corporateActions` |
+| W010 | feed session has both inline `marketSchedule` and `exchangeId` (inline shadows exchange)     | any feed                         |
+| W011 | feed has `exchangeId` but every session has an inline `marketSchedule` (`exchangeId` unused) | any feed                         |
+
+### Exchange-aware rules (E019–E025, W010–W011)
+
+Rules covering the new `exchanges[]` top-level array and per-feed `exchangeId` /
+per-session `scheduleOverrides` fields described in
+[`Exchange_Configuration_Guide.md`](./Exchange_Configuration_Guide.md). They
+validate referential integrity (E019), schedule-source completeness (E020),
+exchange-array uniqueness (E021/E023), required-field schema (E024), enum
+values (E025), holiday-override token syntax (E022), and migration-mistake
+patterns (W010/W011).
 
 ### E011 vs W003
 
