@@ -94,3 +94,45 @@ class TestE024:
         findings = [f for f in check_exchanges([], ex) if f.rule_id == "E024"]
         assert len(findings) == 1
         assert "at index 1" in findings[0].message
+
+
+class TestE023:
+    _OK = {"sessions": [{"session": "REGULAR", "marketSchedule": "UTC;O,O,O,O,O,O,O;"}]}
+
+    def test_distinct_ids_no_finding(self):
+        ex = [
+            {"exchangeId": 1, "name": "A", **self._OK},
+            {"exchangeId": 2, "name": "B", **self._OK},
+        ]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E023"]
+        assert findings == []
+
+    def test_duplicate_id_pair(self):
+        ex = [
+            {"exchangeId": 1, "name": "A", **self._OK},
+            {"exchangeId": 1, "name": "B", **self._OK},
+        ]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E023"]
+        assert len(findings) == 1
+        assert "duplicate exchangeId 1" in findings[0].message
+        assert "appears on 2 entries" in findings[0].message
+
+    def test_duplicate_id_three_way_emits_one_finding(self):
+        ex = [
+            {"exchangeId": 7, "name": "A", **self._OK},
+            {"exchangeId": 7, "name": "B", **self._OK},
+            {"exchangeId": 7, "name": "C", **self._OK},
+        ]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E023"]
+        assert len(findings) == 1
+        assert "appears on 3 entries" in findings[0].message
+
+    def test_malformed_entries_excluded(self):
+        # Both entries missing 'name' — they're not well-formed,
+        # E024 reports them, E023 ignores them.
+        ex = [
+            {"exchangeId": 1, **self._OK},
+            {"exchangeId": 1, **self._OK},
+        ]
+        findings = [f for f in check_exchanges([], ex) if f.rule_id == "E023"]
+        assert findings == []

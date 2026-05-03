@@ -6,6 +6,7 @@ Public entry point: check_exchanges(feeds, exchanges) -> list[LintFinding].
 
 from __future__ import annotations
 
+from collections import Counter
 from typing import Any
 
 from lib.config_lint import LintFinding
@@ -99,6 +100,25 @@ def _build_index(
     return by_id, sessions_by_id
 
 
+def _check_e023(exchanges: list) -> list[LintFinding]:
+    """E023: duplicate exchangeId across well-formed entries."""
+    ids = [e["exchangeId"] for e in exchanges if _is_well_formed(e)]
+    counts = Counter(ids)
+    findings: list[LintFinding] = []
+    for eid, n in counts.items():
+        if n >= 2:
+            findings.append(
+                LintFinding(
+                    rule_id="E023",
+                    severity="ERROR",
+                    message=f"duplicate exchangeId {eid!r} appears on {n} entries in exchanges[]",
+                    feed_id=None,
+                    symbol=None,
+                )
+            )
+    return findings
+
+
 def _check_e024(exchanges: list) -> list[LintFinding]:
     """E024: missing required exchange fields (exchangeId, name, sessions)."""
     findings: list[LintFinding] = []
@@ -153,6 +173,7 @@ def check_exchanges(
 
     findings: list[LintFinding] = []
     findings.extend(_check_e024(exchanges))
-    # Subsequent tasks add: check_e023, check_e021, check_e025,
+    findings.extend(_check_e023(exchanges))
+    # Subsequent tasks add: check_e021, check_e025,
     # check_e019_e020_w010_w011, check_e022.
     return findings
