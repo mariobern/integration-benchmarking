@@ -16,7 +16,10 @@ class TestInvalidKind:
     def test_unknown_kind(self, token):
         result = validate_holiday_token(token)
         assert result is not None
-        assert "unknown kind" in result or "expected MMDD/" in result
+        # After Task 2: non-C/O kinds fall through to _validate_time_range,
+        # so single-letter / empty kinds now produce "malformed time range"
+        # rather than "unknown kind".
+        assert "malformed time range" in result or "expected MMDD/" in result
 
 
 class TestInvalidMonth:
@@ -53,3 +56,51 @@ class TestMalformedShape:
         result = validate_holiday_token("0101/C\n")
         assert result is not None
         assert "expected MMDD/" in result
+
+
+class TestTimeRange:
+    @pytest.mark.parametrize(
+        "token",
+        [
+            "0703/0930-1300",
+            "0703/0000-2400",
+            "0703/0930-2400",
+        ],
+    )
+    def test_valid_time_range(self, token):
+        assert validate_holiday_token(token) is None
+
+    @pytest.mark.parametrize(
+        "token",
+        ["0703/0930-1", "0703/0930-25"],
+    )
+    def test_malformed_time_range(self, token):
+        result = validate_holiday_token(token)
+        assert result is not None
+        assert "malformed time range" in result
+
+    def test_invalid_hour(self):
+        # Hour 25 is invalid even with full MMHH form
+        result = validate_holiday_token("0703/0930-2500")
+        assert result is not None
+        assert "malformed time range" in result
+
+    @pytest.mark.parametrize(
+        "token",
+        [
+            "0703/0930-0930",  # zero-length
+            "0703/2400-0000",  # reversed (start would be 24:00 anyway)
+            "0703/1300-0930",  # end < start
+        ],
+    )
+    def test_reversed_time_range(self, token):
+        result = validate_holiday_token(token)
+        assert result is not None
+        # Either malformed (24:00 in start position) or reversed
+        assert "reversed time range" in result or "malformed time range" in result
+
+    def test_24_00_only_at_end(self):
+        # 24:30 is invalid — when HH=24, MM must be 00
+        result = validate_holiday_token("0703/0930-2430")
+        assert result is not None
+        assert "malformed time range" in result
