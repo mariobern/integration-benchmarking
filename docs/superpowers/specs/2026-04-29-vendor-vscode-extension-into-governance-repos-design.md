@@ -101,13 +101,13 @@ If sync ever becomes painful, an obvious next step is a GitHub Action in this re
 
 ## Edge cases & failure modes
 
-| Scenario | Behavior | Notes |
-|---|---|---|
-| `code` CLI not on PATH | Shell error from the install command | README mentions the macOS palette action to install the CLI. |
-| Python 3 missing | Extension surfaces a single line-0 diagnostic on the saved file | Already handled by the extension itself — never silent. |
-| `config_linter.py` missing in workspace | Single line-0 diagnostic | Failure mode for an old governance commit (pre-#626 in `pyth-lazer-governance`). Tells the user exactly what's wrong. |
-| Stale extension version installed | `--force` upgrades or downgrades to match the vendored `.vsix` | No manual `code --uninstall-extension` needed. |
-| User re-runs install after `git pull` | Idempotent — same one-liner works | This is why we use `--force`. |
+| Scenario                                | Behavior                                                        | Notes                                                                                                                 |
+| --------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `code` CLI not on PATH                  | Shell error from the install command                            | README mentions the macOS palette action to install the CLI.                                                          |
+| Python 3 missing                        | Extension surfaces a single line-0 diagnostic on the saved file | Already handled by the extension itself — never silent.                                                               |
+| `config_linter.py` missing in workspace | Single line-0 diagnostic                                        | Failure mode for an old governance commit (pre-#626 in `pyth-lazer-governance`). Tells the user exactly what's wrong. |
+| Stale extension version installed       | `--force` upgrades or downgrades to match the vendored `.vsix`  | No manual `code --uninstall-extension` needed.                                                                        |
+| User re-runs install after `git pull`   | Idempotent — same one-liner works                               | This is why we use `--force`.                                                                                         |
 
 ## Verification
 
