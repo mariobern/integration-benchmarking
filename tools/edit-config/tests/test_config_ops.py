@@ -167,3 +167,83 @@ class TestAddPublisher:
         changes, _ = op.apply(feed)
         assert feed["allowedPublisherIds"] == [80]
         assert len(changes) == 1
+
+
+from lib.config_ops import RemovePublisher
+
+
+class TestRemovePublisher:
+    def test_default_removes_everywhere_on_equity(self, feeds):
+        feed = feed_by_id(feeds, 922)
+        # publisher 22 is in top-level + REGULAR + PRE_MARKET + POST_MARKET
+        op = RemovePublisher(publisher_id=22)
+        changes, _ = op.apply(feed)
+        assert 22 not in feed["allowedPublisherIds"]
+        for name in SESSION_NAMES:
+            sess = get_session(feed, name)
+            if sess and "allowedPublisherIds" in sess:
+                assert 22 not in sess["allowedPublisherIds"]
+        # 4 changes: top_level + REGULAR + PRE_MARKET + POST_MARKET
+        # (OVER_NIGHT didn't have 22)
+        assert len(changes) == 4
+
+    def test_default_on_non_equity_removes_top_level(self, feeds):
+        feed = feed_by_id(feeds, 1)
+        op = RemovePublisher(publisher_id=3)
+        changes, _ = op.apply(feed)
+        assert 3 not in feed["allowedPublisherIds"]
+        assert len(changes) == 1
+
+    def test_explicit_session_removes_only_that_session(self, feeds):
+        feed = feed_by_id(feeds, 922)
+        op = RemovePublisher(publisher_id=22, session="PRE_MARKET")
+        changes, _ = op.apply(feed)
+        assert 22 in feed["allowedPublisherIds"]  # top-level untouched
+        assert 22 not in get_session(feed, "PRE_MARKET")["allowedPublisherIds"]
+        assert 22 in get_session(feed, "REGULAR")["allowedPublisherIds"]
+        assert len(changes) == 1
+        assert changes[0].location == "PRE_MARKET"
+
+    def test_session_all_leaves_top_level(self, feeds):
+        feed = feed_by_id(feeds, 922)
+        op = RemovePublisher(publisher_id=22, session="ALL")
+        changes, _ = op.apply(feed)
+        assert 22 in feed["allowedPublisherIds"]
+        for name in SESSION_NAMES:
+            sess = get_session(feed, name)
+            if sess and "allowedPublisherIds" in sess:
+                assert 22 not in sess["allowedPublisherIds"]
+        assert all(c.location != "top_level" for c in changes)
+
+    def test_session_none_warns_about_consistency(self, feeds):
+        feed = feed_by_id(feeds, 922)
+        op = RemovePublisher(publisher_id=22, session="NONE")
+        changes, warns = op.apply(feed)
+        assert 22 not in feed["allowedPublisherIds"]
+        # 22 still in REGULAR session -> consistency warning
+        assert any("still in session" in w.message for w in warns)
+
+    def test_noop_when_absent(self, feeds):
+        feed = feed_by_id(feeds, 1)
+        op = RemovePublisher(publisher_id=999)
+        changes, _ = op.apply(feed)
+        assert changes == []
+
+    def test_warns_when_at_or_below_min_publishers(self, feeds):
+        feed = feed_by_id(feeds, 922)
+        # OVER_NIGHT has [32, 41, 42] with minPublishers=2.
+        # Remove 32 -> [41, 42] with min=2 -> at-floor warning.
+        op = RemovePublisher(publisher_id=32, session="OVER_NIGHT")
+        changes, warns = op.apply(feed)
+        assert any(
+            "OVER_NIGHT" in w.message and "headroom" in w.message.lower() for w in warns
+        )
+
+    def test_warns_for_top_level_at_floor(self, feeds):
+        feed = feed_by_id(feeds, 6000)
+        # top-level [19, 22], minPublishers=1. Remove 19 -> [22], min=1 -> warn
+        op = RemovePublisher(publisher_id=19)
+        changes, warns = op.apply(feed)
+        assert any(
+            "top_level" in w.message or "headroom" in w.message.lower() for w in warns
+        )

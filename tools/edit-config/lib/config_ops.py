@@ -131,3 +131,136 @@ class AddPublisher:
             )
 
         return changes, warnings
+
+
+def _remove_from_list(
+    target: list[int], pub_id: int
+) -> tuple[list[int], list[int]] | None:
+    """Helper: remove pub_id from list. Returns (before, after) or None if NOOP."""
+    before = list(target)
+    if pub_id not in before:
+        return None
+    target[:] = [p for p in before if p != pub_id]
+    return (before, list(target))
+
+
+def _check_at_floor(
+    feed_id: int,
+    symbol: str,
+    location: str,
+    allowed: list[int],
+    min_pub: int | None,
+) -> Warning | None:
+    """Warn if list length is at or below minPublishers (no headroom)."""
+    if min_pub is None:
+        return None
+    if len(allowed) <= min_pub:
+        return Warning(
+            feed_id=feed_id,
+            symbol=symbol,
+            message=(
+                f"feed {feed_id} {location}: after op, "
+                f"{len(allowed)} publishers with minPublishers={min_pub} — "
+                f"no headroom"
+            ),
+        )
+    return None
+
+
+@dataclass
+class RemovePublisher:
+    publisher_id: int
+    session: str | None = None
+
+    def apply(self, feed: dict) -> tuple[list[Change], list[Warning]]:
+        changes: list[Change] = []
+        warnings: list[Warning] = []
+        feed_id = feed["feedId"]
+        symbol = feed.get("symbol", "")
+
+        # location, list ref, min_publishers
+        targets: list[tuple[str, list[int], int | None]] = []
+
+        if self.session is None:
+            # Default: remove from everywhere (top-level + every session list).
+            targets.append(
+                (
+                    "top_level",
+                    feed.get("allowedPublisherIds", []),
+                    feed.get("minPublishers"),
+                )
+            )
+            for name in SESSION_NAMES:
+                sess = get_session(feed, name)
+                if sess and "allowedPublisherIds" in sess:
+                    targets.append(
+                        (name, sess["allowedPublisherIds"], sess.get("minPublishers"))
+                    )
+        elif self.session == "NONE":
+            targets.append(
+                (
+                    "top_level",
+                    feed.get("allowedPublisherIds", []),
+                    feed.get("minPublishers"),
+                )
+            )
+        elif self.session == "ALL":
+            for name in SESSION_NAMES:
+                sess = get_session(feed, name)
+                if sess and "allowedPublisherIds" in sess:
+                    targets.append(
+                        (name, sess["allowedPublisherIds"], sess.get("minPublishers"))
+                    )
+        elif self.session in SESSION_NAMES:
+            sess = get_session(feed, self.session)
+            if sess is None or "allowedPublisherIds" not in sess:
+                raise OpError(
+                    f"feed {feed_id}: session {self.session!r} does not exist on this feed"
+                )
+            targets.append(
+                (
+                    self.session,
+                    sess["allowedPublisherIds"],
+                    sess.get("minPublishers"),
+                )
+            )
+        else:
+            raise OpError(f"unknown session value: {self.session!r}")
+
+        for location, ref, min_pub in targets:
+            result = _remove_from_list(ref, self.publisher_id)
+            if result is None:
+                continue
+            before, after = result
+            changes.append(
+                Change(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    location=location,
+                    field="allowedPublisherIds",
+                    before=before,
+                    after=after,
+                )
+            )
+            warn = _check_at_floor(feed_id, symbol, location, after, min_pub)
+            if warn is not None:
+                warnings.append(warn)
+
+        # session=NONE: warn if publisher still in any session list
+        if self.session == "NONE":
+            for name in SESSION_NAMES:
+                sess = get_session(feed, name)
+                if sess and self.publisher_id in sess.get("allowedPublisherIds", []):
+                    warnings.append(
+                        Warning(
+                            feed_id=feed_id,
+                            symbol=symbol,
+                            message=(
+                                f"feed {feed_id}: publisher {self.publisher_id} "
+                                f"still in session {name} but not in top-level roster"
+                            ),
+                        )
+                    )
+                    break
+
+        return changes, warnings
