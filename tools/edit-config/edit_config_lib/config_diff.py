@@ -5,7 +5,7 @@ feedId, symbol, and (optionally) session — far more useful than raw
 line numbers in a 3 MB file.
 """
 
-from lib.config_ops import Change
+from edit_config_lib.config_ops import Change
 
 
 def _format_publisher_list(ids: list[int]) -> str:

@@ -414,7 +414,7 @@ passes.
 tools/edit-config/
   README.md
   edit_config.py                       # CLI wrapper (~80 lines)
-  lib/
+  edit_config_lib/
     __init__.py
     config_editor.py                   # orchestrator
     config_ops.py                      # operation classes
@@ -442,7 +442,7 @@ docs/superpowers/specs/
 **Independence:** no imports from `update_config_from_summary.py`,
 `update_min_publishers.py`, `update_lazer_symbols.py`, or the repo-level
 `lib/` package. The bracket-depth scanner and block locators are
-re-implemented inside `tools/edit-config/lib/config_text_surgery.py`.
+re-implemented inside `tools/edit-config/edit_config_lib/config_text_surgery.py`.
 
 ## Testing strategy
 

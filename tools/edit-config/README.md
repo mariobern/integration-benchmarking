@@ -18,15 +18,15 @@ python3 tools/edit-config/edit_config.py --config after.json \
 
 ## Layout
 
-| Path                         | Purpose                                                  |
-| ---------------------------- | -------------------------------------------------------- |
-| `edit_config.py`             | CLI entry point (thin wrapper)                           |
-| `lib/config_editor.py`       | Spec parsing → plan → validate → apply orchestrator      |
-| `lib/config_ops.py`          | Operation classes (`AddPublisher`, `RemovePublisher`, …) |
-| `lib/config_text_surgery.py` | Bracket-depth scanner, feed/session block locators       |
-| `lib/config_diff.py`         | Unified diff with feedId/symbol/session hunk headers     |
-| `tests/`                     | pytest suite (unit, integration, CLI)                    |
-| `tests/fixtures/`            | Sample `after.json` slice and YAML specs                 |
+| Path                                     | Purpose                                                  |
+| ---------------------------------------- | -------------------------------------------------------- |
+| `edit_config.py`                         | CLI entry point (thin wrapper)                           |
+| `edit_config_lib/config_editor.py`       | Spec parsing → plan → validate → apply orchestrator      |
+| `edit_config_lib/config_ops.py`          | Operation classes (`AddPublisher`, `RemovePublisher`, …) |
+| `edit_config_lib/config_text_surgery.py` | Bracket-depth scanner, feed/session block locators       |
+| `edit_config_lib/config_diff.py`         | Unified diff with feedId/symbol/session hunk headers     |
+| `tests/`                                 | pytest suite (unit, integration, CLI)                    |
+| `tests/fixtures/`                        | Sample `after.json` slice and YAML specs                 |
 
 ## Docs
 
@@ -38,4 +38,4 @@ python3 tools/edit-config/edit_config.py --config after.json \
 
 This tool is fully self-contained. It does not import from `update_config_from_summary.py`,
 `update_min_publishers.py`, `update_lazer_symbols.py`, or the repo-level `lib/` package.
-Helpers live under `tools/edit-config/lib/`.
+Helpers live under `tools/edit-config/edit_config_lib/`.

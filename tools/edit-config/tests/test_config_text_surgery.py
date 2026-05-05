@@ -1,8 +1,8 @@
 from pathlib import Path
 
 import pytest
-from lib.config_text_surgery import find_feed_block, find_matching_close
-from lib.config_text_surgery import (
+from edit_config_lib.config_text_surgery import find_feed_block, find_matching_close
+from edit_config_lib.config_text_surgery import (
     find_session_block,
     find_publisher_array_span,
     find_int_field_span,
@@ -149,7 +149,7 @@ class TestFindIntFieldSpan:
     def test_top_level_min_publishers(self):
         # We want the top-level minPublishers, not a session's. Pass
         # the top-level "tail" portion of the feed (after marketSchedules).
-        from lib.config_text_surgery import find_matching_close
+        from edit_config_lib.config_text_surgery import find_matching_close
 
         start, end = find_feed_block(self.raw, 922)
         feed = self.raw[start:end]

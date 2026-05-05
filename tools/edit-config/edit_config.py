@@ -14,8 +14,8 @@ _TOOL_ROOT = Path(__file__).resolve().parent
 if str(_TOOL_ROOT) not in sys.path:
     sys.path.insert(0, str(_TOOL_ROOT))
 
-from lib.config_diff import render_diff  # noqa: E402
-from lib.config_editor import (  # noqa: E402
+from edit_config_lib.config_diff import render_diff  # noqa: E402
+from edit_config_lib.config_editor import (  # noqa: E402
     apply_changes,
     build_op_from_args,
     parse_yaml_spec,

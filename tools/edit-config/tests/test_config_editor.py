@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from lib.config_editor import FilterSet, resolve_targets
+from edit_config_lib.config_editor import FilterSet, resolve_targets
 
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "after_sample.json"
@@ -77,8 +77,8 @@ class TestResolveTargets:
 
 import argparse
 
-from lib.config_editor import PlannedOp, build_op_from_args
-from lib.config_ops import (
+from edit_config_lib.config_editor import PlannedOp, build_op_from_args
+from edit_config_lib.config_ops import (
     AddPublisher,
     RemovePublisher,
     SetMinPublishers,
@@ -187,7 +187,7 @@ class TestBuildOpFromArgs:
         assert ops[0].filters.feed_ids == {1, 2, 100}
 
 
-from lib.config_editor import parse_yaml_spec
+from edit_config_lib.config_editor import parse_yaml_spec
 
 
 YAML_BASIC = Path(__file__).parent / "fixtures" / "edits_basic.yaml"
@@ -272,11 +272,11 @@ class TestParseYamlSpec:
 
 from copy import deepcopy
 
-from lib.config_editor import (
+from edit_config_lib.config_editor import (
     SimulationResult,
     simulate_plan,
 )
-from lib.config_ops import AddPublisher, SetState
+from edit_config_lib.config_ops import AddPublisher, SetState
 
 
 class TestSimulatePlan:
@@ -353,8 +353,8 @@ class TestSimulatePlan:
         assert any("deactivat" in w.message.lower() for w in result.warnings)
 
 
-from lib.config_editor import apply_changes
-from lib.config_ops import Change
+from edit_config_lib.config_editor import apply_changes
+from edit_config_lib.config_ops import Change
 
 
 class TestApplyChanges:
@@ -547,7 +547,7 @@ class TestApplyChanges:
 
 import shutil
 
-from lib.config_editor import write_with_backup, run_linter
+from edit_config_lib.config_editor import write_with_backup, run_linter
 
 
 class TestWriteWithBackup:
@@ -586,7 +586,7 @@ class TestRunLinter:
     def test_handles_missing_linter_gracefully(self, monkeypatch, tmp_path):
         # Point at a non-existent linter path; expect a non-zero rc and
         # a clear "not found" message rather than a crash.
-        from lib import config_editor
+        from edit_config_lib import config_editor
 
         monkeypatch.setattr(config_editor, "_LINTER_PATH", "/does/not/exist.py")
         target = tmp_path / "after.json"

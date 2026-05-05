@@ -41,14 +41,14 @@ def resolve_targets(filters: FilterSet, feeds: list[dict]) -> list[dict]:
 
 from typing import Any
 
-from lib.config_ops import (
+from edit_config_lib.config_ops import (
     AddPublisher,
     RemovePublisher,
     SetMinPublishers,
     BumpMinPublishers,
     SetState,
 )
-from lib.config_selector import parse_selector_text, read_selector_file
+from edit_config_lib.config_selector import parse_selector_text, read_selector_file
 
 
 @dataclass
@@ -255,7 +255,7 @@ def parse_yaml_spec(path: str) -> list[PlannedOp]:
 
 from copy import deepcopy
 
-from lib.config_ops import Change, OpError, Warning
+from edit_config_lib.config_ops import Change, OpError, Warning
 
 
 @dataclass
@@ -311,7 +311,7 @@ def simulate_plan(plan: list[PlannedOp], feeds: list[dict]) -> SimulationResult:
 
 from collections import defaultdict
 
-from lib.config_text_surgery import (
+from edit_config_lib.config_text_surgery import (
     find_feed_block,
     find_session_block,
     find_publisher_array_span,

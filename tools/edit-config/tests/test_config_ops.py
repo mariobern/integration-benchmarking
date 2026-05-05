@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from lib.config_ops import (
+from edit_config_lib.config_ops import (
     AddPublisher,
     Change,
     Warning,
@@ -169,7 +169,7 @@ class TestAddPublisher:
         assert len(changes) == 1
 
 
-from lib.config_ops import RemovePublisher
+from edit_config_lib.config_ops import RemovePublisher
 
 
 class TestRemovePublisher:
@@ -249,7 +249,7 @@ class TestRemovePublisher:
         )
 
 
-from lib.config_ops import SetMinPublishers
+from edit_config_lib.config_ops import SetMinPublishers
 
 
 class TestSetMinPublishers:
@@ -318,7 +318,7 @@ class TestSetMinPublishers:
         assert changes[0].location == "top_level"
 
 
-from lib.config_ops import BumpMinPublishers
+from edit_config_lib.config_ops import BumpMinPublishers
 
 
 class TestBumpMinPublishers:
@@ -356,7 +356,7 @@ class TestBumpMinPublishers:
             op.apply(feed)
 
 
-from lib.config_ops import SetState
+from edit_config_lib.config_ops import SetState
 
 
 VALID_STATES = ("STABLE", "COMING_SOON", "INACTIVE")
