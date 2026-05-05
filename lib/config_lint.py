@@ -255,7 +255,7 @@ def check_publishers(feeds: list[dict], publishers: list[dict]) -> list[LintFind
                         severity="ERROR",
                         message=(
                             f"minPublishers ({min_pub}) >= publisher count"
-                            f" ({len(pub_ids)}), no fault tolerance"
+                            f" ({len(pub_ids)}), Not enough publishers permissioned"
                         ),
                         feed_id=fid,
                         symbol=sym,
@@ -377,7 +377,8 @@ def check_publishers(feeds: list[dict], publishers: list[dict]) -> list[LintFind
                             severity="ERROR",
                             message=(
                                 f"session {session_name}: minPublishers ({session_min})"
-                                f" >= publisher count ({session_count})"
+                                f" >= publisher count ({session_count}),"
+                                f" Not enough publishers permissioned"
                             ),
                             feed_id=fid,
                             symbol=sym,

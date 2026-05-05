@@ -413,6 +413,41 @@ class TestCheckPublishers:
         assert len(warnings) == 1
         assert "2" in warnings[0].message
 
+    def test_e004_message_uses_not_enough_publishers_permissioned(self):
+        """E004's trailing clause must read 'Not enough publishers permissioned'."""
+        feeds = [_make_feed(1, min_publishers=3, publisher_ids=[1, 2, 3])]
+        publishers = [_make_publisher(1), _make_publisher(2), _make_publisher(3)]
+        findings = check_publishers(feeds, publishers)
+        e004 = [f for f in findings if f.rule_id == "E004"]
+        assert len(e004) == 1
+        assert "Not enough publishers permissioned" in e004[0].message
+        assert "no fault tolerance" not in e004[0].message
+
+    def test_e004_session_level_message_uses_not_enough_publishers_permissioned(self):
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                min_publishers=3,
+                publisher_ids=[1, 2, 3, 4, 5],
+                schedules=[
+                    {"marketSchedule": "America/New_York;O;", "session": "REGULAR"},
+                    {
+                        "marketSchedule": "America/New_York;0400-0930;",
+                        "session": "PRE_MARKET",
+                        "allowedPublisherIds": [1, 2],
+                        "minPublishers": 2,
+                    },
+                ],
+            )
+        ]
+        publishers = [_make_publisher(i) for i in range(1, 6)]
+        findings = check_publishers(feeds, publishers)
+        e004 = [f for f in findings if f.rule_id == "E004"]
+        assert len(e004) == 1
+        assert "Not enough publishers permissioned" in e004[0].message
+
     def test_w007_stable_test_publisher(self):
         feeds = [_make_feed(1, state="STABLE", publisher_ids=[1, 2])]
         publishers = [_make_publisher(1, key_type="TEST"), _make_publisher(2)]
