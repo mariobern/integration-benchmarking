@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from lib.config_ops import (
+    AddPublisher,
     Change,
     Warning,
     OpError,
@@ -76,3 +77,93 @@ class TestSessionHelpers:
 
     def test_get_session_missing_returns_none(self, feeds):
         assert get_session(feed_by_id(feeds, 1), "PRE_MARKET") is None
+
+
+class TestAddPublisher:
+    def test_default_on_non_equity_adds_top_level(self, feeds):
+        feed = feed_by_id(feeds, 1)  # crypto, no per-session lists
+        op = AddPublisher(publisher_id=80)
+        changes, warns = op.apply(feed)
+        assert feed["allowedPublisherIds"] == [1, 3, 7, 11, 80]
+        assert len(changes) == 1
+        assert changes[0].location == "top_level"
+        assert changes[0].field == "allowedPublisherIds"
+        assert changes[0].before == [1, 3, 7, 11]
+        assert changes[0].after == [1, 3, 7, 11, 80]
+        assert warns == []
+
+    def test_default_on_equity_adds_top_level_and_regular(self, feeds):
+        feed = feed_by_id(feeds, 922)
+        op = AddPublisher(publisher_id=80)
+        changes, warns = op.apply(feed)
+        assert 80 in feed["allowedPublisherIds"]
+        regular = get_session(feed, "REGULAR")
+        assert 80 in regular["allowedPublisherIds"]
+        # PRE_MARKET should NOT be touched
+        pre = get_session(feed, "PRE_MARKET")
+        assert 80 not in pre["allowedPublisherIds"]
+        locs = sorted(c.location for c in changes)
+        assert locs == ["REGULAR", "top_level"]
+
+    def test_explicit_pre_market_session(self, feeds):
+        feed = feed_by_id(feeds, 922)
+        op = AddPublisher(publisher_id=80, session="PRE_MARKET")
+        changes, warns = op.apply(feed)
+        assert 80 in feed["allowedPublisherIds"]
+        assert 80 in get_session(feed, "PRE_MARKET")["allowedPublisherIds"]
+        # REGULAR not touched
+        regular = get_session(feed, "REGULAR")
+        assert 80 not in regular["allowedPublisherIds"]
+
+    def test_session_all(self, feeds):
+        feed = feed_by_id(feeds, 922)
+        op = AddPublisher(publisher_id=80, session="ALL")
+        changes, _ = op.apply(feed)
+        for sname in SESSION_NAMES:
+            sess = get_session(feed, sname)
+            assert 80 in sess["allowedPublisherIds"]
+        assert 80 in feed["allowedPublisherIds"]
+        assert len(changes) == 5  # 4 sessions + top_level
+
+    def test_session_none_only_top_level(self, feeds):
+        feed = feed_by_id(feeds, 922)
+        op = AddPublisher(publisher_id=80, session="NONE")
+        changes, _ = op.apply(feed)
+        assert 80 in feed["allowedPublisherIds"]
+        for sname in SESSION_NAMES:
+            sess = get_session(feed, sname)
+            assert 80 not in sess["allowedPublisherIds"]
+        assert len(changes) == 1
+        assert changes[0].location == "top_level"
+
+    def test_explicit_session_on_non_equity_raises(self, feeds):
+        feed = feed_by_id(feeds, 1)  # crypto, no PRE_MARKET
+        op = AddPublisher(publisher_id=80, session="PRE_MARKET")
+        with pytest.raises(OpError, match="session.*does not exist"):
+            op.apply(feed)
+
+    def test_session_all_on_non_equity_raises(self, feeds):
+        feed = feed_by_id(feeds, 1)
+        op = AddPublisher(publisher_id=80, session="ALL")
+        with pytest.raises(OpError, match="no per-session"):
+            op.apply(feed)
+
+    def test_noop_when_already_present(self, feeds):
+        feed = feed_by_id(feeds, 1)
+        op = AddPublisher(publisher_id=3)  # 3 already in [1, 3, 7, 11]
+        changes, _ = op.apply(feed)
+        assert changes == []
+
+    def test_lists_deduped_and_sorted(self, feeds):
+        feed = feed_by_id(feeds, 1)
+        feed["allowedPublisherIds"] = [11, 1, 7, 3]  # not sorted
+        op = AddPublisher(publisher_id=5)
+        op.apply(feed)
+        assert feed["allowedPublisherIds"] == [1, 3, 5, 7, 11]
+
+    def test_empty_list_initial(self, feeds):
+        feed = feed_by_id(feeds, 5000)  # COMING_SOON, empty list
+        op = AddPublisher(publisher_id=80)
+        changes, _ = op.apply(feed)
+        assert feed["allowedPublisherIds"] == [80]
+        assert len(changes) == 1
