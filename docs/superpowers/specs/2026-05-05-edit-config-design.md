@@ -1,7 +1,7 @@
 # edit-config: Design Spec
 
 **Date:** 2026-05-05
-**Status:** Draft (pending user review)
+**Status:** Implemented
 **Branch:** `feat/edit-config-tool`
 
 ## Problem
