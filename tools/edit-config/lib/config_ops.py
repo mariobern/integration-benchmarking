@@ -436,3 +436,53 @@ class BumpMinPublishers:
                 )
 
         return changes, warnings
+
+
+VALID_STATES = ("STABLE", "COMING_SOON", "INACTIVE")
+
+_STATE_WARNINGS = {
+    ("STABLE", "COMING_SOON"): "regression: STABLE feed downgraded to COMING_SOON",
+    ("STABLE", "INACTIVE"): "deactivation of live STABLE feed",
+    ("INACTIVE", "STABLE"): "reactivation of INACTIVE feed — verify intent",
+}
+
+
+@dataclass
+class SetState:
+    value: str
+
+    def apply(self, feed: dict) -> tuple[list[Change], list[Warning]]:
+        if self.value not in VALID_STATES:
+            raise OpError(
+                f"invalid state {self.value!r}; must be one of {VALID_STATES}"
+            )
+
+        feed_id = feed["feedId"]
+        symbol = feed.get("symbol", "")
+        old = feed.get("state")
+
+        if old == self.value:
+            return [], []
+
+        feed["state"] = self.value
+        changes = [
+            Change(
+                feed_id=feed_id,
+                symbol=symbol,
+                location="top_level",
+                field="state",
+                before=old,
+                after=self.value,
+            )
+        ]
+        warnings: list[Warning] = []
+        msg = _STATE_WARNINGS.get((old, self.value))
+        if msg:
+            warnings.append(
+                Warning(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    message=f"feed {feed_id}: {msg}",
+                )
+            )
+        return changes, warnings

@@ -354,3 +354,55 @@ class TestBumpMinPublishers:
         op = BumpMinPublishers(delta=+2, session="OVER_NIGHT")
         with pytest.raises(OpError, match="exceed"):
             op.apply(feed)
+
+
+from lib.config_ops import SetState
+
+
+VALID_STATES = ("STABLE", "COMING_SOON", "INACTIVE")
+
+
+class TestSetState:
+    def test_promote_coming_soon_to_stable(self, feeds):
+        feed = feed_by_id(feeds, 5000)
+        op = SetState(value="STABLE")
+        changes, warns = op.apply(feed)
+        assert feed["state"] == "STABLE"
+        assert len(changes) == 1
+        assert changes[0].field == "state"
+        assert changes[0].before == "COMING_SOON" and changes[0].after == "STABLE"
+        # COMING_SOON -> STABLE is the natural progression; no warning
+        assert warns == []
+
+    def test_regression_stable_to_coming_soon_warns(self, feeds):
+        feed = feed_by_id(feeds, 1)
+        op = SetState(value="COMING_SOON")
+        changes, warns = op.apply(feed)
+        assert feed["state"] == "COMING_SOON"
+        assert any("regression" in w.message.lower() for w in warns)
+
+    def test_deactivation_warns(self, feeds):
+        feed = feed_by_id(feeds, 1)
+        op = SetState(value="INACTIVE")
+        changes, warns = op.apply(feed)
+        assert feed["state"] == "INACTIVE"
+        assert any("deactivat" in w.message.lower() for w in warns)
+
+    def test_reactivation_warns(self, feeds):
+        feed = feed_by_id(feeds, 6000)  # INACTIVE
+        op = SetState(value="STABLE")
+        changes, warns = op.apply(feed)
+        assert feed["state"] == "STABLE"
+        assert any("reactivat" in w.message.lower() for w in warns)
+
+    def test_noop_when_already_target(self, feeds):
+        feed = feed_by_id(feeds, 1)  # STABLE
+        op = SetState(value="STABLE")
+        changes, _ = op.apply(feed)
+        assert changes == []
+
+    def test_invalid_state_raises(self, feeds):
+        feed = feed_by_id(feeds, 1)
+        op = SetState(value="DELETED")
+        with pytest.raises(OpError, match="invalid state"):
+            op.apply(feed)
