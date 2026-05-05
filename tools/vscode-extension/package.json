@@ -2,7 +2,7 @@
   "name": "lazer-config-linter",
   "displayName": "Lazer Config Linter",
   "description": "Inline diagnostics for pyth-lazer governance proposal after.json files. Wraps the Python config linter.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "pyth-network",
   "engines": {
     "vscode": "^1.85.0"
