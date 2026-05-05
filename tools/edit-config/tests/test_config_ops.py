@@ -168,6 +168,31 @@ class TestAddPublisher:
         assert feed["allowedPublisherIds"] == [80]
         assert len(changes) == 1
 
+    def test_missing_top_level_field_warns_and_skips(self, feeds):
+        # Some feeds (e.g. inactive crypto) lack a top-level allowedPublisherIds.
+        # AddPublisher must NOT invent the field — text-surgery cannot insert
+        # it later. Instead, emit a Warning and produce no Change.
+        feed = feed_by_id(feeds, 1)  # crypto, no per-session lists
+        del feed["allowedPublisherIds"]
+        op = AddPublisher(publisher_id=80)
+        changes, warns = op.apply(feed)
+        assert changes == []
+        assert "allowedPublisherIds" not in feed  # not invented
+        assert len(warns) == 1
+        assert "no top-level allowedPublisherIds" in warns[0].message
+
+    def test_missing_top_level_field_with_session_all(self, feeds):
+        # session=ALL on an equity-style feed: top-level missing -> warn for
+        # top_level only; session targets still get their changes.
+        feed = feed_by_id(feeds, 922)
+        del feed["allowedPublisherIds"]
+        op = AddPublisher(publisher_id=80, session="ALL")
+        changes, warns = op.apply(feed)
+        assert "allowedPublisherIds" not in feed
+        assert any("top-level" in w.message for w in warns)
+        # All four sessions should still be edited.
+        assert sorted(c.location for c in changes) == sorted(SESSION_NAMES)
+
 
 from edit_config_lib.config_ops import RemovePublisher
 

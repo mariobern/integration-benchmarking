@@ -266,6 +266,7 @@ class SimulationResult:
     warnings: list[Warning]
     errors: list[str]
     simulated_feeds: list[dict]  # working copy after all ops; useful for tests
+    skipped_inactive: int = 0  # feeds skipped because state==INACTIVE (non-SetState)
 
 
 def simulate_plan(plan: list[PlannedOp], feeds: list[dict]) -> SimulationResult:
@@ -274,12 +275,18 @@ def simulate_plan(plan: list[PlannedOp], feeds: list[dict]) -> SimulationResult:
     Operations are applied in spec order; later ops see earlier ops'
     effects. Errors do not stop simulation — they're collected so the
     user sees every problem in one pass.
+
+    Feeds with state=INACTIVE are silently skipped for every op except
+    SetState. Reactivate the feed first (--set-state) if you want to
+    edit it. The skip is unconditional — explicit --state INACTIVE does
+    not override.
     """
     work = deepcopy(feeds)
     all_changes: list[Change] = []
     all_warnings: list[Warning] = []
     all_errors: list[str] = []
     matched_counts: list[int] = []
+    skipped_inactive = 0
 
     for idx, planned in enumerate(plan, start=1):
         targets = resolve_targets(planned.filters, work)
@@ -290,7 +297,11 @@ def simulate_plan(plan: list[PlannedOp], feeds: list[dict]) -> SimulationResult:
                 f"no feeds matched the filter"
             )
             continue
+        is_set_state = isinstance(planned.op, SetState)
         for feed in targets:
+            if not is_set_state and feed.get("state") == "INACTIVE":
+                skipped_inactive += 1
+                continue
             try:
                 changes, warns = planned.op.apply(feed)
             except OpError as e:
@@ -306,6 +317,7 @@ def simulate_plan(plan: list[PlannedOp], feeds: list[dict]) -> SimulationResult:
         warnings=all_warnings,
         errors=all_errors,
         simulated_feeds=work,
+        skipped_inactive=skipped_inactive,
     )
 
 

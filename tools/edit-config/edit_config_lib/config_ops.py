@@ -80,25 +80,42 @@ class AddPublisher:
         feed_id = feed["feedId"]
         symbol = feed.get("symbol", "")
 
-        # Determine which lists to touch.
+        # Determine which lists to touch. We only target fields that already exist
+        # in the parsed dict — text-surgery cannot insert missing fields. A missing
+        # top-level allowedPublisherIds emits a Warning and skips that target.
         targets: list[tuple[str, list[int]]] = []  # (location, list ref)
+
+        def _want_top_level() -> None:
+            if "allowedPublisherIds" in feed:
+                targets.append(("top_level", feed["allowedPublisherIds"]))
+            else:
+                warnings.append(
+                    Warning(
+                        feed_id=feed_id,
+                        symbol=symbol,
+                        message=(
+                            f"feed {feed_id}: no top-level allowedPublisherIds — "
+                            f"skipped (cannot insert new field via text surgery)"
+                        ),
+                    )
+                )
 
         if self.session is None:
             # Default scope
-            targets.append(("top_level", feed.setdefault("allowedPublisherIds", [])))
+            _want_top_level()
             if has_session_publishers(feed):
                 regular = get_session(feed, "REGULAR")
                 if regular is not None and "allowedPublisherIds" in regular:
                     targets.append(("REGULAR", regular["allowedPublisherIds"]))
         elif self.session == "NONE":
-            targets.append(("top_level", feed.setdefault("allowedPublisherIds", [])))
+            _want_top_level()
         elif self.session == "ALL":
             if not has_session_publishers(feed):
                 raise OpError(
                     f"feed {feed_id}: session=ALL requires per-session publisher lists; "
                     f"feed has no per-session lists"
                 )
-            targets.append(("top_level", feed.setdefault("allowedPublisherIds", [])))
+            _want_top_level()
             for name in SESSION_NAMES:
                 sess = get_session(feed, name)
                 if sess is not None and "allowedPublisherIds" in sess:
@@ -109,7 +126,7 @@ class AddPublisher:
                 raise OpError(
                     f"feed {feed_id}: session {self.session!r} does not exist on this feed"
                 )
-            targets.append(("top_level", feed.setdefault("allowedPublisherIds", [])))
+            _want_top_level()
             targets.append((self.session, sess["allowedPublisherIds"]))
         else:
             raise OpError(f"unknown session value: {self.session!r}")

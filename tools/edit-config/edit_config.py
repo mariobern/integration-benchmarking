@@ -148,6 +148,11 @@ def main(argv: list[str] | None = None) -> int:
         f"Summary: {len(result.changes)} changes, "
         f"{len(result.errors)} errors, {len(result.warnings)} warnings."
     )
+    if result.skipped_inactive:
+        summary += (
+            f" Skipped {result.skipped_inactive} INACTIVE feed(s) "
+            f"(reactivate via --set-state to edit)."
+        )
     print(summary)
 
     if not is_apply:

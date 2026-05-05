@@ -353,6 +353,119 @@ class TestSimulatePlan:
         assert any("deactivat" in w.message.lower() for w in result.warnings)
 
 
+class TestSimulatePlanInactiveSkip:
+    """INACTIVE feeds are silently skipped for every op except SetState.
+
+    The skip is unconditional — explicit --state INACTIVE does not override.
+    Reactivate via SetState first, then run the edit op.
+    """
+
+    def test_inactive_feed_skipped_for_add_publisher(self, feeds):
+        # Feed 6000 is INACTIVE in the fixture.
+        plan = [
+            PlannedOp(
+                op=AddPublisher(publisher_id=80),
+                filters=FilterSet(feed_ids={6000}),
+            )
+        ]
+        result = simulate_plan(plan, feeds)
+        assert result.changes == []
+        assert result.warnings == []
+        assert result.errors == []
+        assert result.skipped_inactive == 1
+        assert result.matched_counts == [1]  # matched but skipped
+
+    def test_skipped_inactive_count_aggregated(self, feeds):
+        # Mark a second feed as INACTIVE for this test.
+        feed_by_id_local = {f["feedId"]: f for f in feeds}
+        feed_by_id_local[1]["state"] = "INACTIVE"
+        plan = [
+            PlannedOp(
+                op=AddPublisher(publisher_id=80),
+                filters=FilterSet(feed_ids={1, 6000, 100}),
+            )
+        ]
+        result = simulate_plan(plan, feeds)
+        # Only feed 100 (STABLE) actually edited; 1 and 6000 are skipped.
+        assert result.skipped_inactive == 2
+        assert all(c.feed_id == 100 for c in result.changes)
+
+    def test_explicit_state_inactive_filter_still_skips(self, feeds):
+        # Even with --state INACTIVE the user must reactivate first.
+        plan = [
+            PlannedOp(
+                op=AddPublisher(publisher_id=80),
+                filters=FilterSet(feed_ids={6000}, states={"INACTIVE"}),
+            )
+        ]
+        result = simulate_plan(plan, feeds)
+        assert result.changes == []
+        assert result.skipped_inactive == 1
+
+    def test_set_state_operates_on_inactive_feeds(self, feeds):
+        # SetState is exempt — that's how you reactivate.
+        plan = [
+            PlannedOp(
+                op=SetState(value="STABLE"),
+                filters=FilterSet(feed_ids={6000}),
+            )
+        ]
+        result = simulate_plan(plan, feeds)
+        assert result.skipped_inactive == 0
+        assert len(result.changes) == 1
+        assert result.changes[0].field == "state"
+        assert result.changes[0].after == "STABLE"
+
+    def test_skipped_for_remove_publisher(self, feeds):
+        from edit_config_lib.config_ops import RemovePublisher
+
+        plan = [
+            PlannedOp(
+                op=RemovePublisher(publisher_id=22),
+                filters=FilterSet(feed_ids={6000}),
+            )
+        ]
+        result = simulate_plan(plan, feeds)
+        assert result.changes == []
+        assert result.skipped_inactive == 1
+
+    def test_skipped_for_set_min_publishers(self, feeds):
+        from edit_config_lib.config_ops import SetMinPublishers
+
+        plan = [
+            PlannedOp(
+                op=SetMinPublishers(value=2),
+                filters=FilterSet(feed_ids={6000}),
+            )
+        ]
+        result = simulate_plan(plan, feeds)
+        assert result.changes == []
+        assert result.skipped_inactive == 1
+
+    def test_skipped_for_bump_min_publishers(self, feeds):
+        from edit_config_lib.config_ops import BumpMinPublishers
+
+        plan = [
+            PlannedOp(
+                op=BumpMinPublishers(delta=1),
+                filters=FilterSet(feed_ids={6000}),
+            )
+        ]
+        result = simulate_plan(plan, feeds)
+        assert result.changes == []
+        assert result.skipped_inactive == 1
+
+    def test_skipped_count_zero_when_no_inactive(self, feeds):
+        plan = [
+            PlannedOp(
+                op=AddPublisher(publisher_id=80),
+                filters=FilterSet(feed_ids={1}),  # STABLE
+            )
+        ]
+        result = simulate_plan(plan, feeds)
+        assert result.skipped_inactive == 0
+
+
 from edit_config_lib.config_editor import apply_changes
 from edit_config_lib.config_ops import Change
 
