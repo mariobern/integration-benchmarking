@@ -351,3 +351,195 @@ class TestSimulatePlan:
         ]
         result = simulate_plan(plan, feeds)
         assert any("deactivat" in w.message.lower() for w in result.warnings)
+
+
+from lib.config_editor import apply_changes
+from lib.config_ops import Change
+
+
+class TestApplyChanges:
+    def setup_method(self):
+        self.raw = FIXTURE_PATH.read_text(encoding="utf-8")
+
+    def test_publisher_top_level_change(self):
+        change = Change(
+            feed_id=1,
+            symbol="Crypto.BTC/USD",
+            location="top_level",
+            field="allowedPublisherIds",
+            before=[1, 3, 7, 11],
+            after=[1, 3, 7, 11, 80],
+        )
+        new_raw = apply_changes(self.raw, [change])
+        # Locate the feed 1 block in the result
+        new_data = json.loads(new_raw)
+        f = next(x for x in new_data["feeds"] if x["feedId"] == 1)
+        assert f["allowedPublisherIds"] == [1, 3, 7, 11, 80]
+
+    def test_publisher_session_change(self):
+        change = Change(
+            feed_id=922,
+            symbol="Equity.US.AAPL/USD",
+            location="PRE_MARKET",
+            field="allowedPublisherIds",
+            before=[19, 20, 22, 41, 42, 45, 55, 59, 65],
+            after=[19, 20, 41, 42, 45, 55, 59, 65],
+        )
+        new_raw = apply_changes(self.raw, [change])
+        new_data = json.loads(new_raw)
+        f = next(x for x in new_data["feeds"] if x["feedId"] == 922)
+        pre = next(s for s in f["marketSchedules"] if s["session"] == "PRE_MARKET")
+        assert pre["allowedPublisherIds"] == [19, 20, 41, 42, 45, 55, 59, 65]
+
+    def test_min_publishers_top_level(self):
+        change = Change(
+            feed_id=1,
+            symbol="Crypto.BTC/USD",
+            location="top_level",
+            field="minPublishers",
+            before=3,
+            after=4,
+        )
+        new_raw = apply_changes(self.raw, [change])
+        new_data = json.loads(new_raw)
+        f = next(x for x in new_data["feeds"] if x["feedId"] == 1)
+        assert f["minPublishers"] == 4
+
+    def test_min_publishers_session(self):
+        change = Change(
+            feed_id=922,
+            symbol="Equity.US.AAPL/USD",
+            location="OVER_NIGHT",
+            field="minPublishers",
+            before=2,
+            after=3,
+        )
+        new_raw = apply_changes(self.raw, [change])
+        new_data = json.loads(new_raw)
+        f = next(x for x in new_data["feeds"] if x["feedId"] == 922)
+        on = next(s for s in f["marketSchedules"] if s["session"] == "OVER_NIGHT")
+        assert on["minPublishers"] == 3
+
+    def test_state_change(self):
+        change = Change(
+            feed_id=5000,
+            symbol="Crypto.NEW/USD",
+            location="top_level",
+            field="state",
+            before="COMING_SOON",
+            after="STABLE",
+        )
+        new_raw = apply_changes(self.raw, [change])
+        new_data = json.loads(new_raw)
+        f = next(x for x in new_data["feeds"] if x["feedId"] == 5000)
+        assert f["state"] == "STABLE"
+
+    def test_multiple_changes_same_feed(self):
+        changes = [
+            Change(
+                feed_id=922,
+                symbol="X",
+                location="top_level",
+                field="allowedPublisherIds",
+                before=[
+                    11,
+                    12,
+                    13,
+                    14,
+                    19,
+                    20,
+                    21,
+                    22,
+                    26,
+                    29,
+                    32,
+                    35,
+                    41,
+                    42,
+                    45,
+                    48,
+                    54,
+                    55,
+                    57,
+                    59,
+                    64,
+                    65,
+                    69,
+                    71,
+                    72,
+                    73,
+                ],
+                after=[
+                    11,
+                    12,
+                    13,
+                    14,
+                    19,
+                    20,
+                    21,
+                    22,
+                    26,
+                    29,
+                    32,
+                    35,
+                    41,
+                    42,
+                    45,
+                    48,
+                    54,
+                    55,
+                    57,
+                    59,
+                    64,
+                    65,
+                    69,
+                    71,
+                    72,
+                    73,
+                    80,
+                ],
+            ),
+            Change(
+                feed_id=922,
+                symbol="X",
+                location="REGULAR",
+                field="minPublishers",
+                before=3,
+                after=4,
+            ),
+        ]
+        new_raw = apply_changes(self.raw, changes)
+        new_data = json.loads(new_raw)
+        f = next(x for x in new_data["feeds"] if x["feedId"] == 922)
+        assert 80 in f["allowedPublisherIds"]
+        regular = next(s for s in f["marketSchedules"] if s["session"] == "REGULAR")
+        assert regular["minPublishers"] == 4
+
+    def test_multiple_changes_different_feeds(self):
+        changes = [
+            Change(
+                feed_id=1,
+                symbol="X",
+                location="top_level",
+                field="minPublishers",
+                before=3,
+                after=2,
+            ),
+            Change(
+                feed_id=100,
+                symbol="Y",
+                location="top_level",
+                field="minPublishers",
+                before=3,
+                after=4,
+            ),
+        ]
+        new_raw = apply_changes(self.raw, changes)
+        new_data = json.loads(new_raw)
+        f1 = next(x for x in new_data["feeds"] if x["feedId"] == 1)
+        f100 = next(x for x in new_data["feeds"] if x["feedId"] == 100)
+        assert f1["minPublishers"] == 2
+        assert f100["minPublishers"] == 4
+
+    def test_empty_changes_is_identity(self):
+        assert apply_changes(self.raw, []) == self.raw

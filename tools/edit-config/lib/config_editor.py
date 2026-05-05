@@ -307,3 +307,119 @@ def simulate_plan(plan: list[PlannedOp], feeds: list[dict]) -> SimulationResult:
         errors=all_errors,
         simulated_feeds=work,
     )
+
+
+from collections import defaultdict
+
+from lib.config_text_surgery import (
+    find_feed_block,
+    find_session_block,
+    find_publisher_array_span,
+    find_int_field_span,
+    find_string_field_span,
+    find_matching_close,
+)
+
+
+def _format_publisher_list(ids: list[int]) -> str:
+    if not ids:
+        return "[ ]"
+    return "[ " + ", ".join(str(i) for i in ids) + " ]"
+
+
+def _apply_changes_to_feed_block(block: str, changes: list[Change]) -> str:
+    """Apply all changes for a single feed to its raw text block.
+
+    Strategy: collect (start, end, replacement) tuples relative to the
+    feed block, sort by descending start offset, splice them in order
+    so prior splices don't shift later offsets.
+    """
+    edits: list[tuple[int, int, str]] = []
+
+    # Compute marketSchedules array span up-front (used to scope top-level int
+    # field lookups so we don't accidentally hit a session's minPublishers).
+    ms_match = None
+    ms_idx = block.find('"marketSchedules":')
+    if ms_idx >= 0:
+        ms_open = block.find("[", ms_idx)
+        if ms_open >= 0:
+            ms_close = find_matching_close(block, ms_open)
+            if ms_close is not None:
+                ms_match = (ms_open, ms_close + 1)
+
+    for change in changes:
+        if change.location == "top_level":
+            scope_block, scope_offset = block, 0
+            # For top-level int fields, scope the lookup to the tail after marketSchedules.
+            if change.field == "minPublishers" and ms_match is not None:
+                tail_start = ms_match[1]
+                scope_block = block[tail_start:]
+                scope_offset = tail_start
+        else:
+            sb = find_session_block(block, change.location)
+            if sb is None:
+                raise RuntimeError(
+                    f"session block {change.location!r} not found in feed block"
+                )
+            scope_block = block[sb[0] : sb[1]]
+            scope_offset = sb[0]
+
+        if change.field == "allowedPublisherIds":
+            span = find_publisher_array_span(scope_block)
+            if span is None:
+                raise RuntimeError(
+                    f"allowedPublisherIds not found in {change.location}"
+                )
+            replacement = _format_publisher_list(change.after)
+        elif change.field == "minPublishers":
+            span = find_int_field_span(scope_block, "minPublishers")
+            if span is None:
+                raise RuntimeError(f"minPublishers not found in {change.location}")
+            replacement = str(change.after)
+        elif change.field == "state":
+            span = find_string_field_span(scope_block, "state")
+            if span is None:
+                raise RuntimeError(f"state field not found in {change.location}")
+            replacement = f'"{change.after}"'
+        else:
+            raise RuntimeError(f"unsupported field {change.field!r}")
+
+        abs_start = scope_offset + span[0]
+        abs_end = scope_offset + span[1]
+        edits.append((abs_start, abs_end, replacement))
+
+    # Apply in reverse offset order so earlier spans aren't disturbed.
+    for start, end, replacement in sorted(edits, key=lambda e: -e[0]):
+        block = block[:start] + replacement + block[end:]
+    return block
+
+
+def apply_changes(raw: str, changes: list[Change]) -> str:
+    """Apply all changes to the raw JSON text, preserving formatting.
+
+    Groups changes by feedId, locates each feed block once, applies all
+    changes for that feed, then splices back. This avoids byte-offset
+    drift across the larger document.
+    """
+    if not changes:
+        return raw
+
+    by_feed: dict[int, list[Change]] = defaultdict(list)
+    for c in changes:
+        by_feed[c.feed_id].append(c)
+
+    # Apply per-feed in reverse feedId-block order so absolute offsets are stable.
+    feed_bounds = {}
+    for feed_id in by_feed:
+        bounds = find_feed_block(raw, feed_id)
+        if bounds is None:
+            raise RuntimeError(f"feed {feed_id} not found in raw text")
+        feed_bounds[feed_id] = bounds
+
+    for feed_id in sorted(by_feed.keys(), key=lambda fid: -feed_bounds[fid][0]):
+        start, end = feed_bounds[feed_id]
+        block = raw[start:end]
+        new_block = _apply_changes_to_feed_block(block, by_feed[feed_id])
+        raw = raw[:start] + new_block + raw[end:]
+
+    return raw
