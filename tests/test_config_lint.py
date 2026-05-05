@@ -9,7 +9,7 @@ from lib.config_lint import (
     check_publisher_duplicates,
     check_schedules,
     check_hermes_ids,
-    check_expired_coming_soon_futures,
+    check_expired_futures,
     check_benchmark_mapping,
     check_corporate_actions,
     check_identifier_continuity,
@@ -413,6 +413,41 @@ class TestCheckPublishers:
         assert len(warnings) == 1
         assert "2" in warnings[0].message
 
+    def test_e004_message_uses_not_enough_publishers_permissioned(self):
+        """E004's trailing clause must read 'Not enough publishers permissioned'."""
+        feeds = [_make_feed(1, min_publishers=3, publisher_ids=[1, 2, 3])]
+        publishers = [_make_publisher(1), _make_publisher(2), _make_publisher(3)]
+        findings = check_publishers(feeds, publishers)
+        e004 = [f for f in findings if f.rule_id == "E004"]
+        assert len(e004) == 1
+        assert "Not enough publishers permissioned" in e004[0].message
+        assert "no fault tolerance" not in e004[0].message
+
+    def test_e004_session_level_message_uses_not_enough_publishers_permissioned(self):
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                min_publishers=3,
+                publisher_ids=[1, 2, 3, 4, 5],
+                schedules=[
+                    {"marketSchedule": "America/New_York;O;", "session": "REGULAR"},
+                    {
+                        "marketSchedule": "America/New_York;0400-0930;",
+                        "session": "PRE_MARKET",
+                        "allowedPublisherIds": [1, 2],
+                        "minPublishers": 2,
+                    },
+                ],
+            )
+        ]
+        publishers = [_make_publisher(i) for i in range(1, 6)]
+        findings = check_publishers(feeds, publishers)
+        e004 = [f for f in findings if f.rule_id == "E004"]
+        assert len(e004) == 1
+        assert "Not enough publishers permissioned" in e004[0].message
+
     def test_w007_stable_test_publisher(self):
         feeds = [_make_feed(1, state="STABLE", publisher_ids=[1, 2])]
         publishers = [_make_publisher(1, key_type="TEST"), _make_publisher(2)]
@@ -535,7 +570,8 @@ class TestCheckE014BenchmarkMapping:
         assert len(errors) == 1
         assert "REGULAR" in errors[0].message
 
-    def test_e014_overnight_exempt(self):
+    def test_e014_overnight_missing_bm_flagged(self):
+        """OVER_NIGHT must now be checked like every other session."""
         feed = _make_feed(
             1,
             symbol="Equity.US.AAPL/USD",
@@ -544,7 +580,39 @@ class TestCheckE014BenchmarkMapping:
             schedules=[_schedule_without_bm("OVER_NIGHT")],
         )
         findings = check_benchmark_mapping([feed])
+        errors = [f for f in findings if f.rule_id == "E014"]
+        assert len(errors) == 1
+        assert "OVER_NIGHT" in errors[0].message
+
+    def test_e014_overnight_with_bm_silent(self):
+        """OVER_NIGHT with benchmarkMapping populated must not fire."""
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.AAPL/USD",
+            state="STABLE",
+            asset_type="equity",
+            schedules=[_schedule_with_bm("OVER_NIGHT")],
+        )
+        findings = check_benchmark_mapping([feed])
         assert findings == []
+
+    def test_e014_all_four_equity_sessions_missing_bm_emits_four(self):
+        """All four sessions of a STABLE US equity missing bm → 4 findings."""
+        sessions = ["REGULAR", "PRE_MARKET", "POST_MARKET", "OVER_NIGHT"]
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.AAPL/USD",
+            state="STABLE",
+            asset_type="equity",
+            schedules=[_schedule_without_bm(s) for s in sessions],
+        )
+        findings = check_benchmark_mapping([feed])
+        errors = [f for f in findings if f.rule_id == "E014"]
+        flagged_sessions = sorted(
+            session for session in sessions if any(session in f.message for f in errors)
+        )
+        assert flagged_sessions == sorted(sessions)
+        assert len(errors) == 4
 
     def test_e014_coming_soon_skipped(self):
         feed = _make_feed(
@@ -808,6 +876,54 @@ class TestCheckSchedules:
         warnings = [f for f in findings if f.rule_id == "W003"]
         assert len(warnings) == 0
 
+    def test_w003_no_majority_unique_schedules_per_feed_flagged(self):
+        """3 commodity feeds each with a different schedule — no majority,
+        every feed gets a 'no consensus' W003."""
+        feeds = []
+        for i, hours in enumerate(["0800-1400", "0800-1500", "0800-1600"], start=1):
+            feeds.append(
+                _make_feed(
+                    i,
+                    symbol=f"Commodities.GOLD{i}/USD",
+                    asset_type="commodity",
+                    state="STABLE",
+                    schedules=[
+                        {
+                            "marketSchedule": f"America/New_York;{hours};",
+                            "session": "REGULAR",
+                        }
+                    ],
+                )
+            )
+        findings = check_schedules(feeds)
+        warnings = [f for f in findings if f.rule_id == "W003"]
+        assert len(warnings) == 3
+        flagged_ids = sorted(f.feed_id for f in warnings)
+        assert flagged_ids == [1, 2, 3]
+        for w in warnings:
+            assert "no consensus" in w.message
+
+    def test_w003_top_count_tied_per_feed_flagged(self):
+        """4 feeds, schedules [A, A, B, B] — tie at top, every feed flagged."""
+        sched_a = "America/New_York;0930-1600;"
+        sched_b = "America/New_York;0800-1500;"
+        feeds = []
+        for i, sched in enumerate([sched_a, sched_a, sched_b, sched_b], start=1):
+            feeds.append(
+                _make_feed(
+                    i,
+                    symbol=f"Commodities.GOLD{i}/USD",
+                    asset_type="commodity",
+                    state="STABLE",
+                    schedules=[{"marketSchedule": sched, "session": "REGULAR"}],
+                )
+            )
+        findings = check_schedules(feeds)
+        warnings = [f for f in findings if f.rule_id == "W003"]
+        assert len(warnings) == 4
+        for w in warnings:
+            assert "no consensus" in w.message
+
     def test_inactive_feeds_skipped(self):
         feeds = [
             _make_feed(
@@ -984,6 +1100,7 @@ class TestCheckE011ScheduleInconsistency:
         assert errors[0].feed_id == 3
 
     def test_e011_futures_same_root_disagree(self):
+        """Two-feed tie case: both feeds get a 'no consensus' E011."""
         sched_a = [{"marketSchedule": "America/New_York;O;", "session": "REGULAR"}]
         sched_b = [
             {"marketSchedule": "America/New_York;0800-1400;", "session": "REGULAR"}
@@ -1004,7 +1121,9 @@ class TestCheckE011ScheduleInconsistency:
         ]
         findings = check_schedules(feeds)
         errors = [f for f in findings if f.rule_id == "E011"]
-        assert len(errors) == 1
+        assert len(errors) == 2
+        for f in errors:
+            assert "no consensus" in f.message
 
     def test_e011_different_futures_roots_not_flagged(self):
         sched_a = [{"marketSchedule": "America/New_York;O;", "session": "REGULAR"}]
@@ -1051,6 +1170,73 @@ class TestCheckE011ScheduleInconsistency:
         findings = check_schedules(feeds)
         errors = [f for f in findings if f.rule_id == "E011"]
         assert len(errors) == 0
+
+    def test_e011_two_feeds_two_schedules_emits_per_feed_no_consensus(self):
+        """Tie case: 2 STABLE feeds with 2 distinct schedules. Both feeds
+        get a finding with a 'no consensus' message — neither is treated
+        as the reference."""
+        sched_a = [
+            {"marketSchedule": "America/New_York;0930-1600;", "session": "REGULAR"}
+        ]
+        sched_b = [
+            {"marketSchedule": "America/New_York;0800-1500;", "session": "REGULAR"}
+        ]
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                2,
+                symbol="Equity.US.MSFT/USD",
+                asset_type="equity",
+                schedules=sched_b,
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 2
+        flagged_ids = sorted(f.feed_id for f in errors)
+        assert flagged_ids == [1, 2]
+        for f in errors:
+            assert "no consensus" in f.message
+
+    def test_e011_clear_majority_keeps_per_minority_behavior(self):
+        """Sanity: 3 feeds, 2 of them share a schedule. Only the lone
+        deviant gets flagged (not the majority)."""
+        sched_a = [
+            {"marketSchedule": "America/New_York;0930-1600;", "session": "REGULAR"}
+        ]
+        sched_b = [
+            {"marketSchedule": "America/New_York;0800-1500;", "session": "REGULAR"}
+        ]
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                2,
+                symbol="Equity.US.MSFT/USD",
+                asset_type="equity",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                3,
+                symbol="Equity.US.GOOG/USD",
+                asset_type="equity",
+                schedules=sched_b,
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 1
+        assert errors[0].feed_id == 3
+        assert "no consensus" not in errors[0].message
 
 
 class TestE011IntlEquityGrouping:
@@ -1607,7 +1793,7 @@ class TestCheckE013ExpiredFutures:
         feed = _futures_feed_with_validto(
             1, "Commodities.WTIK6/USD", "2026-01-01T00:00:00.000000000Z"
         )
-        findings = check_expired_coming_soon_futures([feed], _NOW)
+        findings = check_expired_futures([feed], _NOW)
         errors = [f for f in findings if f.rule_id == "E013"]
         assert len(errors) == 1
 
@@ -1615,24 +1801,61 @@ class TestCheckE013ExpiredFutures:
         feed = _futures_feed_with_validto(
             1, "Commodities.WTIK6/USD", "2026-12-01T00:00:00.000000000Z"
         )
-        findings = check_expired_coming_soon_futures([feed], _NOW)
+        findings = check_expired_futures([feed], _NOW)
         assert findings == []
 
-    def test_e013_stable_state_not_flagged(self):
+    def test_e013_stable_not_yet_expired(self):
+        """STABLE futures with future validTo must not fire E013."""
+        feed = _futures_feed_with_validto(
+            1,
+            "Commodities.WTIK6/USD",
+            "2026-12-01T00:00:00.000000000Z",
+            state="STABLE",
+        )
+        findings = check_expired_futures([feed], _NOW)
+        assert findings == []
+
+    def test_e013_expired_stable_futures_flagged(self):
+        """STABLE futures with all validTo in the past must fire E013
+        with a state-tagged message."""
         feed = _futures_feed_with_validto(
             1,
             "Commodities.WTIK6/USD",
             "2026-01-01T00:00:00.000000000Z",
             state="STABLE",
         )
-        findings = check_expired_coming_soon_futures([feed], _NOW)
+        findings = check_expired_futures([feed], _NOW)
+        errors = [f for f in findings if f.rule_id == "E013"]
+        assert len(errors) == 1
+        assert "STABLE futures feed has expired" in errors[0].message
+        assert "change state to INACTIVE" in errors[0].message
+
+    def test_e013_expired_coming_soon_message_unchanged(self):
+        """COMING_SOON message keeps its existing wording."""
+        feed = _futures_feed_with_validto(
+            1, "Commodities.WTIK6/USD", "2026-01-01T00:00:00.000000000Z"
+        )
+        findings = check_expired_futures([feed], _NOW)
+        errors = [f for f in findings if f.rule_id == "E013"]
+        assert len(errors) == 1
+        assert "COMING_SOON futures feed has expired" in errors[0].message
+
+    def test_e013_inactive_stable_futures_not_flagged(self):
+        """INACTIVE feeds (regardless of expiry) must never fire E013."""
+        feed = _futures_feed_with_validto(
+            1,
+            "Commodities.WTIK6/USD",
+            "2026-01-01T00:00:00.000000000Z",
+            state="INACTIVE",
+        )
+        findings = check_expired_futures([feed], _NOW)
         assert findings == []
 
     def test_e013_non_futures_not_flagged(self):
         feed = _futures_feed_with_validto(
             1, "Crypto.BTC/USD", "2026-01-01T00:00:00.000000000Z"
         )
-        findings = check_expired_coming_soon_futures([feed], _NOW)
+        findings = check_expired_futures([feed], _NOW)
         assert findings == []
 
     def test_e013_no_validto_skipped(self):
@@ -1658,7 +1881,7 @@ class TestCheckE013ExpiredFutures:
                 }
             ],
         )
-        findings = check_expired_coming_soon_futures([feed], _NOW)
+        findings = check_expired_futures([feed], _NOW)
         assert findings == []
 
     def test_e013_mixed_expired_and_future_not_flagged(self):
@@ -1688,7 +1911,7 @@ class TestCheckE013ExpiredFutures:
                 }
             ],
         )
-        findings = check_expired_coming_soon_futures([feed], _NOW)
+        findings = check_expired_futures([feed], _NOW)
         assert findings == []
 
 
@@ -2942,7 +3165,7 @@ class TestParseIso:
         )
         # Should produce E013 (validTo is in the past relative to _NOW)
         # rather than raising TypeError.
-        findings = check_expired_coming_soon_futures([feed], _NOW)
+        findings = check_expired_futures([feed], _NOW)
         e013 = [f for f in findings if f.rule_id == "E013"]
         assert len(e013) == 1
         assert e013[0].feed_id == 1

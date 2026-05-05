@@ -110,17 +110,50 @@ class TestCLIOutputFormats:
         config = _make_clean_config()
         config["feeds"].append(config["feeds"][0].copy())
         path = _write_config(tmp_path, config)
-        result = _run_linter("--config", path, "--format", "json")
-        findings = json.loads(result.stdout)
-        assert isinstance(findings, list)
-        assert any(f["rule_id"] == "E001" for f in findings)
+        result = _run_linter("--config", path, "--format", "json", "--no-baseline")
+        payload = json.loads(result.stdout)
+        assert isinstance(payload, dict)
+        assert "findings" in payload
+        assert any(f["rule_id"] == "E001" for f in payload["findings"])
 
     def test_json_format_clean(self, tmp_path):
         path = _write_config(tmp_path, _make_clean_config())
-        result = _run_linter("--config", path, "--format", "json")
-        findings = json.loads(result.stdout)
-        errors = [f for f in findings if f["severity"] == "ERROR"]
+        result = _run_linter("--config", path, "--format", "json", "--no-baseline")
+        payload = json.loads(result.stdout)
+        errors = [f for f in payload["findings"] if f["severity"] == "ERROR"]
         assert len(errors) == 0
+
+    def test_json_format_returns_envelope(self, tmp_path):
+        config = _make_clean_config()
+        config["feeds"].append(config["feeds"][0].copy())  # E001 dup
+        path = _write_config(tmp_path, config)
+        result = _run_linter("--config", path, "--format", "json", "--no-baseline")
+        payload = json.loads(result.stdout)
+        assert isinstance(payload, dict)
+        assert "findings" in payload
+        assert "pre_existing_count" in payload
+        assert payload["pre_existing_count"] is None  # full lint mode
+        assert any(f["rule_id"] == "E001" for f in payload["findings"])
+
+    def test_json_format_envelope_in_diff_mode(self, tmp_path):
+        bad = _make_clean_config()
+        bad["feeds"].append(bad["feeds"][0].copy())  # E001 dup in both
+        before_path = Path(tmp_path) / "before.json"
+        before_path.write_text(json.dumps(bad))
+        after_path = _write_config(tmp_path, bad)
+        result = _run_linter(
+            "--config",
+            after_path,
+            "--baseline",
+            str(before_path),
+            "--format",
+            "json",
+        )
+        payload = json.loads(result.stdout)
+        assert isinstance(payload, dict)
+        assert payload["findings"] == []
+        assert isinstance(payload["pre_existing_count"], int)
+        assert payload["pre_existing_count"] >= 1
 
 
 class TestCLIFileHandling:

@@ -30,7 +30,7 @@ describe("runLinter", () => {
     mockSpawn.mockReset();
   });
 
-  it("parses linter JSON output into findings on exit code 0", async () => {
+  it("parses linter JSON envelope into findings on exit code 0", async () => {
     const child = makeFakeChild();
     mockSpawn.mockReturnValue(child as never);
 
@@ -42,16 +42,19 @@ describe("runLinter", () => {
       timeoutMs: 5000,
     });
 
-    // Simulate linter producing output then exiting cleanly.
-    const sample = JSON.stringify([
-      {
-        rule_id: "E001",
-        severity: "ERROR",
-        message: "feedId 327 is duplicated",
-        feed_id: 327,
-        symbol: null,
-      },
-    ]);
+    // Linter now emits {"findings": [...], "pre_existing_count": N | null}.
+    const sample = JSON.stringify({
+      findings: [
+        {
+          rule_id: "E001",
+          severity: "ERROR",
+          message: "feedId 327 is duplicated",
+          feed_id: 327,
+          symbol: null,
+        },
+      ],
+      pre_existing_count: null,
+    });
     child.stdout.emit("data", Buffer.from(sample));
     child.emit("close", 0);
 
@@ -60,6 +63,27 @@ describe("runLinter", () => {
     expect(result.findings).toHaveLength(1);
     expect(result.findings[0].rule_id).toBe("E001");
     expect(result.findings[0].feed_id).toBe(327);
+  });
+
+  it("rejects bare-array stdout as parse_error (regression guard)", async () => {
+    const child = makeFakeChild();
+    mockSpawn.mockReturnValue(child as never);
+
+    const promise = runLinter({
+      pythonPath: "python3",
+      linterPath: "/repo/tools/config-linter/config_linter.py",
+      configPath: "/repo/2026-04-29-T123456-foo/after.json",
+      baselinePath: null,
+      timeoutMs: 5000,
+    });
+
+    // Old bare-array shape — no longer accepted.
+    child.stdout.emit("data", Buffer.from("[]"));
+    child.emit("close", 0);
+
+    const result = await promise;
+    expect(result.findings).toEqual([]);
+    expect(result.error?.kind).toBe("parse_error");
   });
 
   it("returns crashed error when subprocess exits non-zero with no JSON output", async () => {

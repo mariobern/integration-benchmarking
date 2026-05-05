@@ -83,7 +83,7 @@ Files outside this pattern (root configs, the linter's own test fixtures, `befor
 10. Convert findings to `vscode.Diagnostic` (severity ERROR → `Error`, WARNING → `Warning`).
 11. Replace the file's entry in a singleton `DiagnosticCollection`. Old diagnostics from the previous save vanish atomically.
 
-The linter exits with code 0 (no errors), 1 (errors), or 2 (baseline file missing/unparseable). All three are valid; only spawn-level failures (`ENOENT`, timeout, malformed stdout) trigger error-handler diagnostics.
+The linter exits with code 0 (no errors) or 1 (errors, baseline file missing, or malformed input). Both are valid; only spawn-level failures (`ENOENT`, timeout, malformed stdout) trigger error-handler diagnostics.
 
 ## Range Mapping (Locator)
 

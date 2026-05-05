@@ -54,15 +54,16 @@ A finding is "pre-existing" when the tuple `(rule_id, feed_id, symbol)` matches 
 
 Most rules skip `INACTIVE` feeds. The major scope buckets:
 
-| Scope                | Rules                                                                  |
-| -------------------- | ---------------------------------------------------------------------- |
-| All feeds            | `E001`, `E007`                                                         |
-| Active-pipeline only | `E002` (STABLE + COMING_SOON)                                          |
-| Non-INACTIVE         | `E003`, `E006`, `E008`, `E010`, `E012`, `E016`, `W006`                 |
-| STABLE only          | `E004`, `E005`, `E009`, `E011`, `E014`, `W001`, `W002`, `W005`, `W007` |
-| COMING_SOON only     | `W004`, plus `E013` for futures                                        |
-| STABLE + COMING_SOON | `W003`                                                                 |
-| Publishers array     | `E017`, `E018`                                                         |
+| Scope                        | Rules                                                                  |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| All feeds                    | `E001`, `E007`                                                         |
+| Active-pipeline only         | `E002` (STABLE + COMING_SOON)                                          |
+| Non-INACTIVE                 | `E003`, `E006`, `E008`, `E010`, `E012`, `E016`, `W006`                 |
+| STABLE only                  | `E004`, `E005`, `E009`, `E011`, `E014`, `W001`, `W002`, `W005`, `W007` |
+| COMING_SOON only             | `W004`                                                                 |
+| STABLE + COMING_SOON futures | `E013`                                                                 |
+| STABLE + COMING_SOON         | `W003`                                                                 |
+| Publishers array             | `E017`, `E018`                                                         |
 
 ## How To: Run the Linter Locally
 
@@ -178,9 +179,9 @@ The five rules that bite most often, with the typical fix:
 | ---- | ---------------------------------------------------- | -------------------------------------------------------------------- |
 | E004 | `minPublishers (N) >= publisher count (N)`           | Lower `minPublishers`, or onboard another publisher to add headroom. |
 | E011 | Two STABLE peers disagree on a session schedule      | Pick one canonical schedule for the asset group and update outliers. |
-| E014 | STABLE benchmarkable feed missing `benchmarkMapping` | Add `benchmarkMapping` to every non-OVERNIGHT session.               |
+| E014 | STABLE benchmarkable feed missing `benchmarkMapping` | Add `benchmarkMapping` to every session, including OVER_NIGHT.       |
 | W003 | Schedule deviates from asset-class majority          | Confirm the deviation is intentional, otherwise align with majority. |
-| E013 | COMING_SOON futures past every `validTo`             | Flip `state` to `INACTIVE` (the contract has rolled off).            |
+| E013 | STABLE or COMING_SOON futures past every `validTo`   | Flip `state` to `INACTIVE` (the contract has rolled off).            |
 
 For the full set, see [docs/config_linter_examples.md](docs/config_linter_examples.md), which shows the smallest fragment that triggers each rule.
 
@@ -232,8 +233,8 @@ For each rule's exact trigger condition and a copy-pasteable example fragment, s
 | E010 | Duplicate session in `marketSchedules`                                                                | non-INACTIVE                            |
 | E011 | Schedule inconsistency within asset group                                                             | STABLE only                             |
 | E012 | Duplicate `metadata.hermes_id`                                                                        | non-INACTIVE                            |
-| E013 | COMING_SOON futures past every `validTo`                                                              | COMING_SOON futures                     |
-| E014 | STABLE benchmarkable feed missing `benchmarkMapping`                                                  | STABLE, benchmarkable, non-OVERNIGHT    |
+| E013 | STABLE or COMING_SOON futures past every `validTo`                                                    | STABLE + COMING_SOON futures            |
+| E014 | STABLE benchmarkable feed missing `benchmarkMapping`                                                  | STABLE, benchmarkable, all sessions     |
 | E015 | `corporateActions` schema violation                                                                   | any feed with `corporateActions`        |
 | E016 | Identifier date range overlap within same vendor/session                                              | non-INACTIVE, 2+ identifiers per vendor |
 | E017 | Duplicate `publisherId` in publishers array                                                           | publishers array                        |
@@ -296,7 +297,7 @@ Exemptions apply only to the publisher-count headroom rules.
 ### Notes on Time-Sensitive and Schema-Validating Rules
 
 - **E013** is evaluated against `datetime.now(timezone.utc)` at runtime. Feeds with no `validTo` identifiers are skipped — E013 only fires when there is positive evidence every mapped contract has rolled off.
-- **E014** considers only `equity`, `fx`, `metal`, `commodity`, `rates` as benchmarkable. The `OVER_NIGHT` session is always exempt because it uses publisher 32 peer comparison rather than Datascope.
+- **E014** considers only `equity`, `fx`, `metal`, `commodity`, `rates` as benchmarkable. Every session including `OVER_NIGHT` must populate `benchmarkMapping`. (OVER_NIGHT validation against Datascope is replaced by publisher 32 peer comparison at runtime, but the mapping still needs to be present in config.)
 - **E015 / W009** validate `corporateActions` entries. Only `SPLIT` is currently implemented. Unknown event types raise `W009` (advisory) rather than blocking CI; once the linter is taught the new schema, the same config produces `E015` with structured field-level messages.
 - **E016** sorts identifiers by `validFrom` and checks consecutive pairs. The last identifier in a chain may omit `validTo` (open-ended current contract); a non-last identifier missing `validTo` is flagged because it creates an unbounded range.
 - **E017 / E018** mirror invariants enforced by the Rust governance tool's `diff_publishers`. Both fire before the proposal pipeline reaches the Rust stack-trace error.

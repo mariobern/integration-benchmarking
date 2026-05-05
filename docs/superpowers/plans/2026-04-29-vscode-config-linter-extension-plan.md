@@ -890,8 +890,9 @@ export function runLinter(options: LinterOptions): Promise<LinterResult> {
     });
 
     child.on("close", (code) => {
-      // Linter exits 0 (no errors), 1 (errors), or 2 (baseline missing).
-      // Stdout in all three cases should be a JSON array.
+      // Linter exits 0 (no errors) or 1 (errors / baseline missing).
+      // Stdout in both cases should be a JSON envelope
+      // ({"findings": [...], "pre_existing_count": int | null}).
       try {
         const parsed = JSON.parse(stdout);
         if (Array.isArray(parsed)) {

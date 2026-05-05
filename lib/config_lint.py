@@ -255,7 +255,7 @@ def check_publishers(feeds: list[dict], publishers: list[dict]) -> list[LintFind
                         severity="ERROR",
                         message=(
                             f"minPublishers ({min_pub}) >= publisher count"
-                            f" ({len(pub_ids)}), no fault tolerance"
+                            f" ({len(pub_ids)}), Not enough publishers permissioned"
                         ),
                         feed_id=fid,
                         symbol=sym,
@@ -377,7 +377,8 @@ def check_publishers(feeds: list[dict], publishers: list[dict]) -> list[LintFind
                             severity="ERROR",
                             message=(
                                 f"session {session_name}: minPublishers ({session_min})"
-                                f" >= publisher count ({session_count})"
+                                f" >= publisher count ({session_count}),"
+                                f" Not enough publishers permissioned"
                             ),
                             feed_id=fid,
                             symbol=sym,
@@ -583,20 +584,43 @@ def check_schedules(feeds: list[dict]) -> list[LintFinding]:
         sig_counter: Counter[str] = Counter(
             sched_str for _, _, sched_str in stable_entries
         )
-        reference = sig_counter.most_common(1)[0][0]
+        top_count = sig_counter.most_common(1)[0][1]
+        top_schedules = {s for s, c in sig_counter.items() if c == top_count}
         session = bucket_key[-1]
         group_label = _format_group_label(bucket_key[:-1])
 
-        for fid, sym, sched_str in stable_entries:
-            if sched_str != reference:
+        if len(top_schedules) == 1:
+            # Clear majority — flag only the minority feeds.
+            reference = next(iter(top_schedules))
+            for fid, sym, sched_str in stable_entries:
+                if sched_str != reference:
+                    findings.append(
+                        LintFinding(
+                            rule_id="E011",
+                            severity="ERROR",
+                            message=(
+                                f"{session} schedule disagrees with group"
+                                f" {group_label}: {len(distinct)} distinct"
+                                f" schedules across {len(stable_entries)} STABLE"
+                                f" feeds"
+                            ),
+                            feed_id=fid,
+                            symbol=sym,
+                        )
+                    )
+        else:
+            # Tie at the top — no clear majority. Flag every STABLE feed
+            # in the bucket symmetrically.
+            for fid, sym, _sched_str in stable_entries:
                 findings.append(
                     LintFinding(
                         rule_id="E011",
                         severity="ERROR",
                         message=(
-                            f"{session} schedule disagrees with group"
-                            f" {group_label}: {len(distinct)} distinct"
-                            f" schedules across {len(stable_entries)} STABLE feeds"
+                            f"{session} schedule has no consensus across group"
+                            f" {group_label}: {len(distinct)} distinct schedules"
+                            f" across {len(stable_entries)} STABLE feeds, no"
+                            f" majority"
                         ),
                         feed_id=fid,
                         symbol=sym,
@@ -614,22 +638,43 @@ def check_schedules(feeds: list[dict]) -> list[LintFinding]:
             continue
 
         counts: Counter[str] = Counter(sched_str for _, _, sched_str in active_entries)
-        majority = counts.most_common(1)[0][0]
-        if counts[majority] == 1:
+        if len(set(counts)) < 2:
+            # Everyone agrees — nothing to report.
             continue
 
+        top_count = counts.most_common(1)[0][1]
+        top_schedules = {s for s, c in counts.items() if c == top_count}
         session = bucket_key[-1]
         group_label = _format_group_label(bucket_key[:-1])
 
-        for fid, sym, sched_str in active_entries:
-            if sched_str != majority:
+        if top_count >= 2 and len(top_schedules) == 1:
+            # Clear majority — flag only the minority feeds.
+            majority = next(iter(top_schedules))
+            for fid, sym, sched_str in active_entries:
+                if sched_str != majority:
+                    findings.append(
+                        LintFinding(
+                            rule_id="W003",
+                            severity="WARNING",
+                            message=(
+                                f"{session} schedule deviates from {group_label}"
+                                f" majority"
+                            ),
+                            feed_id=fid,
+                            symbol=sym,
+                        )
+                    )
+        else:
+            # No consensus: top_count == 1 (every feed unique) or tie at
+            # the top. Flag every active feed in the bucket.
+            for fid, sym, _sched_str in active_entries:
                 findings.append(
                     LintFinding(
                         rule_id="W003",
                         severity="WARNING",
                         message=(
-                            f"{session} schedule deviates from {group_label}"
-                            f" majority"
+                            f"{session} schedule has no consensus across"
+                            f" {group_label}"
                         ),
                         feed_id=fid,
                         symbol=sym,
@@ -674,7 +719,7 @@ def check_hermes_ids(feeds: list[dict]) -> list[LintFinding]:
 
 
 def check_benchmark_mapping(feeds: list[dict]) -> list[LintFinding]:
-    """E014: STABLE benchmarkable feed missing benchmarkMapping on non-OVERNIGHT session."""
+    """E014: STABLE benchmarkable feed missing benchmarkMapping on any session."""
     findings: list[LintFinding] = []
 
     for feed in feeds:
@@ -689,8 +734,6 @@ def check_benchmark_mapping(feeds: list[dict]) -> list[LintFinding]:
 
         for schedule in feed.get("marketSchedules", []):
             session_name = schedule.get("session", "")
-            if session_name == "OVER_NIGHT":
-                continue
             bm = schedule.get("benchmarkMapping")
             if not bm:
                 findings.append(
@@ -948,14 +991,22 @@ def _parse_iso(value: str) -> Optional[datetime]:
     return dt
 
 
-def check_expired_coming_soon_futures(
-    feeds: list[dict], now: datetime
-) -> list[LintFinding]:
-    """E013: COMING_SOON futures whose every validTo is in the past."""
+def check_expired_futures(feeds: list[dict], now: datetime) -> list[LintFinding]:
+    """E013: STABLE or COMING_SOON futures whose every validTo is in the past.
+
+    A feed is flagged when:
+      - state is STABLE or COMING_SOON, AND
+      - the symbol matches the futures pattern, AND
+      - at least one identifier has a validTo, AND
+      - every validTo found is earlier than `now`.
+
+    INACTIVE feeds and feeds with no validTo identifiers are skipped.
+    """
     findings: list[LintFinding] = []
 
     for feed in feeds:
-        if feed.get("state", "") != "COMING_SOON":
+        state = feed.get("state", "")
+        if state not in ("STABLE", "COMING_SOON"):
             continue
         sym = feed.get("symbol", "")
         if not is_futures_symbol(sym):
@@ -983,7 +1034,7 @@ def check_expired_coming_soon_futures(
                     rule_id="E013",
                     severity="ERROR",
                     message=(
-                        f"COMING_SOON futures feed has expired"
+                        f"{state} futures feed has expired"
                         f" (latest validTo: {latest.isoformat()});"
                         f" change state to INACTIVE"
                     ),
@@ -1067,7 +1118,7 @@ def lint_config(config: dict, now: Optional[datetime] = None) -> list[LintFindin
     findings.extend(check_publishers(feeds, publishers))
     findings.extend(check_schedules(feeds))
     findings.extend(check_hermes_ids(feeds))
-    findings.extend(check_expired_coming_soon_futures(feeds, now))
+    findings.extend(check_expired_futures(feeds, now))
     findings.extend(check_benchmark_mapping(feeds))
     findings.extend(check_corporate_actions(feeds))
     findings.extend(check_identifier_continuity(feeds))
