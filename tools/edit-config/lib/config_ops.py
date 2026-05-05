@@ -264,3 +264,114 @@ class RemovePublisher:
                     break
 
         return changes, warnings
+
+
+def _resolve_min_pub_targets(
+    feed: dict,
+    session: str | None,
+) -> list[tuple[str, dict, str]]:
+    """Return list of (location, container, key) tuples.
+
+    `container` is the dict that holds the field; `key` is "minPublishers".
+    Used by SetMinPublishers and BumpMinPublishers.
+    """
+    feed_id = feed["feedId"]
+    targets: list[tuple[str, dict, str]] = []
+
+    if session is None:
+        targets.append(("top_level", feed, "minPublishers"))
+        if has_session_publishers(feed):
+            regular = get_session(feed, "REGULAR")
+            if regular is not None:
+                targets.append(("REGULAR", regular, "minPublishers"))
+    elif session == "NONE":
+        targets.append(("top_level", feed, "minPublishers"))
+    elif session == "ALL":
+        if not has_session_publishers(feed):
+            raise OpError(f"feed {feed_id}: session=ALL requires per-session lists")
+        targets.append(("top_level", feed, "minPublishers"))
+        for name in SESSION_NAMES:
+            sess = get_session(feed, name)
+            if sess and "allowedPublisherIds" in sess:
+                targets.append((name, sess, "minPublishers"))
+    elif session in SESSION_NAMES:
+        sess = get_session(feed, session)
+        if sess is None or "allowedPublisherIds" not in sess:
+            raise OpError(
+                f"feed {feed_id}: session {session!r} does not exist on this feed"
+            )
+        targets.append((session, sess, "minPublishers"))
+    else:
+        raise OpError(f"unknown session value: {session!r}")
+
+    return targets
+
+
+def _list_for_target(feed: dict, location: str) -> list[int]:
+    if location == "top_level":
+        return feed.get("allowedPublisherIds", [])
+    sess = get_session(feed, location)
+    return sess.get("allowedPublisherIds", []) if sess else []
+
+
+@dataclass
+class SetMinPublishers:
+    value: int
+    session: str | None = None
+
+    def apply(self, feed: dict) -> tuple[list[Change], list[Warning]]:
+        changes: list[Change] = []
+        warnings: list[Warning] = []
+        feed_id = feed["feedId"]
+        symbol = feed.get("symbol", "")
+        state = feed.get("state", "")
+
+        if self.value < 1:
+            raise OpError(f"minPublishers must be >= 1; got {self.value}")
+
+        targets = _resolve_min_pub_targets(feed, self.session)
+
+        for location, container, key in targets:
+            allowed = _list_for_target(feed, location)
+            if self.value > len(allowed):
+                raise OpError(
+                    f"feed {feed_id} {location}: minPublishers={self.value} "
+                    f"exceeds publisher count {len(allowed)} — unsatisfiable"
+                )
+            old = container.get(key)
+            if old == self.value:
+                continue
+            container[key] = self.value
+            changes.append(
+                Change(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    location=location,
+                    field="minPublishers",
+                    before=old,
+                    after=self.value,
+                )
+            )
+            if self.value >= len(allowed):
+                warnings.append(
+                    Warning(
+                        feed_id=feed_id,
+                        symbol=symbol,
+                        message=(
+                            f"feed {feed_id} {location}: minPublishers={self.value} "
+                            f"with {len(allowed)} publishers — no headroom"
+                        ),
+                    )
+                )
+            if self.value == 1 and state == "STABLE":
+                warnings.append(
+                    Warning(
+                        feed_id=feed_id,
+                        symbol=symbol,
+                        message=(
+                            f"feed {feed_id} {location}: minPublishers=1 on STABLE feed"
+                        ),
+                    )
+                )
+
+        return changes, warnings

@@ -247,3 +247,72 @@ class TestRemovePublisher:
         assert any(
             "top_level" in w.message or "headroom" in w.message.lower() for w in warns
         )
+
+
+from lib.config_ops import SetMinPublishers
+
+
+class TestSetMinPublishers:
+    def test_default_on_non_equity_writes_top_level(self, feeds):
+        feed = feed_by_id(feeds, 1)
+        op = SetMinPublishers(value=2)
+        changes, _ = op.apply(feed)
+        assert feed["minPublishers"] == 2
+        assert len(changes) == 1
+        assert changes[0].location == "top_level"
+        assert changes[0].field == "minPublishers"
+        assert changes[0].after == 2
+
+    def test_default_on_equity_writes_top_and_regular(self, feeds):
+        feed = feed_by_id(feeds, 922)
+        op = SetMinPublishers(value=4)
+        changes, _ = op.apply(feed)
+        assert feed["minPublishers"] == 4
+        assert get_session(feed, "REGULAR")["minPublishers"] == 4
+        assert get_session(feed, "PRE_MARKET")["minPublishers"] == 2  # untouched
+        locs = sorted(c.location for c in changes)
+        assert locs == ["REGULAR", "top_level"]
+
+    def test_explicit_session(self, feeds):
+        feed = feed_by_id(feeds, 922)
+        op = SetMinPublishers(value=3, session="PRE_MARKET")
+        changes, _ = op.apply(feed)
+        assert get_session(feed, "PRE_MARKET")["minPublishers"] == 3
+        assert feed["minPublishers"] == 1  # untouched
+        assert len(changes) == 1
+        assert changes[0].location == "PRE_MARKET"
+
+    def test_hard_error_when_value_exceeds_count(self, feeds):
+        feed = feed_by_id(feeds, 922)
+        # OVER_NIGHT has 3 publishers, set min=5 -> unsatisfiable
+        op = SetMinPublishers(value=5, session="OVER_NIGHT")
+        with pytest.raises(OpError, match="exceed"):
+            op.apply(feed)
+
+    def test_warning_at_floor(self, feeds):
+        feed = feed_by_id(feeds, 922)
+        # OVER_NIGHT has 3 publishers, set min=3 -> at-floor warning
+        op = SetMinPublishers(value=3, session="OVER_NIGHT")
+        changes, warns = op.apply(feed)
+        assert any("headroom" in w.message.lower() for w in warns)
+
+    def test_warning_when_one_on_stable(self, feeds):
+        feed = feed_by_id(feeds, 1)
+        op = SetMinPublishers(value=1)
+        changes, warns = op.apply(feed)
+        assert any("STABLE" in w.message and "1" in w.message for w in warns)
+
+    def test_noop_when_unchanged(self, feeds):
+        feed = feed_by_id(feeds, 1)
+        op = SetMinPublishers(value=3)  # already 3
+        changes, _ = op.apply(feed)
+        assert changes == []
+
+    def test_session_none_only_top_level(self, feeds):
+        feed = feed_by_id(feeds, 922)
+        op = SetMinPublishers(value=4, session="NONE")
+        changes, _ = op.apply(feed)
+        assert feed["minPublishers"] == 4
+        assert get_session(feed, "REGULAR")["minPublishers"] == 3  # untouched
+        assert len(changes) == 1
+        assert changes[0].location == "top_level"
