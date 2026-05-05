@@ -7,6 +7,7 @@
 **Architecture:** Surgical edits to `lib/config_lint.py` (rule logic), `tools/config-linter/config_linter.py` (CLI envelope), `tools/vscode-extension/src/linter.ts` (parser update), and `docs/config_linter.md` plus two superpowers docs (text fixes). Each task is independently testable and committable. Each task follows TDD: write a failing test first, run it to confirm failure, edit production code, run tests to confirm they pass, then commit.
 
 **Tech stack:**
+
 - Python 3.11+, pytest, stdlib-only linter (no external deps)
 - TypeScript / Node.js / Vitest for the VS Code extension
 - Run Python tests: `pytest tests/test_config_lint.py tests/test_config_linter_cli.py -v`
@@ -15,19 +16,20 @@
 
 **File map:**
 
-| File | Touched in | Responsibility |
-| --- | --- | --- |
-| `lib/config_lint.py` | Tasks 1, 2, 3, 4, 5 | Rule logic; pure functions returning `LintFinding` lists |
-| `tools/config-linter/config_linter.py` | Task 6 | CLI argparse, output formatting, envelope |
-| `tools/vscode-extension/src/linter.ts` | Task 6 | Subprocess driver and JSON parser for the extension |
-| `tools/vscode-extension/test/linter.test.ts` | Task 6 | Vitest fixtures for the extension parser |
-| `tests/test_config_lint.py` | Tasks 1, 2, 3, 4, 5 | Library unit tests, ~3000 lines, organized by `class TestCheckXNN` |
-| `tests/test_config_linter_cli.py` | Task 6 | CLI integration tests via `subprocess.run` |
-| `docs/config_linter.md` | Task 7 | User-facing rule reference |
-| `docs/superpowers/specs/2026-04-29-vscode-config-linter-extension-design.md` | Task 7 | Stale exit-code-2 claim |
-| `docs/superpowers/plans/2026-04-29-vscode-config-linter-extension-plan.md` | Task 7 | Stale exit-code-2 claim |
+| File                                                                         | Touched in          | Responsibility                                                     |
+| ---------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------ |
+| `lib/config_lint.py`                                                         | Tasks 1, 2, 3, 4, 5 | Rule logic; pure functions returning `LintFinding` lists           |
+| `tools/config-linter/config_linter.py`                                       | Task 6              | CLI argparse, output formatting, envelope                          |
+| `tools/vscode-extension/src/linter.ts`                                       | Task 6              | Subprocess driver and JSON parser for the extension                |
+| `tools/vscode-extension/test/linter.test.ts`                                 | Task 6              | Vitest fixtures for the extension parser                           |
+| `tests/test_config_lint.py`                                                  | Tasks 1, 2, 3, 4, 5 | Library unit tests, ~3000 lines, organized by `class TestCheckXNN` |
+| `tests/test_config_linter_cli.py`                                            | Task 6              | CLI integration tests via `subprocess.run`                         |
+| `docs/config_linter.md`                                                      | Task 7              | User-facing rule reference                                         |
+| `docs/superpowers/specs/2026-04-29-vscode-config-linter-extension-design.md` | Task 7              | Stale exit-code-2 claim                                            |
+| `docs/superpowers/plans/2026-04-29-vscode-config-linter-extension-plan.md`   | Task 7              | Stale exit-code-2 claim                                            |
 
 **Notes for the engineer:**
+
 - The linter is invoked via `python3 tools/config-linter/config_linter.py --config after.json`. There is no installed package; `lib/` is added to `sys.path` from the CLI script.
 - `LintFinding` is a dataclass at `lib/lint_finding.py` with fields `rule_id, severity, message, feed_id, symbol`.
 - Diff mode (`--baseline ...` / git auto-detect) compares findings by `(rule_id, feed_id, symbol)` and ignores message text. So changing E004's message in Task 1 is silently absorbed by diff-mode suppression — no spurious "new" findings on existing PRs.
@@ -41,6 +43,7 @@
 **Spec ref:** Item 1 in design doc.
 
 **Files:**
+
 - Modify: `lib/config_lint.py:251-263, 370-385` (top-level and session-level E004 emissions)
 - Test: `tests/test_config_lint.py` (add to `class TestCheckPublishers`)
 
@@ -205,6 +208,7 @@ level E004 emissions updated."
 When two STABLE feeds in the same group have two distinct schedules, today's code uses `Counter.most_common(1)` to pick a "reference" — but with a tie, that pick is non-deterministic dict-order. Fix: detect ties on the top count and emit one finding per feed with a "no consensus" message.
 
 **Files:**
+
 - Modify: `lib/config_lint.py:570-604` (the E011 emission block in `check_schedules`)
 - Modify: `tests/test_config_lint.py:986` (existing `test_e011_futures_same_root_disagree` asserts `len(errors) == 1`; under tie-mode it becomes 2)
 - Test: `tests/test_config_lint.py` (add to `class TestCheckE011ScheduleInconsistency`)
@@ -487,6 +491,7 @@ message."
 Today `check_expired_coming_soon_futures` only fires on `state == "COMING_SOON"`. Extend it to also fire on `state == "STABLE"` and branch the message by state. Rename the function to `check_expired_futures` so the name matches its scope.
 
 **Files:**
+
 - Modify: `lib/config_lint.py:951-995` (function body and rename)
 - Modify: `lib/config_lint.py:1070` (orchestrator call site)
 - Modify: `tests/test_config_lint.py:12, 1605-1692` (import + class with state-not-flagged test)
@@ -572,7 +577,7 @@ from lib.config_lint import (
 )
 ```
 
-Update the existing test at `tests/test_config_lint.py:1621` (`test_e013_stable_state_not_flagged`) — under the new behavior, STABLE expired IS flagged. Replace its body so it now checks the *non-expired* STABLE case (which is still silent):
+Update the existing test at `tests/test_config_lint.py:1621` (`test_e013_stable_state_not_flagged`) — under the new behavior, STABLE expired IS flagged. Replace its body so it now checks the _non-expired_ STABLE case (which is still silent):
 
 ```python
     def test_e013_stable_not_yet_expired(self):
@@ -717,6 +722,7 @@ pre-launch (COMING_SOON). INACTIVE feeds remain unaffected."
 Empirically, all 126 STABLE feeds with an OVER_NIGHT session in `after.json` already populate `benchmarkMapping`, so this is a tightening of an already-followed convention.
 
 **Files:**
+
 - Modify: `lib/config_lint.py:691-693` (delete the `if session_name == "OVER_NIGHT": continue`)
 - Modify: `tests/test_config_lint.py:538-547` (existing `test_e014_overnight_exempt` is now wrong)
 - Test: `tests/test_config_lint.py` (add to `class TestCheckE014BenchmarkMapping`)
@@ -894,6 +900,7 @@ Task 7."
 Today W003 short-circuits when `counts[majority] == 1`, so a bucket where every feed has a unique schedule produces no warning. Detect the no-consensus case and emit per-feed warnings.
 
 **Files:**
+
 - Modify: `lib/config_lint.py:606-637` (W003 emission block)
 - Test: `tests/test_config_lint.py` (add to `class TestCheckSchedules` near `test_w003_*`)
 
@@ -1087,6 +1094,7 @@ unchanged. Mirrors the option-c approach already applied to E011."
 The CLI's `--format json` currently emits a bare findings array. Wrap it in `{"findings": [...], "pre_existing_count": N | null}` so JSON consumers see the same diff-mode metadata that text consumers do. The VS Code extension is the only known JSON consumer and must be updated in lockstep.
 
 **Files:**
+
 - Modify: `tools/config-linter/config_linter.py:121-135` (`_format_json` function)
 - Modify: `tools/config-linter/config_linter.py:274-300` (`--output .json` path)
 - Modify: `tools/vscode-extension/src/linter.ts:85-102` (`runLinter` parser)
@@ -1257,61 +1265,61 @@ Expected: all CLI tests pass.
 Update `tools/vscode-extension/test/linter.test.ts` to test the new envelope shape. Replace the existing test at lines 33–63 (`it("parses linter JSON output into findings on exit code 0", ...)`) with:
 
 ```typescript
-  it("parses linter JSON envelope into findings on exit code 0", async () => {
-    const child = makeFakeChild();
-    mockSpawn.mockReturnValue(child as never);
+it("parses linter JSON envelope into findings on exit code 0", async () => {
+  const child = makeFakeChild();
+  mockSpawn.mockReturnValue(child as never);
 
-    const promise = runLinter({
-      pythonPath: "python3",
-      linterPath: "/repo/tools/config-linter/config_linter.py",
-      configPath: "/repo/2026-04-29-T123456-foo/after.json",
-      baselinePath: null,
-      timeoutMs: 5000,
-    });
-
-    // Linter now emits {"findings": [...], "pre_existing_count": N | null}.
-    const sample = JSON.stringify({
-      findings: [
-        {
-          rule_id: "E001",
-          severity: "ERROR",
-          message: "feedId 327 is duplicated",
-          feed_id: 327,
-          symbol: null,
-        },
-      ],
-      pre_existing_count: null,
-    });
-    child.stdout.emit("data", Buffer.from(sample));
-    child.emit("close", 0);
-
-    const result = await promise;
-    expect(result.error).toBeUndefined();
-    expect(result.findings).toHaveLength(1);
-    expect(result.findings[0].rule_id).toBe("E001");
-    expect(result.findings[0].feed_id).toBe(327);
+  const promise = runLinter({
+    pythonPath: "python3",
+    linterPath: "/repo/tools/config-linter/config_linter.py",
+    configPath: "/repo/2026-04-29-T123456-foo/after.json",
+    baselinePath: null,
+    timeoutMs: 5000,
   });
 
-  it("rejects bare-array stdout as parse_error (regression guard)", async () => {
-    const child = makeFakeChild();
-    mockSpawn.mockReturnValue(child as never);
-
-    const promise = runLinter({
-      pythonPath: "python3",
-      linterPath: "/repo/tools/config-linter/config_linter.py",
-      configPath: "/repo/2026-04-29-T123456-foo/after.json",
-      baselinePath: null,
-      timeoutMs: 5000,
-    });
-
-    // Old bare-array shape — no longer accepted.
-    child.stdout.emit("data", Buffer.from("[]"));
-    child.emit("close", 0);
-
-    const result = await promise;
-    expect(result.findings).toEqual([]);
-    expect(result.error?.kind).toBe("parse_error");
+  // Linter now emits {"findings": [...], "pre_existing_count": N | null}.
+  const sample = JSON.stringify({
+    findings: [
+      {
+        rule_id: "E001",
+        severity: "ERROR",
+        message: "feedId 327 is duplicated",
+        feed_id: 327,
+        symbol: null,
+      },
+    ],
+    pre_existing_count: null,
   });
+  child.stdout.emit("data", Buffer.from(sample));
+  child.emit("close", 0);
+
+  const result = await promise;
+  expect(result.error).toBeUndefined();
+  expect(result.findings).toHaveLength(1);
+  expect(result.findings[0].rule_id).toBe("E001");
+  expect(result.findings[0].feed_id).toBe(327);
+});
+
+it("rejects bare-array stdout as parse_error (regression guard)", async () => {
+  const child = makeFakeChild();
+  mockSpawn.mockReturnValue(child as never);
+
+  const promise = runLinter({
+    pythonPath: "python3",
+    linterPath: "/repo/tools/config-linter/config_linter.py",
+    configPath: "/repo/2026-04-29-T123456-foo/after.json",
+    baselinePath: null,
+    timeoutMs: 5000,
+  });
+
+  // Old bare-array shape — no longer accepted.
+  child.stdout.emit("data", Buffer.from("[]"));
+  child.emit("close", 0);
+
+  const result = await promise;
+  expect(result.findings).toEqual([]);
+  expect(result.error?.kind).toBe("parse_error");
+});
 ```
 
 - [ ] **Step 6: Run the extension test to confirm it fails**
@@ -1325,56 +1333,56 @@ Expected: both new tests FAIL — the parser still expects a bare array.
 In `tools/vscode-extension/src/linter.ts` find the `child.on("close", ...)` block at lines 85–102:
 
 ```typescript
-    child.on("close", () => {
-      // Linter exits 0 (clean) or 1 (errors and/or input failure).
-      try {
-        const parsed = JSON.parse(stdout);
-        if (Array.isArray(parsed)) {
-          settle({ findings: parsed as Finding[] });
-          return;
-        }
-      } catch {
-        // fall through
-      }
-      // Non-JSON output → prefer stderr presence over exit code for dispatch.
-      const error: LinterError =
-        stderr.trim().length > 0
-          ? { kind: "crashed", stderr: firstLine(stderr) }
-          : { kind: "parse_error", output: stdout.slice(0, 200) };
-      settle({ findings: [], error });
-    });
+child.on("close", () => {
+  // Linter exits 0 (clean) or 1 (errors and/or input failure).
+  try {
+    const parsed = JSON.parse(stdout);
+    if (Array.isArray(parsed)) {
+      settle({ findings: parsed as Finding[] });
+      return;
+    }
+  } catch {
+    // fall through
+  }
+  // Non-JSON output → prefer stderr presence over exit code for dispatch.
+  const error: LinterError =
+    stderr.trim().length > 0
+      ? { kind: "crashed", stderr: firstLine(stderr) }
+      : { kind: "parse_error", output: stdout.slice(0, 200) };
+  settle({ findings: [], error });
+});
 ```
 
 Replace with:
 
 ```typescript
-    child.on("close", () => {
-      // Linter exits 0 (clean) or 1 (errors and/or input failure).
-      // Stdout is a JSON envelope: {"findings": [...], "pre_existing_count": int | null}.
-      try {
-        const parsed = JSON.parse(stdout);
-        if (
-          parsed !== null &&
-          typeof parsed === "object" &&
-          !Array.isArray(parsed) &&
-          Array.isArray((parsed as { findings?: unknown }).findings)
-        ) {
-          settle({
-            findings: (parsed as { findings: Finding[] }).findings,
-          });
-          return;
-        }
-      } catch {
-        // fall through
-      }
-      // Non-JSON or bare-array output → prefer stderr presence over exit
-      // code for dispatch.
-      const error: LinterError =
-        stderr.trim().length > 0
-          ? { kind: "crashed", stderr: firstLine(stderr) }
-          : { kind: "parse_error", output: stdout.slice(0, 200) };
-      settle({ findings: [], error });
-    });
+child.on("close", () => {
+  // Linter exits 0 (clean) or 1 (errors and/or input failure).
+  // Stdout is a JSON envelope: {"findings": [...], "pre_existing_count": int | null}.
+  try {
+    const parsed = JSON.parse(stdout);
+    if (
+      parsed !== null &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed) &&
+      Array.isArray((parsed as { findings?: unknown }).findings)
+    ) {
+      settle({
+        findings: (parsed as { findings: Finding[] }).findings,
+      });
+      return;
+    }
+  } catch {
+    // fall through
+  }
+  // Non-JSON or bare-array output → prefer stderr presence over exit
+  // code for dispatch.
+  const error: LinterError =
+    stderr.trim().length > 0
+      ? { kind: "crashed", stderr: firstLine(stderr) }
+      : { kind: "parse_error", output: stdout.slice(0, 200) };
+  settle({ findings: [], error });
+});
 ```
 
 - [ ] **Step 8: Run extension tests to confirm everything passes**
@@ -1415,6 +1423,7 @@ VS Code extension parser updated in lockstep to read response.findings."
 **Spec ref:** Items 3, 4, 7 (the doc bits) in design doc.
 
 **Files:**
+
 - Modify: `docs/config_linter.md:173-179` (E013 / E014 notes)
 - Modify: `docs/superpowers/specs/2026-04-29-vscode-config-linter-extension-design.md:86`
 - Modify: `docs/superpowers/plans/2026-04-29-vscode-config-linter-extension-plan.md:893`
@@ -1444,13 +1453,13 @@ The message text branches on state (`STABLE futures feed has expired...` vs `COM
 Also update the rule-table row at line 122:
 
 ```markdown
-| E013 | COMING_SOON futures past every `validTo`                                                              | COMING_SOON futures only                                                      |
+| E013 | COMING_SOON futures past every `validTo` | COMING_SOON futures only |
 ```
 
 becomes:
 
 ```markdown
-| E013 | STABLE or COMING_SOON futures past every `validTo`                                                    | STABLE + COMING_SOON futures                                                  |
+| E013 | STABLE or COMING_SOON futures past every `validTo` | STABLE + COMING_SOON futures |
 ```
 
 - [ ] **Step 2: Update the E014 note in `docs/config_linter.md`**
@@ -1474,13 +1483,13 @@ Benchmarkable asset types are: `equity`, `fx`, `metal`, `commodity`, `rates`. Al
 Also update the rule-table row at line 123:
 
 ```markdown
-| E014 | STABLE benchmarkable feed missing `benchmarkMapping`                                                  | STABLE, benchmarkable asset types, non-OVERNIGHT                              |
+| E014 | STABLE benchmarkable feed missing `benchmarkMapping` | STABLE, benchmarkable asset types, non-OVERNIGHT |
 ```
 
 becomes:
 
 ```markdown
-| E014 | STABLE benchmarkable feed missing `benchmarkMapping`                                                  | STABLE, benchmarkable asset types, all sessions                               |
+| E014 | STABLE benchmarkable feed missing `benchmarkMapping` | STABLE, benchmarkable asset types, all sessions |
 ```
 
 - [ ] **Step 3: Update the VS Code extension design doc — exit-code-2 claim**

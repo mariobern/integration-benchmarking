@@ -16,15 +16,15 @@ extend scope, or refine logic on rules that already exist.
 
 ## Scope summary
 
-| Item | Type   | Affects                                                         |
-| ---- | ------ | --------------------------------------------------------------- |
-| 1    | Logic  | E004 message text                                               |
-| 2    | Logic  | E011 ambiguous-tie handling                                     |
-| 3    | Logic  | E013 expand to STABLE expired futures                           |
-| 4    | Logic  | E014 lift OVER_NIGHT exemption                                  |
-| 5    | Logic  | W003 fire when no majority exists                               |
-| 6    | Output | `--format json` envelope to include `pre_existing_count`        |
-| 7    | Docs   | VS Code extension spec/plan: remove stale "exit code 2" claim   |
+| Item | Type   | Affects                                                       |
+| ---- | ------ | ------------------------------------------------------------- |
+| 1    | Logic  | E004 message text                                             |
+| 2    | Logic  | E011 ambiguous-tie handling                                   |
+| 3    | Logic  | E013 expand to STABLE expired futures                         |
+| 4    | Logic  | E014 lift OVER_NIGHT exemption                                |
+| 5    | Logic  | W003 fire when no majority exists                             |
+| 6    | Output | `--format json` envelope to include `pre_existing_count`      |
+| 7    | Docs   | VS Code extension spec/plan: remove stale "exit code 2" claim |
 
 E017/E018 are already documented in `docs/config_linter.md` (lines
 126–127); no doc change needed there.
@@ -84,10 +84,10 @@ rely on.
 `validTo` is in the past. Scope stays futures-only (`is_futures_symbol`
 guard retained); the rule branches the message by state.
 
-| State        | Message                                                                             |
-| ------------ | ----------------------------------------------------------------------------------- |
-| COMING_SOON  | `COMING_SOON futures feed has expired (latest validTo: {ts}); change state to INACTIVE` |
-| STABLE       | `STABLE futures feed has expired (latest validTo: {ts}); change state to INACTIVE`  |
+| State       | Message                                                                                 |
+| ----------- | --------------------------------------------------------------------------------------- |
+| COMING_SOON | `COMING_SOON futures feed has expired (latest validTo: {ts}); change state to INACTIVE` |
+| STABLE      | `STABLE futures feed has expired (latest validTo: {ts}); change state to INACTIVE`      |
 
 Same rule ID, same severity (ERROR). The "more critical" framing for
 STABLE comes through in the message and PR-review attention rather
@@ -223,20 +223,20 @@ spawn failure, or unparseable input)". No CLI change.
 Each item lands with focused unit tests in `tests/test_config_lint.py`
 (library) and `tests/test_config_linter_cli.py` (CLI envelope):
 
-| Item | Tests                                                                  |
-| ---- | ---------------------------------------------------------------------- |
-| 1    | E004 message text matches new wording at top-level and session-level   |
-| 2    | E011 emits per-feed findings on 2-feed-2-schedule bucket               |
-| 2    | E011 keeps current per-minority behavior when one schedule dominates    |
-| 3    | E013 fires on STABLE expired futures with state-tagged message         |
-| 3    | E013 keeps existing COMING_SOON behavior unchanged                     |
-| 4    | E014 fires on STABLE benchmarkable feed with empty OVER_NIGHT mapping  |
+| Item | Tests                                                                         |
+| ---- | ----------------------------------------------------------------------------- |
+| 1    | E004 message text matches new wording at top-level and session-level          |
+| 2    | E011 emits per-feed findings on 2-feed-2-schedule bucket                      |
+| 2    | E011 keeps current per-minority behavior when one schedule dominates          |
+| 3    | E013 fires on STABLE expired futures with state-tagged message                |
+| 3    | E013 keeps existing COMING_SOON behavior unchanged                            |
+| 4    | E014 fires on STABLE benchmarkable feed with empty OVER_NIGHT mapping         |
 | 4    | E014 silent on STABLE feed where every session (incl. OVER_NIGHT) has mapping |
-| 5    | W003 emits one finding per feed when bucket has no majority            |
-| 5    | W003 keeps current behavior when one schedule has clear majority       |
-| 6    | `--format json` includes `pre_existing_count` in diff mode             |
-| 6    | `--format json` omits or nulls `pre_existing_count` outside diff mode  |
-| 6    | VS Code extension parser reads `response.findings`                     |
+| 5    | W003 emits one finding per feed when bucket has no majority                   |
+| 5    | W003 keeps current behavior when one schedule has clear majority              |
+| 6    | `--format json` includes `pre_existing_count` in diff mode                    |
+| 6    | `--format json` omits or nulls `pre_existing_count` outside diff mode         |
+| 6    | VS Code extension parser reads `response.findings`                            |
 
 Diff-mode regression: re-run the linter against current `after.json`
 in diff mode against `origin/main` and confirm no new findings appear
