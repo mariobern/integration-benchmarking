@@ -86,3 +86,86 @@ def find_feed_block(raw: str, feed_id: int) -> tuple[int, int] | None:
     if close_idx is None:
         return None
     return (pos, close_idx + 1)
+
+
+def find_session_block(feed_block: str, session_name: str) -> tuple[int, int] | None:
+    """Locate the {…} of the session entry with the given name.
+
+    `feed_block` is the raw text of a single feed object (as returned
+    by find_feed_block). Returns bounds relative to `feed_block`.
+    """
+    pattern = re.compile(rf'"session":\s*"{re.escape(session_name)}"')
+    match = pattern.search(feed_block)
+    if match is None:
+        return None
+
+    # Start one char before match.start() so the opening '"' of "session"
+    # doesn't toggle in_string=True at the start of the backward walk.
+    pos = match.start() - 1
+    depth = 0
+    in_string = False
+    while pos >= 0:
+        c = feed_block[pos]
+        if in_string:
+            if c == '"' and (pos == 0 or feed_block[pos - 1] != "\\"):
+                in_string = False
+            pos -= 1
+            continue
+        if c == '"':
+            in_string = True
+        elif c == "}":
+            depth += 1
+        elif c == "{":
+            if depth == 0:
+                break
+            depth -= 1
+        pos -= 1
+
+    if pos < 0:
+        return None
+    close_idx = find_matching_close(feed_block, pos)
+    if close_idx is None:
+        return None
+    return (pos, close_idx + 1)
+
+
+def find_publisher_array_span(block: str) -> tuple[int, int] | None:
+    """Locate the [ … ] value of `allowedPublisherIds` within `block`.
+
+    Returns (start, end) where start points at `[` and end is one past
+    the closing `]`. None if the field is absent.
+    """
+    match = re.search(r'"allowedPublisherIds":\s*\[', block)
+    if match is None:
+        return None
+    open_idx = match.end() - 1  # position of '['
+    close_idx = find_matching_close(block, open_idx)
+    if close_idx is None:
+        return None
+    return (open_idx, close_idx + 1)
+
+
+def find_int_field_span(block: str, key: str) -> tuple[int, int] | None:
+    """Locate the integer value of `"key": N` within `block`.
+
+    Returns the byte span of the digit characters only (no surrounding
+    whitespace, no comma). None if missing.
+    """
+    pattern = re.compile(rf'"{re.escape(key)}":\s*(-?\d+)')
+    match = pattern.search(block)
+    if match is None:
+        return None
+    return (match.start(1), match.end(1))
+
+
+def find_string_field_span(block: str, key: str) -> tuple[int, int] | None:
+    """Locate the quoted string value of `"key": "..."` within `block`.
+
+    Returns the byte span INCLUDING the surrounding double quotes.
+    None if missing.
+    """
+    pattern = re.compile(rf'"{re.escape(key)}":\s*("[^"\\]*(?:\\.[^"\\]*)*")')
+    match = pattern.search(block)
+    if match is None:
+        return None
+    return (match.start(1), match.end(1))
