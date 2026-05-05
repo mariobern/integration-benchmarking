@@ -39,7 +39,7 @@
         "lazerConfigLinter.lintOnSave": {
           "type": "boolean",
           "default": true,
-          "description": "Master switch \u2014 set to false to disable the extension without uninstalling."
+          "description": "Master switch — set to false to disable the extension without uninstalling."
         }
       }
     }
