@@ -73,3 +73,115 @@ class TestResolveTargets:
         f = FilterSet(feed_ids={922, 5000}, states={"STABLE"})
         result = resolve_targets(f, feeds)
         assert [x["feedId"] for x in result] == [922]
+
+
+import argparse
+
+from lib.config_editor import PlannedOp, build_op_from_args
+from lib.config_ops import (
+    AddPublisher,
+    RemovePublisher,
+    SetMinPublishers,
+    BumpMinPublishers,
+    SetState,
+)
+
+
+def make_args(**kwargs) -> argparse.Namespace:
+    defaults = dict(
+        add_publisher=None,
+        remove_publisher=None,
+        set_min_publishers=None,
+        bump_min_publishers=None,
+        set_state=None,
+        from_spec=None,
+        feed_id=None,
+        feed_ids_from=None,
+        symbol_pattern=None,
+        asset_class=None,
+        state=None,
+        session=None,
+    )
+    defaults.update(kwargs)
+    return argparse.Namespace(**defaults)
+
+
+class TestBuildOpFromArgs:
+    def test_add_publisher(self):
+        args = make_args(add_publisher=80, feed_id="100-105", session="REGULAR")
+        ops = build_op_from_args(args)
+        assert len(ops) == 1
+        op, filters = ops[0].op, ops[0].filters
+        assert isinstance(op, AddPublisher)
+        assert op.publisher_id == 80
+        assert op.session == "REGULAR"
+        assert filters.feed_ids == {100, 101, 102, 103, 104, 105}
+
+    def test_remove_publisher_default_session(self):
+        args = make_args(remove_publisher=22, feed_id="922")
+        ops = build_op_from_args(args)
+        assert isinstance(ops[0].op, RemovePublisher)
+        assert ops[0].op.session is None
+
+    def test_set_min_publishers(self):
+        args = make_args(set_min_publishers=3, feed_id="922", session="REGULAR")
+        ops = build_op_from_args(args)
+        assert isinstance(ops[0].op, SetMinPublishers)
+        assert ops[0].op.value == 3
+
+    def test_bump_min_publishers_signed(self):
+        args = make_args(bump_min_publishers="+1", feed_id="922")
+        ops = build_op_from_args(args)
+        assert isinstance(ops[0].op, BumpMinPublishers)
+        assert ops[0].op.delta == 1
+
+        args2 = make_args(bump_min_publishers="-2", feed_id="922")
+        ops2 = build_op_from_args(args2)
+        assert ops2[0].op.delta == -2
+
+    def test_set_state(self):
+        args = make_args(set_state="COMING_SOON", feed_id="500,501")
+        ops = build_op_from_args(args)
+        assert isinstance(ops[0].op, SetState)
+        assert ops[0].op.value == "COMING_SOON"
+
+    def test_no_op_flag_raises(self):
+        args = make_args(feed_id="1")
+        with pytest.raises(ValueError, match="no operation"):
+            build_op_from_args(args)
+
+    def test_multiple_op_flags_raises(self):
+        args = make_args(add_publisher=1, remove_publisher=2, feed_id="1")
+        with pytest.raises(ValueError, match="exactly one"):
+            build_op_from_args(args)
+
+    def test_no_targeting_raises(self):
+        args = make_args(add_publisher=80)
+        with pytest.raises(ValueError, match="at least one"):
+            build_op_from_args(args)
+
+    def test_state_filter_value(self):
+        args = make_args(add_publisher=80, asset_class="equity", state="STABLE")
+        ops = build_op_from_args(args)
+        assert ops[0].filters.states == {"STABLE"}
+
+    def test_feed_id_with_ranges(self):
+        args = make_args(add_publisher=80, feed_id="100-200,205,208,3530-3540")
+        ops = build_op_from_args(args)
+        ids = ops[0].filters.feed_ids
+        assert 100 in ids and 200 in ids and 205 in ids and 3540 in ids
+        assert 201 not in ids and 209 not in ids
+
+    def test_feed_ids_from_file(self, tmp_path):
+        f = tmp_path / "ids.txt"
+        f.write_text("1,2,3\n100-102", encoding="utf-8")
+        args = make_args(add_publisher=80, feed_ids_from=str(f))
+        ops = build_op_from_args(args)
+        assert ops[0].filters.feed_ids == {1, 2, 3, 100, 101, 102}
+
+    def test_feed_id_and_feed_ids_from_unioned(self, tmp_path):
+        f = tmp_path / "ids.txt"
+        f.write_text("100", encoding="utf-8")
+        args = make_args(add_publisher=80, feed_id="1,2", feed_ids_from=str(f))
+        ops = build_op_from_args(args)
+        assert ops[0].filters.feed_ids == {1, 2, 100}

@@ -37,3 +37,92 @@ class FilterSet:
 def resolve_targets(filters: FilterSet, feeds: list[dict]) -> list[dict]:
     """Return the subset of feeds matching all filters (AND)."""
     return [f for f in feeds if filters.matches(f)]
+
+
+from typing import Any
+
+from lib.config_ops import (
+    AddPublisher,
+    RemovePublisher,
+    SetMinPublishers,
+    BumpMinPublishers,
+    SetState,
+)
+from lib.config_selector import parse_selector_text, read_selector_file
+
+
+@dataclass
+class PlannedOp:
+    op: Any  # one of the operation classes
+    filters: FilterSet
+
+
+_OP_FLAGS = (
+    "add_publisher",
+    "remove_publisher",
+    "set_min_publishers",
+    "bump_min_publishers",
+    "set_state",
+)
+
+
+def _build_filters_from_args(args) -> FilterSet:
+    feed_ids: set[int] | None = None
+    if args.feed_id:
+        feed_ids = parse_selector_text(args.feed_id)
+    if args.feed_ids_from:
+        from_file = read_selector_file(args.feed_ids_from)
+        feed_ids = (feed_ids or set()) | from_file
+    states = {args.state} if args.state else None
+    f = FilterSet(
+        feed_ids=feed_ids,
+        symbol_pattern=args.symbol_pattern,
+        asset_class=args.asset_class,
+        states=states,
+    )
+    f.validate()
+    return f
+
+
+def _parse_signed_int(s: str) -> int:
+    if not s:
+        raise ValueError(f"empty bump value")
+    if s[0] not in "+-" and not s.isdigit():
+        raise ValueError(f"bump must be signed integer (+1 / -2); got {s!r}")
+    return int(s)
+
+
+def build_op_from_args(args) -> list[PlannedOp]:
+    """Build a single-element PlannedOp list from argparse Namespace.
+
+    Raises ValueError on missing/multiple operation flags, missing
+    targeting, etc.
+    """
+    selected = [name for name in _OP_FLAGS if getattr(args, name) is not None]
+    if not selected:
+        raise ValueError(
+            "no operation specified (use one of --add-publisher, "
+            "--remove-publisher, --set-min-publishers, "
+            "--bump-min-publishers, --set-state)"
+        )
+    if len(selected) > 1:
+        raise ValueError(f"exactly one operation flag allowed; got {selected}")
+
+    name = selected[0]
+    filters = _build_filters_from_args(args)
+
+    if name == "add_publisher":
+        op = AddPublisher(publisher_id=args.add_publisher, session=args.session)
+    elif name == "remove_publisher":
+        op = RemovePublisher(publisher_id=args.remove_publisher, session=args.session)
+    elif name == "set_min_publishers":
+        op = SetMinPublishers(value=args.set_min_publishers, session=args.session)
+    elif name == "bump_min_publishers":
+        delta = _parse_signed_int(args.bump_min_publishers)
+        op = BumpMinPublishers(delta=delta, session=args.session)
+    elif name == "set_state":
+        op = SetState(value=args.set_state)
+    else:
+        raise AssertionError(f"unhandled op {name}")
+
+    return [PlannedOp(op=op, filters=filters)]
