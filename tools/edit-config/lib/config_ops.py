@@ -375,3 +375,64 @@ class SetMinPublishers:
                 )
 
         return changes, warnings
+
+
+@dataclass
+class BumpMinPublishers:
+    delta: int
+    session: str | None = None
+
+    def apply(self, feed: dict) -> tuple[list[Change], list[Warning]]:
+        changes: list[Change] = []
+        warnings: list[Warning] = []
+        feed_id = feed["feedId"]
+        symbol = feed.get("symbol", "")
+        state = feed.get("state", "")
+
+        targets = _resolve_min_pub_targets(feed, self.session)
+
+        for location, container, key in targets:
+            allowed = _list_for_target(feed, location)
+            old = container.get(key, 0)
+            new = max(1, old + self.delta)
+            if new > len(allowed):
+                raise OpError(
+                    f"feed {feed_id} {location}: bumped minPublishers={new} "
+                    f"exceeds publisher count {len(allowed)} — unsatisfiable"
+                )
+            if new == old:
+                continue
+            container[key] = new
+            changes.append(
+                Change(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    location=location,
+                    field="minPublishers",
+                    before=old,
+                    after=new,
+                )
+            )
+            if new >= len(allowed):
+                warnings.append(
+                    Warning(
+                        feed_id=feed_id,
+                        symbol=symbol,
+                        message=(
+                            f"feed {feed_id} {location}: minPublishers={new} "
+                            f"with {len(allowed)} publishers — no headroom"
+                        ),
+                    )
+                )
+            if new == 1 and state == "STABLE":
+                warnings.append(
+                    Warning(
+                        feed_id=feed_id,
+                        symbol=symbol,
+                        message=(
+                            f"feed {feed_id} {location}: minPublishers=1 on STABLE feed"
+                        ),
+                    )
+                )
+
+        return changes, warnings

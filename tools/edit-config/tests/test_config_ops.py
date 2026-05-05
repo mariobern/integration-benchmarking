@@ -316,3 +316,41 @@ class TestSetMinPublishers:
         assert get_session(feed, "REGULAR")["minPublishers"] == 3  # untouched
         assert len(changes) == 1
         assert changes[0].location == "top_level"
+
+
+from lib.config_ops import BumpMinPublishers
+
+
+class TestBumpMinPublishers:
+    def test_bump_up(self, feeds):
+        feed = feed_by_id(feeds, 1)  # min=3
+        op = BumpMinPublishers(delta=+1)
+        changes, _ = op.apply(feed)
+        assert feed["minPublishers"] == 4
+        assert changes[0].before == 3 and changes[0].after == 4
+
+    def test_bump_down(self, feeds):
+        feed = feed_by_id(feeds, 1)  # min=3
+        op = BumpMinPublishers(delta=-1)
+        changes, _ = op.apply(feed)
+        assert feed["minPublishers"] == 2
+
+    def test_clamped_at_one(self, feeds):
+        feed = feed_by_id(feeds, 6000)  # min=1
+        op = BumpMinPublishers(delta=-5)
+        changes, _ = op.apply(feed)
+        assert feed["minPublishers"] == 1
+        assert changes == []  # NOOP since value didn't change
+
+    def test_zero_delta_is_noop(self, feeds):
+        feed = feed_by_id(feeds, 1)
+        op = BumpMinPublishers(delta=0)
+        changes, _ = op.apply(feed)
+        assert changes == []
+
+    def test_hard_error_when_exceeding_count(self, feeds):
+        feed = feed_by_id(feeds, 922)
+        # OVER_NIGHT min=2, count=3. Bump +2 -> 4 -> exceeds.
+        op = BumpMinPublishers(delta=+2, session="OVER_NIGHT")
+        with pytest.raises(OpError, match="exceed"):
+            op.apply(feed)
