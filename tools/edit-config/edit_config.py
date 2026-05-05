@@ -19,7 +19,6 @@ from edit_config_lib.config_editor import (  # noqa: E402
     apply_changes,
     build_op_from_args,
     parse_yaml_spec,
-    run_linter,
     simulate_plan,
     write_with_backup,
 )
@@ -85,7 +84,6 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--apply", action="store_true", help="Write changes")
     p.add_argument("--show-full-diff", action="store_true")
-    p.add_argument("--no-lint", action="store_true")
     p.add_argument("--no-backup", action="store_true")
     return p
 
@@ -172,16 +170,6 @@ def main(argv: list[str] | None = None) -> int:
     if not args.no_backup:
         print(f"Backup written: {config_path}.bak")
     print(f"Wrote {len(result.changes)} changes to {config_path}.")
-
-    if not args.no_lint:
-        print(f"Running config-linter on {config_path}...")
-        rc, out = run_linter(str(config_path))
-        if out.strip():
-            print(out.strip())
-        if rc == 0:
-            print("Lint: clean.")
-        else:
-            print(f"Lint: rc={rc} (informational; no rollback).")
 
     return 0
 

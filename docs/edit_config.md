@@ -51,8 +51,14 @@ Defaults: top-level + REGULAR for equity feeds with sessions; top-level only for
 | `--dry-run`        | yes     | Show plan + diff; do not write      |
 | `--apply`          | no      | Required to write                   |
 | `--show-full-diff` | no      | Don't truncate the diff at 40 hunks |
-| `--no-lint`        | no      | Skip post-apply config-linter run   |
 | `--no-backup`      | no      | Skip `.bak` write                   |
+
+`edit_config.py` does not run the config-linter. Run it separately when you
+want a post-edit sanity check:
+
+```bash
+python3 tools/config-linter/config_linter.py --config after.json
+```
 
 ### Exit codes
 

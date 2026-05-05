@@ -57,7 +57,6 @@ class TestCli:
                 "--feed-id",
                 "1",
                 "--apply",
-                "--no-lint",
             ]
         )
         assert result.returncode == 0, result.stderr
@@ -75,7 +74,6 @@ class TestCli:
                 "--feed-id",
                 "1",
                 "--apply",
-                "--no-lint",
             ]
         )
         bak = config_copy.parent / "after.json.bak"
@@ -93,7 +91,6 @@ class TestCli:
                 "--feed-id",
                 "1",
                 "--apply",
-                "--no-lint",
                 "--no-backup",
             ]
         )
@@ -123,7 +120,6 @@ class TestCli:
                 "--feed-id",
                 "1",
                 "--apply",
-                "--no-lint",
             ]
         )
         assert result.returncode == 0
@@ -145,7 +141,6 @@ class TestCli:
                 "--from-spec",
                 str(spec),
                 "--apply",
-                "--no-lint",
             ]
         )
         assert result.returncode == 0, result.stderr
@@ -165,7 +160,6 @@ class TestCli:
                 "--feed-ids-from",
                 str(ids_file),
                 "--apply",
-                "--no-lint",
             ]
         )
         assert result.returncode == 0, result.stderr
@@ -222,9 +216,9 @@ class TestCliInProcess:
         assert "[DRY RUN]" in out
         assert "@@ feedId 1" in out
 
-    def test_apply_with_lint(self, config_copy, capsys):
-        # Default --apply path runs the linter on real config-linter; that's fine
-        # because after_sample.json is small and the linter exits in a few ms.
+    def test_apply_does_not_run_linter(self, config_copy, capsys):
+        # The linter is intentionally NOT auto-run after --apply; users
+        # invoke tools/config-linter/config_linter.py separately.
         m = self._import_main()
         rc = m.main(
             [
@@ -240,7 +234,8 @@ class TestCliInProcess:
         out = capsys.readouterr().out
         assert rc == 0
         assert "Backup written" in out
-        assert "Lint:" in out
+        assert "Lint:" not in out
+        assert "config-linter" not in out
 
     def test_apply_no_changes(self, config_copy, capsys):
         # Adding publisher 1 to feed 1 (already present) yields no changes.
@@ -254,7 +249,6 @@ class TestCliInProcess:
                 "--feed-id",
                 "1",
                 "--apply",
-                "--no-lint",
             ]
         )
         out = capsys.readouterr().out
@@ -273,7 +267,6 @@ class TestCliInProcess:
                 "--feed-id",
                 "99999",
                 "--apply",
-                "--no-lint",
             ]
         )
         err = capsys.readouterr().err
