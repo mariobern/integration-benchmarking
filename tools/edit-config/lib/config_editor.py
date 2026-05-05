@@ -423,3 +423,40 @@ def apply_changes(raw: str, changes: list[Change]) -> str:
         raw = raw[:start] + new_block + raw[end:]
 
     return raw
+
+
+import shutil
+import subprocess
+from pathlib import Path
+
+
+_LINTER_PATH = str(
+    Path(__file__).resolve().parents[3] / "tools" / "config-linter" / "config_linter.py"
+)
+
+
+def write_with_backup(path: str, new_text: str, no_backup: bool = False) -> None:
+    """Write `new_text` to `path`, optionally writing a `.bak` copy first."""
+    target = Path(path)
+    if not no_backup:
+        backup = target.with_suffix(target.suffix + ".bak")
+        if target.exists():
+            shutil.copy2(target, backup)
+    target.write_text(new_text, encoding="utf-8")
+
+
+def run_linter(config_path: str) -> tuple[int, str]:
+    """Run tools/config-linter on `config_path`. Returns (rc, output)."""
+    if not Path(_LINTER_PATH).exists():
+        return 1, f"linter script not found at {_LINTER_PATH}"
+    try:
+        proc = subprocess.run(
+            ["python3", _LINTER_PATH, "--config", config_path],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        return 1, "linter timed out"
+    return proc.returncode, proc.stdout + proc.stderr

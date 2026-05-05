@@ -543,3 +543,54 @@ class TestApplyChanges:
 
     def test_empty_changes_is_identity(self):
         assert apply_changes(self.raw, []) == self.raw
+
+
+import shutil
+
+from lib.config_editor import write_with_backup, run_linter
+
+
+class TestWriteWithBackup:
+    def test_writes_backup_and_new_content(self, tmp_path):
+        target = tmp_path / "after.json"
+        target.write_text("ORIGINAL", encoding="utf-8")
+        write_with_backup(str(target), "MODIFIED")
+        assert target.read_text() == "MODIFIED"
+        assert (tmp_path / "after.json.bak").read_text() == "ORIGINAL"
+
+    def test_skip_backup_flag(self, tmp_path):
+        target = tmp_path / "after.json"
+        target.write_text("ORIGINAL", encoding="utf-8")
+        write_with_backup(str(target), "MODIFIED", no_backup=True)
+        assert target.read_text() == "MODIFIED"
+        assert not (tmp_path / "after.json.bak").exists()
+
+    def test_overwrites_prior_backup(self, tmp_path):
+        target = tmp_path / "after.json"
+        target.write_text("ORIGINAL", encoding="utf-8")
+        (tmp_path / "after.json.bak").write_text("STALE_BACKUP", encoding="utf-8")
+        write_with_backup(str(target), "MODIFIED")
+        assert (tmp_path / "after.json.bak").read_text() == "ORIGINAL"
+
+
+class TestRunLinter:
+    def test_runs_existing_linter_on_fixture(self, tmp_path):
+        # Copy the fixture so we don't run on the real after.json
+        src = FIXTURE_PATH
+        dst = tmp_path / "after.json"
+        shutil.copy(src, dst)
+        rc, output = run_linter(str(dst))
+        assert isinstance(rc, int)
+        assert isinstance(output, str)
+
+    def test_handles_missing_linter_gracefully(self, monkeypatch, tmp_path):
+        # Point at a non-existent linter path; expect a non-zero rc and
+        # a clear "not found" message rather than a crash.
+        from lib import config_editor
+
+        monkeypatch.setattr(config_editor, "_LINTER_PATH", "/does/not/exist.py")
+        target = tmp_path / "after.json"
+        shutil.copy(FIXTURE_PATH, target)
+        rc, output = run_linter(str(target))
+        assert rc != 0
+        assert "linter" in output.lower() or "not found" in output.lower()
