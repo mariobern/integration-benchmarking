@@ -570,7 +570,8 @@ class TestCheckE014BenchmarkMapping:
         assert len(errors) == 1
         assert "REGULAR" in errors[0].message
 
-    def test_e014_overnight_exempt(self):
+    def test_e014_overnight_missing_bm_flagged(self):
+        """OVER_NIGHT must now be checked like every other session."""
         feed = _make_feed(
             1,
             symbol="Equity.US.AAPL/USD",
@@ -579,7 +580,39 @@ class TestCheckE014BenchmarkMapping:
             schedules=[_schedule_without_bm("OVER_NIGHT")],
         )
         findings = check_benchmark_mapping([feed])
+        errors = [f for f in findings if f.rule_id == "E014"]
+        assert len(errors) == 1
+        assert "OVER_NIGHT" in errors[0].message
+
+    def test_e014_overnight_with_bm_silent(self):
+        """OVER_NIGHT with benchmarkMapping populated must not fire."""
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.AAPL/USD",
+            state="STABLE",
+            asset_type="equity",
+            schedules=[_schedule_with_bm("OVER_NIGHT")],
+        )
+        findings = check_benchmark_mapping([feed])
         assert findings == []
+
+    def test_e014_all_four_equity_sessions_missing_bm_emits_four(self):
+        """All four sessions of a STABLE US equity missing bm → 4 findings."""
+        sessions = ["REGULAR", "PRE_MARKET", "POST_MARKET", "OVER_NIGHT"]
+        feed = _make_feed(
+            1,
+            symbol="Equity.US.AAPL/USD",
+            state="STABLE",
+            asset_type="equity",
+            schedules=[_schedule_without_bm(s) for s in sessions],
+        )
+        findings = check_benchmark_mapping([feed])
+        errors = [f for f in findings if f.rule_id == "E014"]
+        flagged_sessions = sorted(
+            session for session in sessions if any(session in f.message for f in errors)
+        )
+        assert flagged_sessions == sorted(sessions)
+        assert len(errors) == 4
 
     def test_e014_coming_soon_skipped(self):
         feed = _make_feed(
