@@ -119,8 +119,8 @@ In diff mode, exit code reflects only **new** findings. Pre-existing findings ne
 | E010 | Duplicate session in `marketSchedules`                                                                | non-INACTIVE                                                                  |
 | E011 | Schedule inconsistency within asset group                                                             | STABLE only, grouped by `(asset_type, equity_listing_prefix?, futures_root?)` |
 | E012 | Duplicate `metadata.hermes_id`                                                                        | non-INACTIVE                                                                  |
-| E013 | COMING_SOON futures past every `validTo`                                                              | COMING_SOON futures only                                                      |
-| E014 | STABLE benchmarkable feed missing `benchmarkMapping`                                                  | STABLE, benchmarkable asset types, non-OVERNIGHT                              |
+| E013 | STABLE or COMING_SOON futures past every `validTo`                                                    | STABLE + COMING_SOON futures                                                  |
+| E014 | STABLE benchmarkable feed missing `benchmarkMapping`                                                  | STABLE, benchmarkable asset types, all sessions                               |
 | E015 | `corporateActions` schema violation (missing fields, invalid formats)                                 | any feed with `corporateActions`                                              |
 | E016 | Identifier date range overlap within same vendor/session                                              | non-INACTIVE, 2+ identifiers per vendor                                       |
 | E017 | Duplicate `publisherId` in publishers array                                                           | publishers array                                                              |
@@ -170,13 +170,15 @@ Single-source asset types where `minPublishers >= publisher count` is acceptable
 
 These exemptions apply only to the publisher-count headroom rules, not to any other check.
 
-## Notes on E013 (Expired COMING_SOON Futures)
+## Notes on E013 (Expired Futures)
 
-A COMING_SOON futures feed is considered expired if **every** `validTo` timestamp found under `marketSchedules[*].benchmarkMapping.*.identifiers[*].validTo` is earlier than the current UTC time. Feeds with no `validTo` identifiers are skipped — E013 only fires when there is evidence that every mapped contract has already rolled off. The fix is usually to flip the feed to `INACTIVE`.
+A STABLE or COMING_SOON futures feed is considered expired if **every** `validTo` timestamp found under `marketSchedules[*].benchmarkMapping.*.identifiers[*].validTo` is earlier than the current UTC time. Feeds with no `validTo` identifiers are skipped — E013 only fires when there is evidence that every mapped contract has already rolled off. The fix is to flip the feed to `INACTIVE`. INACTIVE feeds are never flagged.
+
+The message text branches on state (`STABLE futures feed has expired...` vs `COMING_SOON futures feed has expired...`) so operators can tell at a glance whether a mid-lifecycle or pre-launch feed has rolled off.
 
 ## Notes on E014 (Benchmark Mapping)
 
-Benchmarkable asset types are: `equity`, `fx`, `metal`, `commodity`, `rates`. All other asset types are skipped. The `OVER_NIGHT` session is always exempt since it uses publisher 32 peer comparison rather than Datascope benchmarks.
+Benchmarkable asset types are: `equity`, `fx`, `metal`, `commodity`, `rates`. All other asset types are skipped. Every session of a STABLE benchmarkable feed must populate `benchmarkMapping`, including `OVER_NIGHT`. (Even though OVER_NIGHT validation against Datascope is replaced by publisher 32 peer comparison at runtime, the mapping still needs to be present in config.)
 
 ## Notes on E015 / W009 (Corporate Actions)
 
