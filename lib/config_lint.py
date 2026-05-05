@@ -972,14 +972,22 @@ def _parse_iso(value: str) -> Optional[datetime]:
     return dt
 
 
-def check_expired_coming_soon_futures(
-    feeds: list[dict], now: datetime
-) -> list[LintFinding]:
-    """E013: COMING_SOON futures whose every validTo is in the past."""
+def check_expired_futures(feeds: list[dict], now: datetime) -> list[LintFinding]:
+    """E013: STABLE or COMING_SOON futures whose every validTo is in the past.
+
+    A feed is flagged when:
+      - state is STABLE or COMING_SOON, AND
+      - the symbol matches the futures pattern, AND
+      - at least one identifier has a validTo, AND
+      - every validTo found is earlier than `now`.
+
+    INACTIVE feeds and feeds with no validTo identifiers are skipped.
+    """
     findings: list[LintFinding] = []
 
     for feed in feeds:
-        if feed.get("state", "") != "COMING_SOON":
+        state = feed.get("state", "")
+        if state not in ("STABLE", "COMING_SOON"):
             continue
         sym = feed.get("symbol", "")
         if not is_futures_symbol(sym):
@@ -1007,7 +1015,7 @@ def check_expired_coming_soon_futures(
                     rule_id="E013",
                     severity="ERROR",
                     message=(
-                        f"COMING_SOON futures feed has expired"
+                        f"{state} futures feed has expired"
                         f" (latest validTo: {latest.isoformat()});"
                         f" change state to INACTIVE"
                     ),
@@ -1091,7 +1099,7 @@ def lint_config(config: dict, now: Optional[datetime] = None) -> list[LintFindin
     findings.extend(check_publishers(feeds, publishers))
     findings.extend(check_schedules(feeds))
     findings.extend(check_hermes_ids(feeds))
-    findings.extend(check_expired_coming_soon_futures(feeds, now))
+    findings.extend(check_expired_futures(feeds, now))
     findings.extend(check_benchmark_mapping(feeds))
     findings.extend(check_corporate_actions(feeds))
     findings.extend(check_identifier_continuity(feeds))

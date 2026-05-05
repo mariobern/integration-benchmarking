@@ -9,7 +9,7 @@ from lib.config_lint import (
     check_publisher_duplicates,
     check_schedules,
     check_hermes_ids,
-    check_expired_coming_soon_futures,
+    check_expired_futures,
     check_benchmark_mapping,
     check_corporate_actions,
     check_identifier_continuity,
@@ -1712,7 +1712,7 @@ class TestCheckE013ExpiredFutures:
         feed = _futures_feed_with_validto(
             1, "Commodities.WTIK6/USD", "2026-01-01T00:00:00.000000000Z"
         )
-        findings = check_expired_coming_soon_futures([feed], _NOW)
+        findings = check_expired_futures([feed], _NOW)
         errors = [f for f in findings if f.rule_id == "E013"]
         assert len(errors) == 1
 
@@ -1720,24 +1720,61 @@ class TestCheckE013ExpiredFutures:
         feed = _futures_feed_with_validto(
             1, "Commodities.WTIK6/USD", "2026-12-01T00:00:00.000000000Z"
         )
-        findings = check_expired_coming_soon_futures([feed], _NOW)
+        findings = check_expired_futures([feed], _NOW)
         assert findings == []
 
-    def test_e013_stable_state_not_flagged(self):
+    def test_e013_stable_not_yet_expired(self):
+        """STABLE futures with future validTo must not fire E013."""
+        feed = _futures_feed_with_validto(
+            1,
+            "Commodities.WTIK6/USD",
+            "2026-12-01T00:00:00.000000000Z",
+            state="STABLE",
+        )
+        findings = check_expired_futures([feed], _NOW)
+        assert findings == []
+
+    def test_e013_expired_stable_futures_flagged(self):
+        """STABLE futures with all validTo in the past must fire E013
+        with a state-tagged message."""
         feed = _futures_feed_with_validto(
             1,
             "Commodities.WTIK6/USD",
             "2026-01-01T00:00:00.000000000Z",
             state="STABLE",
         )
-        findings = check_expired_coming_soon_futures([feed], _NOW)
+        findings = check_expired_futures([feed], _NOW)
+        errors = [f for f in findings if f.rule_id == "E013"]
+        assert len(errors) == 1
+        assert "STABLE futures feed has expired" in errors[0].message
+        assert "change state to INACTIVE" in errors[0].message
+
+    def test_e013_expired_coming_soon_message_unchanged(self):
+        """COMING_SOON message keeps its existing wording."""
+        feed = _futures_feed_with_validto(
+            1, "Commodities.WTIK6/USD", "2026-01-01T00:00:00.000000000Z"
+        )
+        findings = check_expired_futures([feed], _NOW)
+        errors = [f for f in findings if f.rule_id == "E013"]
+        assert len(errors) == 1
+        assert "COMING_SOON futures feed has expired" in errors[0].message
+
+    def test_e013_inactive_stable_futures_not_flagged(self):
+        """INACTIVE feeds (regardless of expiry) must never fire E013."""
+        feed = _futures_feed_with_validto(
+            1,
+            "Commodities.WTIK6/USD",
+            "2026-01-01T00:00:00.000000000Z",
+            state="INACTIVE",
+        )
+        findings = check_expired_futures([feed], _NOW)
         assert findings == []
 
     def test_e013_non_futures_not_flagged(self):
         feed = _futures_feed_with_validto(
             1, "Crypto.BTC/USD", "2026-01-01T00:00:00.000000000Z"
         )
-        findings = check_expired_coming_soon_futures([feed], _NOW)
+        findings = check_expired_futures([feed], _NOW)
         assert findings == []
 
     def test_e013_no_validto_skipped(self):
@@ -1763,7 +1800,7 @@ class TestCheckE013ExpiredFutures:
                 }
             ],
         )
-        findings = check_expired_coming_soon_futures([feed], _NOW)
+        findings = check_expired_futures([feed], _NOW)
         assert findings == []
 
     def test_e013_mixed_expired_and_future_not_flagged(self):
@@ -1793,7 +1830,7 @@ class TestCheckE013ExpiredFutures:
                 }
             ],
         )
-        findings = check_expired_coming_soon_futures([feed], _NOW)
+        findings = check_expired_futures([feed], _NOW)
         assert findings == []
 
 
@@ -3047,7 +3084,7 @@ class TestParseIso:
         )
         # Should produce E013 (validTo is in the past relative to _NOW)
         # rather than raising TypeError.
-        findings = check_expired_coming_soon_futures([feed], _NOW)
+        findings = check_expired_futures([feed], _NOW)
         e013 = [f for f in findings if f.rule_id == "E013"]
         assert len(e013) == 1
         assert e013[0].feed_id == 1
