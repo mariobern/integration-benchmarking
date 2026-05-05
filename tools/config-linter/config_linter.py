@@ -118,19 +118,31 @@ def _format_text(
     return "\n".join(lines)
 
 
-def _format_json(findings: list[LintFinding]) -> str:
-    """Format findings as JSON array."""
+def _format_json(
+    findings: list[LintFinding],
+    pre_existing_count: Optional[int] = None,
+) -> str:
+    """Format findings as a JSON envelope.
+
+    Shape: {"findings": [...], "pre_existing_count": int | null}.
+
+    `pre_existing_count` is None outside diff mode; an int (possibly
+    zero) when running with a baseline.
+    """
     return json.dumps(
-        [
-            {
-                "rule_id": f.rule_id,
-                "severity": f.severity,
-                "message": f.message,
-                "feed_id": f.feed_id,
-                "symbol": f.symbol,
-            }
-            for f in findings
-        ],
+        {
+            "findings": [
+                {
+                    "rule_id": f.rule_id,
+                    "severity": f.severity,
+                    "message": f.message,
+                    "feed_id": f.feed_id,
+                    "symbol": f.symbol,
+                }
+                for f in findings
+            ],
+            "pre_existing_count": pre_existing_count,
+        },
         indent=2,
     )
 
@@ -273,7 +285,7 @@ def main() -> None:
 
     if args.output:
         if args.output.suffix.lower() == ".json":
-            content = _format_json(findings)
+            content = _format_json(findings, pre_existing_count=pre_existing_count)
         else:
             content = _format_text(
                 findings, use_color=False, pre_existing_count=pre_existing_count
@@ -300,7 +312,7 @@ def main() -> None:
             )
     else:
         if args.format == "json":
-            print(_format_json(findings))
+            print(_format_json(findings, pre_existing_count=pre_existing_count))
         else:
             print(
                 _format_text(

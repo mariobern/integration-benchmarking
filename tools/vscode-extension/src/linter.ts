@@ -84,16 +84,25 @@ export function runLinter(options: LinterOptions): Promise<LinterResult> {
 
     child.on("close", () => {
       // Linter exits 0 (clean) or 1 (errors and/or input failure).
+      // Stdout is a JSON envelope: {"findings": [...], "pre_existing_count": int | null}.
       try {
         const parsed = JSON.parse(stdout);
-        if (Array.isArray(parsed)) {
-          settle({ findings: parsed as Finding[] });
+        if (
+          parsed !== null &&
+          typeof parsed === "object" &&
+          !Array.isArray(parsed) &&
+          Array.isArray((parsed as { findings?: unknown }).findings)
+        ) {
+          settle({
+            findings: (parsed as { findings: Finding[] }).findings,
+          });
           return;
         }
       } catch {
         // fall through
       }
-      // Non-JSON output → prefer stderr presence over exit code for dispatch.
+      // Non-JSON or bare-array output → prefer stderr presence over exit
+      // code for dispatch.
       const error: LinterError =
         stderr.trim().length > 0
           ? { kind: "crashed", stderr: firstLine(stderr) }
