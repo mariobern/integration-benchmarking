@@ -331,6 +331,8 @@ class SetMinPublishers:
 
         targets = _resolve_min_pub_targets(feed, self.session)
 
+        # Before mutation: pre-validate all targets so a later failure
+        # doesn't leave earlier targets partially mutated.
         for location, container, key in targets:
             allowed = _list_for_target(feed, location)
             if self.value > len(allowed):
@@ -338,6 +340,9 @@ class SetMinPublishers:
                     f"feed {feed_id} {location}: minPublishers={self.value} "
                     f"exceeds publisher count {len(allowed)} — unsatisfiable"
                 )
+
+        for location, container, key in targets:
+            allowed = _list_for_target(feed, location)
             old = container.get(key)
             if old == self.value:
                 continue
@@ -391,6 +396,8 @@ class BumpMinPublishers:
 
         targets = _resolve_min_pub_targets(feed, self.session)
 
+        # Before mutation: pre-validate all targets so a later failure
+        # doesn't leave earlier targets partially mutated.
         for location, container, key in targets:
             allowed = _list_for_target(feed, location)
             old = container.get(key, 0)
@@ -400,6 +407,11 @@ class BumpMinPublishers:
                     f"feed {feed_id} {location}: bumped minPublishers={new} "
                     f"exceeds publisher count {len(allowed)} — unsatisfiable"
                 )
+
+        for location, container, key in targets:
+            allowed = _list_for_target(feed, location)
+            old = container.get(key, 0)
+            new = max(1, old + self.delta)
             if new == old:
                 continue
             container[key] = new

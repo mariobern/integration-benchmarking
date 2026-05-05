@@ -1,7 +1,7 @@
 """Orchestrator: parse spec, resolve targets, simulate, apply."""
 
 import fnmatch
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
@@ -86,7 +86,7 @@ def _build_filters_from_args(args) -> FilterSet:
 
 def _parse_signed_int(s: str) -> int:
     if not s:
-        raise ValueError(f"empty bump value")
+        raise ValueError("empty bump value")
     if s[0] not in "+-" and not s.isdigit():
         raise ValueError(f"bump must be signed integer (+1 / -2); got {s!r}")
     return int(s)
