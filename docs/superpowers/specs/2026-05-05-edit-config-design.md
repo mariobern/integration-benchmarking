@@ -143,18 +143,77 @@ int). Result is clamped at floor of 1 (never below).
 Targeting flags are AND-combined. **At least one targeting flag is required**
 for any operation; there is no implicit "edit everything" default.
 
-| Filter         | CLI form                             | YAML form                                         |
-| -------------- | ------------------------------------ | ------------------------------------------------- |
-| Feed ID        | `--feed-id 922` or `--feed-id 1,2,3` | `feed_id: 922` or `feed_ids: [1, 2, 3]`           |
-| Feed range     | `--feed-range 1000-1050`             | `feed_range: [1000, 1050]`                        |
-| Symbol pattern | `--symbol-pattern "Equity.US.*"`     | `symbol_pattern: "Equity.US.*"`                   |
-| Asset class    | `--asset-class us-equities`          | `asset_class: us-equities`                        |
-| State          | `--state STABLE`                     | `state: STABLE` or `state: [STABLE, COMING_SOON]` |
+| Filter         | CLI form                                                 | YAML form                                          |
+| -------------- | -------------------------------------------------------- | -------------------------------------------------- |
+| Feed ID        | `--feed-id 922` or `--feed-id 100-200,205,208,3530-3540` | `feed_id: 922` or `feed_id: [100, "200-250", 300]` |
+| From file      | `--feed-ids-from feeds.txt` (or `-` for stdin)           | _(use CLI; YAML inlines the list directly)_        |
+| Symbol pattern | `--symbol-pattern "Equity.US.*"`                         | `symbol_pattern: "Equity.US.*"`                    |
+| Asset class    | `--asset-class us-equities`                              | `asset_class: us-equities`                         |
+| State          | `--state STABLE`                                         | `state: STABLE` or `state: [STABLE, COMING_SOON]`  |
 
-`feed_id` (singular) and `feed_ids` (list) in YAML are equivalent; using
-both keys in one operation is rejected by validation. `state` accepts a
-list only in YAML (CLI takes a single value; pipe through a spec for
-multi-state filtering).
+### Feed ID selector syntax
+
+A single, unified syntax is used everywhere a feed ID can be specified
+(CLI `--feed-id`, the file behind `--feed-ids-from`, and YAML `feed_id`).
+Each entry is one of:
+
+- A single feed ID: `922`
+- An inclusive range: `100-200` (requires `A <= B`)
+
+CLI, file, and YAML each accept a list of these entries. Resolution is
+the union of all entries (deduplicated). `--feed-id` and
+`--feed-ids-from` may both be passed in the same invocation; their
+results are unioned.
+
+`state` accepts a list only in YAML; CLI takes a single value (pipe
+through a spec for multi-state filtering).
+
+### `--feed-ids-from` file format
+
+Plain text, UTF-8. Forgiving parser:
+
+- **Tokens**: a token is `N` (single ID) or `A-B` (range).
+- **Separators**: tokens may be separated by commas, whitespace, or
+  newlines — any combination. Internally split on `[,\s]+`.
+- **Comments**: `#` to end-of-line is stripped before tokenization.
+- **Blank lines** ignored.
+- **No header**, no quoting.
+- **Errors**: any token not matching `^\d+$` or `^\d+-\d+$` is a hard
+  error with line and column. Empty file is a hard error (matches the
+  "zero target match" rule below).
+
+Example file (all four equivalent):
+
+```text
+# canonical one-per-line
+100-200
+205
+208
+275
+299
+3530
+```
+
+```text
+# inline (paste from a slack message)
+100-200, 205, 208, 275, 299, 3530
+```
+
+```text
+# annotated
+100-200    # contig run from the incident
+205 208    # spotty middle
+275, 299
+3530       # one-off
+```
+
+```text
+# everything on one line
+100-200,205,208,275,299,3530
+```
+
+Stdin: pass `-` as the path. Useful for piping from other tools, e.g.
+`awk -F, 'NR>1 {print $1}' summary.csv | edit_config.py --feed-ids-from -`.
 
 **Hard error** if the resolved target set is empty for any operation.
 Silent zero-match is a footgun, not a feature.
@@ -179,6 +238,18 @@ Operation (mutually exclusive):
 - `--set-state {STABLE,COMING_SOON,INACTIVE}`
 - `--from-spec PATH`
 
+Targeting (≥1 required when not using `--from-spec`; AND-combined):
+
+- `--feed-id SELECTOR` — single ID, range, or comma-separated mix:
+  `922` / `1000-1050` / `100-200,205,208,3530-3540`. Repeatable;
+  multiple `--feed-id` flags are unioned.
+- `--feed-ids-from PATH` — read selector(s) from a file (or stdin via
+  `-`). Same selector grammar; whitespace, commas, newlines, and `#`
+  comments all accepted. See "`--feed-ids-from` file format" above.
+- `--symbol-pattern GLOB` — `fnmatch`-style: `*`, `?`, `[abc]`.
+- `--asset-class STR` — matched against `metadata.asset_type`.
+- `--state {STABLE,COMING_SOON,INACTIVE}` — single state filter.
+
 Scope (publisher / minPublishers ops; ignored for `set-state`):
 
 - `--session {REGULAR,PRE_MARKET,POST_MARKET,OVER_NIGHT,ALL,NONE}`
@@ -201,7 +272,7 @@ version: 1
 operations:
   - op: add_publisher
     publisher_id: 80
-    feed_range: [1000, 1050]
+    feed_id: "1000-1050"
     # session omitted → default
 
   - op: remove_publisher
@@ -217,11 +288,16 @@ operations:
 
   - op: bump_min_publishers
     delta: +1
-    feed_ids: [1000, 1001, 1002]
+    feed_id: [1000, 1001, 1002]
 
   - op: set_state
     value: COMING_SOON
-    feed_ids: [500, 501, 502]
+    feed_id: [500, 501, 502]
+
+  - op: add_publisher
+    publisher_id: 80
+    feed_id: [100, "200-250", 300, "400-410", 500] # mixed singles + ranges
+    session: NONE
 
   - op: add_publisher
     publisher_id: 90
@@ -237,6 +313,10 @@ Schema rules:
   op-specific value field (`publisher_id`, `value`, `delta`).
 - **Unknown keys fail validation** (typos shouldn't silently drop ops).
 - Operations are applied **in spec order**.
+- `feed_id` accepts a single integer, a range string (`"A-B"`), or a
+  list whose entries are integers and/or range strings. Range strings
+  must be quoted (unquoted `1000-1050` is parsed by YAML as the
+  arithmetic expression `-50`).
 
 ## Validation pipeline
 
@@ -286,7 +366,7 @@ Plan:
       matched 1 feed (1 change)
   [3] set_min_publishers value=3 → asset_class=us-equities AND state=STABLE AND session=REGULAR
       matched 89 feeds (12 NOOP, 77 changes)
-  [4] set_state value=COMING_SOON → feed_ids [500,501,502]
+  [4] set_state value=COMING_SOON → feed_id [500,501,502]
       matched 3 feeds (3 changes)
       WARNING: feed 500 STABLE → COMING_SOON (regression)
       WARNING: feed 501 STABLE → COMING_SOON (regression)
