@@ -185,3 +185,86 @@ class TestBuildOpFromArgs:
         args = make_args(add_publisher=80, feed_id="1,2", feed_ids_from=str(f))
         ops = build_op_from_args(args)
         assert ops[0].filters.feed_ids == {1, 2, 100}
+
+
+from lib.config_editor import parse_yaml_spec
+
+
+YAML_BASIC = Path(__file__).parent / "fixtures" / "edits_basic.yaml"
+YAML_INVALID = Path(__file__).parent / "fixtures" / "edits_invalid.yaml"
+
+
+class TestParseYamlSpec:
+    def test_parses_all_op_types(self):
+        ops = parse_yaml_spec(str(YAML_BASIC))
+        assert len(ops) == 6
+        kinds = [type(p.op).__name__ for p in ops]
+        assert kinds == [
+            "AddPublisher",
+            "RemovePublisher",
+            "SetMinPublishers",
+            "BumpMinPublishers",
+            "SetState",
+            "AddPublisher",
+        ]
+
+    def test_feed_id_range_string(self):
+        ops = parse_yaml_spec(str(YAML_BASIC))
+        # First op uses "100-105"
+        assert ops[0].filters.feed_ids == {100, 101, 102, 103, 104, 105}
+
+    def test_feed_id_mixed_list(self):
+        ops = parse_yaml_spec(str(YAML_BASIC))
+        # Last op uses [1, "100-101", 5000]
+        assert ops[-1].filters.feed_ids == {1, 100, 101, 5000}
+
+    def test_state_list_in_yaml(self, tmp_path):
+        spec = tmp_path / "spec.yaml"
+        spec.write_text(
+            "operations:\n"
+            "  - op: add_publisher\n"
+            "    publisher_id: 1\n"
+            "    feed_id: 1\n"
+            "    state: [STABLE, COMING_SOON]\n",
+            encoding="utf-8",
+        )
+        ops = parse_yaml_spec(str(spec))
+        assert ops[0].filters.states == {"STABLE", "COMING_SOON"}
+
+    def test_unknown_key_rejected(self):
+        with pytest.raises(ValueError, match="unknown key"):
+            parse_yaml_spec(str(YAML_INVALID))
+
+    def test_missing_op_field_rejected(self, tmp_path):
+        spec = tmp_path / "spec.yaml"
+        spec.write_text(
+            "operations:\n  - publisher_id: 1\n    feed_id: 1\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="missing.*op"):
+            parse_yaml_spec(str(spec))
+
+    def test_unknown_op_rejected(self, tmp_path):
+        spec = tmp_path / "spec.yaml"
+        spec.write_text(
+            "operations:\n  - op: drop_feed\n    feed_id: 1\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="unknown op"):
+            parse_yaml_spec(str(spec))
+
+    def test_version_above_1_fails(self, tmp_path):
+        spec = tmp_path / "spec.yaml"
+        spec.write_text(
+            "version: 2\noperations:\n"
+            "  - op: add_publisher\n    publisher_id: 1\n    feed_id: 1\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="version"):
+            parse_yaml_spec(str(spec))
+
+    def test_no_operations_key_fails(self, tmp_path):
+        spec = tmp_path / "spec.yaml"
+        spec.write_text("foo: bar\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="operations"):
+            parse_yaml_spec(str(spec))

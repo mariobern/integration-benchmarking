@@ -126,3 +126,128 @@ def build_op_from_args(args) -> list[PlannedOp]:
         raise AssertionError(f"unhandled op {name}")
 
     return [PlannedOp(op=op, filters=filters)]
+
+
+import yaml
+
+
+_OP_REQUIRED_FIELDS = {
+    "add_publisher": {"publisher_id"},
+    "remove_publisher": {"publisher_id"},
+    "set_min_publishers": {"value"},
+    "bump_min_publishers": {"delta"},
+    "set_state": {"value"},
+}
+
+_TARGETING_KEYS = {
+    "feed_id",
+    "symbol_pattern",
+    "asset_class",
+    "state",
+}
+
+_SCOPE_KEYS = {"session"}
+
+
+def _parse_feed_id_field(value) -> set[int]:
+    """Accept int, range-string, or list of int/range-strings."""
+    if isinstance(value, int):
+        return {value}
+    if isinstance(value, str):
+        return parse_selector_text(value)
+    if isinstance(value, list):
+        ids: set[int] = set()
+        for item in value:
+            if isinstance(item, int):
+                ids.add(item)
+            elif isinstance(item, str):
+                ids.update(parse_selector_text(item))
+            else:
+                raise ValueError(
+                    f"feed_id list entries must be int or range-string; got {item!r}"
+                )
+        return ids
+    raise ValueError(
+        f"feed_id must be int, range-string, or list; got {type(value).__name__}"
+    )
+
+
+def _filters_from_yaml_entry(entry: dict) -> FilterSet:
+    feed_ids: set[int] | None = None
+    if "feed_id" in entry:
+        feed_ids = _parse_feed_id_field(entry["feed_id"])
+    states_raw = entry.get("state")
+    if isinstance(states_raw, str):
+        states = {states_raw}
+    elif isinstance(states_raw, list):
+        states = set(states_raw)
+    elif states_raw is None:
+        states = None
+    else:
+        raise ValueError(
+            f"state must be string or list; got {type(states_raw).__name__}"
+        )
+    f = FilterSet(
+        feed_ids=feed_ids,
+        symbol_pattern=entry.get("symbol_pattern"),
+        asset_class=entry.get("asset_class"),
+        states=states,
+    )
+    f.validate()
+    return f
+
+
+def _validate_keys(entry: dict, op_name: str) -> None:
+    allowed = {"op"} | _TARGETING_KEYS | _SCOPE_KEYS | _OP_REQUIRED_FIELDS[op_name]
+    extras = set(entry.keys()) - allowed
+    if extras:
+        raise ValueError(f"unknown key(s) in op {op_name!r}: {sorted(extras)}")
+
+
+def _build_op_from_yaml_entry(entry: dict):
+    op_name = entry["op"]
+    if op_name not in _OP_REQUIRED_FIELDS:
+        raise ValueError(f"unknown op {op_name!r}")
+    missing = _OP_REQUIRED_FIELDS[op_name] - set(entry.keys())
+    if missing:
+        raise ValueError(f"op {op_name!r} missing required field(s): {sorted(missing)}")
+    _validate_keys(entry, op_name)
+
+    session = entry.get("session")
+
+    if op_name == "add_publisher":
+        return AddPublisher(publisher_id=entry["publisher_id"], session=session)
+    if op_name == "remove_publisher":
+        return RemovePublisher(publisher_id=entry["publisher_id"], session=session)
+    if op_name == "set_min_publishers":
+        return SetMinPublishers(value=entry["value"], session=session)
+    if op_name == "bump_min_publishers":
+        return BumpMinPublishers(delta=entry["delta"], session=session)
+    if op_name == "set_state":
+        return SetState(value=entry["value"])
+    raise AssertionError(f"unhandled op {op_name}")
+
+
+def parse_yaml_spec(path: str) -> list[PlannedOp]:
+    """Load a YAML spec file and produce a list of PlannedOp."""
+    with open(path, encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    if not isinstance(data, dict):
+        raise ValueError("YAML root must be a mapping")
+    version = data.get("version", 1)
+    if not isinstance(version, int) or version > 1:
+        raise ValueError(f"unsupported spec version {version!r}")
+    if "operations" not in data or not isinstance(data["operations"], list):
+        raise ValueError("YAML spec must contain a top-level `operations` list")
+
+    planned: list[PlannedOp] = []
+    for i, entry in enumerate(data["operations"]):
+        if not isinstance(entry, dict):
+            raise ValueError(f"operation #{i + 1}: must be a mapping")
+        if "op" not in entry:
+            raise ValueError(f"operation #{i + 1}: missing 'op' field")
+        op = _build_op_from_yaml_entry(entry)
+        filters = _filters_from_yaml_entry(entry)
+        planned.append(PlannedOp(op=op, filters=filters))
+
+    return planned

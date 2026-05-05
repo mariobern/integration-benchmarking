@@ -1,0 +1,29 @@
+version: 1
+operations:
+  - op: add_publisher
+    publisher_id: 80
+    feed_id: "100-105"
+
+  - op: remove_publisher
+    publisher_id: 22
+    feed_id: 922
+    session: PRE_MARKET
+
+  - op: set_min_publishers
+    value: 3
+    asset_class: equity
+    state: STABLE
+    session: REGULAR
+
+  - op: bump_min_publishers
+    delta: 1
+    feed_id: [1023]
+
+  - op: set_state
+    value: COMING_SOON
+    feed_id: [1, 100]
+
+  - op: add_publisher
+    publisher_id: 90
+    feed_id: [1, "100-101", 5000]
+    session: NONE
