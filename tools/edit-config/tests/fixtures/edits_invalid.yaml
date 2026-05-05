@@ -1,0 +1,7 @@
+version: 1
+operations:
+  - op: add_publisher
+    publisher_id: 80
+    feed_id: 1
+    session: REGULAR
+    bogus_key: hello # unknown key -> reject
