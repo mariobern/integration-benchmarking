@@ -9,7 +9,7 @@ change `state` — across one feed, a range of feeds, or a filtered set
 ```bash
 # CLI (single op, dry-run is the default)
 python3 tools/edit-config/edit_config.py --config after.json \
-    --add-publisher 80 --feed-range 1000-1050
+    --add-publisher 80 --feed-id 1000-1050
 
 # YAML spec (batched ops)
 python3 tools/edit-config/edit_config.py --config after.json \
@@ -18,15 +18,16 @@ python3 tools/edit-config/edit_config.py --config after.json \
 
 ## Layout
 
-| Path                                     | Purpose                                                  |
-| ---------------------------------------- | -------------------------------------------------------- |
-| `edit_config.py`                         | CLI entry point (thin wrapper)                           |
-| `edit_config_lib/config_editor.py`       | Spec parsing → plan → validate → apply orchestrator      |
-| `edit_config_lib/config_ops.py`          | Operation classes (`AddPublisher`, `RemovePublisher`, …) |
-| `edit_config_lib/config_text_surgery.py` | Bracket-depth scanner, feed/session block locators       |
-| `edit_config_lib/config_diff.py`         | Unified diff with feedId/symbol/session hunk headers     |
-| `tests/`                                 | pytest suite (unit, integration, CLI)                    |
-| `tests/fixtures/`                        | Sample `after.json` slice and YAML specs                 |
+| Path                                     | Purpose                                                       |
+| ---------------------------------------- | ------------------------------------------------------------- |
+| `edit_config.py`                         | CLI entry point (thin wrapper)                                |
+| `edit_config_lib/config_selector.py`     | Feed-ID selector grammar (singles + ranges, file/stdin input) |
+| `edit_config_lib/config_text_surgery.py` | Bracket-depth scanner, feed/session block locators            |
+| `edit_config_lib/config_ops.py`          | Operation classes (`AddPublisher`, `RemovePublisher`, …)      |
+| `edit_config_lib/config_diff.py`         | Unified diff with feedId/symbol/session hunk headers          |
+| `edit_config_lib/config_editor.py`       | Spec parsing → plan → validate → apply orchestrator           |
+| `tests/`                                 | pytest suite (unit, integration, CLI)                         |
+| `tests/fixtures/`                        | Sample `after.json` slice and YAML specs                      |
 
 ## Docs
 
