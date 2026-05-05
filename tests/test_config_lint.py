@@ -876,6 +876,54 @@ class TestCheckSchedules:
         warnings = [f for f in findings if f.rule_id == "W003"]
         assert len(warnings) == 0
 
+    def test_w003_no_majority_unique_schedules_per_feed_flagged(self):
+        """3 commodity feeds each with a different schedule — no majority,
+        every feed gets a 'no consensus' W003."""
+        feeds = []
+        for i, hours in enumerate(["0800-1400", "0800-1500", "0800-1600"], start=1):
+            feeds.append(
+                _make_feed(
+                    i,
+                    symbol=f"Commodities.GOLD{i}/USD",
+                    asset_type="commodity",
+                    state="STABLE",
+                    schedules=[
+                        {
+                            "marketSchedule": f"America/New_York;{hours};",
+                            "session": "REGULAR",
+                        }
+                    ],
+                )
+            )
+        findings = check_schedules(feeds)
+        warnings = [f for f in findings if f.rule_id == "W003"]
+        assert len(warnings) == 3
+        flagged_ids = sorted(f.feed_id for f in warnings)
+        assert flagged_ids == [1, 2, 3]
+        for w in warnings:
+            assert "no consensus" in w.message
+
+    def test_w003_top_count_tied_per_feed_flagged(self):
+        """4 feeds, schedules [A, A, B, B] — tie at top, every feed flagged."""
+        sched_a = "America/New_York;0930-1600;"
+        sched_b = "America/New_York;0800-1500;"
+        feeds = []
+        for i, sched in enumerate([sched_a, sched_a, sched_b, sched_b], start=1):
+            feeds.append(
+                _make_feed(
+                    i,
+                    symbol=f"Commodities.GOLD{i}/USD",
+                    asset_type="commodity",
+                    state="STABLE",
+                    schedules=[{"marketSchedule": sched, "session": "REGULAR"}],
+                )
+            )
+        findings = check_schedules(feeds)
+        warnings = [f for f in findings if f.rule_id == "W003"]
+        assert len(warnings) == 4
+        for w in warnings:
+            assert "no consensus" in w.message
+
     def test_inactive_feeds_skipped(self):
         feeds = [
             _make_feed(

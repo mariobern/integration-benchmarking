@@ -638,22 +638,43 @@ def check_schedules(feeds: list[dict]) -> list[LintFinding]:
             continue
 
         counts: Counter[str] = Counter(sched_str for _, _, sched_str in active_entries)
-        majority = counts.most_common(1)[0][0]
-        if counts[majority] == 1:
+        if len(set(counts)) < 2:
+            # Everyone agrees — nothing to report.
             continue
 
+        top_count = counts.most_common(1)[0][1]
+        top_schedules = {s for s, c in counts.items() if c == top_count}
         session = bucket_key[-1]
         group_label = _format_group_label(bucket_key[:-1])
 
-        for fid, sym, sched_str in active_entries:
-            if sched_str != majority:
+        if top_count >= 2 and len(top_schedules) == 1:
+            # Clear majority — flag only the minority feeds.
+            majority = next(iter(top_schedules))
+            for fid, sym, sched_str in active_entries:
+                if sched_str != majority:
+                    findings.append(
+                        LintFinding(
+                            rule_id="W003",
+                            severity="WARNING",
+                            message=(
+                                f"{session} schedule deviates from {group_label}"
+                                f" majority"
+                            ),
+                            feed_id=fid,
+                            symbol=sym,
+                        )
+                    )
+        else:
+            # No consensus: top_count == 1 (every feed unique) or tie at
+            # the top. Flag every active feed in the bucket.
+            for fid, sym, _sched_str in active_entries:
                 findings.append(
                     LintFinding(
                         rule_id="W003",
                         severity="WARNING",
                         message=(
-                            f"{session} schedule deviates from {group_label}"
-                            f" majority"
+                            f"{session} schedule has no consensus across"
+                            f" {group_label}"
                         ),
                         feed_id=fid,
                         symbol=sym,
