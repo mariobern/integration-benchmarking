@@ -1019,6 +1019,7 @@ class TestCheckE011ScheduleInconsistency:
         assert errors[0].feed_id == 3
 
     def test_e011_futures_same_root_disagree(self):
+        """Two-feed tie case: both feeds get a 'no consensus' E011."""
         sched_a = [{"marketSchedule": "America/New_York;O;", "session": "REGULAR"}]
         sched_b = [
             {"marketSchedule": "America/New_York;0800-1400;", "session": "REGULAR"}
@@ -1039,7 +1040,9 @@ class TestCheckE011ScheduleInconsistency:
         ]
         findings = check_schedules(feeds)
         errors = [f for f in findings if f.rule_id == "E011"]
-        assert len(errors) == 1
+        assert len(errors) == 2
+        for f in errors:
+            assert "no consensus" in f.message
 
     def test_e011_different_futures_roots_not_flagged(self):
         sched_a = [{"marketSchedule": "America/New_York;O;", "session": "REGULAR"}]
@@ -1086,6 +1089,73 @@ class TestCheckE011ScheduleInconsistency:
         findings = check_schedules(feeds)
         errors = [f for f in findings if f.rule_id == "E011"]
         assert len(errors) == 0
+
+    def test_e011_two_feeds_two_schedules_emits_per_feed_no_consensus(self):
+        """Tie case: 2 STABLE feeds with 2 distinct schedules. Both feeds
+        get a finding with a 'no consensus' message — neither is treated
+        as the reference."""
+        sched_a = [
+            {"marketSchedule": "America/New_York;0930-1600;", "session": "REGULAR"}
+        ]
+        sched_b = [
+            {"marketSchedule": "America/New_York;0800-1500;", "session": "REGULAR"}
+        ]
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                2,
+                symbol="Equity.US.MSFT/USD",
+                asset_type="equity",
+                schedules=sched_b,
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 2
+        flagged_ids = sorted(f.feed_id for f in errors)
+        assert flagged_ids == [1, 2]
+        for f in errors:
+            assert "no consensus" in f.message
+
+    def test_e011_clear_majority_keeps_per_minority_behavior(self):
+        """Sanity: 3 feeds, 2 of them share a schedule. Only the lone
+        deviant gets flagged (not the majority)."""
+        sched_a = [
+            {"marketSchedule": "America/New_York;0930-1600;", "session": "REGULAR"}
+        ]
+        sched_b = [
+            {"marketSchedule": "America/New_York;0800-1500;", "session": "REGULAR"}
+        ]
+        feeds = [
+            _make_feed(
+                1,
+                symbol="Equity.US.AAPL/USD",
+                asset_type="equity",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                2,
+                symbol="Equity.US.MSFT/USD",
+                asset_type="equity",
+                schedules=sched_a,
+            ),
+            _make_feed(
+                3,
+                symbol="Equity.US.GOOG/USD",
+                asset_type="equity",
+                schedules=sched_b,
+            ),
+        ]
+        findings = check_schedules(feeds)
+        errors = [f for f in findings if f.rule_id == "E011"]
+        assert len(errors) == 1
+        assert errors[0].feed_id == 3
+        assert "no consensus" not in errors[0].message
 
 
 class TestE011IntlEquityGrouping:

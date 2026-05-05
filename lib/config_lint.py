@@ -584,20 +584,43 @@ def check_schedules(feeds: list[dict]) -> list[LintFinding]:
         sig_counter: Counter[str] = Counter(
             sched_str for _, _, sched_str in stable_entries
         )
-        reference = sig_counter.most_common(1)[0][0]
+        top_count = sig_counter.most_common(1)[0][1]
+        top_schedules = {s for s, c in sig_counter.items() if c == top_count}
         session = bucket_key[-1]
         group_label = _format_group_label(bucket_key[:-1])
 
-        for fid, sym, sched_str in stable_entries:
-            if sched_str != reference:
+        if len(top_schedules) == 1:
+            # Clear majority — flag only the minority feeds.
+            reference = next(iter(top_schedules))
+            for fid, sym, sched_str in stable_entries:
+                if sched_str != reference:
+                    findings.append(
+                        LintFinding(
+                            rule_id="E011",
+                            severity="ERROR",
+                            message=(
+                                f"{session} schedule disagrees with group"
+                                f" {group_label}: {len(distinct)} distinct"
+                                f" schedules across {len(stable_entries)} STABLE"
+                                f" feeds"
+                            ),
+                            feed_id=fid,
+                            symbol=sym,
+                        )
+                    )
+        else:
+            # Tie at the top — no clear majority. Flag every STABLE feed
+            # in the bucket symmetrically.
+            for fid, sym, _sched_str in stable_entries:
                 findings.append(
                     LintFinding(
                         rule_id="E011",
                         severity="ERROR",
                         message=(
-                            f"{session} schedule disagrees with group"
-                            f" {group_label}: {len(distinct)} distinct"
-                            f" schedules across {len(stable_entries)} STABLE feeds"
+                            f"{session} schedule has no consensus across group"
+                            f" {group_label}: {len(distinct)} distinct schedules"
+                            f" across {len(stable_entries)} STABLE feeds, no"
+                            f" majority"
                         ),
                         feed_id=fid,
                         symbol=sym,
