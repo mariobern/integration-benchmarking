@@ -268,3 +268,86 @@ class TestParseYamlSpec:
         spec.write_text("foo: bar\n", encoding="utf-8")
         with pytest.raises(ValueError, match="operations"):
             parse_yaml_spec(str(spec))
+
+
+from copy import deepcopy
+
+from lib.config_editor import (
+    SimulationResult,
+    simulate_plan,
+)
+from lib.config_ops import AddPublisher, SetState
+
+
+class TestSimulatePlan:
+    def test_single_op_succeeds(self, feeds):
+        plan = [
+            PlannedOp(
+                op=AddPublisher(publisher_id=80),
+                filters=FilterSet(feed_ids={1}),
+            )
+        ]
+        result = simulate_plan(plan, feeds)
+        assert isinstance(result, SimulationResult)
+        assert result.errors == []
+        assert len(result.changes) == 1
+        assert result.changes[0].after == [1, 3, 7, 11, 80]
+
+    def test_zero_match_is_error(self, feeds):
+        plan = [
+            PlannedOp(
+                op=AddPublisher(publisher_id=80),
+                filters=FilterSet(feed_ids={99999}),
+            )
+        ]
+        result = simulate_plan(plan, feeds)
+        assert result.changes == []
+        assert any(
+            "zero" in e.lower() or "no feeds" in e.lower() for e in result.errors
+        )
+
+    def test_op_error_recorded(self, feeds):
+        # Add to PRE_MARKET on a crypto feed -> OpError
+        plan = [
+            PlannedOp(
+                op=AddPublisher(publisher_id=80, session="PRE_MARKET"),
+                filters=FilterSet(feed_ids={1}),
+            )
+        ]
+        result = simulate_plan(plan, feeds)
+        assert any("PRE_MARKET" in e for e in result.errors)
+
+    def test_inter_op_visibility(self, feeds):
+        # Op 1: add publisher 80 to feed 1.
+        # Op 2: add publisher 80 again -> should NOOP because op 1 already added it.
+        plan = [
+            PlannedOp(
+                op=AddPublisher(publisher_id=80), filters=FilterSet(feed_ids={1})
+            ),
+            PlannedOp(
+                op=AddPublisher(publisher_id=80), filters=FilterSet(feed_ids={1})
+            ),
+        ]
+        result = simulate_plan(plan, feeds)
+        assert len(result.changes) == 1  # only op 1 produced a change
+
+    def test_does_not_mutate_input_feeds(self, feeds):
+        original = deepcopy(feeds)
+        plan = [
+            PlannedOp(
+                op=AddPublisher(publisher_id=80),
+                filters=FilterSet(feed_ids={1}),
+            )
+        ]
+        simulate_plan(plan, feeds)
+        assert feeds == original  # no mutation of caller's data
+
+    def test_warnings_collected(self, feeds):
+        plan = [
+            PlannedOp(
+                op=SetState(value="INACTIVE"),
+                filters=FilterSet(feed_ids={1}),
+            )
+        ]
+        result = simulate_plan(plan, feeds)
+        assert any("deactivat" in w.message.lower() for w in result.warnings)

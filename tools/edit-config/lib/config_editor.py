@@ -251,3 +251,59 @@ def parse_yaml_spec(path: str) -> list[PlannedOp]:
         planned.append(PlannedOp(op=op, filters=filters))
 
     return planned
+
+
+from copy import deepcopy
+
+from lib.config_ops import Change, OpError, Warning
+
+
+@dataclass
+class SimulationResult:
+    plan: list["PlannedOp"]
+    matched_counts: list[int]  # one per op
+    changes: list[Change]
+    warnings: list[Warning]
+    errors: list[str]
+    simulated_feeds: list[dict]  # working copy after all ops; useful for tests
+
+
+def simulate_plan(plan: list[PlannedOp], feeds: list[dict]) -> SimulationResult:
+    """Apply each op against a working copy and collect results.
+
+    Operations are applied in spec order; later ops see earlier ops'
+    effects. Errors do not stop simulation — they're collected so the
+    user sees every problem in one pass.
+    """
+    work = deepcopy(feeds)
+    all_changes: list[Change] = []
+    all_warnings: list[Warning] = []
+    all_errors: list[str] = []
+    matched_counts: list[int] = []
+
+    for idx, planned in enumerate(plan, start=1):
+        targets = resolve_targets(planned.filters, work)
+        matched_counts.append(len(targets))
+        if not targets:
+            all_errors.append(
+                f"operation #{idx} ({type(planned.op).__name__}): "
+                f"no feeds matched the filter"
+            )
+            continue
+        for feed in targets:
+            try:
+                changes, warns = planned.op.apply(feed)
+            except OpError as e:
+                all_errors.append(f"operation #{idx} feed {feed['feedId']}: {e}")
+                continue
+            all_changes.extend(changes)
+            all_warnings.extend(warns)
+
+    return SimulationResult(
+        plan=plan,
+        matched_counts=matched_counts,
+        changes=all_changes,
+        warnings=all_warnings,
+        errors=all_errors,
+        simulated_feeds=work,
+    )
