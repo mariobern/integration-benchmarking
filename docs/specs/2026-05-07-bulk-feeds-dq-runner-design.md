@@ -38,7 +38,7 @@ as today's CSV-driven flow.
   blast radius and ClickHouse load concerns can be addressed later if needed.)
 - In-process import of the standalone engine. Considered ("Approach B") and
   rejected: the standalone uses module-level globals (`global feed_id, date,
-  mode, ...`), so in-process iteration would require a non-trivial refactor.
+mode, ...`), so in-process iteration would require a non-trivial refactor.
 - Aggregated cross-feed dashboard / index page. Out of scope for this work.
 - Per-row cluster override. `--cluster` stays global; if per-row clusters
   become a need, that's a future 4th CSV column.
@@ -84,20 +84,20 @@ Structure mirrors today's `evaluate_feeds.py`:
   NY→UTC conversion via `zoneinfo.ZoneInfo("America/New_York")` /
   `ZoneInfo("UTC")` based on the date and mode. Mode→NY-time mapping:
 
-  | Mode | NY start | NY end |
-  |---|---|---|
-  | `us-equities-pre` | 08:30:00 | 09:30:00 |
-  | `us-equities-post` | 16:30:00 | 17:30:00 |
-  | `us-equities-overnight` | 20:00:00 | 21:00:00 |
+  | Mode                            | NY start | NY end   |
+  | ------------------------------- | -------- | -------- |
+  | `us-equities-pre`               | 08:30:00 | 09:30:00 |
+  | `us-equities-post`              | 16:30:00 | 17:30:00 |
+  | `us-equities-overnight`         | 20:00:00 | 21:00:00 |
   | _anything else / `us-equities`_ | 09:30:00 | 10:30:00 |
 
 - `run_standalone(feed_id, date, mode, cluster, start_time, end_time,
-  output_path, target_pub_count) -> bool` — builds argv list, calls
+output_path, target_pub_count) -> bool` — builds argv list, calls
   `subprocess.run(argv, check=False)`, returns `True` iff `returncode == 0`.
   Stdio inherited (no `capture_output=True`).
 
 - `process_csv(csv_file, cluster, start_time_override, end_time_override,
-  output_path, target_pub_count) -> tuple[int, int, list[str]]` — iterates the
+output_path, target_pub_count) -> tuple[int, int, list[str]]` — iterates the
   CSV. For each row: skip blanks, warn on rows with <3 columns, resolve times
   (override if provided, else `compute_times_from_mode`), call
   `run_standalone`, track `(succeeded_count, failed_count, failed_descriptors)`
@@ -105,14 +105,14 @@ Structure mirrors today's `evaluate_feeds.py`:
 
 - `main()` — argparse identical to current `evaluate_feeds.py`:
 
-  | Flag | Required | Default |
-  |---|---|---|
-  | `--csv` | no | `price_id_list.csv` |
-  | `--cluster` | yes | — |
-  | `--start-time` | no | (computed per-row from mode) |
-  | `--end-time` | no | (computed per-row from mode) |
-  | `--output-path` | no | `dq_reports` |
-  | `--target-pub-count` | no | `4` |
+  | Flag                 | Required | Default                      |
+  | -------------------- | -------- | ---------------------------- |
+  | `--csv`              | no       | `price_id_list.csv`          |
+  | `--cluster`          | yes      | —                            |
+  | `--start-time`       | no       | (computed per-row from mode) |
+  | `--end-time`         | no       | (computed per-row from mode) |
+  | `--output-path`      | no       | `dq_reports`                 |
+  | `--target-pub-count` | no       | `4`                          |
 
   Calls `process_csv`, prints summary line, exits with code `0` if no failures
   or `1` otherwise.
@@ -214,11 +214,13 @@ The bulk runner adds nothing to this tree.
 ## Files Touched
 
 **Added (3):**
+
 - `pythresearch/data_quality/lazer/evaluate_feeds_bulk.py`
 - `pythresearch/data_quality/lazer/tests/__init__.py`
 - `pythresearch/data_quality/lazer/tests/test_evaluate_feeds_bulk.py`
 
 **Untouched (intentional):**
+
 - `pythresearch/data_quality/lazer/evaluate_feeds.py` — original papermill loop
 - `pythresearch/data_quality/lazer/evaluate_feed_standalone.py` — engine
 - `pythresearch/data_quality/lazer/publisher_benchmark_eval.ipynb` — interactive
@@ -231,7 +233,7 @@ The bulk runner adds nothing to this tree.
 - **No retries.** A failure is logged and we move on. Operator decides what to
   re-run.
 - **End-of-run summary.** Single line: `Processed N feeds: M succeeded, K
-  failed.` plus, if non-empty, `Failed: [feed_id@date, ...]`. Avoids
+failed.` plus, if non-empty, `Failed: [feed_id@date, ...]`. Avoids
   scrolling-through-stdout to count outcomes.
 - **Process exit code.** `0` iff every row succeeded, else `1`. Useful for CI
   and for `&&` chaining.

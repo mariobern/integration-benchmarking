@@ -30,17 +30,17 @@ requirements.txt                      (REGENERATE via pip-compile)
 
 **Module responsibilities (summarize_feeds.py):**
 
-| Function | Purpose |
-|---|---|
-| `load_excluded_publishers(path) -> set[int]` | Parse markdown table, extract IDs ending in `.Test` + always 0. |
-| `discover_feeds(csv_path) -> list[int]` | Distinct numeric feed_ids from CSV column 1, in first-seen order. |
-| `load_stats(reports_dir, cluster, mode, feed_id, date) -> list[dict] \| None` | Read stats.csv, return None if missing. |
-| `rank_top_n(stats, n, excluded) -> list[dict]` | Drop excluded, sort by rmse_over_spread, take top n. |
-| `apply_filter(stats, max_ros, min_hit, min_obs, fallback_n) -> tuple[list[dict], bool]` | Threshold filter with fallback flag. |
-| `compute_aggregate(per_session_arrays) -> list[int]` | Sorted union of session arrays. |
-| `write_rankings_sheet(ws, per_feed_data, date, cluster)` | Populate sheet 1. |
-| `write_allowed_sheet(ws, per_feed_data, skipped_feeds, date, cluster)` | Populate sheet 2. |
-| `main()` | argparse → glue → workbook write → stdout summary. |
+| Function                                                                                | Purpose                                                           |
+| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `load_excluded_publishers(path) -> set[int]`                                            | Parse markdown table, extract IDs ending in `.Test` + always 0.   |
+| `discover_feeds(csv_path) -> list[int]`                                                 | Distinct numeric feed_ids from CSV column 1, in first-seen order. |
+| `load_stats(reports_dir, cluster, mode, feed_id, date) -> list[dict] \| None`           | Read stats.csv, return None if missing.                           |
+| `rank_top_n(stats, n, excluded) -> list[dict]`                                          | Drop excluded, sort by rmse_over_spread, take top n.              |
+| `apply_filter(stats, max_ros, min_hit, min_obs, fallback_n) -> tuple[list[dict], bool]` | Threshold filter with fallback flag.                              |
+| `compute_aggregate(per_session_arrays) -> list[int]`                                    | Sorted union of session arrays.                                   |
+| `write_rankings_sheet(ws, per_feed_data, date, cluster)`                                | Populate sheet 1.                                                 |
+| `write_allowed_sheet(ws, per_feed_data, skipped_feeds, date, cluster)`                  | Populate sheet 2.                                                 |
+| `main()`                                                                                | argparse → glue → workbook write → stdout summary.                |
 
 ---
 
@@ -66,6 +66,7 @@ pytest pythresearch/data_quality/lazer/tests/test_summarize_feeds.py \
 ## Task 1: Add openpyxl dependency
 
 **Files:**
+
 - Modify: `requirements.in`
 - Regenerate: `requirements.txt`
 
@@ -102,6 +103,7 @@ git commit -m "chore: add openpyxl for DQ summary workbook generation"
 ## Task 2: Module skeleton with constants
 
 **Files:**
+
 - Create: `pythresearch/data_quality/lazer/summarize_feeds.py`
 
 - [ ] **Step 1: Create the skeleton with module-level constants**
@@ -178,6 +180,7 @@ git commit -m "feat: scaffold summarize_feeds module with mode constants"
 ## Task 3: TDD `load_excluded_publishers`
 
 **Files:**
+
 - Create: `pythresearch/data_quality/lazer/tests/test_summarize_feeds.py`
 - Modify: `pythresearch/data_quality/lazer/summarize_feeds.py`
 
@@ -297,6 +300,7 @@ git commit -m "feat: add load_excluded_publishers parser for .Test exclusion"
 ## Task 4: TDD `discover_feeds`
 
 **Files:**
+
 - Modify: `pythresearch/data_quality/lazer/tests/test_summarize_feeds.py`
 - Modify: `pythresearch/data_quality/lazer/summarize_feeds.py`
 
@@ -393,6 +397,7 @@ git commit -m "feat: add discover_feeds CSV parser with malformed-row tolerance"
 ## Task 5: TDD `load_stats`
 
 **Files:**
+
 - Modify: `tests/test_summarize_feeds.py`
 - Modify: `summarize_feeds.py`
 
@@ -478,6 +483,7 @@ git commit -m "feat: add load_stats reader with missing-file None semantics"
 ## Task 6: TDD `rank_top_n`
 
 **Files:**
+
 - Modify: `tests/test_summarize_feeds.py`
 - Modify: `summarize_feeds.py`
 
@@ -580,6 +586,7 @@ git commit -m "feat: add rank_top_n with exclusion + malformed-row tolerance"
 ## Task 7: TDD `apply_filter`
 
 **Files:**
+
 - Modify: `tests/test_summarize_feeds.py`
 - Modify: `summarize_feeds.py`
 
@@ -720,6 +727,7 @@ git commit -m "feat: add apply_filter with per-mode thresholds + fallback"
 ## Task 8: TDD `compute_aggregate`
 
 **Files:**
+
 - Modify: `tests/test_summarize_feeds.py`
 - Modify: `summarize_feeds.py`
 
@@ -793,6 +801,7 @@ git commit -m "feat: add compute_aggregate sorted-union helper"
 ## Task 9: Implement `write_rankings_sheet`
 
 **Files:**
+
 - Modify: `summarize_feeds.py`
 
 This sheet has no unit tests — its contract is exercised by the integration test in Task 11. Cell-level format details (colors, fonts) are explicitly out of scope for testing per the spec.
@@ -925,6 +934,7 @@ git commit -m "feat: add write_rankings_sheet for per-feed mode-side-by-side lay
 ## Task 10: Implement `write_allowed_sheet`
 
 **Files:**
+
 - Modify: `summarize_feeds.py`
 
 - [ ] **Step 1: Implement `write_allowed_sheet`**
@@ -1047,6 +1057,7 @@ git commit -m "feat: add write_allowed_sheet with paste-ready JSON arrays"
 ## Task 11: Implement `main` + happy-path integration test
 
 **Files:**
+
 - Modify: `summarize_feeds.py`
 - Modify: `tests/test_summarize_feeds.py`
 
@@ -1317,6 +1328,7 @@ git commit -m "feat: add main + happy-path integration test for summarize_feeds"
 ## Task 12: Edge-case integration tests
 
 **Files:**
+
 - Modify: `tests/test_summarize_feeds.py`
 
 - [ ] **Step 1: Write failing tests**
@@ -1487,11 +1499,13 @@ Expected: all tests pass. Count should be ≥ 24 (4 + 3 + 2 + 4 + 6 + 4 + 1 + 4 
 - [ ] **Step 2: Run with coverage**
 
 Run:
+
 ```bash
 pytest pythresearch/data_quality/lazer/tests/test_summarize_feeds.py \
     --cov=pythresearch.data_quality.lazer.summarize_feeds \
     --cov-report=term-missing
 ```
+
 Expected: coverage ≥ 80%. If under 80%, add small targeted tests for the missing lines reported in the term-missing output.
 
 - [ ] **Step 3: Verify the existing suite still passes (no regression)**
@@ -1510,9 +1524,11 @@ Expected: all tests pass — both `test_evaluate_feeds_bulk.py` and `test_summar
 - [ ] **Step 1: Run the script against a real CSV that exists in repo**
 
 Run from repo root:
+
 ```bash
 ls *.csv | head -3
 ```
+
 Pick any CSV at the repo root (e.g. `MV_Mario_3_pre.csv` if present). If none exists at root, look under `pythresearch/data_quality/lazer/`.
 
 - [ ] **Step 2: Invoke the new script with that CSV against an existing date**
@@ -1526,11 +1542,13 @@ python3 -m pythresearch.data_quality.lazer.summarize_feeds \
     --date 2026-05-06 \
     --output /tmp/dq_summary_smoke.xlsx
 ```
+
 Expected: stdout summary printed, exit code 0, file `/tmp/dq_summary_smoke.xlsx` exists.
 
 - [ ] **Step 3: Open the file and eyeball the layout**
 
 Open `/tmp/dq_summary_smoke.xlsx` in Excel/Numbers/LibreOffice. Verify:
+
 - `rankings` sheet has 4 mode-block headers and at least one feed banner.
 - `allowed` sheet has tabular rows. Column C contains JSON arrays like `[11, 35, 20]`.
 - Selecting a single cell in column C and copying yields just the JSON text (no merged-cell oddness).
@@ -1564,34 +1582,35 @@ The branch is ready for the user to inspect or open a PR. Do not push or open a 
 
 **Spec coverage check** (every spec section → task that implements it):
 
-| Spec section | Implementing task |
-|---|---|
-| Module file path & function decomposition | Task 2 (skeleton) + Tasks 3–11 (each function) |
-| CLI flags | Task 11 (`main()` argparse) |
-| Mode → session mapping (`MODE_TO_SESSION`) | Task 2 |
-| Data flow (exclusion → rank → filter → aggregate) | Task 11 (`_build_per_feed_data`) |
-| Per-mode thresholds + global `min_n_observations` | Tasks 7, 11 |
-| Excluded publishers (`{0} ∪ .Test`) | Task 3 (loader) + Task 11 (applied at row level) |
-| Fallback when filter empty | Task 7 (function) + Task 11 (used) |
-| `rmse_over_spread` definition (documentation only) | Spec only — no code change needed |
-| `rankings` sheet layout (24-col side-by-side) | Task 9 |
-| `allowed` sheet layout (tabular, no merges) | Task 10 |
-| Aggregate row | Task 8 + Task 10 |
-| Cell coloring (yellow / light-gray for fallback / no-data) | Task 10 |
-| Auto-filter + freeze panes | Tasks 9, 10 |
-| Skipped-feeds footer in `allowed` | Task 10 + integration test in Task 12 |
-| Hard error: missing CSV / publishers.md / cluster dir | Task 11 + integration test in Task 12 |
-| Soft error: missing per-feed-mode `stats.csv` | Task 5 (returns None) + Task 11 (renders `(no data)`) |
-| Soft error: malformed CSV row | Task 4 |
-| Soft error: malformed `stats.csv` row | Tasks 6, 7 |
-| Stdout summary | Task 11 |
-| openpyxl dependency | Task 1 |
-| Tests 1-13 unit + 14-19 integration | Tasks 3–8 (units) + Tasks 11–12 (integration) |
-| 24-column note | Spec said "26 cols total" but 5×4 + 1 + 3 spacers = 24. Plan uses 24 (range A:X). Spec self-review of design doc already noted this discrepancy informally; correcting at implementation time. |
+| Spec section                                               | Implementing task                                                                                                                                                                              |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Module file path & function decomposition                  | Task 2 (skeleton) + Tasks 3–11 (each function)                                                                                                                                                 |
+| CLI flags                                                  | Task 11 (`main()` argparse)                                                                                                                                                                    |
+| Mode → session mapping (`MODE_TO_SESSION`)                 | Task 2                                                                                                                                                                                         |
+| Data flow (exclusion → rank → filter → aggregate)          | Task 11 (`_build_per_feed_data`)                                                                                                                                                               |
+| Per-mode thresholds + global `min_n_observations`          | Tasks 7, 11                                                                                                                                                                                    |
+| Excluded publishers (`{0} ∪ .Test`)                        | Task 3 (loader) + Task 11 (applied at row level)                                                                                                                                               |
+| Fallback when filter empty                                 | Task 7 (function) + Task 11 (used)                                                                                                                                                             |
+| `rmse_over_spread` definition (documentation only)         | Spec only — no code change needed                                                                                                                                                              |
+| `rankings` sheet layout (24-col side-by-side)              | Task 9                                                                                                                                                                                         |
+| `allowed` sheet layout (tabular, no merges)                | Task 10                                                                                                                                                                                        |
+| Aggregate row                                              | Task 8 + Task 10                                                                                                                                                                               |
+| Cell coloring (yellow / light-gray for fallback / no-data) | Task 10                                                                                                                                                                                        |
+| Auto-filter + freeze panes                                 | Tasks 9, 10                                                                                                                                                                                    |
+| Skipped-feeds footer in `allowed`                          | Task 10 + integration test in Task 12                                                                                                                                                          |
+| Hard error: missing CSV / publishers.md / cluster dir      | Task 11 + integration test in Task 12                                                                                                                                                          |
+| Soft error: missing per-feed-mode `stats.csv`              | Task 5 (returns None) + Task 11 (renders `(no data)`)                                                                                                                                          |
+| Soft error: malformed CSV row                              | Task 4                                                                                                                                                                                         |
+| Soft error: malformed `stats.csv` row                      | Tasks 6, 7                                                                                                                                                                                     |
+| Stdout summary                                             | Task 11                                                                                                                                                                                        |
+| openpyxl dependency                                        | Task 1                                                                                                                                                                                         |
+| Tests 1-13 unit + 14-19 integration                        | Tasks 3–8 (units) + Tasks 11–12 (integration)                                                                                                                                                  |
+| 24-column note                                             | Spec said "26 cols total" but 5×4 + 1 + 3 spacers = 24. Plan uses 24 (range A:X). Spec self-review of design doc already noted this discrepancy informally; correcting at implementation time. |
 
 **Placeholder scan:** none. All test code, all implementation code, all commands shown in full. No "implement later", "TBD", or "similar to Task N" references.
 
 **Type / signature consistency:**
+
 - `load_excluded_publishers(path) -> set[int]` — same name in module, tests, and `main()`. ✓
 - `discover_feeds(csv_path) -> list[int]` — consistent. ✓
 - `load_stats(reports_dir, cluster, mode, feed_id, date)` — same arg order in module, tests, and `_build_per_feed_data`. ✓

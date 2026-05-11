@@ -50,6 +50,7 @@ pytest pythresearch/data_quality/lazer/tests/test_evaluate_feeds_bulk.py::test_N
 ## Task 1: Bootstrap test package
 
 **Files:**
+
 - Create: `pythresearch/data_quality/lazer/tests/__init__.py`
 
 - [ ] **Step 1: Create the empty test package init**
@@ -77,6 +78,7 @@ git commit -m "test: bootstrap tests package for lazer DQ"
 ## Task 2: Implement `compute_times_from_mode`
 
 **Files:**
+
 - Create: `pythresearch/data_quality/lazer/evaluate_feeds_bulk.py`
 - Modify: `pythresearch/data_quality/lazer/tests/test_evaluate_feeds_bulk.py`
 
@@ -226,6 +228,7 @@ git commit -m "feat: add compute_times_from_mode for bulk DQ runner"
 ## Task 3: Implement `run_standalone`
 
 **Files:**
+
 - Modify: `pythresearch/data_quality/lazer/evaluate_feeds_bulk.py` (replace `run_standalone` stub)
 - Modify: `pythresearch/data_quality/lazer/tests/test_evaluate_feeds_bulk.py` (append test)
 
@@ -339,6 +342,7 @@ git commit -m "feat: add run_standalone subprocess wrapper for bulk DQ runner"
 ## Task 4: Implement `process_csv` — iteration + parsing tolerance
 
 **Files:**
+
 - Modify: `pythresearch/data_quality/lazer/evaluate_feeds_bulk.py` (replace `process_csv` stub)
 - Modify: `pythresearch/data_quality/lazer/tests/test_evaluate_feeds_bulk.py` (append 4 tests)
 
@@ -557,6 +561,7 @@ git commit -m "feat: add process_csv loop + override + parsing tolerance"
 ## Task 5: `process_csv` result tracking + summary line via `main`
 
 **Files:**
+
 - Modify: `pythresearch/data_quality/lazer/tests/test_evaluate_feeds_bulk.py` (append 3 tests)
 
 `process_csv` already returns `(succeeded, failed, failed_list)` from Task 4. The summary line and exit code live in `main`, which we'll implement in Task 6. We're writing the tests now so they'll be in place when `main` lands.
@@ -634,6 +639,7 @@ These will go green in Task 6 when `main` lands. Don't commit yet — Task 6 pac
 ## Task 6: Implement `main` (argparse + summary + exit code)
 
 **Files:**
+
 - Modify: `pythresearch/data_quality/lazer/evaluate_feeds_bulk.py` (replace `main` stub)
 - Modify: `pythresearch/data_quality/lazer/tests/test_evaluate_feeds_bulk.py` (append 1 test)
 
@@ -765,6 +771,7 @@ echo "exit: $?"
 ```
 
 Expected:
+
 - For each row: `Executing engine for ...` then engine progress (ClickHouse queries, `Saved all plots for feed ... to ...`, `Updated feed ... readiness in ...`).
 - After loop: `Processed 2 feeds: 2 succeeded, 0 failed.` and `exit: 0`.
 
@@ -846,6 +853,7 @@ Expected: empty output (no commits on this branch touched those files).
 
 Run: `git log --name-only main..HEAD --diff-filter=A -- pythresearch/data_quality/lazer/`
 Expected output includes:
+
 - `pythresearch/data_quality/lazer/evaluate_feeds_bulk.py`
 - `pythresearch/data_quality/lazer/tests/__init__.py`
 - `pythresearch/data_quality/lazer/tests/test_evaluate_feeds_bulk.py`
@@ -867,24 +875,25 @@ Expected: ≥80% line coverage on `evaluate_feeds_bulk.py`. The only intentional
 
 Mentally check each spec requirement against this plan:
 
-| Spec requirement | Task |
-|---|---|
-| New `evaluate_feeds_bulk.py` file, no edits to existing files | Tasks 2-6, verified in Task 8 step 2 |
-| `compute_times_from_mode` for 4 modes | Task 2 |
-| `run_standalone` shells out via `subprocess.run`, sys.executable, ENGINE_MODULE | Task 3 |
-| `process_csv` iterates, tolerates whitespace/blanks/short rows, applies override | Task 4 |
-| Per-row failure → continue, no retries | Task 4 (in `process_csv` impl, not aborting on `ok=False`) |
-| End-of-run summary line + failed list | Task 6 (`main`) |
-| Exit code 0 on full success, 1 on any failure | Task 6 (`main`) |
-| Missing CSV → print + sys.exit(1) | Task 6 (`main`) — explicit `csv_path.exists()` check |
-| 13 pytest tests covering specified cases | Tasks 2, 3, 4, 5, 6 (4+1+4+3+1 = 13) |
-| Outputs identical to old papermill flow | Task 7 (parity check on `stats.csv`) |
+| Spec requirement                                                                 | Task                                                       |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| New `evaluate_feeds_bulk.py` file, no edits to existing files                    | Tasks 2-6, verified in Task 8 step 2                       |
+| `compute_times_from_mode` for 4 modes                                            | Task 2                                                     |
+| `run_standalone` shells out via `subprocess.run`, sys.executable, ENGINE_MODULE  | Task 3                                                     |
+| `process_csv` iterates, tolerates whitespace/blanks/short rows, applies override | Task 4                                                     |
+| Per-row failure → continue, no retries                                           | Task 4 (in `process_csv` impl, not aborting on `ok=False`) |
+| End-of-run summary line + failed list                                            | Task 6 (`main`)                                            |
+| Exit code 0 on full success, 1 on any failure                                    | Task 6 (`main`)                                            |
+| Missing CSV → print + sys.exit(1)                                                | Task 6 (`main`) — explicit `csv_path.exists()` check       |
+| 13 pytest tests covering specified cases                                         | Tasks 2, 3, 4, 5, 6 (4+1+4+3+1 = 13)                       |
+| Outputs identical to old papermill flow                                          | Task 7 (parity check on `stats.csv`)                       |
 
 ---
 
 ## Self-Review (against the spec — done by author)
 
 - **Coverage of spec sections:**
+
   - Problem / Goals / Non-Goals → reflected in Goal/Architecture/Scope of this plan.
   - Approach (subprocess loop) → Tasks 3, 4, 6.
   - Components (`compute_times_from_mode`, `run_standalone`, `process_csv`, `main`) → Tasks 2, 3, 4, 6.

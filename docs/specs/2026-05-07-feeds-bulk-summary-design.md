@@ -26,26 +26,26 @@ Replaces the current workflow of opening 4× `dq_reports/.../stats.csv` files pe
 
 **Function decomposition** (one purpose each, ~40-80 lines):
 
-| Function | Purpose |
-|---|---|
-| `load_excluded_publishers(publishers_md_path) -> set[int]` | Parse `publishers.md` markdown table, return IDs whose `Name` ends with `.Test`, plus `0` (always). |
-| `discover_feeds(csv_path) -> list[int]` | Distinct feed_ids from CSV column 1, in the order first seen. |
-| `load_stats(reports_dir, cluster, mode, feed_id, date) -> list[dict] \| None` | Read `dq_reports/<cluster>/<mode>/<feed_id>/<date>/stats.csv`. Return `None` if missing. |
-| `rank_top_n(stats, n, excluded) -> list[dict]` | Drop excluded publisher_ids, sort ascending by `rmse_over_spread`, take top `n`. |
+| Function                                                                                | Purpose                                                                                                                                |
+| --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `load_excluded_publishers(publishers_md_path) -> set[int]`                              | Parse `publishers.md` markdown table, return IDs whose `Name` ends with `.Test`, plus `0` (always).                                    |
+| `discover_feeds(csv_path) -> list[int]`                                                 | Distinct feed_ids from CSV column 1, in the order first seen.                                                                          |
+| `load_stats(reports_dir, cluster, mode, feed_id, date) -> list[dict] \| None`           | Read `dq_reports/<cluster>/<mode>/<feed_id>/<date>/stats.csv`. Return `None` if missing.                                               |
+| `rank_top_n(stats, n, excluded) -> list[dict]`                                          | Drop excluded publisher_ids, sort ascending by `rmse_over_spread`, take top `n`.                                                       |
 | `apply_filter(stats, max_ros, min_hit, min_obs, fallback_n) -> tuple[list[dict], bool]` | Apply per-mode thresholds. Return `(passers, False)` if any pass, else `(top_fallback_n_of_input, True)`. Empty input → `([], False)`. |
-| `compute_aggregate(per_session_arrays) -> list[int]` | Sorted union of arrays. Empty if all empty. |
-| `write_rankings_sheet(ws, per_feed_data, date, cluster)` | Populate sheet 1 (multi-feed, modes side-by-side). |
-| `write_allowed_sheet(ws, per_feed_data, skipped_feeds, date, cluster)` | Populate sheet 2 (tabular, paste-ready). |
-| `main()` | argparse → discover → for each feed gather mode data → write workbook → stdout summary. |
+| `compute_aggregate(per_session_arrays) -> list[int]`                                    | Sorted union of arrays. Empty if all empty.                                                                                            |
+| `write_rankings_sheet(ws, per_feed_data, date, cluster)`                                | Populate sheet 1 (multi-feed, modes side-by-side).                                                                                     |
+| `write_allowed_sheet(ws, per_feed_data, skipped_feeds, date, cluster)`                  | Populate sheet 2 (tabular, paste-ready).                                                                                               |
+| `main()`                                                                                | argparse → discover → for each feed gather mode data → write workbook → stdout summary.                                                |
 
 **Mode → session label mapping:**
 
-| CLI mode | after.json session |
-|---|---|
-| `us-equities` | `REGULAR` |
-| `us-equities-pre` | `PRE_MARKET` |
-| `us-equities-post` | `POST_MARKET` |
-| `us-equities-overnight` | `OVER_NIGHT` |
+| CLI mode                | after.json session |
+| ----------------------- | ------------------ |
+| `us-equities`           | `REGULAR`          |
+| `us-equities-pre`       | `PRE_MARKET`       |
+| `us-equities-post`      | `POST_MARKET`      |
+| `us-equities-overnight` | `OVER_NIGHT`       |
 
 ## CLI
 
@@ -108,16 +108,16 @@ Workbook (1 file):
 
 **Per-mode thresholds (defaults; CLI flags override):**
 
-| Mode | `rmse_over_spread ≤` | `hit_rate_0.1pct ≥` |
-|---|---|---|
-| `us-equities` (regular) | 1.0 | 80% |
-| `us-equities-pre` | 2.0 | 50% |
-| `us-equities-post` | 2.0 | 50% |
-| `us-equities-overnight` | 3.0 | 25% |
+| Mode                    | `rmse_over_spread ≤` | `hit_rate_0.1pct ≥` |
+| ----------------------- | -------------------- | ------------------- |
+| `us-equities` (regular) | 1.0                  | 80%                 |
+| `us-equities-pre`       | 2.0                  | 50%                 |
+| `us-equities-post`      | 2.0                  | 50%                 |
+| `us-equities-overnight` | 3.0                  | 25%                 |
 
 **Always-applied:** `n_observations ≥ 1000` (single global flag, not per-mode).
 
-**Excluded publishers:** parsed dynamically from `publishers.md` at startup. Set = `{0} ∪ {ids whose Name ends with ".Test"}`. Excluded *before* ranking, so they appear in neither sheet.
+**Excluded publishers:** parsed dynamically from `publishers.md` at startup. Set = `{0} ∪ {ids whose Name ends with ".Test"}`. Excluded _before_ ranking, so they appear in neither sheet.
 
 **Fallback:** if zero publishers pass thresholds for a (feed, mode) cell but the input had at least 1 publisher after exclusions, the `allowed` sheet uses the top-`fallback-top` (default 3) by `rmse_over_spread` and flags the row `FALLBACK: 0 passed filter` in `Notes`. The `rankings` sheet always shows the unfiltered top-`top-n`.
 
@@ -131,11 +131,12 @@ Workbook (1 file):
 
 All feeds stacked vertically. Per feed: a header row, a column-header row, top-`top-n` ranking rows × 4 mode blocks side-by-side, blank divider row.
 
-| col | A | B–F | G | H–L | M | N–R | S | T–X |
-|---|---|---|---|---|---|---|---|---|
-| | rank | us-equities (pub, n_obs, rmse, r/s, hit%) | ⎵ | us-equities-pre … | ⎵ | us-equities-post … | ⎵ | us-equities-overnight … |
+| col | A    | B–F                                       | G   | H–L               | M   | N–R                | S   | T–X                     |
+| --- | ---- | ----------------------------------------- | --- | ----------------- | --- | ------------------ | --- | ----------------------- |
+|     | rank | us-equities (pub, n_obs, rmse, r/s, hit%) | ⎵   | us-equities-pre … | ⎵   | us-equities-post … | ⎵   | us-equities-overnight … |
 
 **Formatting (openpyxl):**
+
 - Workbook title in row 1 (merged across A:X), bold, font size 14.
 - Per-feed banner `=== Feed N ===` (merged across A:X), bold, font size 12.
 - Column headers: bold, light gray fill, frozen pane below.
@@ -161,21 +162,23 @@ A9: 1060     | (aggregate) | [12, 19, 22, 45]             |
 
 **Column rules:**
 
-| Col | Content |
-|---|---|
-| A — Feed ID | Numeric. Repeated on every row of a feed's group (no merging). |
-| B — Session | `(aggregate)` first, then `REGULAR`, `PRE_MARKET`, `POST_MARKET`, `OVER_NIGHT` in that order. |
+| Col                     | Content                                                                                                                                             |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A — Feed ID             | Numeric. Repeated on every row of a feed's group (no merging).                                                                                      |
+| B — Session             | `(aggregate)` first, then `REGULAR`, `PRE_MARKET`, `POST_MARKET`, `OVER_NIGHT` in that order.                                                       |
 | C — allowedPublisherIds | Pure JSON array text, e.g. `[11, 35, 20]`. Sorted ascending. For "mode missing", value is the literal string `(no data)`. This is the cell to copy. |
-| D — Notes | Free text. `FALLBACK: 0 passed filter` for fallback rows; `mode missing for <date>` for `(no data)` rows; empty otherwise. |
+| D — Notes               | Free text. `FALLBACK: 0 passed filter` for fallback rows; `mode missing for <date>` for `(no data)` rows; empty otherwise.                          |
 
 **Aggregate semantics:** sorted union of the per-session arrays we actually emit (after exclusions and fallbacks). If every session for a feed is `(no data)`, aggregate is `(no data)`. JSON arrays sorted ascending so output is stable across runs (diff-friendly).
 
 **Cell coloring (openpyxl):**
+
 - Light yellow fill on column D for `FALLBACK` rows.
 - Light gray fill on column D for `(no data)` rows.
 - Never affects copy-paste of column C.
 
 **Sheet behavior:**
+
 - Row 2 frozen so column headers stay visible while scrolling.
 - Excel auto-filter enabled on row 2 — lets the user filter by session, by feed, or hide `(no data)` rows.
 - No merged cells anywhere on this sheet.
@@ -193,18 +196,21 @@ If zero feeds were skipped, the footer is omitted.
 ## Error Handling
 
 **Hard errors (exit 1):**
+
 - `--csv` file missing.
 - `publishers.md` missing (we need it to build the exclusion set; refusing to run is safer than letting `.Test` publishers leak through).
 - `dq_reports/<cluster>/` missing entirely.
 - After processing, no feed produced any data (likely user error — wrong date or cluster).
 
 **Soft errors (warn-and-continue, exit 0 if any feed had data):**
+
 - Individual feed/mode `stats.csv` missing → render as `(no data)` cell.
 - CSV row malformed (empty, fewer columns than required, non-numeric feed_id) → skip with one-line warning.
 - `stats.csv` row with non-numeric `rmse_over_spread` / `hit_rate_0.1pct` / `n_observations` → skip that publisher with warning.
 - `publishers.md` malformed table row → skip with warning.
 
 **Logical edge cases:**
+
 - All publishers excluded for a mode → treat as `(no data)`.
 - Filter returns zero **and** ranked list empty after exclusions → `(no data)` (no fallback to invent from nothing).
 - Filter returns zero with `< fallback_top` publishers in input → fallback to whatever exists (1 or 2), still flagged `FALLBACK`.
@@ -263,6 +269,7 @@ Tests at `pythresearch/data_quality/lazer/tests/test_summarize_feeds.py`. Pytest
 19. `test_main_excluded_publishers_never_appear_in_either_sheet` — `.Test` publisher with stellar `rmse_over_spread` not present.
 
 **Fixtures** (reused):
+
 - `tmp_publishers_md` — minimal markdown table with one `.Test`, one `.Production`.
 - `tmp_dq_reports_tree(tmp_path)` — builder helper creating the full `dq_reports/<cluster>/<mode>/<feed>/<date>/stats.csv` tree with parameterized rows.
 - `tmp_csv` — small CSV mimicking `MV_Mario_*.csv`.
