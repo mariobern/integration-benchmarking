@@ -39,6 +39,8 @@ python quick_benchmark.py --csv price_id_list.csv
 | `generate_source_upload.py`       | Generate CSVs for Datascope instrument onboarding      | [Details](docs/generate_source_upload.md)       |
 | `generate_price_list.py`          | Generate price_id_list.csv from feed IDs               | See below                                       |
 | `isin_resolver_v2.py`             | Resolve tickers to ISINs (multi-tier)                  | [Details](docs/isin_resolver_v2.md)             |
+| `lazer_dq/evaluate_feeds_bulk.py` | Bulk lazer DQ runner — subprocess engine per CSV row   | [Details](docs/evaluate_feeds_bulk.md)          |
+| `lazer_dq/summarize_feeds.py`     | Roll up bulk DQ outputs into an Excel summary workbook | [Details](docs/summarize_feeds.md)              |
 | `portal/`                         | Self-service FastAPI dashboard + daily batch runner    | [Details](docs/portal_usage.md)                 |
 
 ## Quick Benchmark Notes
