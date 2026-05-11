@@ -29,7 +29,6 @@ import os
 import re
 import subprocess
 import yaml
-import logger
 from pathlib import Path
 from datetime import timedelta
 from datetime import time
