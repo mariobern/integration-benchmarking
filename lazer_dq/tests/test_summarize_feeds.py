@@ -10,6 +10,7 @@ from lazer_dq.summarize_feeds import (
 
 # ---------- load_excluded_publishers ----------
 
+
 def _write_publishers_md(tmp_path: Path, body: str) -> Path:
     p = tmp_path / "publishers.md"
     p.write_text(body)
@@ -17,7 +18,9 @@ def _write_publishers_md(tmp_path: Path, body: str) -> Path:
 
 
 def test_load_excluded_publishers_extracts_dot_test_and_zero(tmp_path):
-    md = _write_publishers_md(tmp_path, """\
+    md = _write_publishers_md(
+        tmp_path,
+        """\
 # Publisher IDs and Names
 | ID  | Name                  | Active |
 | --- | --------------------- | ------ |
@@ -25,7 +28,8 @@ def test_load_excluded_publishers_extracts_dot_test_and_zero(tmp_path):
 | 23  | LoTech.Test           | Yes    |
 | 25  | CharlesworthResearch.Test | Yes |
 | 26  | CharlesworthResearch.Production | Yes |
-""")
+""",
+    )
     assert load_excluded_publishers(md) == {0, 23, 25}
 
 
@@ -35,23 +39,29 @@ def test_load_excluded_publishers_always_includes_zero_even_if_empty_md(tmp_path
 
 
 def test_load_excluded_publishers_handles_malformed_row(tmp_path):
-    md = _write_publishers_md(tmp_path, """\
+    md = _write_publishers_md(
+        tmp_path,
+        """\
 | ID  | Name        | Active |
 | --- | ----------- | ------ |
 | abc | Bad.Test    | Yes    |
 | 27  | MEMX.Test   | Yes    |
-""")
+""",
+    )
     # Malformed ID row skipped, valid one parsed.
     assert load_excluded_publishers(md) == {0, 27}
 
 
 def test_load_excluded_publishers_ignores_production_publishers(tmp_path):
-    md = _write_publishers_md(tmp_path, """\
+    md = _write_publishers_md(
+        tmp_path,
+        """\
 | ID  | Name              | Active |
 | --- | ----------------- | ------ |
 | 1   | Lazer.Binance     | Yes    |
 | 2   | Jump.Production   | Yes    |
-""")
+""",
+    )
     assert load_excluded_publishers(md) == {0}
 
 
@@ -59,6 +69,7 @@ from lazer_dq.summarize_feeds import discover_feeds
 
 
 # ---------- discover_feeds ----------
+
 
 def test_discover_feeds_returns_distinct_feed_ids_from_csv(tmp_path):
     csv = tmp_path / "input.csv"
@@ -75,9 +86,9 @@ def test_discover_feeds_skips_malformed_rows(tmp_path, capsys):
     csv = tmp_path / "input.csv"
     csv.write_text(
         "1021, 2026-05-06, us-equities-pre\n"
-        "\n"                                 # blank line
-        ", , \n"                             # empty fields
-        "abc, 2026-05-06, us-equities\n"     # non-numeric feed_id
+        "\n"  # blank line
+        ", , \n"  # empty fields
+        "abc, 2026-05-06, us-equities\n"  # non-numeric feed_id
         "1060, 2026-05-06, us-equities\n"
     )
     assert discover_feeds(csv) == [1021, 1060]
@@ -118,8 +129,14 @@ def test_load_stats_returns_none_for_missing_file(tmp_path):
 
 def test_load_stats_parses_real_csv_format(tmp_path):
     _write_stats_csv(
-        tmp_path, "lazer-prod", "us-equities-post", 1021, "2026-05-06",
-        ["1021,11,22218,-0.05,0.08,-0.01,0.02,0.0932,0.51,0.0185,0.07,-84,0,75,0,0,100.0,0.96,fail\n"]
+        tmp_path,
+        "lazer-prod",
+        "us-equities-post",
+        1021,
+        "2026-05-06",
+        [
+            "1021,11,22218,-0.05,0.08,-0.01,0.02,0.0932,0.51,0.0185,0.07,-84,0,75,0,0,100.0,0.96,fail\n"
+        ],
     )
     rows = load_stats(tmp_path, "lazer-prod", "us-equities-post", 1021, "2026-05-06")
     assert rows is not None
@@ -133,6 +150,7 @@ from lazer_dq.summarize_feeds import rank_top_n
 
 
 # ---------- rank_top_n ----------
+
 
 def _stat(publisher_id, ros, hit=80.0, n_obs=10000):
     """Helper: minimal stats.csv-style dict."""
@@ -166,7 +184,12 @@ def test_rank_top_n_excludes_excluded_publishers():
 def test_rank_top_n_skips_rows_with_bad_rmse_over_spread(capsys):
     stats = [
         _stat(11, 0.1),
-        {"publisher_id": "20", "rmse_over_spread": "abc", "hit_rate_0.1pct": "0", "n_observations": "0"},
+        {
+            "publisher_id": "20",
+            "rmse_over_spread": "abc",
+            "hit_rate_0.1pct": "0",
+            "n_observations": "0",
+        },
         _stat(35, 0.2),
     ]
     ranked = rank_top_n(stats, n=10, excluded=set())
@@ -178,13 +201,16 @@ from lazer_dq.summarize_feeds import apply_filter
 
 # ---------- apply_filter ----------
 
+
 def test_apply_filter_returns_passers_when_present():
     stats = [
-        _stat(11, 0.5, hit=90, n_obs=10000),   # passes
-        _stat(20, 1.5, hit=90, n_obs=10000),   # fails ros
-        _stat(35, 0.3, hit=85, n_obs=10000),   # passes
+        _stat(11, 0.5, hit=90, n_obs=10000),  # passes
+        _stat(20, 1.5, hit=90, n_obs=10000),  # fails ros
+        _stat(35, 0.3, hit=85, n_obs=10000),  # passes
     ]
-    passers, is_fallback = apply_filter(stats, max_ros=1.0, min_hit=80, min_obs=1000, fallback_n=3)
+    passers, is_fallback = apply_filter(
+        stats, max_ros=1.0, min_hit=80, min_obs=1000, fallback_n=3
+    )
     assert is_fallback is False
     assert {r["publisher_id"] for r in passers} == {"11", "35"}
     # Sorted ascending by rmse_over_spread.
@@ -198,7 +224,9 @@ def test_apply_filter_returns_fallback_when_zero_pass():
         _stat(35, 6.0, hit=10, n_obs=10000),
         _stat(42, 7.0, hit=10, n_obs=10000),
     ]
-    passers, is_fallback = apply_filter(stats, max_ros=1.0, min_hit=80, min_obs=1000, fallback_n=3)
+    passers, is_fallback = apply_filter(
+        stats, max_ros=1.0, min_hit=80, min_obs=1000, fallback_n=3
+    )
     assert is_fallback is True
     # Top-3 by rmse_over_spread: 20 (4.0), 11 (5.0), 35 (6.0).
     assert [r["publisher_id"] for r in passers] == ["20", "11", "35"]
@@ -206,23 +234,29 @@ def test_apply_filter_returns_fallback_when_zero_pass():
 
 def test_apply_filter_returns_partial_when_under_fallback_size():
     stats = [_stat(11, 5.0, hit=10), _stat(20, 4.0, hit=10)]
-    passers, is_fallback = apply_filter(stats, max_ros=1.0, min_hit=80, min_obs=1000, fallback_n=3)
+    passers, is_fallback = apply_filter(
+        stats, max_ros=1.0, min_hit=80, min_obs=1000, fallback_n=3
+    )
     assert is_fallback is True
     assert [r["publisher_id"] for r in passers] == ["20", "11"]
 
 
 def test_apply_filter_returns_empty_when_input_empty():
-    passers, is_fallback = apply_filter([], max_ros=1.0, min_hit=80, min_obs=1000, fallback_n=3)
+    passers, is_fallback = apply_filter(
+        [], max_ros=1.0, min_hit=80, min_obs=1000, fallback_n=3
+    )
     assert passers == []
     assert is_fallback is False
 
 
 def test_apply_filter_excludes_low_n_observations():
     stats = [
-        _stat(11, 0.1, hit=90, n_obs=500),      # fails n_obs
-        _stat(20, 0.2, hit=90, n_obs=10000),    # passes
+        _stat(11, 0.1, hit=90, n_obs=500),  # fails n_obs
+        _stat(20, 0.2, hit=90, n_obs=10000),  # passes
     ]
-    passers, is_fallback = apply_filter(stats, max_ros=1.0, min_hit=80, min_obs=1000, fallback_n=3)
+    passers, is_fallback = apply_filter(
+        stats, max_ros=1.0, min_hit=80, min_obs=1000, fallback_n=3
+    )
     assert is_fallback is False
     assert [r["publisher_id"] for r in passers] == ["20"]
 
@@ -235,10 +269,14 @@ def test_apply_filter_uses_per_mode_thresholds():
         _stat(35, 2.5, hit=20, n_obs=10000),
     ]
     # Regular: max_ros=1.0, min_hit=80 → nobody passes → fallback top-3.
-    passers, fb = apply_filter(stats, max_ros=1.0, min_hit=80, min_obs=1000, fallback_n=3)
+    passers, fb = apply_filter(
+        stats, max_ros=1.0, min_hit=80, min_obs=1000, fallback_n=3
+    )
     assert fb is True and len(passers) == 3
     # Overnight: max_ros=3.0, min_hit=25 → 11 and 20 pass.
-    passers, fb = apply_filter(stats, max_ros=3.0, min_hit=25, min_obs=1000, fallback_n=3)
+    passers, fb = apply_filter(
+        stats, max_ros=3.0, min_hit=25, min_obs=1000, fallback_n=3
+    )
     assert fb is False
     assert {r["publisher_id"] for r in passers} == {"11", "20"}
 
@@ -247,6 +285,7 @@ from lazer_dq.summarize_feeds import compute_aggregate
 
 
 # ---------- compute_aggregate ----------
+
 
 def test_compute_aggregate_is_sorted_union_of_per_session_arrays():
     arrays = [[11, 20, 35], [20, 22, 41], [11, 42]]
@@ -281,12 +320,14 @@ def test_main_writes_workbook_for_one_feed_one_mode(tmp_path, monkeypatch, capsy
     """End-to-end happy path: 1 feed, 1 mode populated, 3 missing modes."""
     # publishers.md
     pubs_md = tmp_path / "publishers.md"
-    pubs_md.write_text("""\
+    pubs_md.write_text(
+        """\
 | ID  | Name              | Active |
 | --- | ----------------- | ------ |
 | 11  | Amber.Production  | Yes    |
 | 23  | LoTech.Test       | Yes    |
-""")
+"""
+    )
 
     # CSV with one feed.
     csv = tmp_path / "input.csv"
@@ -295,25 +336,39 @@ def test_main_writes_workbook_for_one_feed_one_mode(tmp_path, monkeypatch, capsy
     # dq_reports tree - only us-equities-post for feed 1021 has data.
     reports = tmp_path / "dq_reports"
     _write_stats_csv(
-        reports, "lazer-prod", "us-equities-post", 1021, "2026-05-06",
+        reports,
+        "lazer-prod",
+        "us-equities-post",
+        1021,
+        "2026-05-06",
         [
             "1021,11,22218,-0.05,0.08,-0.01,0.02,0.0932,0.51,0.0185,0.07,-84,0,75,0,0,100.0,0.96,fail\n",
             # excluded .Test publisher 23 - must not appear anywhere.
             "1021,23,5000,-0.05,0.08,-0.01,0.02,0.05,0.5,0.01,0.05,0,0,0,0,0,100.0,0.5,fail\n",
-        ]
+        ],
     )
 
     out_path = tmp_path / "out.xlsx"
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(sys, "argv", [
-        "summarize_feeds",
-        "--csv", str(csv),
-        "--cluster", "lazer-prod",
-        "--date", "2026-05-06",
-        "--reports-dir", str(reports),
-        "--publishers-md", str(pubs_md),
-        "--output", str(out_path),
-    ])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "summarize_feeds",
+            "--csv",
+            str(csv),
+            "--cluster",
+            "lazer-prod",
+            "--date",
+            "2026-05-06",
+            "--reports-dir",
+            str(reports),
+            "--publishers-md",
+            str(pubs_md),
+            "--output",
+            str(out_path),
+        ],
+    )
 
     with pytest.raises(SystemExit) as exc:
         main()
@@ -342,35 +397,57 @@ def test_main_writes_workbook_for_one_feed_one_mode(tmp_path, monkeypatch, capsy
     # Rankings sheet: feed banner + at least 1 data row.
     rank = wb["rankings"]
     found_banner = any(
-        rank.cell(r, 1).value == "=== Feed 1021 ==="
-        for r in range(1, 30)
+        rank.cell(r, 1).value == "=== Feed 1021 ===" for r in range(1, 30)
     )
     assert found_banner
 
 
-def test_main_skipped_feeds_section_lists_zero_data_feeds(tmp_path, monkeypatch, capsys):
+def test_main_skipped_feeds_section_lists_zero_data_feeds(
+    tmp_path, monkeypatch, capsys
+):
     """Feed in CSV with no data anywhere → listed in skipped footer + stdout summary."""
     pubs_md = tmp_path / "publishers.md"
-    pubs_md.write_text("| ID | Name | Active |\n| --- | --- | --- |\n| 11 | Amber.Production | Yes |\n")
+    pubs_md.write_text(
+        "| ID | Name | Active |\n| --- | --- | --- |\n| 11 | Amber.Production | Yes |\n"
+    )
 
     csv = tmp_path / "input.csv"
     csv.write_text("1021, 2026-05-06, us-equities\n9999, 2026-05-06, us-equities\n")
 
     reports = tmp_path / "dq_reports"
     _write_stats_csv(
-        reports, "lazer-prod", "us-equities", 1021, "2026-05-06",
-        ["1021,11,22218,-0.05,0.08,-0.01,0.02,0.0932,0.51,0.0185,0.07,-84,0,75,0,0,100.0,0.96,fail\n"]
+        reports,
+        "lazer-prod",
+        "us-equities",
+        1021,
+        "2026-05-06",
+        [
+            "1021,11,22218,-0.05,0.08,-0.01,0.02,0.0932,0.51,0.0185,0.07,-84,0,75,0,0,100.0,0.96,fail\n"
+        ],
     )
     # Feed 9999 has no stats anywhere.
 
     out_path = tmp_path / "out.xlsx"
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(sys, "argv", [
-        "summarize_feeds",
-        "--csv", str(csv), "--cluster", "lazer-prod", "--date", "2026-05-06",
-        "--reports-dir", str(reports), "--publishers-md", str(pubs_md),
-        "--output", str(out_path),
-    ])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "summarize_feeds",
+            "--csv",
+            str(csv),
+            "--cluster",
+            "lazer-prod",
+            "--date",
+            "2026-05-06",
+            "--reports-dir",
+            str(reports),
+            "--publishers-md",
+            str(pubs_md),
+            "--output",
+            str(out_path),
+        ],
+    )
     with pytest.raises(SystemExit) as exc:
         main()
     assert exc.value.code == 0
@@ -406,12 +483,25 @@ def test_main_no_data_anywhere_exits_nonzero(tmp_path, monkeypatch):
 
     out_path = tmp_path / "out.xlsx"
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(sys, "argv", [
-        "summarize_feeds",
-        "--csv", str(csv), "--cluster", "lazer-prod", "--date", "2026-05-06",
-        "--reports-dir", str(reports), "--publishers-md", str(pubs_md),
-        "--output", str(out_path),
-    ])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "summarize_feeds",
+            "--csv",
+            str(csv),
+            "--cluster",
+            "lazer-prod",
+            "--date",
+            "2026-05-06",
+            "--reports-dir",
+            str(reports),
+            "--publishers-md",
+            str(pubs_md),
+            "--output",
+            str(out_path),
+        ],
+    )
     with pytest.raises(SystemExit) as exc:
         main()
     assert exc.value.code == 1
@@ -420,34 +510,53 @@ def test_main_no_data_anywhere_exits_nonzero(tmp_path, monkeypatch):
 def test_main_excluded_publishers_never_appear_in_either_sheet(tmp_path, monkeypatch):
     """A .Test publisher with stellar metrics must not appear in rankings or allowed."""
     pubs_md = tmp_path / "publishers.md"
-    pubs_md.write_text("""\
+    pubs_md.write_text(
+        """\
 | ID | Name             | Active |
 | --- | --------------- | ------ |
 | 11 | Amber.Production | Yes   |
 | 23 | LoTech.Test      | Yes   |
-""")
+"""
+    )
 
     csv = tmp_path / "input.csv"
     csv.write_text("1021, 2026-05-06, us-equities\n")
 
     reports = tmp_path / "dq_reports"
     _write_stats_csv(
-        reports, "lazer-prod", "us-equities", 1021, "2026-05-06",
+        reports,
+        "lazer-prod",
+        "us-equities",
+        1021,
+        "2026-05-06",
         [
             # publisher 23 has the BEST rmse_over_spread but is .Test → must be filtered out.
             "1021,23,99999,-0.001,0.001,-0.0001,0.0001,0.001,0.001,0.0001,0.001,0,0,0,0,0,100.0,0.01,fail\n",
             "1021,11,22218,-0.05,0.08,-0.01,0.02,0.0932,0.51,0.0185,0.07,-84,0,75,0,0,100.0,0.96,fail\n",
-        ]
+        ],
     )
 
     out_path = tmp_path / "out.xlsx"
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(sys, "argv", [
-        "summarize_feeds",
-        "--csv", str(csv), "--cluster", "lazer-prod", "--date", "2026-05-06",
-        "--reports-dir", str(reports), "--publishers-md", str(pubs_md),
-        "--output", str(out_path),
-    ])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "summarize_feeds",
+            "--csv",
+            str(csv),
+            "--cluster",
+            "lazer-prod",
+            "--date",
+            "2026-05-06",
+            "--reports-dir",
+            str(reports),
+            "--publishers-md",
+            str(pubs_md),
+            "--output",
+            str(out_path),
+        ],
+    )
     with pytest.raises(SystemExit) as exc:
         main()
     assert exc.value.code == 0
@@ -458,10 +567,13 @@ def test_main_excluded_publishers_never_appear_in_either_sheet(tmp_path, monkeyp
     rank = wb["rankings"]
     for r in range(1, 30):
         for c in range(1, 25):
-            assert rank.cell(r, c).value != 23, f"excluded publisher 23 leaked into rankings at ({r},{c})"
+            assert (
+                rank.cell(r, c).value != 23
+            ), f"excluded publisher 23 leaked into rankings at ({r},{c})"
 
     # Allowed sheet: column C JSON arrays must not contain 23.
     import re as _re
+
     allow = wb["allowed"]
     for r in range(1, 30):
         v = allow.cell(r, 3).value
@@ -479,12 +591,21 @@ def test_main_missing_csv_exits_nonzero(tmp_path, monkeypatch, capsys):
     pubs_md.write_text("| ID | Name | Active |\n| --- | --- | --- |\n")
 
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(sys, "argv", [
-        "summarize_feeds",
-        "--csv", str(tmp_path / "missing.csv"),
-        "--cluster", "lazer-prod", "--date", "2026-05-06",
-        "--publishers-md", str(pubs_md),
-    ])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "summarize_feeds",
+            "--csv",
+            str(tmp_path / "missing.csv"),
+            "--cluster",
+            "lazer-prod",
+            "--date",
+            "2026-05-06",
+            "--publishers-md",
+            str(pubs_md),
+        ],
+    )
     with pytest.raises(SystemExit) as exc:
         main()
     assert exc.value.code == 1

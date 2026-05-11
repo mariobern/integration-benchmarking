@@ -92,7 +92,9 @@ def discover_feeds(csv_path) -> list[int]:
             try:
                 feed_id = int(raw)
             except ValueError:
-                print(f"  Warning: skipping malformed CSV row (non-numeric feed_id): {raw!r}")
+                print(
+                    f"  Warning: skipping malformed CSV row (non-numeric feed_id): {raw!r}"
+                )
                 continue
             if feed_id not in seen_set:
                 seen.append(feed_id)
@@ -128,7 +130,9 @@ def rank_top_n(stats, n: int, excluded: set[int]) -> list[dict]:
         try:
             ros = float(r["rmse_over_spread"])
         except (ValueError, KeyError):
-            print(f"  Warning: skipping row with bad rmse_over_spread: publisher_id={r.get('publisher_id')}")
+            print(
+                f"  Warning: skipping row with bad rmse_over_spread: publisher_id={r.get('publisher_id')}"
+            )
             continue
         keyed.append((ros, r))
     keyed.sort(key=lambda x: x[0])
@@ -208,10 +212,10 @@ def write_rankings_sheet(ws, per_feed_data: dict, date: str, cluster: str) -> No
     center = Alignment(horizontal="center")
 
     mode_starts = {  # 1-indexed start columns of each 5-col mode block
-        "us-equities": 2,            # B
-        "us-equities-pre": 8,        # H
-        "us-equities-post": 14,      # N
-        "us-equities-overnight": 20, # T
+        "us-equities": 2,  # B
+        "us-equities-pre": 8,  # H
+        "us-equities-post": 14,  # N
+        "us-equities-overnight": 20,  # T
     }
     sub_headers = ["pub", "n_obs", "rmse", "r/s", "hit%"]
 
@@ -255,12 +259,11 @@ def write_rankings_sheet(ws, per_feed_data: dict, date: str, cluster: str) -> No
 
         # Top-N data rows.
         ranked_per_mode = {
-            m: (mode_data[m]["ranked"] if mode_data.get(m) else None) for m in MODE_ORDER
+            m: (mode_data[m]["ranked"] if mode_data.get(m) else None)
+            for m in MODE_ORDER
         }
         # Determine row count = max ranked length, capped at top_n (already capped upstream).
-        n_rows = max(
-            (len(r) for r in ranked_per_mode.values() if r), default=0
-        )
+        n_rows = max((len(r) for r in ranked_per_mode.values() if r), default=0)
         if n_rows == 0:
             # Every mode is None → still emit a single "(no data)" row for visibility.
             ws.cell(row=row, column=2, value="(no data)")
@@ -279,8 +282,16 @@ def write_rankings_sheet(ws, per_feed_data: dict, date: str, cluster: str) -> No
                 ws.cell(row=row + i, column=start + 0, value=int(r["publisher_id"]))
                 ws.cell(row=row + i, column=start + 1, value=int(r["n_observations"]))
                 ws.cell(row=row + i, column=start + 2, value=round(float(r["rmse"]), 4))
-                ws.cell(row=row + i, column=start + 3, value=round(float(r["rmse_over_spread"]), 4))
-                ws.cell(row=row + i, column=start + 4, value=round(float(r["hit_rate_0.1pct"]), 2))
+                ws.cell(
+                    row=row + i,
+                    column=start + 3,
+                    value=round(float(r["rmse_over_spread"]), 4),
+                )
+                ws.cell(
+                    row=row + i,
+                    column=start + 4,
+                    value=round(float(r["hit_rate_0.1pct"]), 2),
+                )
         row += n_rows + 1  # data rows + blank divider
 
     # Reasonable column widths.
@@ -299,7 +310,9 @@ def _format_allowed_pub_ids(ids: list[int]) -> str:
     return f'"allowedPublisherIds": [ {", ".join(str(i) for i in ids)} ],'
 
 
-def write_allowed_sheet(ws, per_feed_data: dict, skipped_feeds: list[int], date: str, cluster: str) -> None:
+def write_allowed_sheet(
+    ws, per_feed_data: dict, skipped_feeds: list[int], date: str, cluster: str
+) -> None:
     """Populate the 'allowed' worksheet.
 
     Layout (4 cols, NO merges):
@@ -320,10 +333,14 @@ def write_allowed_sheet(ws, per_feed_data: dict, skipped_feeds: list[int], date:
     bold_xl = Font(bold=True, size=14)
     gray = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
     yellow = PatternFill(start_color="FFF4B5", end_color="FFF4B5", fill_type="solid")
-    light_gray = PatternFill(start_color="EEEEEE", end_color="EEEEEE", fill_type="solid")
+    light_gray = PatternFill(
+        start_color="EEEEEE", end_color="EEEEEE", fill_type="solid"
+    )
 
     # Row 1: title (single cell, no merge).
-    ws.cell(row=1, column=1, value=f"Allowed Publishers — {cluster} — {date}").font = bold_xl
+    ws.cell(
+        row=1, column=1, value=f"Allowed Publishers — {cluster} — {date}"
+    ).font = bold_xl
 
     # Row 2: column headers.
     headers = ["Feed ID", "Session", "allowedPublisherIds", "Notes"]
@@ -352,7 +369,11 @@ def write_allowed_sheet(ws, per_feed_data: dict, skipped_feeds: list[int], date:
         agg = compute_aggregate(per_session_arrays)
         ws.cell(row=row, column=1, value=feed_id)
         ws.cell(row=row, column=2, value="(aggregate)")
-        ws.cell(row=row, column=3, value=_format_allowed_pub_ids(agg) if agg else "(no data)")
+        ws.cell(
+            row=row,
+            column=3,
+            value=_format_allowed_pub_ids(agg) if agg else "(no data)",
+        )
         if not agg:
             ws.cell(row=row, column=4, value="all sessions empty").fill = light_gray
         row += 1
@@ -365,15 +386,21 @@ def write_allowed_sheet(ws, per_feed_data: dict, skipped_feeds: list[int], date:
             ws.cell(row=row, column=2, value=session_label)
             if md is None:
                 ws.cell(row=row, column=3, value="(no data)")
-                ws.cell(row=row, column=4, value=f"mode missing for {date}").fill = light_gray
+                ws.cell(
+                    row=row, column=4, value=f"mode missing for {date}"
+                ).fill = light_gray
             elif ids is None:
                 # Filter returned empty *after* parsing rows — rare, treat as no data.
                 ws.cell(row=row, column=3, value="(no data)")
-                ws.cell(row=row, column=4, value="filter empty after parse").fill = light_gray
+                ws.cell(
+                    row=row, column=4, value="filter empty after parse"
+                ).fill = light_gray
             else:
                 ws.cell(row=row, column=3, value=_format_allowed_pub_ids(ids))
                 if md["is_fallback"]:
-                    ws.cell(row=row, column=4, value="FALLBACK: 0 passed filter").fill = yellow
+                    ws.cell(
+                        row=row, column=4, value="FALLBACK: 0 passed filter"
+                    ).fill = yellow
             row += 1
 
         row += 1  # blank divider between feeds
@@ -381,7 +408,9 @@ def write_allowed_sheet(ws, per_feed_data: dict, skipped_feeds: list[int], date:
     # Skipped-feeds footer.
     if skipped_feeds:
         row += 1
-        ws.cell(row=row, column=1, value="Feeds skipped (no data for any mode):").font = bold
+        ws.cell(
+            row=row, column=1, value="Feeds skipped (no data for any mode):"
+        ).font = bold
         for fid in skipped_feeds:
             row += 1
             ws.cell(row=row, column=1, value=fid)
@@ -398,8 +427,16 @@ def write_allowed_sheet(ws, per_feed_data: dict, skipped_feeds: list[int], date:
 
 
 def _build_per_feed_data(
-    feed_ids, reports_dir, cluster, date, excluded, top_n,
-    max_ros_map, min_hit_map, min_obs, fallback_top,
+    feed_ids,
+    reports_dir,
+    cluster,
+    date,
+    excluded,
+    top_n,
+    max_ros_map,
+    min_hit_map,
+    min_obs,
+    fallback_top,
 ):
     """Returns (per_feed_data, skipped_feeds, fallback_count, modes_with_data_count)."""
     per_feed_data: dict = {}
@@ -432,7 +469,11 @@ def _build_per_feed_data(
             filtered, is_fallback = apply_filter(
                 kept, max_ros_map[mode], min_hit_map[mode], min_obs, fallback_top
             )
-            mode_data[mode] = {"ranked": ranked, "filtered": filtered, "is_fallback": is_fallback}
+            mode_data[mode] = {
+                "ranked": ranked,
+                "filtered": filtered,
+                "is_fallback": is_fallback,
+            }
             any_data = True
             modes_with_data += 1
             if is_fallback:
@@ -453,31 +494,62 @@ Example:
       --csv MV_Mario_3_pre.csv --cluster lazer-prod --date 2026-05-06
 """,
     )
-    parser.add_argument("--csv", required=True, help="CSV: feed_id,date,mode per row (column 1 used)")
-    parser.add_argument("--cluster", required=True, help="Cluster name (e.g. lazer-prod)")
+    parser.add_argument(
+        "--csv", required=True, help="CSV: feed_id,date,mode per row (column 1 used)"
+    )
+    parser.add_argument(
+        "--cluster", required=True, help="Cluster name (e.g. lazer-prod)"
+    )
     parser.add_argument("--date", required=True, help="Date YYYY-MM-DD")
-    parser.add_argument("--reports-dir", default="dq_reports",
-                        help="Base reports directory (default: dq_reports)")
-    parser.add_argument("--publishers-md", default="publishers.md",
-                        help="Path to publishers.md (default: publishers.md)")
-    parser.add_argument("--output", default=None,
-                        help="Output .xlsx path (default: dq_summary_<cluster>_<date>.xlsx)")
-    parser.add_argument("--max-rmse-over-spread-regular", type=float,
-                        default=DEFAULT_MAX_ROS["us-equities"])
-    parser.add_argument("--min-hit-rate-regular", type=float,
-                        default=DEFAULT_MIN_HIT["us-equities"])
-    parser.add_argument("--max-rmse-over-spread-pre", type=float,
-                        default=DEFAULT_MAX_ROS["us-equities-pre"])
-    parser.add_argument("--min-hit-rate-pre", type=float,
-                        default=DEFAULT_MIN_HIT["us-equities-pre"])
-    parser.add_argument("--max-rmse-over-spread-post", type=float,
-                        default=DEFAULT_MAX_ROS["us-equities-post"])
-    parser.add_argument("--min-hit-rate-post", type=float,
-                        default=DEFAULT_MIN_HIT["us-equities-post"])
-    parser.add_argument("--max-rmse-over-spread-overnight", type=float,
-                        default=DEFAULT_MAX_ROS["us-equities-overnight"])
-    parser.add_argument("--min-hit-rate-overnight", type=float,
-                        default=DEFAULT_MIN_HIT["us-equities-overnight"])
+    parser.add_argument(
+        "--reports-dir",
+        default="dq_reports",
+        help="Base reports directory (default: dq_reports)",
+    )
+    parser.add_argument(
+        "--publishers-md",
+        default="publishers.md",
+        help="Path to publishers.md (default: publishers.md)",
+    )
+    parser.add_argument(
+        "--output",
+        default=None,
+        help="Output .xlsx path (default: dq_summary_<cluster>_<date>.xlsx)",
+    )
+    parser.add_argument(
+        "--max-rmse-over-spread-regular",
+        type=float,
+        default=DEFAULT_MAX_ROS["us-equities"],
+    )
+    parser.add_argument(
+        "--min-hit-rate-regular", type=float, default=DEFAULT_MIN_HIT["us-equities"]
+    )
+    parser.add_argument(
+        "--max-rmse-over-spread-pre",
+        type=float,
+        default=DEFAULT_MAX_ROS["us-equities-pre"],
+    )
+    parser.add_argument(
+        "--min-hit-rate-pre", type=float, default=DEFAULT_MIN_HIT["us-equities-pre"]
+    )
+    parser.add_argument(
+        "--max-rmse-over-spread-post",
+        type=float,
+        default=DEFAULT_MAX_ROS["us-equities-post"],
+    )
+    parser.add_argument(
+        "--min-hit-rate-post", type=float, default=DEFAULT_MIN_HIT["us-equities-post"]
+    )
+    parser.add_argument(
+        "--max-rmse-over-spread-overnight",
+        type=float,
+        default=DEFAULT_MAX_ROS["us-equities-overnight"],
+    )
+    parser.add_argument(
+        "--min-hit-rate-overnight",
+        type=float,
+        default=DEFAULT_MIN_HIT["us-equities-overnight"],
+    )
     parser.add_argument("--min-n-observations", type=int, default=DEFAULT_MIN_N_OBS)
     parser.add_argument("--top-n", type=int, default=DEFAULT_TOP_N)
     parser.add_argument("--fallback-top", type=int, default=DEFAULT_FALLBACK_TOP)
@@ -491,7 +563,9 @@ Example:
         print(f"Error: CSV file '{csv_path}' not found.")
         sys.exit(1)
     if not md_path.exists():
-        print(f"Error: publishers.md '{md_path}' not found (needed for .Test exclusion).")
+        print(
+            f"Error: publishers.md '{md_path}' not found (needed for .Test exclusion)."
+        )
         sys.exit(1)
     if not (reports_dir / args.cluster).exists():
         print(f"Error: reports dir '{reports_dir / args.cluster}' not found.")
@@ -517,8 +591,16 @@ Example:
     }
 
     per_feed_data, skipped, fb_count, modes_with_data = _build_per_feed_data(
-        feed_ids, reports_dir, args.cluster, args.date, excluded,
-        args.top_n, max_ros_map, min_hit_map, args.min_n_observations, args.fallback_top,
+        feed_ids,
+        reports_dir,
+        args.cluster,
+        args.date,
+        excluded,
+        args.top_n,
+        max_ros_map,
+        min_hit_map,
+        args.min_n_observations,
+        args.fallback_top,
     )
 
     feeds_with_data = len(feed_ids) - len(skipped)
@@ -528,6 +610,7 @@ Example:
 
     # Build workbook.
     from openpyxl import Workbook
+
     wb = Workbook()
     ws_rank = wb.active
     ws_rank.title = "rankings"
@@ -535,8 +618,10 @@ Example:
     write_rankings_sheet(ws_rank, per_feed_data, args.date, args.cluster)
     write_allowed_sheet(ws_allow, per_feed_data, skipped, args.date, args.cluster)
 
-    out_path = Path(args.output) if args.output else Path(
-        f"dq_summary_{args.cluster}_{args.date}.xlsx"
+    out_path = (
+        Path(args.output)
+        if args.output
+        else Path(f"dq_summary_{args.cluster}_{args.date}.xlsx")
     )
     wb.save(out_path)
 

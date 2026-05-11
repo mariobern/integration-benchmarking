@@ -62,15 +62,25 @@ def run_standalone(
     next CSV row.
     """
     argv = [
-        sys.executable, "-m", ENGINE_MODULE,
-        "--feed-id", str(feed_id),
-        "--date", date,
-        "--mode", mode,
-        "--cluster", cluster,
-        "--start-time", start_time,
-        "--end-time", end_time,
-        "--output-path", output_path,
-        "--target-pub-count", str(target_pub_count),
+        sys.executable,
+        "-m",
+        ENGINE_MODULE,
+        "--feed-id",
+        str(feed_id),
+        "--date",
+        date,
+        "--mode",
+        mode,
+        "--cluster",
+        cluster,
+        "--start-time",
+        start_time,
+        "--end-time",
+        end_time,
+        "--output-path",
+        output_path,
+        "--target-pub-count",
+        str(target_pub_count),
     ]
     print(f"  Executing engine for {feed_id} (mode: {mode}, cluster: {cluster})...")
     try:
@@ -163,18 +173,35 @@ Examples:
   python3 -m lazer_dq.evaluate_feeds_bulk --csv MV_Mario_1.csv --cluster lazer-prod
 """,
     )
-    parser.add_argument("--csv", default="price_id_list.csv",
-                        help="CSV: feed_id,date,mode per row (default: price_id_list.csv)")
-    parser.add_argument("--cluster", required=True,
-                        help="Cluster name (e.g. lazer-prod)")
-    parser.add_argument("--start-time", default=None,
-                        help="Override start time HH:MM:SS UTC (default: per-row from mode)")
-    parser.add_argument("--end-time", default=None,
-                        help="Override end time HH:MM:SS UTC (default: per-row from mode)")
-    parser.add_argument("--output-path", default="dq_reports",
-                        help="Base output dir (default: dq_reports)")
-    parser.add_argument("--target-pub-count", type=int, default=4,
-                        help="Target publisher count (default: 4)")
+    parser.add_argument(
+        "--csv",
+        default="price_id_list.csv",
+        help="CSV: feed_id,date,mode per row (default: price_id_list.csv)",
+    )
+    parser.add_argument(
+        "--cluster", required=True, help="Cluster name (e.g. lazer-prod)"
+    )
+    parser.add_argument(
+        "--start-time",
+        default=None,
+        help="Override start time HH:MM:SS UTC (default: per-row from mode)",
+    )
+    parser.add_argument(
+        "--end-time",
+        default=None,
+        help="Override end time HH:MM:SS UTC (default: per-row from mode)",
+    )
+    parser.add_argument(
+        "--output-path",
+        default="dq_reports",
+        help="Base output dir (default: dq_reports)",
+    )
+    parser.add_argument(
+        "--target-pub-count",
+        type=int,
+        default=4,
+        help="Target publisher count (default: 4)",
+    )
 
     args = parser.parse_args()
 
