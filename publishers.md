@@ -2,7 +2,7 @@
 
 Source: `publishers_metadata_latest` table (ClickHouse Lazer cluster)
 
-Generated: 2026-02-17
+Generated: 2026-05-11
 
 | ID  | Name                            | Active |
 | --- | ------------------------------- | ------ |
@@ -34,7 +34,7 @@ Generated: 2026-02-17
 | 30  | Belvedere.Test                  | Yes    |
 | 31  | Blueocean.Test                  | Yes    |
 | 32  | Blueocean.Production            | Yes    |
-| 33  | Keyrock.Test                    | No     |
+| 33  | Keyrock.Test                    | Yes    |
 | 34  | Keyrock.Production              | Yes    |
 | 35  | XBTO.Production                 | Yes    |
 | 36  | Shift_FX.Test                   | Yes    |
@@ -75,3 +75,14 @@ Generated: 2026-02-17
 | 71  | Assembly_Partners.Production    | Yes    |
 | 72  | Blueocean2.Production           | Yes    |
 | 73  | Blueocean3.Production           | Yes    |
+| 74  | Douro1.Production               | Yes    |
+| 75  | Douro2.Production               | Yes    |
+| 76  | Douro3.Production               | Yes    |
+| 77  | Jump.Test                       | Yes    |
+| 78  | Argo.Test                       | Yes    |
+| 79  | Nobi.Test                       | Yes    |
+| 80  | Nobi.Production                 | Yes    |
+| 81  | CMS.Test                        | Yes    |
+| 82  | CMS.Production                  | Yes    |
+| 83  | Argo.Production                 | Yes    |
+| 20001 | Lazer.E2EProbe                | Yes    |

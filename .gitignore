@@ -36,6 +36,9 @@ after.json
 # Local governance-proposal snapshots (before.json / after.json under staging/)
 staging/
 
+# Local DQ reports output
+dq_reports/
+
 # IDE
 .idea/
 .vscode/
