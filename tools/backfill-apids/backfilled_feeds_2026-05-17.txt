@@ -1,0 +1,1680 @@
+# Backfill audit record — 2026-05-17
+#
+# Tool:     tools/backfill-apids/backfill.py
+# Input:    after.json (pre-migration, snapshotted as after.json.bak)
+# Output:   after.json (post-migration)
+# Totals:   1019 feeds modified,
+#           61 INACTIVE feeds skipped (no change)
+#
+# Format: <feedId>  <symbol>  <description>
+#
+
+==============================================================================
+BUCKET A — Standard US-equity COMING_SOON, expanded to 4 sessions (218)
+==============================================================================
+Got: top-level allowedPublisherIds: [];
+     marketSchedules expanded to REGULAR / PRE_MARKET / POST_MARKET / OVER_NIGHT
+     using AAPL/feedId=922 schedule templates;
+     each session: allowedPublisherIds: [], minPublishers carried over;
+     benchmarkMapping: original RIC if present (16/218), else ticker;
+     OVER_NIGHT always uses <ticker>.BLUE.
+
+             2273  Equity.US.BNC/USD                           BNB NETWORK COMPANY / US DOLLAR
+  [orig-bm]  2275  Equity.US.BTBT/USD                          BIT DIGITAL INC / US DOLLAR
+  [orig-bm]  2276  Equity.US.BTDR/USD                          BITDEER / US DOLLAR
+             2277  Equity.US.DAPP/USD                          VANECK DIGITAL TRANSFORMATION ETF / US DOLLAR
+             2278  Equity.US.DJTA/USD                          DOW JONES TRANSPORTATION AVERAGE / US DOLLAR
+  [orig-bm]  2285  Equity.US.ESLT/USD                          ELBIT SYSTEMS / US DOLLAR
+             2287  Equity.US.FIG/USD                           FIGMA INC / US DOLLAR
+             2290  Equity.US.IXCO/USD                          NASDAQ COMPUTER INDEX / US DOLLAR
+             2291  Equity.US.KRE/USD                           SPDR S&P REGIONAL BANKING ETF / US DOLLAR
+  [orig-bm]  2292  Equity.US.MSTY/USD                          YIELDMAX MSTR OPTION INCOME STGY ETF / US DOLLAR
+             2293  Equity.US.NA/USD                            NANO LABS / US DOLLAR
+  [orig-bm]  2297  Equity.US.QS/USD                            QUANTUMSCAPE CORPORATION / US DOLLAR
+  [orig-bm]  2299  Equity.US.SLS/USD                           SELLAS LIFE SCIENCES GROUP INC / US DOLLAR
+  [orig-bm]  2300  Equity.US.SSK/USD                           REX-OSPREY SOL + STAKING ETF / US DOLLAR
+  [orig-bm]  2301  Equity.US.TKO/USD                           TKO GROUP HOLDINGS INC / US DOLLAR
+  [orig-bm]  2302  Equity.US.UFO/USD                           PROCURE SPACE ETF / US DOLLAR
+  [orig-bm]  2303  Equity.US.UPXI/USD                          UPEXI INC / US DOLLAR
+  [orig-bm]  2305  Equity.US.WSM/USD                           WILLIAMS SONOMA INC / US DOLLAR
+  [orig-bm]  2306  Equity.US.XYZ/USD                           BLOCK INC / US DOLLAR
+  [orig-bm]  2352  Equity.US.BLSH/USD                          BULLISH / US DOLLAR
+             2354  Equity.US.BTOG/USD                          BIT ORIGIN LIMITED CLASS A ORDINARY SHARES / US DOLLAR
+             2356  Equity.US.ETOR/USD                          ETORO GROUP LTD / US DOLLAR
+             2358  Equity.US.FLD/USD                           FOLD HOLDINGS INC / US DOLLAR
+             2359  Equity.US.FORD/USD                          FORWARD INDSUTRIES INC / US DOLLAR
+             2360  Equity.US.FWONA/USD                         LIBERTY MEDIA CORP SERIES A LIBERTY FORMULA ONE / US DOLLAR
+             2361  Equity.US.GEMI/USD                          GEMINI SPACE STATION INC / US DOLLAR
+             2362  Equity.US.GENI/USD                          GENIUS SPORTS LTD / US DOLLAR
+             2365  Equity.US.MSTZ/USD                          T-REX 2X INVERSE MSTR DAILY TARGET ETF / US DOLLAR
+             2369  Equity.US.PSKY/USD                          PARAMOUNT SKYDANCE CORPORATION / US DOLLAR
+             2373  Equity.US.SONY/USD                          SONY GROUP CORP ADR / US DOLLAR
+             2374  Equity.US.STKE/USD                          SOL STRATEGIES INC / US DOLLAR
+             2376  Equity.US.TONX/USD                          TON STRATEGY COMPANY / US DOLLAR
+             2407  Equity.US.AGRI/USD                          AGRIFORCE GROWING SYSTEMS LTD / US DOLLAR
+             2408  Equity.US.BNKK/USD                          BONK INC / US DOLLAR
+             2409  Equity.US.BTCS/USD                          BTCS INC / US DOLLAR
+             2411  Equity.US.DFDV/USD                          DEFI DEVELOPMENT CORP / US DOLLAR
+             2412  Equity.US.GAME/USD                          GAMESQUARE HOLDINGS INC / US DOLLAR
+             2413  Equity.US.HYPD/USD                          HYPERION DEFI INC / US DOLLAR
+             2414  Equity.US.LGHL/USD                          LION GROUP HOLDING LTD ADR / US DOLLAR
+             2415  Equity.US.MP/USD                            MP MATERIALS CORP / US DOLLAR
+             2416  Equity.US.NAKA/USD                          KINDLY MD INC / US DOLLAR
+             2417  Equity.US.NVVE/USD                          NUVVE HOLDING CORP / US DOLLAR
+  [orig-bm]  2420  Equity.US.STRD/USD                          STRATEGY INC 10.00% SERIES A PERPETUAL STRIDE PREFERRED STOC
+  [orig-bm]  2421  Equity.US.STRF/USD                          STRATEGY INC 10.00% SERIES A PERPETUAL STRIFE PREFERRED STOC
+             2422  Equity.US.STSS/USD                          SHARPS TECHNOLOGY INC / US DOLLAR
+             2423  Equity.US.SUIG/USD                          SUI GROUP HOLDINGS LTD / US DOLLAR
+             2424  Equity.US.WGRX/USD                          WELLGISTICS HEALTH INC / US DOLLAR
+             2703  Equity.US.AAPX/USD                          T-REX 2X LONG APPLE DAILY TARGET ETF
+             2704  Equity.US.AFRM/USD                          AFFIRM HOLDINGS INC
+             2705  Equity.US.ALAB/USD                          ASTERA LABS INC
+             2706  Equity.US.APLD/USD                          APPLIED DIGITAL CORP
+             2707  Equity.US.APLX/USD                          TRADR 2X LONG APLD DAILY ETF
+             2708  Equity.US.ARKF/USD                          ARK FINTECH INNOVATION ETF
+             2709  Equity.US.ARKG/USD                          ARK GENOMIC REVOLUTION UCITS ETF USD ACC ETF
+             2710  Equity.US.ARKQ/USD                          ARK AUTONOMOUS TECHNOLOGY & ROBOTICS ETF
+             2711  Equity.US.ARKW/USD                          ARK NEXT GENERATION INTERNET ETF
+             2712  Equity.US.ARKX/USD                          ARK SPACE EXPLORATION & INNOVATION ETF
+             2713  Equity.US.ASTX/USD                          21SHARES STACKS STAKING ETP
+             2714  Equity.US.AVAV/USD                          AEROVIRONMENT INC
+             2715  Equity.US.BBAI/USD                          BIGBEARAI HOLDINGS INC
+             2716  Equity.US.BBAX/USD                          JPMORGAN BETABUILDERS DEV ASIA PACIFIC EX-JAPAN
+             2717  Equity.US.BBCA/USD                          JPMORGAN BETABUILDERS CANADA ETF
+             2718  Equity.US.BBEU/USD                          JPMORGAN BETABUILDERS EUROPE ETF
+             2719  Equity.US.BBJP/USD                          JPMORGAN BETABUILDERS JAPAN ETF
+             2720  Equity.US.BBUS/USD                          JPM BETABUILDERS US EQUITY UCITS ETF USD ACC
+             2723  Equity.US.BITF/USD                          BITFARMS LTD
+             2724  Equity.US.BITX/USD                          2X BITCOIN STRATEGY ETF
+             2725  Equity.US.BOXX/USD                          ALPHA ARCHITECT 1-3 MONTH BOX ETF
+             2726  Equity.US.BTCI/USD                          NEOS BITCOIN HIGH INCOME ETF
+             2727  Equity.US.BTCL/USD                          T-REX 2X LONG BITCOIN DAILY TARGET ETF
+             2728  Equity.US.BUFR/USD                          FT VEST LADDERED BUFFER ETF
+             2729  Equity.US.CALF/USD                          PACER US SMALL CAP CASH COWS INDEX
+             2730  Equity.US.CCUP/USD                          T-REX 2X LONG CRCL DAILY TARGET ETF
+             2731  Equity.US.CELH/USD                          CELSIUS HOLDINGS INC
+             2732  Equity.US.CLS/USD                           CELESTICA INC
+             2733  Equity.US.COIW/USD                          ROUNDHILL COIN WEEKLYPAY ETF
+             2734  Equity.US.COWZ/USD                          PACER US CASH COWS 100 INDEX
+             2736  Equity.US.CRWU/USD                          T-REX 2X LONG CRWV DAILY TARGET ETF
+             2738  Equity.US.CWVX/USD                          TRADR 2X LONG CRWV DAILY ETF
+             2739  Equity.US.DEFT/USD                          DEFI TECHNOLOGIES INC / US DOLLAR
+             2740  Equity.US.DFIC/USD                          DFA DIMENSIONAL INTERNATIONAL CORE EQUITY 2 ETF
+             2741  Equity.US.DIHP/USD                          DFA DIMENSIONAL INTERNATL HIGH PROFITABILITY ETF
+             2742  Equity.US.DIVB/USD                          ISHARES CORE DIVIDEND ETF
+             2743  Equity.US.DMAX/USD                          ISHARES LARGE CAP MAX BUFFER DEC ETF
+             2744  Equity.US.DUOL/USD                          DUOLINGO INC
+             2745  Equity.US.EEMV/USD                          ISHARES MSCI EMERGING MARKETS MIN VOL FACTOR ETF
+             2749  Equity.US.EMB/USD                           ISHARES JPMORGAN USD EMERGING MARKETS BOND ETF
+             2750  Equity.US.EMGF/USD                          ISHARES EMERGING MARKETS EQUITY FACTOR ETF
+             2751  Equity.US.EMHY/USD                          ISHARES JP MORGAN EM HIGH YIELD BOND ETF
+             2753  Equity.US.ESGV/USD                          VANGUARD ESG US STOCK ETF
+             2754  Equity.US.ETHA/USD                          ISHARES ETHEREUM TRUST ETF
+             2755  Equity.US.ETHU/USD                          2X ETHER ETF
+             2756  Equity.US.ETHV/USD                          VANECK ETHEREUM ETF
+             2757  Equity.US.ETU/USD                           E2GOLD INC
+             2758  Equity.US.EUAD/USD                          SELECT STOXX EUROPE AEROSPACE & DEFENSE ETF
+             2759  Equity.US.EVUS/USD                          ISHARES ESG AWARE MSCI USA VALUE ETF
+             2761  Equity.US.EZET/USD                          FRANKLIN ETHEREUM ETF
+             2763  Equity.US.FBCG/USD                          FIDELITY BLUE CHIP GROWTH ETF
+             2764  Equity.US.FCNCA/USD                         FIRST CITIZENS BANCSHARES INC DELAWARE CLASS A
+             2765  Equity.US.FERG/USD                          FERGUSON ENTERPRISES INC
+             2766  Equity.US.FETH/USD                          FIDELITY ETHEREUM FUND
+             2767  Equity.US.FGI/USD                           FGI INDUSTRIES LTD
+             2768  Equity.US.FLOT/USD                          ISHARES $ FLOATING RATE BD UCITS ETF USD DIST
+             2769  Equity.US.FLUT/USD                          FLUTTER ENTERTAINMENT PLC
+             2770  Equity.US.FRDM/USD                          FREEDOM 100 EMERGING MARKETS ETF
+             2772  Equity.US.GDMN/USD                          WISDOMTREE EFFICIENT GOLD PLUS GOLD MINERS STR FD
+             2773  Equity.US.GDX/USD                           VANECK GOLD MINERS ETF
+             2775  Equity.US.GEVX/USD                          TRADR 2X LONG GEV DAILY ETF
+             2776  Equity.US.GMEU/USD                          T-REX 2X LONG GME DAILY TARGET ETF
+             2777  Equity.US.GOOX/USD                          T-REX 2X LONG ALPHABET DAILY TARGET ETF
+             2778  Equity.US.GOVZ/USD                          ISHARES 25+ YEAR TREASURY STRIPS BOND ETF
+             2779  Equity.US.GRAB/USD                          GRAB HOLDINGS LTD
+             2780  Equity.US.GSST/USD                          GOLDMAN SACHS ULTRA SHORT BOND ETF
+             2781  Equity.US.GVI/USD                           ISHARES INTERMEDIATE GOVT/CREDIT BOND ETF
+             2783  Equity.US.HIMU/USD                          ISHARES HIGH YIELD MUNI ACTIVE ETF
+             2784  Equity.US.HOOW/USD                          ROUNDHILL HOOD WEEKLYPAY ETF
+             2785  Equity.US.HYBL/USD                          SPDR BLACKSTONE HIGH INCOME ETF
+             2786  Equity.US.HYD/USD                           HYDRIX LTD
+             2787  Equity.US.HYDB/USD                          ISHARES HIGH YIELD SYSTEMATIC BOND ETF
+             2788  Equity.US.IAGG/USD                          ISHARES CORE INTERNATIONAL AGGREGATE BOND ETF
+             2790  Equity.US.ICSH/USD                          ISHARES ULTRA SHORT DURATION BOND ACTIVE ETF
+             2791  Equity.US.ICVT/USD                          ISHARES CONVERTIBLE BOND ETF
+             2793  Equity.US.IEO/USD                           ISHARES US OIL & GAS EXPLORATION & PRODUCTION ETF
+             2794  Equity.US.IFRA/USD                          VANECK FTSE GLOBAL INFRASTRUCTURE HEDGED ETF
+             2796  Equity.US.IGEB/USD                          ISHARES INVESTMENT GRADE SYSTEMATIC BOND ETF
+             2797  Equity.US.IGV/USD                           ISHARES EXPANDED TECH-SOFTWARE SECTOR ETF
+             2799  Equity.US.IONQ/USD                          IONQ INC
+             2800  Equity.US.ITB/USD                           ISHARES US HOME CONSTRUCTION ETF
+             2801  Equity.US.ITM/USD                           ITM POWER PLC
+             2802  Equity.US.IWMI/USD                          NEOS RUSSELL 2000 HIGH INCOME ETF
+             2803  Equity.US.IYR/USD                           ISHARES US REAL ESTATE ETF
+             2804  Equity.US.IYRI/USD                          NEOS REAL ESTATE HIGH INCOME ETF
+             2805  Equity.US.IYT/USD                           ISHARES US TRANSPORTATION ETF
+             2806  Equity.US.IYW/USD                           ISHARES US TECHNOLOGY ETF
+             2807  Equity.US.IYZ/USD                           ISHARES US TELECOMMUNICATIONS ETF
+             2808  Equity.US.JBBB/USD                          JANUS HENDERSON B-BBB CLO ETF
+             2809  Equity.US.JCPB/USD                          JPMORGAN CORE PLUS BOND ETF
+             2810  Equity.US.JMUB/USD                          JPMORGAN MUNICIPAL ETF
+             2811  Equity.US.JOBX/USD                          TRADR 2X LONG JOBY DAILY ETF
+             2812  Equity.US.JPLD/USD                          JPMORGAN LIMITED DURATION BOND ETF
+             2813  Equity.US.KNG/USD                           KINGSMEN RESOURCES LTD
+             2814  Equity.US.KTOS/USD                          KRATOS DEFENSE & SECURITY SOLUTIONS INC
+             2816  Equity.US.LABX/USD                          TRADR 2X LONG ALAB DAILY ETF
+             2817  Equity.US.LVHI/USD                          FRANKLIN INTL LOW VOLATILITY HIGH DIVIDEND INDEX
+             2818  Equity.US.LYFT/USD                          LYFT INC
+             2819  Equity.US.MAGX/USD                          ROUNDHILL DAILY 2X LONG MAGNIFICENT SEVEN ETF
+             2820  Equity.US.MEAR/USD                          ISHARES SHORT MATURITY MUNICIPAL BOND ACTIVE ETF
+             2821  Equity.US.MOAT/USD                          VANECK MRNSTR US ESG WIDE MOAT UCITS ETF USD A
+             2822  Equity.US.MSFX/USD                          T-REX 2X LONG MICROSOFT DAILY TARGET ETF
+             2823  Equity.US.MSTU/USD                          T-REX 2X LONG MSTR DAILY TARGET ETF
+             2824  Equity.US.MSTW/USD                          ROUNDHILL MSTR WEEKLYPAY ETF
+             2825  Equity.US.MTUM/USD                          BETASHARES AUSTRALIAN MOMENTUM ETF
+             2827  Equity.US.NEAR/USD                          21SHARES NEAR PROTOCOL STAKING ETP
+             2828  Equity.US.NEBX/USD                          TRADR 2X LONG NBIS DAILY ETF
+             2829  Equity.US.NET/USD                           CLOUDFLARE INC
+             2830  Equity.US.NFLU/USD                          T-REX 2X LONG NFLX DAILY TARGET ETF
+             2831  Equity.US.NOBL/USD                          NOBLE PLAINS URANIUM CORP
+             2832  Equity.US.NULV/USD                          NUVEEN ESG LARGE-CAP VALUE ETF
+             2833  Equity.US.NVDQ/USD                          T-REX 2X INVERSE NVIDIA DAILY TARGET ETF
+             2834  Equity.US.NVDW/USD                          ROUNDHILL NVDA WEEKLYPAY ETF
+             2835  Equity.US.NVDX/USD                          T-REX 2X LONG NVIDIA DAILY TARGET ETF
+             2836  Equity.US.OMFL/USD                          INVESCO RUSSELL 1000 DYNAMIC MULTIFACTOR ETF
+             2837  Equity.US.PAVE/USD                          GLOBAL X US INFRA DEVELOPMENTS UCITS ETF USD ACC
+             2838  Equity.US.PLTW/USD                          ROUNDHILL PLTR WEEKLYPAY ETF
+             2839  Equity.US.POCT/USD                          INNOVATOR US EQUITY POWER BUFFER ETF - OCTOBER
+             2840  Equity.US.QBTX/USD                          TRADR 2X LONG QBTS DAILY ETF
+             2841  Equity.US.QDTE/USD                          ROUNDHILL INNOV-100 0DTE COVERED CALL STRAT ETF
+             2842  Equity.US.QETH/USD                          BETASHARES ETHEREUM ETF
+             2843  Equity.US.QUBX/USD                          TRADR 2X LONG QUBT DAILY ETF
+             2844  Equity.US.RBLU/USD                          T-REX 2X LONG RBLX DAILY TARGET ETF
+             2845  Equity.US.REM/USD                           REMSENSE TECHNOLOGIES LTD
+             2846  Equity.US.RGTU/USD                          TRADR 2X LONG RGTI DAILY ETF
+             2847  Equity.US.ROBN/USD                          T-REX 2X LONG HOOD DAILY TARGET ETF
+             2848  Equity.US.ROKU/USD                          ROKU INC
+             2850  Equity.US.SATS/USD                          ECHOSTAR CORP
+             2851  Equity.US.SE/USD                            SEA LTD
+             2852  Equity.US.SFM/USD                           SPROUTS FARMERS MARKET INC
+             2854  Equity.US.SMIN/USD                          SMITHS GROUP PLC
+             2856  Equity.US.SMU/USD                           TRADR 2X LONG SMR DAILY ETF
+             2857  Equity.US.SMUP/USD                          T-REX 2X LONG SMR DAILY TARGET ETF
+             2859  Equity.US.SNOU/USD                          T-REX 2X LONG SNOW DAILY TARGET ETF
+             2861  Equity.US.SOFI/USD                          SOFI TECHNOLOGIES INC
+             2862  Equity.US.SOUN/USD                          SOUNDHOUND AI INC
+             2864  Equity.US.SPOT/USD                          SPOTIFY TECHNOLOGY SA
+             2865  Equity.US.SPXL/USD                          DIREXION DAILY S&P 500 BULL 3X SHARES
+             2866  Equity.US.SPYI/USD                          NEOS S&P 500 HIGH INCOME ETF
+             2867  Equity.US.SVIX/USD                          -1X SHORT VIX FUTURES ETF
+             2868  Equity.US.SVXY/USD                          PROSHARES SHORT VIX SHORT-TERM FUTURES ETF
+             2870  Equity.US.TEMT/USD                          TRADR 2X LONG TEM DAILY ETF
+             2871  Equity.US.TETH/USD                          21SHARES ETHEREUM ETF
+             2872  Equity.US.TLTW/USD                          ISHARES 20+ YEAR TREASURY BOND BUYWRITE STRAT ETF
+             2873  Equity.US.TMFC/USD                          MOTLEY FOOL 100 INDEX ETF
+             2874  Equity.US.TNA/USD                           DIREXION DAILY SMALL CAP BULL 3X SHARES
+             2875  Equity.US.TSLT/USD                          T-REX 2X LONG TESLA DAILY TARGET ETF
+             2876  Equity.US.TSLW/USD                          ROUNDHILL TSLA WEEKLYPAY ETF
+             2877  Equity.US.TSLZ/USD                          T-REX 2X INVERSE TESLA DAILY TARGET ETF
+             2878  Equity.US.TURB/USD                          TURBO ENERGY SA
+             2879  Equity.US.UPSX/USD                          TRADR 2X LONG UPST DAILY ETF
+             2880  Equity.US.USHY/USD                          AMUNDI USD HIGH YIELD CORPORATE BOND ESG UCITS ETF DIST
+             2881  Equity.US.UVIX/USD                          2X LONG VIX FUTURES ETF
+             2882  Equity.US.UVXY/USD                          PROSHARES ULTRA VIX SHORT-TERM FUTURES ETF
+             2883  Equity.US.VCRM/USD                          VANGUARD CORE TAX-EXEMPT BOND ETF
+             2884  Equity.US.VIXY/USD                          PROSHARES VIX SHORT-TERM FUTURES ETF
+             2885  Equity.US.VLUE/USD                          VANECK MSCI INTERNATIONAL VALUE ETF
+             2886  Equity.US.VNM/USD                           VANECK VIETNAM ETF
+             2888  Equity.US.VUSB/USD                          VANGUARD ULTRA-SHORT BOND ETF
+             2889  Equity.US.WEEK/USD                          ROUNDHILL WEEKLY T BILL ETF
+             2890  Equity.US.WIX/USD                           WIXCOM LTD
+             2891  Equity.US.WPAY/USD                          ROUNDHILL WEEKLYPAY UNIVERSE ETF
+             2893  Equity.US.XLB/USD                           MATERIALS SELECT SECTOR SPDR FUND
+             2894  Equity.US.XLC/USD                           COMMUNICATION SERVICES SELECT SECTOR SPDR FUND
+             2895  Equity.US.XLI/USD                           INDUSTRIAL SELECT SECTOR SPDR FUND
+             2896  Equity.US.XLP/USD                           CONSUMER STAPLES SELECT SECTOR SPDR FUND
+             2897  Equity.US.XLU/USD                           UTILITIES SELECT SECTOR SPDR FUND
+             2898  Equity.US.XLY/USD                           CONSUMER DISCRETIONARY SELECT SECTOR SPDR FUND
+             2899  Equity.US.XOP/USD                           SPDR S&P OIL & GAS EXPLORATION & PRODUCTION ETF
+             2900  Equity.US.YBTC/USD                          ROUNDHILL BITCOIN COVERED CALL STRATEGY ETF
+             2901  Equity.US.YETH/USD                          ROUNDHILL ETHER COVERED CALL STRATEGY ETF
+
+==============================================================================
+BUCKET B — commodity (26)
+==============================================================================
+Got: top-level allowedPublisherIds: [];
+     REGULAR session benchmarkMapping preserved if present,
+     else empty-identifier skeleton added.
+
+  [orig-bm]  3009  Commodities.LEM6/USD                        PYTH PRICE IN USD FOR LEAD 16 JUNE 2026
+  [orig-bm]  3010  Commodities.LEU6/USD                        PYTH PRICE IN USD FOR LEAD 16 SEPTEMBER 2026
+  [orig-bm]  3012  Commodities.TIM6/USD                        PYTH PRICE IN USD FOR TIN 16 JUNE 2026
+  [orig-bm]  3013  Commodities.TIU6/USD                        PYTH PRICE IN USD FOR TIN 15 SEPTEMBER 2026
+  [orig-bm]  3027  Commodities.NGDU6/USD                       PYTH PRICE IN USD FOR HH NATURAL GAS 27 AUGUST 2026
+  [orig-bm]  3044  Commodities.BRENTV6/USD                     PYTH PRICE IN USD FOR BRENT 28 AUGUST 2026
+  [orig-bm]  3045  Commodities.BRENTX6/USD                     PYTH PRICE IN USD FOR BRENT 30 SEPTEMBER 2026
+  [orig-bm]  3046  Commodities.BRENTZ6/USD                     PYTH PRICE IN USD FOR BRENT 30 OCTOBER 2026
+  [orig-bm]  3059  Commodities.GOU6/USD                        PYTH PRICE IN USD FOR LS GASOIL 10 SEPTEMBER 2026
+  [orig-bm]  3060  Commodities.GOV6/USD                        PYTH PRICE IN USD FOR LS GASOIL 12 OCTOBER 2026
+  [orig-bm]  3061  Commodities.GOX6/USD                        PYTH PRICE IN USD FOR LS GASOIL 12 NOVEMBER 2026
+  [orig-bm]  3062  Commodities.GOZ6/USD                        PYTH PRICE IN USD FOR LS GASOIL 10 DECEMBER 2026
+  [orig-bm]  3157  Commodities.BLDU6/USD                       PYTH PRICE IN USD FOR BRENT LAST DAY FINANCIAL FUTURE 31 JUL
+  [orig-bm]  3158  Commodities.BLDV6/USD                       PYTH PRICE IN USD FOR BRENT LAST DAY FINANCIAL FUTURE 28 AUG
+  [orig-bm]  3159  Commodities.BLDX6/USD                       PYTH PRICE IN USD FOR BRENT LAST DAY FINANCIAL FUTURE 30 SEP
+  [orig-bm]  3160  Commodities.BLDZ6/USD                       PYTH PRICE IN USD FOR BRENT LAST DAY FINANCIAL FUTURE 30 OCT
+  [orig-bm]  3171  Commodities.CAK6/USD                        PYTH PRICE IN USD FOR COCOA FUTURES 13 MAY 2026
+  [orig-bm]  3211  Commodities.CFZ6/USc                        PYTH PRICE IN US CENTS FOR COFFEE 18 DECEMBER 2026
+  [orig-bm]  3212  Commodities.LCM6/USc                        PYTH PRICE IN US CENTS FOR LIVE CATTLE 30 JUNE 2026
+  [orig-bm]  3213  Commodities.LCQ6/USc                        PYTH PRICE IN US CENTS FOR LIVE CATTLE 31 AUGUST 2026
+  [orig-bm]  3214  Commodities.LCV6/USc                        PYTH PRICE IN US CENTS FOR LIVE CATTLE 30 OCTOBER 2026
+  [orig-bm]  3215  Commodities.LCZ6/USc                        PYTH PRICE IN US CENTS FOR LIVE CATTLE 31 DECEMBER 2026
+  [orig-bm]  3220  Commodities.NL3M/USD                        PYTH PRICE IN USD FOR NICKEL 3-MONTH
+  [orig-bm]  3247  Commodities.NGDV6/USD                       PYTH PRICE IN USD FOR HH NATURAL GAS 28 SEPTEMBER 2026
+  [orig-bm]  3248  Commodities.NGDX6/USD                       PYTH PRICE IN USD FOR HH NATURAL GAS 28 OCTOBER 2026
+  [orig-bm]  3249  Commodities.NGDZ6/USD                       PYTH PRICE IN USD FOR HH NATURAL GAS 25 NOVEMBER 2026
+
+==============================================================================
+BUCKET B — equity-DE (39)
+==============================================================================
+Got: top-level allowedPublisherIds: [];
+     REGULAR session benchmarkMapping preserved if present,
+     else empty-identifier skeleton added.
+
+             1857  Equity.DE.ADS/EUR                           ADIDAS AG / EURO
+             1858  Equity.DE.ALV/EUR                           ALLIANZ SE / EURO
+             1859  Equity.DE.BAS/EUR                           BASF SE / EURO
+             1860  Equity.DE.BAYN/EUR                          BAYER AG / EURO
+             1861  Equity.DE.BEI/EUR                           BEIERSDORF AG / EURO
+             1862  Equity.DE.BMW/EUR                           BAY MOTOREN WERKE AG ST / EURO
+             1863  Equity.DE.BNR/EUR                           BRENNTAG SE / EURO
+             1864  Equity.DE.CBK/EUR                           COMMERZBANK AG / EURO
+             1865  Equity.DE.CON/EUR                           CONTINENTAL AG / EURO
+             1866  Equity.DE.DB1/EUR                           DEUTSCHE BOERSE AG / EURO
+             1867  Equity.DE.DBK/EUR                           DEUTSCHE BANK AG / EURO
+             1868  Equity.DE.DHL/EUR                           DEUTSCHE POST AG / EURO
+             1869  Equity.DE.DN3/EUR                           METAPLANET INC / EURO
+             1870  Equity.DE.DTE/EUR                           DT TELEKOM AG / EURO
+             1871  Equity.DE.DTG/EUR                           DAIMLER TRUCK HLDG JGE / EURO
+             1872  Equity.DE.ENR/EUR                           SIEMENS ENERGY AG / EURO
+             1873  Equity.DE.EOAN/EUR                          E ON SE / EURO
+             1874  Equity.DE.FME/EUR                           FRESEN MED CARE KGAA / EURO
+             1875  Equity.DE.FRE/EUR                           FRESENIUS SE CO KGAA / EURO
+             1876  Equity.DE.HEI/EUR                           HEIDELBERG MATERIALS / EURO
+             1877  Equity.DE.HEN3/EUR                          HENKEL AG+CO KGAA VZO / EURO
+             1878  Equity.DE.HNR1/EUR                          HANNOVER RUECK SE / EURO
+             1879  Equity.DE.IFX/EUR                           INFINEON TECH AG / EURO
+             1880  Equity.DE.MBG/EUR                           MERCEDES-BENZ GROUP AG / EURO
+             1881  Equity.DE.MRK/EUR                           MERCK KGAA / EURO
+             1882  Equity.DE.MTX/EUR                           MTU AERO ENGINES AG / EURO
+             1883  Equity.DE.MUV2/EUR                          MUENCH RUECKVERS VNA / EURO
+             1884  Equity.DE.P911/EUR                          PORSCHE AG VZ / EURO
+             1885  Equity.DE.PAH3/EUR                          PORSCHE AUTOMOBIL HOLDING SE / EURO
+             1886  Equity.DE.RHM/EUR                           RHEINMETALL AG / EURO
+             1887  Equity.DE.RWE/EUR                           RWE AG / EURO
+             1888  Equity.DE.SAP/EUR                           SAP SE / EURO
+             1889  Equity.DE.SHL/EUR                           SIEMENS HEALTHINEERS AG / EURO
+             1890  Equity.DE.SIE/EUR                           SIEMENS AG / EURO
+             1891  Equity.DE.SRT3/EUR                          SARTORIUS AG / EURO
+             1892  Equity.DE.SY1/EUR                           SYMRISE AG / EURO
+             1893  Equity.DE.VNA/EUR                           VONOVIA SE / EURO
+             1894  Equity.DE.VOW3/EUR                          VOLKSWAGEN AG VZO / EURO
+             1895  Equity.DE.ZAL/EUR                           ZALANDO SE / EURO
+
+==============================================================================
+BUCKET B — equity-FR (36)
+==============================================================================
+Got: top-level allowedPublisherIds: [];
+     REGULAR session benchmarkMapping preserved if present,
+     else empty-identifier skeleton added.
+
+             1896  Equity.FR.AC/EUR                            ACCOR / EURO
+             1897  Equity.FR.ACA/EUR                           CREDIT AGRICOLE / EURO
+             1898  Equity.FR.AI/EUR                            AIR LIQUIDE / EURO
+             1899  Equity.FR.AM/EUR                            DASSAULT AVIATION SA / EURO
+             1900  Equity.FR.BN/EUR                            DANONE / EURO
+             1901  Equity.FR.BNP/EUR                           BNP PARIBAS ACTA / EURO
+             1902  Equity.FR.BVI/EUR                           BUREAU VERITAS / EURO
+             1903  Equity.FR.CA/EUR                            CARREFOUR / EURO
+             1904  Equity.FR.CAP/EUR                           CAPGEMINI / EURO
+             1905  Equity.FR.CS/EUR                            AXA / EURO
+             1906  Equity.FR.DG/EUR                            VINCI / EURO
+             1907  Equity.FR.DSY/EUR                           DASSAULT SYSTEMES / EURO
+             1908  Equity.FR.EDEN/EUR                          EDENRED / EURO
+             1909  Equity.FR.EL/EUR                            ESSILORLUXOTTICA / EURO
+             1910  Equity.FR.EN/EUR                            BOUYGUES / EURO
+             1911  Equity.FR.ENGI/EUR                          ENGIE / EURO
+             1912  Equity.FR.GLE/EUR                           SOCIETE GENERALE / EURO
+             1913  Equity.FR.HO/EUR                            THALES / EURO
+             1914  Equity.FR.KER/EUR                           KERING / EURO
+             1915  Equity.FR.LR/EUR                            LEGRAND / EURO
+             1916  Equity.FR.MC/EUR                            LVMH / EURO
+             1917  Equity.FR.ML/EUR                            MICHELIN / EURO
+             1918  Equity.FR.OR/EUR                            L'OREAL / EURO
+             1919  Equity.FR.ORA/EUR                           ORANGE / EURO
+             1920  Equity.FR.PUB/EUR                           PUBLICIS GROUPE SA / EURO
+             1921  Equity.FR.RI/EUR                            PERNOD RICARD / EURO
+             1922  Equity.FR.RMS/EUR                           HERMES INTL / EURO
+             1923  Equity.FR.RNO/EUR                           RENAULT / EURO
+             1924  Equity.FR.SAF/EUR                           SAFRAN / EURO
+             1925  Equity.FR.SAN/EUR                           SANOFI / EURO
+             1926  Equity.FR.SGO/EUR                           SAINT GOBAIN / EURO
+             1927  Equity.FR.SU/EUR                            SCHNEIDER ELECTRIC SE / EURO
+             1928  Equity.FR.TEP/EUR                           TELEPERFORMANCE / EURO
+             1929  Equity.FR.TTE/EUR                           TOTALENERGIES / EURO
+             1930  Equity.FR.URW/EUR                           UNIBAIL-RODAMCO-WESTFIELD / EURO
+             1931  Equity.FR.VIE/EUR                           VEOLIA ENVIRON / EURO
+
+==============================================================================
+BUCKET B — equity-HK (6)
+==============================================================================
+Got: top-level allowedPublisherIds: [];
+     REGULAR session benchmarkMapping preserved if present,
+     else empty-identifier skeleton added.
+
+             1932  Equity.HK.0300-HK/HKD                       MIDEA GROUP / HONG KONG DOLLAR
+             1933  Equity.HK.1606-HK/HKD                       CDB FINANCIAL LEASING CO LTD / HONG KONG DOLLAR
+             1934  Equity.HK.2057-HK/HKD                       ZTO EXPRESS CAYMAN INC / HONG KONG DOLLAR
+             1935  Equity.HK.9992-HK/HKD                       POP MART INTL GROUP / HONG KONG DOLLAR
+             2996  Equity.HK.3188-HK/HKD                       CHINAAMC CSI 300 INDEX ETF / HONG KONG DOLLAR
+             2997  Equity.HK.2823-HK/HKD                       ISHARES FTSE CHINA A50 ETF / HONG KONG DOLLAR
+
+==============================================================================
+BUCKET B — equity-JP (227)
+==============================================================================
+Got: top-level allowedPublisherIds: [];
+     REGULAR session benchmarkMapping preserved if present,
+     else empty-identifier skeleton added.
+
+             1936  Equity.JP.1332/JPY                          NISSUI CORPORATION / JAPANESE YEN
+             1937  Equity.JP.1605/JPY                          INPEX CORPORATION / JAPANESE YEN
+             1938  Equity.JP.1721/JPY                          COMSYS HOLDINGS CORP / JAPANESE YEN
+             1939  Equity.JP.1801/JPY                          TAISEI CORP / JAPANESE YEN
+             1940  Equity.JP.1802/JPY                          OBAYASHI CORP / JAPANESE YEN
+             1941  Equity.JP.1803/JPY                          SHIMIZU CORP / JAPANESE YEN
+             1942  Equity.JP.1808/JPY                          HASEKO CORPORATION / JAPANESE YEN
+             1943  Equity.JP.1812/JPY                          KAJIMA CORP / JAPANESE YEN
+             1944  Equity.JP.1925/JPY                          DAIWA HOUSE INDUSTRY CO / JAPANESE YEN
+             1945  Equity.JP.1928/JPY                          SEKISUI HOUSE / JAPANESE YEN
+             1946  Equity.JP.1963/JPY                          JGC HOLDINGS CORPORATION / JAPANESE YEN
+             1947  Equity.JP.2002/JPY                          NISSHIN SEIFUN GROUP INC / JAPANESE YEN
+             1948  Equity.JP.2269/JPY                          MEIJI HOLDINGS CO LTD / JAPANESE YEN
+             1949  Equity.JP.2282/JPY                          NH FOODS LTD / JAPANESE YEN
+             1950  Equity.JP.2413/JPY                          M3 INC / JAPANESE YEN
+             1951  Equity.JP.2432/JPY                          DENA CO LTD / JAPANESE YEN
+             1952  Equity.JP.2501/JPY                          SAPPORO HOLDINGS LIMITED / JAPANESE YEN
+             1953  Equity.JP.2502/JPY                          ASAHI GROUP HLDGS / JAPANESE YEN
+             1954  Equity.JP.2503/JPY                          KIRIN HOLDINGS COMPANY LIMITED / JAPANESE YEN
+             1955  Equity.JP.2768/JPY                          SOJITZ CORPORATION / JAPANESE YEN
+             1956  Equity.JP.2801/JPY                          KIKKOMAN CORP / JAPANESE YEN
+             1957  Equity.JP.2802/JPY                          AJINOMOTO CO INC / JAPANESE YEN
+             1958  Equity.JP.2871/JPY                          NICHIREI CORP / JAPANESE YEN
+             1959  Equity.JP.2914/JPY                          JAPAN TOBACCO INC / JAPANESE YEN
+             1960  Equity.JP.3086/JPY                          J FRONT RETAILING CO LTD / JAPANESE YEN
+             1961  Equity.JP.3092/JPY                          ZOZO INC / JAPANESE YEN
+             1962  Equity.JP.3099/JPY                          ISETAN MITSUKOSHI HOLDINGS LTD / JAPANESE YEN
+             1963  Equity.JP.3289/JPY                          TOKYU FUDOSAN HOLDINGS CORPORATION / JAPANESE YEN
+             1964  Equity.JP.3350/JPY                          METAPLANET INC / JAPANESE YEN
+             1965  Equity.JP.3382/JPY                          SEVEN & I HOLDINGS CO LTD / JAPANESE YEN
+             1966  Equity.JP.3401/JPY                          TEIJIN LTD / JAPANESE YEN
+             1967  Equity.JP.3402/JPY                          TORAY INDUSTRIES INC / JAPANESE YEN
+             1968  Equity.JP.3405/JPY                          KURARAY CO / JAPANESE YEN
+             1969  Equity.JP.3407/JPY                          ASAHI KASEI CORP / JAPANESE YEN
+             1970  Equity.JP.3436/JPY                          SUMCO CORPORATION / JAPANESE YEN
+             1971  Equity.JP.3659/JPY                          NEXON CO LTD / JAPANESE YEN
+             1972  Equity.JP.3861/JPY                          OJI HOLDINGS CORP / JAPANESE YEN
+             1973  Equity.JP.4004/JPY                          RESONAC HOLDINGS CORPORATION / JAPANESE YEN
+             1974  Equity.JP.4005/JPY                          SUMITOMO CHEMICAL COMPANY / JAPANESE YEN
+             1975  Equity.JP.4021/JPY                          NISSAN CHEMICAL CORPORATION / JAPANESE YEN
+             1976  Equity.JP.4042/JPY                          TOSOH CORP / JAPANESE YEN
+             1977  Equity.JP.4043/JPY                          TOKUYAMA CORP / JAPANESE YEN
+             1978  Equity.JP.4061/JPY                          DENKA COMPANY LIMITED / JAPANESE YEN
+             1979  Equity.JP.4063/JPY                          SHIN-ETSU CHEMICAL CO / JAPANESE YEN
+             1980  Equity.JP.4151/JPY                          KYOWA KIRIN CO LTD / JAPANESE YEN
+             1981  Equity.JP.4183/JPY                          MITSUI CHEMICALS INC / JAPANESE YEN
+             1982  Equity.JP.4188/JPY                          MITSUBISHI CHEMICAL GROUP CORP / JAPANESE YEN
+             1983  Equity.JP.4208/JPY                          UBE CORPORATION / JAPANESE YEN
+             1984  Equity.JP.4307/JPY                          NOMURA RESEARCH INSTITUTE / JAPANESE YEN
+             1985  Equity.JP.4324/JPY                          DENTSU GROUP INC / JAPANESE YEN
+             1986  Equity.JP.4385/JPY                          MERCARI INC / JAPANESE YEN
+             1987  Equity.JP.4452/JPY                          KAO CORP / JAPANESE YEN
+             1988  Equity.JP.4502/JPY                          TAKEDA PHARMACEUTICAL CO LTD / JAPANESE YEN
+             1989  Equity.JP.4503/JPY                          ASTELLAS PHARMA / JAPANESE YEN
+             1990  Equity.JP.4506/JPY                          SUMITOMO PHARMA CO LTD / JAPANESE YEN
+             1991  Equity.JP.4507/JPY                          SHIONOGI & CO / JAPANESE YEN
+             1992  Equity.JP.4519/JPY                          CHUGAI PHARMACEUTICAL CO / JAPANESE YEN
+             1993  Equity.JP.4523/JPY                          EISAI CO LTD / JAPANESE YEN
+             1994  Equity.JP.4543/JPY                          TERUMO CORP / JAPANESE YEN
+             1995  Equity.JP.4568/JPY                          DAIICHI SANKYO COMPANY LIMITED / JAPANESE YEN
+             1996  Equity.JP.4578/JPY                          OTSUKA HLDGS CO LTD / JAPANESE YEN
+             1997  Equity.JP.4661/JPY                          ORIENTAL LAND CO / JAPANESE YEN
+             1998  Equity.JP.4689/JPY                          LY CORPORATION / JAPANESE YEN
+             1999  Equity.JP.4704/JPY                          TREND MICRO INC / JAPANESE YEN
+             2000  Equity.JP.4751/JPY                          CYBER AGENT / JAPANESE YEN
+             2001  Equity.JP.4755/JPY                          RAKUTEN GROUP INC / JAPANESE YEN
+             2002  Equity.JP.4901/JPY                          FUJIFILM HOLDINGS CORPORATION / JAPANESE YEN
+             2003  Equity.JP.4902/JPY                          KONICA MINOLTA INC / JAPANESE YEN
+             2004  Equity.JP.4911/JPY                          SHISEIDO COMPANY LIMITED / JAPANESE YEN
+             2005  Equity.JP.5019/JPY                          IDEMITSU KOSAN COLTD / JAPANESE YEN
+             2006  Equity.JP.5020/JPY                          ENEOS HOLDINGS INC / JAPANESE YEN
+             2007  Equity.JP.5101/JPY                          YOKOHAMA RUBBER CO / JAPANESE YEN
+             2008  Equity.JP.5108/JPY                          BRIDGESTONE CORP / JAPANESE YEN
+             2009  Equity.JP.5201/JPY                          AGC INC / JAPANESE YEN
+             2010  Equity.JP.5214/JPY                          NIPPON ELECTRIC GLASS / JAPANESE YEN
+             2011  Equity.JP.5233/JPY                          TAIHEIYO CEMENT CORP / JAPANESE YEN
+             2012  Equity.JP.5301/JPY                          TOKAI CARBON CO / JAPANESE YEN
+             2013  Equity.JP.5332/JPY                          TOTO LTD / JAPANESE YEN
+             2014  Equity.JP.5333/JPY                          NGK INSULATORS / JAPANESE YEN
+             2015  Equity.JP.5401/JPY                          NIPPON STEEL CORPORATION / JAPANESE YEN
+             2016  Equity.JP.5406/JPY                          KOBE STEEL / JAPANESE YEN
+             2017  Equity.JP.5411/JPY                          JFE HOLDINGS INC / JAPANESE YEN
+             2018  Equity.JP.5631/JPY                          JAPAN STEEL WORKS / JAPANESE YEN
+             2019  Equity.JP.5706/JPY                          MITSUI MINING & SMELTING CO / JAPANESE YEN
+             2020  Equity.JP.5711/JPY                          MITSUBISHI MATERIALS CORP / JAPANESE YEN
+             2021  Equity.JP.5713/JPY                          SUMITOMO METAL MINING CO / JAPANESE YEN
+             2022  Equity.JP.5714/JPY                          DOWA HOLDINGS / JAPANESE YEN
+             2023  Equity.JP.5801/JPY                          FURUKAWA ELECTRIC CO / JAPANESE YEN
+             2024  Equity.JP.5802/JPY                          SUMITOMO ELECTRIC INDUSTRIES / JAPANESE YEN
+             2025  Equity.JP.5803/JPY                          FUJIKURA LTD / JAPANESE YEN
+             2026  Equity.JP.5831/JPY                          SHIZUOKA FINANCIAL GROUP INC / JAPANESE YEN
+             2027  Equity.JP.6098/JPY                          RECRUIT HOLDINGS CO LTD / JAPANESE YEN
+             2028  Equity.JP.6103/JPY                          OKUMA CORPORATION / JAPANESE YEN
+             2029  Equity.JP.6113/JPY                          AMADA CO LTD / JAPANESE YEN
+             2030  Equity.JP.6146/JPY                          DISCO CORPORATION / JAPANESE YEN
+             2031  Equity.JP.6178/JPY                          JAPAN POST HLDGS CO LTD / JAPANESE YEN
+             2032  Equity.JP.6273/JPY                          SMC CORP / JAPANESE YEN
+             2033  Equity.JP.6301/JPY                          KOMATSU / JAPANESE YEN
+             2034  Equity.JP.6302/JPY                          SUMITOMO HEAVY INDUSTRIES / JAPANESE YEN
+             2035  Equity.JP.6305/JPY                          HITACHI CONSTRUCTION MACHINERY / JAPANESE YEN
+             2036  Equity.JP.6326/JPY                          KUBOTA CORP / JAPANESE YEN
+             2037  Equity.JP.6361/JPY                          EBARA CORP / JAPANESE YEN
+             2038  Equity.JP.6367/JPY                          DAIKIN INDUSTRIES / JAPANESE YEN
+             2039  Equity.JP.6471/JPY                          NSK / JAPANESE YEN
+             2040  Equity.JP.6472/JPY                          NTN CORP / JAPANESE YEN
+             2041  Equity.JP.6473/JPY                          JTEKT CORPORATION / JAPANESE YEN
+             2042  Equity.JP.6479/JPY                          MINEBEA MITSUMI INC / JAPANESE YEN
+             2043  Equity.JP.6501/JPY                          HITACHI / JAPANESE YEN
+             2044  Equity.JP.6503/JPY                          MITSUBISHI ELECTRIC CORP / JAPANESE YEN
+             2045  Equity.JP.6504/JPY                          FUJI ELECTRIC CO LTD / JAPANESE YEN
+             2046  Equity.JP.6506/JPY                          YASKAWA ELECTRIC CORP / JAPANESE YEN
+             2047  Equity.JP.6526/JPY                          SOCIONEXT INC / JAPANESE YEN
+             2048  Equity.JP.6532/JPY                          BAYCURRENT INC / JAPANESE YEN
+             2049  Equity.JP.6594/JPY                          NIDEC CORPORATION / JAPANESE YEN
+             2050  Equity.JP.6645/JPY                          OMRON CORP / JAPANESE YEN
+             2051  Equity.JP.6674/JPY                          GS YUASA CORP / JAPANESE YEN
+             2052  Equity.JP.6701/JPY                          NEC CORP / JAPANESE YEN
+             2053  Equity.JP.6702/JPY                          FUJITSU / JAPANESE YEN
+             2054  Equity.JP.6723/JPY                          RENESAS ELECTRONICS CORP / JAPANESE YEN
+             2055  Equity.JP.6724/JPY                          SEIKO EPSON CORP / JAPANESE YEN
+             2056  Equity.JP.6752/JPY                          PANASONIC HOLDINGS CORP / JAPANESE YEN
+             2057  Equity.JP.6753/JPY                          SHARP CORP / JAPANESE YEN
+             2058  Equity.JP.6758/JPY                          SONY GROUP CORPORATION / JAPANESE YEN
+             2059  Equity.JP.6762/JPY                          TDK CORP / JAPANESE YEN
+             2060  Equity.JP.6770/JPY                          ALPS ALPINE CO LTD / JAPANESE YEN
+             2061  Equity.JP.6841/JPY                          YOKOGAWA ELECTRIC CORP / JAPANESE YEN
+             2062  Equity.JP.6857/JPY                          ADVANTEST CORP / JAPANESE YEN
+             2063  Equity.JP.6861/JPY                          KEYENCE CORP / JAPANESE YEN
+             2064  Equity.JP.6902/JPY                          DENSO CORP / JAPANESE YEN
+             2065  Equity.JP.6920/JPY                          LASERTEC CORPORATION / JAPANESE YEN
+             2066  Equity.JP.6952/JPY                          CASIO COMPUTER CO / JAPANESE YEN
+             2067  Equity.JP.6954/JPY                          FANUC CORPORATION / JAPANESE YEN
+             2068  Equity.JP.6963/JPY                          ROHM CO LTD / JAPANESE YEN
+             2069  Equity.JP.6971/JPY                          KYOCERA CORP / JAPANESE YEN
+             2070  Equity.JP.6976/JPY                          TAIYO YUDEN CO LTD / JAPANESE YEN
+             2071  Equity.JP.6981/JPY                          MURATA MANUFACTURING CO / JAPANESE YEN
+             2072  Equity.JP.6988/JPY                          NITTO DENKO CORP / JAPANESE YEN
+             2073  Equity.JP.7004/JPY                          KANADEVIA CORPORATION / JAPANESE YEN
+             2074  Equity.JP.7011/JPY                          MITSUBISHI HEAVY INDUSTRIES LTD / JAPANESE YEN
+             2075  Equity.JP.7012/JPY                          KAWASAKI HEAVY INDUSTRIES / JAPANESE YEN
+             2076  Equity.JP.7013/JPY                          IHI CORPORATION / JAPANESE YEN
+             2077  Equity.JP.7186/JPY                          CONCORDIA FINANCIAL GROUP LTD / JAPANESE YEN
+             2078  Equity.JP.7201/JPY                          NISSAN MOTOR CO / JAPANESE YEN
+             2079  Equity.JP.7202/JPY                          ISUZU MOTORS / JAPANESE YEN
+             2080  Equity.JP.7203/JPY                          TOYOTA MOTOR CORPORATION / JAPANESE YEN
+             2081  Equity.JP.7205/JPY                          HINO MOTORS / JAPANESE YEN
+             2082  Equity.JP.7211/JPY                          MITSUBISHI MOTOR CORP / JAPANESE YEN
+             2083  Equity.JP.7261/JPY                          MAZDA MOTOR CORP / JAPANESE YEN
+             2084  Equity.JP.7267/JPY                          HONDA MOTOR CO / JAPANESE YEN
+             2085  Equity.JP.7269/JPY                          SUZUKI MOTOR CORP / JAPANESE YEN
+             2086  Equity.JP.7270/JPY                          SUBARU CORPORATION / JAPANESE YEN
+             2087  Equity.JP.7272/JPY                          YAMAHA MOTOR CO / JAPANESE YEN
+             2088  Equity.JP.7453/JPY                          RYOHIN KEIKAKU CO / JAPANESE YEN
+             2089  Equity.JP.7731/JPY                          NIKON CORP / JAPANESE YEN
+             2090  Equity.JP.7733/JPY                          OLYMPUS CORPORATION / JAPANESE YEN
+             2091  Equity.JP.7735/JPY                          SCREEN HOLDINGS CO LTD / JAPANESE YEN
+             2092  Equity.JP.7741/JPY                          HOYA CORP / JAPANESE YEN
+             2093  Equity.JP.7751/JPY                          CANON INC / JAPANESE YEN
+             2094  Equity.JP.7752/JPY                          RICOH CO / JAPANESE YEN
+             2095  Equity.JP.7762/JPY                          CITIZEN WATCH CO LTD / JAPANESE YEN
+             2096  Equity.JP.7832/JPY                          BANDAI NAMCO HOLDINGS INC / JAPANESE YEN
+             2097  Equity.JP.7911/JPY                          TOPPAN HOLDINGS INC / JAPANESE YEN
+             2098  Equity.JP.7912/JPY                          DAI NIPPON PRINTING CO / JAPANESE YEN
+             2099  Equity.JP.7951/JPY                          YAMAHA CORP / JAPANESE YEN
+             2100  Equity.JP.7974/JPY                          NINTENDO CO LTD / JAPANESE YEN
+             2101  Equity.JP.8001/JPY                          ITOCHU CORP / JAPANESE YEN
+             2102  Equity.JP.8002/JPY                          MARUBENI CORP / JAPANESE YEN
+             2103  Equity.JP.8015/JPY                          TOYOTA TSUSHO CORP / JAPANESE YEN
+             2104  Equity.JP.8031/JPY                          MITSUI & CO / JAPANESE YEN
+             2105  Equity.JP.8035/JPY                          TOKYO ELECTRON / JAPANESE YEN
+             2106  Equity.JP.8053/JPY                          SUMITOMO CORP / JAPANESE YEN
+             2107  Equity.JP.8058/JPY                          MITSUBISHI CORP / JAPANESE YEN
+             2108  Equity.JP.8136/JPY                          SANRIO COMPANY LTD / JAPANESE YEN
+             2109  Equity.JP.8233/JPY                          TAKASHIMAYA CO / JAPANESE YEN
+             2110  Equity.JP.8252/JPY                          MARUI GROUP CO LTD / JAPANESE YEN
+             2111  Equity.JP.8253/JPY                          CREDIT SAISON CO / JAPANESE YEN
+             2112  Equity.JP.8267/JPY                          AEON CO LTD / JAPANESE YEN
+             2113  Equity.JP.8304/JPY                          AOZORA BANK / JAPANESE YEN
+             2114  Equity.JP.8306/JPY                          MITSUBISHI UFJ FINANCIAL GROUP INC / JAPANESE YEN
+             2115  Equity.JP.8308/JPY                          RESONA HOLDINGS / JAPANESE YEN
+             2116  Equity.JP.8309/JPY                          SUMITOMO MITSUI TRUST GP INC / JAPANESE YEN
+             2117  Equity.JP.8316/JPY                          SUMITOMO MITSUI FINANCIAL GROUP INC / JAPANESE YEN
+             2118  Equity.JP.8331/JPY                          CHIBA BANK / JAPANESE YEN
+             2119  Equity.JP.8354/JPY                          FUKUOKA FINANCIAL GROUP INC / JAPANESE YEN
+             2120  Equity.JP.8411/JPY                          MIZUHO FINANCIAL GROUP / JAPANESE YEN
+             2121  Equity.JP.8591/JPY                          ORIX CORPORATION / JAPANESE YEN
+             2122  Equity.JP.8601/JPY                          DAIWA SECURITIES GROUP / JAPANESE YEN
+             2123  Equity.JP.8604/JPY                          NOMURA HOLDINGS INC / JAPANESE YEN
+             2124  Equity.JP.8630/JPY                          SOMPO HOLDINGS INC / JAPANESE YEN
+             2125  Equity.JP.8697/JPY                          JAPAN EXCHANGE GROUP / JAPANESE YEN
+             2126  Equity.JP.8725/JPY                          MS&AD INS GP HLDGS / JAPANESE YEN
+             2127  Equity.JP.8750/JPY                          DAI-ICHI LIFE HOLDINGS INC / JAPANESE YEN
+             2128  Equity.JP.8766/JPY                          TOKIO MARINE HOLDINGS INC / JAPANESE YEN
+             2129  Equity.JP.8795/JPY                          T&D HOLDINGS INC / JAPANESE YEN
+             2130  Equity.JP.8801/JPY                          MITSUI FUDOSAN / JAPANESE YEN
+             2131  Equity.JP.8802/JPY                          MITSUBISHI ESTATE CO / JAPANESE YEN
+             2132  Equity.JP.8804/JPY                          TOKYO TATEMONO CO / JAPANESE YEN
+             2133  Equity.JP.8830/JPY                          SUMITOMO REALTY & DEVELOPMENT CO / JAPANESE YEN
+             2134  Equity.JP.9001/JPY                          TOBU RAILWAY CO / JAPANESE YEN
+             2135  Equity.JP.9005/JPY                          TOKYU CORP / JAPANESE YEN
+             2136  Equity.JP.9007/JPY                          ODAKYU ELECTRIC RAILWAY CO / JAPANESE YEN
+             2137  Equity.JP.9008/JPY                          KEIO CORPORATION / JAPANESE YEN
+             2138  Equity.JP.9009/JPY                          KEISEI ELECTRIC RAILWAY CO / JAPANESE YEN
+             2139  Equity.JP.9020/JPY                          EAST JAPAN RAILWAY CO / JAPANESE YEN
+             2140  Equity.JP.9021/JPY                          WEST JAPAN RAILWAY CO / JAPANESE YEN
+             2141  Equity.JP.9022/JPY                          CENTRAL JAPAN RAILWAY CO / JAPANESE YEN
+             2142  Equity.JP.9064/JPY                          YAMATO HOLDINGS CO LTD / JAPANESE YEN
+             2143  Equity.JP.9101/JPY                          NIPPON YUSEN KABUSHIKI KAISHA / JAPANESE YEN
+             2144  Equity.JP.9104/JPY                          MITSUI OSK LINES LTD / JAPANESE YEN
+             2145  Equity.JP.9107/JPY                          KAWASAKI KISEN KAISHA / JAPANESE YEN
+             2146  Equity.JP.9147/JPY                          NIPPON EXPRESS HLDGS INC / JAPANESE YEN
+             2147  Equity.JP.9201/JPY                          JAPAN AIRLINES CO LTD / JAPANESE YEN
+             2148  Equity.JP.9202/JPY                          ANA HOLDINGS INC / JAPANESE YEN
+             2149  Equity.JP.9432/JPY                          NTT INC / JAPANESE YEN
+             2150  Equity.JP.9433/JPY                          KDDI CORPORATION / JAPANESE YEN
+             2151  Equity.JP.9434/JPY                          SOFTBANK CORP / JAPANESE YEN
+             2152  Equity.JP.9501/JPY                          TOKYO ELEC POWER CO HLDGS INC / JAPANESE YEN
+             2153  Equity.JP.9502/JPY                          CHUBU ELECTRIC POWER CO INC / JAPANESE YEN
+             2154  Equity.JP.9503/JPY                          KANSAI ELECTRIC POWER CO INC / JAPANESE YEN
+             2155  Equity.JP.9531/JPY                          TOKYO GAS CO / JAPANESE YEN
+             2156  Equity.JP.9532/JPY                          OSAKA GAS CO / JAPANESE YEN
+             2157  Equity.JP.9602/JPY                          TOHO CO LTD / JAPANESE YEN
+             2158  Equity.JP.9735/JPY                          SECOM CO / JAPANESE YEN
+             2159  Equity.JP.9766/JPY                          KONAMI GROUP CORPORATION / JAPANESE YEN
+             2160  Equity.JP.9843/JPY                          NITORI HOLDINGS CO LTD / JAPANESE YEN
+             2161  Equity.JP.9983/JPY                          FAST RETAILING CO LTD / JAPANESE YEN
+             2162  Equity.JP.9984/JPY                          SOFTBANK GROUP CORP / JAPANESE YEN
+
+==============================================================================
+BUCKET B — equity-KR (104)
+==============================================================================
+Got: top-level allowedPublisherIds: [];
+     REGULAR session benchmarkMapping preserved if present,
+     else empty-identifier skeleton added.
+
+             2163  Equity.KR.000100/KRW                        YUHAN / SOUTH KOREAN WON
+             2164  Equity.KR.000150/KRW                        DOOSAN / SOUTH KOREAN WON
+             2165  Equity.KR.000270/KRW                        KIA CORPORATION / SOUTH KOREAN WON
+             2166  Equity.KR.000660/KRW                        SK HYNIX / SOUTH KOREAN WON
+             2167  Equity.KR.000720/KRW                        HYUNDAI ENGINEERING & CONSTRUCTION / SOUTH KOREAN WON
+             2168  Equity.KR.000810/KRW                        SAMSUNG FIRE & MARINE INSURANCE / SOUTH KOREAN WON
+             2169  Equity.KR.000880/KRW                        HANWHA / SOUTH KOREAN WON
+             2170  Equity.KR.001040/KRW                        CJ CORP  / SOUTH KOREAN WON
+             2171  Equity.KR.003230/KRW                        SAMYANG FOOD / SOUTH KOREAN WON
+             2172  Equity.KR.003490/KRW                        KOREAN AIRLINES / SOUTH KOREAN WON
+             2173  Equity.KR.003550/KRW                        LG CORP  / SOUTH KOREAN WON
+             2174  Equity.KR.003670/KRW                        POSCO FUTURE M / SOUTH KOREAN WON
+             2175  Equity.KR.004020/KRW                        HYUNDAI STEEL / SOUTH KOREAN WON
+             2176  Equity.KR.005380/KRW                        HYUNDAI MOTOR / SOUTH KOREAN WON
+             2177  Equity.KR.005490/KRW                        POSCO HOLDINGS INC  / SOUTH KOREAN WON
+             2178  Equity.KR.005830/KRW                        DB INSURANCE / SOUTH KOREAN WON
+             2179  Equity.KR.005930/KRW                        SAMSUNG ELECTRONICS / SOUTH KOREAN WON
+             2180  Equity.KR.005940/KRW                        NH INVESTMENT & SECURITIES / SOUTH KOREAN WON
+             2181  Equity.KR.006260/KRW                        LS / SOUTH KOREAN WON
+             2182  Equity.KR.006400/KRW                        SAMSUNG SDI CO LTD  / SOUTH KOREAN WON
+             2183  Equity.KR.006800/KRW                        MIRAE ASSET SECURITIES / SOUTH KOREAN WON
+             2184  Equity.KR.007660/KRW                        ISUPETASYS / SOUTH KOREAN WON
+             2185  Equity.KR.009150/KRW                        SAMSUNG ELECTROMECHANICS / SOUTH KOREAN WON
+             2186  Equity.KR.009540/KRW                        HD KOREA SHIPBUILDING & OFFSHORE ENGINEERING / SOUTH KOREAN
+             2187  Equity.KR.009830/KRW                        HANWHA SOLUTIONS / SOUTH KOREAN WON
+             2188  Equity.KR.010120/KRW                        LS ELECTRIC / SOUTH KOREAN WON
+             2189  Equity.KR.010130/KRW                        KOREA ZINC / SOUTH KOREAN WON
+             2190  Equity.KR.010140/KRW                        SAMSUNG HEAVY INDUSTRIES / SOUTH KOREAN WON
+             2191  Equity.KR.010620/KRW                        HD HYUNDAI MIPO / SOUTH KOREAN WON
+             2192  Equity.KR.010950/KRW                        S-OILCORPORATION / SOUTH KOREAN WON
+             2193  Equity.KR.011200/KRW                        HYUNDAI MERC MAR / SOUTH KOREAN WON
+             2194  Equity.KR.012330/KRW                        HYUNDAI MOBIS / SOUTH KOREAN WON
+             2195  Equity.KR.012450/KRW                        HANWHA AEROSPACE / SOUTH KOREAN WON
+             2196  Equity.KR.015760/KRW                        KOREA ELECTRIC POWER / SOUTH KOREAN WON
+             2197  Equity.KR.016360/KRW                        SAMSUNG SECURITIES / SOUTH KOREAN WON
+             2198  Equity.KR.017670/KRW                        SK TELECOM / SOUTH KOREAN WON
+             2199  Equity.KR.018260/KRW                        SAMSUNG SDS CO  LTD  / SOUTH KOREAN WON
+             2200  Equity.KR.021240/KRW                        COWAY / SOUTH KOREAN WON
+             2201  Equity.KR.024110/KRW                        INDUSTRIAL BANK OF KOREA / SOUTH KOREAN WON
+             2202  Equity.KR.028050/KRW                        SAMSUNG E & A / SOUTH KOREAN WON
+             2203  Equity.KR.028260/KRW                        SAMSUNG C&T CORPORATION / SOUTH KOREAN WON
+             2204  Equity.KR.029780/KRW                        SAMSUNG CARD CO  LTD  / SOUTH KOREAN WON
+             2205  Equity.KR.030200/KRW                        KT CORPORATION / SOUTH KOREAN WON
+             2206  Equity.KR.032640/KRW                        LG UPLUS / SOUTH KOREAN WON
+             2207  Equity.KR.032830/KRW                        SAMSUNG LIFE INSURANCE / SOUTH KOREAN WON
+             2208  Equity.KR.033780/KRW                        KT&G CORPORATION / SOUTH KOREAN WON
+             2209  Equity.KR.034020/KRW                        DOOSAN ENERBILITY / SOUTH KOREAN WON
+             2210  Equity.KR.034220/KRW                        LG DISPLAY / SOUTH KOREAN WON
+             2211  Equity.KR.034730/KRW                        SK / SOUTH KOREAN WON
+             2212  Equity.KR.035250/KRW                        KANGWON LAND INC  / SOUTH KOREAN WON
+             2213  Equity.KR.035420/KRW                        NAVER / SOUTH KOREAN WON
+             2214  Equity.KR.035720/KRW                        KAKAO / SOUTH KOREAN WON
+             2215  Equity.KR.036570/KRW                        NC SOFT CORPORATION / SOUTH KOREAN WON
+             2216  Equity.KR.039490/KRW                        KIWOOM SECURITIES / SOUTH KOREAN WON
+             2217  Equity.KR.042660/KRW                        HANWHA OCEAN / SOUTH KOREAN WON
+             2218  Equity.KR.042700/KRW                        HANMI SEMICONDUCTOR CO  LTD  / SOUTH KOREAN WON
+             2219  Equity.KR.047050/KRW                        POSCO INTERNATIONAL / SOUTH KOREAN WON
+             2220  Equity.KR.047810/KRW                        KOREA AEROSPACE INDUSTRIES / SOUTH KOREAN WON
+             2221  Equity.KR.051900/KRW                        LG H&H / SOUTH KOREAN WON
+             2222  Equity.KR.051910/KRW                        LG CHEM LTD / SOUTH KOREAN WON
+             2223  Equity.KR.055550/KRW                        SHINHAN FINANCIAL GROUP CO  LTD  / SOUTH KOREAN WON
+             2224  Equity.KR.064350/KRW                        HYUNDAI ROTEM / SOUTH KOREAN WON
+             2225  Equity.KR.064400/KRW                        LG CNS / SOUTH KOREAN WON
+             2226  Equity.KR.066570/KRW                        LG ELECTRONICS INC  / SOUTH KOREAN WON
+             2227  Equity.KR.068270/KRW                        CELLTRION / SOUTH KOREAN WON
+             2228  Equity.KR.071050/KRW                        KOREA INVESTMENT HOLDINGS / SOUTH KOREAN WON
+             2229  Equity.KR.078930/KRW                        GS HOLDINGS / SOUTH KOREAN WON
+             2230  Equity.KR.079550/KRW                        LIG NEX1 CO  LTD  / SOUTH KOREAN WON
+             2231  Equity.KR.086280/KRW                        HYUNDAI GLOVIS CO  LTD / SOUTH KOREAN WON
+             2232  Equity.KR.086790/KRW                        HANA FINANCIAL GROUP INC  / SOUTH KOREAN WON
+             2233  Equity.KR.088980/KRW                        MACQUARIE KOREA INFRASTRUCTURE FUND / SOUTH KOREAN WON
+             2234  Equity.KR.090430/KRW                        AMOREPACIFIC CORPORATION / SOUTH KOREAN WON
+             2235  Equity.KR.096770/KRW                        SK INNOVATION / SOUTH KOREAN WON
+             2236  Equity.KR.097950/KRW                        CJ CHEILJEDANG CORP / SOUTH KOREAN WON
+             2237  Equity.KR.105560/KRW                        KB FINANCIAL GROUP / SOUTH KOREAN WON
+             2238  Equity.KR.138040/KRW                        MERITZ FINANCIAL GROUP / SOUTH KOREAN WON
+             2239  Equity.KR.138930/KRW                        BNK FINANCIAL GROUP INC  / SOUTH KOREAN WON
+             2240  Equity.KR.161390/KRW                        HANKOOK TIRE & TECHNOLOGY / SOUTH KOREAN WON
+             2241  Equity.KR.175330/KRW                        JB FINANCIAL GROUP CO  LTD  / SOUTH KOREAN WON
+             2242  Equity.KR.180640/KRW                        HANJINKAL / SOUTH KOREAN WON
+             2243  Equity.KR.207940/KRW                        SAMSUNG BIOLOGICS / SOUTH KOREAN WON
+             2244  Equity.KR.241560/KRW                        DOOSAN BOBCAT / SOUTH KOREAN WON
+             2245  Equity.KR.251270/KRW                        NETMARBLE CORPORATION / SOUTH KOREAN WON
+             2246  Equity.KR.259960/KRW                        KRAFTON / SOUTH KOREAN WON
+             2247  Equity.KR.267250/KRW                        HD HYUNDAI / SOUTH KOREAN WON
+             2248  Equity.KR.267260/KRW                        HD HYUNDAI ELECTRIC / SOUTH KOREAN WON
+             2249  Equity.KR.271560/KRW                        ORION / SOUTH KOREAN WON
+             2250  Equity.KR.272210/KRW                        HANWHA SYSTEMS / SOUTH KOREAN WON
+             2251  Equity.KR.278470/KRW                        APR / SOUTH KOREAN WON
+             2252  Equity.KR.298040/KRW                        HYOSUNG HEAVY INDUSTRIES / SOUTH KOREAN WON
+             2253  Equity.KR.307950/KRW                        HYUNDAIAUTOEVER / SOUTH KOREAN WON
+             2254  Equity.KR.316140/KRW                        WOORIFINANCIALGROUP / SOUTH KOREAN WON
+             2255  Equity.KR.323410/KRW                        KAKAOBANK CORP  / SOUTH KOREAN WON
+             2256  Equity.KR.326030/KRW                        SK BIOPHARMACEUTICALS / SOUTH KOREAN WON
+             2257  Equity.KR.329180/KRW                        HD HYUNDAI HEAVY INDUSTRIES / SOUTH KOREAN WON
+             2258  Equity.KR.352820/KRW                        HYBE / SOUTH KOREAN WON
+             2259  Equity.KR.373220/KRW                        LG ENERGY SOLUTION / SOUTH KOREAN WON
+             2260  Equity.KR.377300/KRW                        KAKAOPAY / SOUTH KOREAN WON
+             2261  Equity.KR.402340/KRW                        SKSQUARE / SOUTH KOREAN WON
+             2262  Equity.KR.443060/KRW                        HD HYUNDAI MARINE SOLUTION CO  LTD / SOUTH KOREAN WON
+             2994  Equity.KR.KSM6/KRW                          KSPI 200 11 JUNE 2026 / SOUTH KOREAN WON
+             2995  Equity.KR.KSU6/KRW                          KSPI 200 10 SEPTEMBER 2026 / SOUTH KOREAN WON
+             3003  Equity.KR.KQM6/KRW                          KSDQ 150 11 JUNE 2026 / SOUTH KOREAN WON
+             3004  Equity.KR.KQU6/KRW                          KSDQ 150 10 SEPTEMBER 2026 / SOUTH KOREAN WON
+
+==============================================================================
+BUCKET B — equity-LU (2)
+==============================================================================
+Got: top-level allowedPublisherIds: [];
+     REGULAR session benchmarkMapping preserved if present,
+     else empty-identifier skeleton added.
+
+             2263  Equity.LU.ERF/EUR                           EUROFINS SCIENT / EURO
+             2264  Equity.LU.MT/EUR                            ARCELORMITTAL SA / EURO
+
+==============================================================================
+BUCKET B — equity-NL (4)
+==============================================================================
+Got: top-level allowedPublisherIds: [];
+     REGULAR session benchmarkMapping preserved if present,
+     else empty-identifier skeleton added.
+
+             2265  Equity.NL.AIR/EUR                           AIRBUS SE / EURO
+             2266  Equity.NL.QIA/EUR                           QIAGEN NV / EURO
+             2267  Equity.NL.STLAP/EUR                         STELLANTIS NV / EURO
+             2268  Equity.NL.STMPA/EUR                         STMICROELECTRONICS / EURO
+
+==============================================================================
+BUCKET B — equity-US (3)
+==============================================================================
+Got: top-level allowedPublisherIds: [];
+     REGULAR session benchmarkMapping preserved if present,
+     else empty-identifier skeleton added.
+
+  [orig-bm]  2914  Equity.US.NIDU6/USD                         PYTH PRICE IN USD FOR CME NIKKEI USD FUTURES 10 SEPTEMBER 20
+             2916  Equity.US.FCDM6/USD                         FCD M6 29 JUNE 2026 / US DOLLAR
+             2917  Equity.US.FCDU6/USD                         FCD U6 29 SEPTEMBER 2026 / US DOLLAR
+
+==============================================================================
+BUCKET B — fx (235)
+==============================================================================
+Got: top-level allowedPublisherIds: [];
+     REGULAR session benchmarkMapping preserved if present,
+     else empty-identifier skeleton added.
+
+  [orig-bm]  2307  FX.USDXY                                    US DOLLAR INDEX
+             2425  FX.AED/JPY                                  UAE DIRHAM / JAPANESE YEN
+             2426  FX.ALL/JPY                                  ALBANIAN LEK / JAPANESE YEN
+             2427  FX.ARS/JPY                                  ARGENTINE PESO / JAPANESE YEN
+             2428  FX.AUD/DKK                                  AUSTRALIAN DOLLAR / DANISH KRONE
+             2429  FX.AUD/HKD                                  AUSTRALIAN DOLLAR / HONG KONG DOLLAR
+             2430  FX.AUD/NOK                                  AUSTRALIAN DOLLAR / NORWEGIAN KRONE
+             2431  FX.AUD/SEK                                  AUSTRALIAN DOLLAR / SWEDISH KRONA
+             2432  FX.AUD/SGD                                  AUSTRALIAN DOLLAR / SINGAPORE DOLLAR
+             2433  FX.BGN/JPY                                  BULGARIAN LEV / JAPANESE YEN
+             2434  FX.BRL/JPY                                  BRAZILIAN REAL / JAPANESE YEN
+             2435  FX.BWP/JPY                                  BOTSWANA PULA / JAPANESE YEN
+             2436  FX.CLP/JPY                                  CHILEAN PESO / JAPANESE YEN
+             2437  FX.CNH/JPY                                  CHINESE YUAN (OFFSHORE) / JAPANESE YEN
+             2438  FX.CNY/JPY                                  CHINESE YUAN / JAPANESE YEN
+             2439  FX.COP/JPY                                  COLOMBIAN PESO / JAPANESE YEN
+             2440  FX.CRC/JPY                                  COSTA RICAN COLÓN / JAPANESE YEN
+             2441  FX.CZK/JPY                                  CZECH KORUNA / JAPANESE YEN
+             2442  FX.DKK/JPY                                  DANISH KRONE / JAPANESE YEN
+             2443  FX.EGP/JPY                                  EGYPTIAN POUND / JAPANESE YEN
+             2444  FX.EUR/AED                                  EURO / UAE DIRHAM
+             2445  FX.EUR/ALL                                  EURO / ALBANIAN LEK
+             2446  FX.EUR/ARS                                  EURO / ARGENTINE PESO
+             2447  FX.EUR/BGN                                  EURO / BULGARIAN LEV
+             2448  FX.EUR/BHD                                  EURO / BAHRAINI DINAR
+             2449  FX.EUR/BRL                                  EURO / BRAZILIAN REAL
+             2450  FX.EUR/CLP                                  EURO / CHILEAN PESO
+             2451  FX.EUR/CNY                                  EURO / CHINESE YUAN
+             2452  FX.EUR/COP                                  EURO / COLOMBIAN PESO
+             2453  FX.EUR/CZK                                  EURO / CZECH KORUNA
+             2454  FX.EUR/EGP                                  EURO / EGYPTIAN POUND
+             2455  FX.EUR/GHS                                  EURO / GHANAIAN CEDI
+             2456  FX.EUR/HKD                                  EURO / HONG KONG DOLLAR
+             2457  FX.EUR/HRK                                  EURO / CROATIAN KUNA
+             2458  FX.EUR/HUF                                  EURO / HUNGARIAN FORINT
+             2459  FX.EUR/IDR                                  EURO / INDONESIAN RUPIAH
+             2460  FX.EUR/ILS                                  EURO / ISRAELI NEW SHEKEL
+             2461  FX.EUR/INR                                  EURO / INDIAN RUPEE
+             2462  FX.EUR/ISK                                  EURO / ICELANDIC KRONA
+             2463  FX.EUR/KES                                  EURO / KENYAN SHILLING
+             2464  FX.EUR/KRW                                  EURO / SOUTH KOREAN WON
+             2465  FX.EUR/KWD                                  EURO / KUWAITI DINAR
+             2466  FX.EUR/KZT                                  EURO / KAZAKHSTANI TENGE
+             2467  FX.EUR/MAD                                  EURO / MOROCCAN DIRHAM
+             2468  FX.EUR/MMK                                  EURO / BURMESE KYAT
+             2469  FX.EUR/MUR                                  EURO / MAURITIAN RUPEE
+             2470  FX.EUR/MXN                                  EURO / MEXICAN PESO
+             2471  FX.EUR/MYR                                  EURO / MALAYSIAN RINGGIT
+             2472  FX.EUR/NGN                                  EURO / NIGERIAN NAIRA
+             2473  FX.EUR/OMR                                  EURO / OMANI RIAL
+             2474  FX.EUR/PHP                                  EURO / PHILIPPINE PESO
+             2475  FX.EUR/PLN                                  EURO / POLISH ZLOTY
+             2476  FX.EUR/QAR                                  EURO / QATARI RIYAL
+             2477  FX.EUR/RON                                  EURO / ROMANIAN LEU
+             2478  FX.EUR/RSD                                  EURO / SERBIAN DINAR
+             2479  FX.EUR/RUB                                  EURO / RUSSIAN RUBLE
+             2480  FX.EUR/RWF                                  EURO / RWANDAN FRANC
+             2481  FX.EUR/SAR                                  EURO / SAUDI RIYAL
+             2482  FX.EUR/SGD                                  EURO / SINGAPORE DOLLAR
+             2483  FX.EUR/THB                                  EURO / THAI BAHT
+             2484  FX.EUR/TND                                  EURO / TUNISIAN DINAR
+             2485  FX.EUR/TRY                                  EURO / TURKISH LIRA
+             2486  FX.EUR/TWD                                  EURO / NEW TAIWAN DOLLAR
+             2487  FX.EUR/TZS                                  EURO / TANZANIAN SHILLING
+             2488  FX.EUR/UAH                                  EURO / UKRAINIAN HRYVNIA
+             2489  FX.EUR/UGX                                  EURO / UGANDAN SHILLING
+             2490  FX.EUR/VND                                  EURO / VIETNAMESE DONG
+             2491  FX.EUR/ZAR                                  EURO / SOUTH AFRICAN RAND
+             2492  FX.EUR/ZMW                                  EURO / ZAMBIAN KWACHA
+             2493  FX.FJD/JPY                                  FIJIAN DOLLAR / JAPANESE YEN
+             2494  FX.GBP/AED                                  BRITISH POUND / UAE DIRHAM
+             2495  FX.GBP/ALL                                  BRITISH POUND / ALBANIAN LEK
+             2496  FX.GBP/ARS                                  BRITISH POUND / ARGENTINE PESO
+             2497  FX.GBP/BGN                                  BRITISH POUND / BULGARIAN LEV
+             2498  FX.GBP/BHD                                  BRITISH POUND / BAHRAINI DINAR
+             2499  FX.GBP/BRL                                  BRITISH POUND / BRAZILIAN REAL
+             2500  FX.GBP/CLP                                  BRITISH POUND / CHILEAN PESO
+             2501  FX.GBP/CNY                                  BRITISH POUND / CHINESE YUAN
+             2502  FX.GBP/COP                                  BRITISH POUND / COLOMBIAN PESO
+             2503  FX.GBP/CRC                                  BRITISH POUND / COSTA RICAN COLÓN
+             2504  FX.GBP/CZK                                  BRITISH POUND / CZECH KORUNA
+             2505  FX.GBP/DKK                                  BRITISH POUND / DANISH KRONE
+             2506  FX.GBP/EGP                                  BRITISH POUND / EGYPTIAN POUND
+             2507  FX.GBP/GHS                                  BRITISH POUND / GHANAIAN CEDI
+             2508  FX.GBP/HKD                                  BRITISH POUND / HONG KONG DOLLAR
+             2509  FX.GBP/HRK                                  BRITISH POUND / CROATIAN KUNA
+             2510  FX.GBP/HUF                                  BRITISH POUND / HUNGARIAN FORINT
+             2511  FX.GBP/IDR                                  BRITISH POUND / INDONESIAN RUPIAH
+             2512  FX.GBP/ILS                                  BRITISH POUND / ISRAELI NEW SHEKEL
+             2513  FX.GBP/INR                                  BRITISH POUND / INDIAN RUPEE
+             2514  FX.GBP/KES                                  BRITISH POUND / KENYAN SHILLING
+             2515  FX.GBP/KRW                                  BRITISH POUND / SOUTH KOREAN WON
+             2516  FX.GBP/KWD                                  BRITISH POUND / KUWAITI DINAR
+             2517  FX.GBP/KZT                                  BRITISH POUND / KAZAKHSTANI TENGE
+             2518  FX.GBP/MAD                                  BRITISH POUND / MOROCCAN DIRHAM
+             2519  FX.GBP/MMK                                  BRITISH POUND / BURMESE KYAT
+             2520  FX.GBP/MUR                                  BRITISH POUND / MAURITIAN RUPEE
+             2521  FX.GBP/MXN                                  BRITISH POUND / MEXICAN PESO
+             2522  FX.GBP/MYR                                  BRITISH POUND / MALAYSIAN RINGGIT
+             2523  FX.GBP/NGN                                  BRITISH POUND / NIGERIAN NAIRA
+             2524  FX.GBP/NOK                                  BRITISH POUND / NORWEGIAN KRONE
+             2525  FX.GBP/OMR                                  BRITISH POUND / OMANI RIAL
+             2526  FX.GBP/PHP                                  BRITISH POUND / PHILIPPINE PESO
+             2527  FX.GBP/PLN                                  BRITISH POUND / POLISH ZLOTY
+             2528  FX.GBP/QAR                                  BRITISH POUND / QATARI RIYAL
+             2529  FX.GBP/RON                                  BRITISH POUND / ROMANIAN LEU
+             2530  FX.GBP/RSD                                  BRITISH POUND / SERBIAN DINAR
+             2531  FX.GBP/RUB                                  BRITISH POUND / RUSSIAN RUBLE
+             2532  FX.GBP/RWF                                  BRITISH POUND / RWANDAN FRANC
+             2533  FX.GBP/SAR                                  BRITISH POUND / SAUDI RIYAL
+             2534  FX.GBP/SEK                                  BRITISH POUND / SWEDISH KRONA
+             2535  FX.GBP/SGD                                  BRITISH POUND / SINGAPORE DOLLAR
+             2536  FX.GBP/THB                                  BRITISH POUND / THAI BAHT
+             2537  FX.GBP/TND                                  BRITISH POUND / TUNISIAN DINAR
+             2538  FX.GBP/TRY                                  BRITISH POUND / TURKISH LIRA
+             2539  FX.GBP/TWD                                  BRITISH POUND / NEW TAIWAN DOLLAR
+             2540  FX.GBP/TZS                                  BRITISH POUND / TANZANIAN SHILLING
+             2541  FX.GBP/UAH                                  BRITISH POUND / UKRAINIAN HRYVNIA
+             2542  FX.GBP/UGX                                  BRITISH POUND / UGANDAN SHILLING
+             2543  FX.GBP/VND                                  BRITISH POUND / VIETNAMESE DONG
+             2544  FX.GBP/ZAR                                  BRITISH POUND / SOUTH AFRICAN RAND
+             2545  FX.GBP/ZMW                                  BRITISH POUND / ZAMBIAN KWACHA
+             2546  FX.HKD/JPY                                  HONG KONG DOLLAR / JAPANESE YEN
+             2547  FX.HRK/JPY                                  CROATIAN KUNA / JAPANESE YEN
+             2548  FX.HUF/JPY                                  HUNGARIAN FORINT / JAPANESE YEN
+             2549  FX.IDR/JPY                                  INDONESIAN RUPIAH / JAPANESE YEN
+             2550  FX.ILS/JPY                                  ISRAELI NEW SHEKEL / JAPANESE YEN
+             2551  FX.INR/JPY                                  INDIAN RUPEE / JAPANESE YEN
+             2552  FX.KRW/JPY                                  SOUTH KOREAN WON / JAPANESE YEN
+             2553  FX.KWD/JPY                                  KUWAITI DINAR / JAPANESE YEN
+             2554  FX.MWK/JPY                                  MALAWIAN KWACHA / JAPANESE YEN
+             2555  FX.MXN/JPY                                  MEXICAN PESO / JAPANESE YEN
+             2556  FX.MYR/JPY                                  MALAYSIAN RINGGIT / JAPANESE YEN
+             2557  FX.NOK/JPY                                  NORWEGIAN KRONE / JAPANESE YEN
+             2558  FX.NZD/DKK                                  NEW ZEALAND DOLLAR / DANISH KRONE
+             2559  FX.NZD/HKD                                  NEW ZEALAND DOLLAR / HONG KONG DOLLAR
+             2560  FX.NZD/NOK                                  NEW ZEALAND DOLLAR / NORWEGIAN KRONE
+             2561  FX.NZD/SEK                                  NEW ZEALAND DOLLAR / SWEDISH KRONA
+             2562  FX.NZD/SGD                                  NEW ZEALAND DOLLAR / SINGAPORE DOLLAR
+             2563  FX.PEN/JPY                                  PERUVIAN SOL / JAPANESE YEN
+             2564  FX.PGK/JPY                                  PAPUA NEW GUINEAN KINA / JAPANESE YEN
+             2565  FX.PHP/JPY                                  PHILIPPINE PESO / JAPANESE YEN
+             2566  FX.PKR/JPY                                  PAKISTANI RUPEE / JAPANESE YEN
+             2567  FX.PLN/JPY                                  POLISH ZLOTY / JAPANESE YEN
+             2568  FX.QAR/JPY                                  QATARI RIYAL / JAPANESE YEN
+             2569  FX.RON/JPY                                  ROMANIAN LEU / JAPANESE YEN
+             2570  FX.RSD/JPY                                  SERBIAN DINAR / JAPANESE YEN
+             2571  FX.RUB/JPY                                  RUSSIAN RUBLE / JAPANESE YEN
+             2572  FX.SAR/JPY                                  SAUDI RIYAL / JAPANESE YEN
+             2573  FX.SEK/JPY                                  SWEDISH KRONA / JAPANESE YEN
+             2574  FX.SGD/JPY                                  SINGAPORE DOLLAR / JAPANESE YEN
+             2575  FX.THB/JPY                                  THAI BAHT / JAPANESE YEN
+             2576  FX.TRY/JPY                                  TURKISH LIRA / JAPANESE YEN
+             2577  FX.TWD/JPY                                  NEW TAIWAN DOLLAR / JAPANESE YEN
+             2578  FX.USD/AED                                  US DOLLAR / UAE DIRHAM
+             2579  FX.USD/AFN                                  US DOLLAR / AFGHAN AFGHANI
+             2580  FX.USD/ALL                                  US DOLLAR / ALBANIAN LEK
+             2581  FX.USD/AOA                                  US DOLLAR / ANGOLAN KWANZA
+             2582  FX.USD/ARS                                  US DOLLAR / ARGENTINE PESO
+             2583  FX.USD/AWG                                  US DOLLAR / ARUBAN FLORIN
+             2584  FX.USD/AZN                                  US DOLLAR / AZERBAIJANI MANAT
+             2585  FX.USD/BBD                                  US DOLLAR / BARBADIAN DOLLAR
+             2586  FX.USD/BDT                                  US DOLLAR / BANGLADESHI TAKA
+             2587  FX.USD/BGN                                  US DOLLAR / BULGARIAN LEV
+             2588  FX.USD/BHD                                  US DOLLAR / BAHRAINI DINAR
+             2589  FX.USD/BMD                                  US DOLLAR / BERMUDIAN DOLLAR
+             2590  FX.USD/BSD                                  US DOLLAR / BAHAMIAN DOLLAR
+  [orig-bm]  2591  FX.USD/BWP                                  US DOLLAR / BOTSWANA PULA
+  [orig-bm]  2592  FX.USD/BZD                                  US DOLLAR / BELIZE DOLLAR
+  [orig-bm]  2593  FX.USD/CNY                                  US DOLLAR / CHINESE YUAN
+             2594  FX.USD/CRC                                  US DOLLAR / COSTA RICAN COLÓN
+  [orig-bm]  2595  FX.USD/CUP                                  US DOLLAR / CUBAN PESO
+  [orig-bm]  2596  FX.USD/CVE                                  US DOLLAR / CAPE VERDEAN ESCUDO
+             2598  FX.USD/DJF                                  US DOLLAR / DJIBOUTIAN FRANC
+  [orig-bm]  2600  FX.USD/DOP                                  US DOLLAR / DOMINICAN PESO
+  [orig-bm]  2601  FX.USD/DZD                                  US DOLLAR / ALGERIAN DINAR
+             2602  FX.USD/EGP                                  US DOLLAR / EGYPTIAN POUND
+  [orig-bm]  2603  FX.USD/GEL                                  US DOLLAR / GEORGIAN LARI
+             2604  FX.USD/GHS                                  US DOLLAR / GHANAIAN CEDI
+             2605  FX.USD/GNF                                  US DOLLAR / GUINEAN FRANC
+             2606  FX.USD/GTQ                                  US DOLLAR / GUATEMALAN QUETZAL
+             2607  FX.USD/GYD                                  US DOLLAR / GUYANESE DOLLAR
+             2608  FX.USD/HNL                                  US DOLLAR / HONDURAN LEMPIRA
+             2609  FX.USD/HRK                                  US DOLLAR / CROATIAN KUNA
+             2610  FX.USD/HTG                                  US DOLLAR / HAITIAN GOURDE
+  [orig-bm]  2612  FX.USD/ILS                                  US DOLLAR / ISRAELI NEW SHEKEL
+             2613  FX.USD/IQD                                  US DOLLAR / IRAQI DINAR
+             2614  FX.USD/ISK                                  US DOLLAR / ICELANDIC KRONA
+             2615  FX.USD/JMD                                  US DOLLAR / JAMAICAN DOLLAR
+             2616  FX.USD/JOD                                  US DOLLAR / JORDANIAN DINAR
+             2617  FX.USD/KES                                  US DOLLAR / KENYAN SHILLING
+             2618  FX.USD/KWD                                  US DOLLAR / KUWAITI DINAR
+             2619  FX.USD/KZT                                  US DOLLAR / KAZAKHSTANI TENGE
+             2620  FX.USD/LAK                                  US DOLLAR / LAO KIP
+             2621  FX.USD/LKR                                  US DOLLAR / SRI LANKAN RUPEE
+             2622  FX.USD/LRD                                  US DOLLAR / LIBERIAN DOLLAR
+             2623  FX.USD/LYD                                  US DOLLAR / LIBYAN DINAR
+             2624  FX.USD/MAD                                  US DOLLAR / MOROCCAN DIRHAM
+             2625  FX.USD/MDL                                  US DOLLAR / MOLDOVAN LEU
+             2626  FX.USD/MNT                                  US DOLLAR / MONGOLIAN TUGRIK
+             2627  FX.USD/MUR                                  US DOLLAR / MAURITIAN RUPEE
+             2628  FX.USD/MWK                                  US DOLLAR / MALAWIAN KWACHA
+             2630  FX.USD/MZN                                  US DOLLAR / MOZAMBICAN METICAL
+             2631  FX.USD/NGN                                  US DOLLAR / NIGERIAN NAIRA
+             2632  FX.USD/NIO                                  US DOLLAR / NICARAGUAN CÓRDOBA
+             2633  FX.USD/NPR                                  US DOLLAR / NEPALESE RUPEE
+             2634  FX.USD/OMR                                  US DOLLAR / OMANI RIAL
+             2635  FX.USD/PAB                                  US DOLLAR / PANAMANIAN BALBOA
+             2636  FX.USD/PGK                                  US DOLLAR / PAPUA NEW GUINEAN KINA
+             2637  FX.USD/PKR                                  US DOLLAR / PAKISTANI RUPEE
+             2639  FX.USD/QAR                                  US DOLLAR / QATARI RIYAL
+             2641  FX.USD/RSD                                  US DOLLAR / SERBIAN DINAR
+  [orig-bm]  2642  FX.USD/RUB                                  US DOLLAR / RUSSIAN RUBLE
+             2643  FX.USD/RWF                                  US DOLLAR / RWANDAN FRANC
+             2644  FX.USD/SAR                                  US DOLLAR / SAUDI RIYAL
+             2645  FX.USD/SCR                                  US DOLLAR / SEYCHELLOIS RUPEE
+             2646  FX.USD/SDG                                  US DOLLAR / SUDANESE POUND
+             2647  FX.USD/SLL                                  US DOLLAR / SIERRA LEONEAN LEONE
+             2648  FX.USD/SOS                                  US DOLLAR / SOMALI SHILLING
+             2649  FX.USD/STD                                  US DOLLAR / SÃO TOMÉ AND PRÍNCIPE DOBRA
+             2651  FX.USD/TND                                  US DOLLAR / TUNISIAN DINAR
+             2652  FX.USD/TTD                                  US DOLLAR / TRINIDAD AND TOBAGO DOLLAR
+             2653  FX.USD/TZS                                  US DOLLAR / TANZANIAN SHILLING
+             2654  FX.USD/UAH                                  US DOLLAR / UKRAINIAN HRYVNIA
+             2655  FX.USD/UGX                                  US DOLLAR / UGANDAN SHILLING
+             2656  FX.USD/UYU                                  US DOLLAR / URUGUAYAN PESO
+             2657  FX.USD/UZS                                  US DOLLAR / UZBEKISTANI SOM
+             2658  FX.USD/VES                                  US DOLLAR / VENEZUELAN BOLÍVAR
+             2659  FX.USD/VND                                  US DOLLAR / VIETNAMESE DONG
+             2660  FX.USD/VUV                                  US DOLLAR / VANUATU VATU
+             2661  FX.USD/XOF                                  US DOLLAR / WEST AFRICAN CFA FRANC
+             2662  FX.USD/YER                                  US DOLLAR / YEMENI RIAL
+             2663  FX.USD/ZMW                                  US DOLLAR / ZAMBIAN KWACHA
+             2664  FX.VND/JPY                                  VIETNAMESE DONG / JAPANESE YEN
+             2665  FX.ZAR/JPY                                  SOUTH AFRICAN RAND / JAPANESE YEN
+
+==============================================================================
+BUCKET B — rates (10)
+==============================================================================
+Got: top-level allowedPublisherIds: [];
+     REGULAR session benchmarkMapping preserved if present,
+     else empty-identifier skeleton added.
+
+             2380  Rates.EPE-USDC                              EULER PRIME (ETHEREUM) USDC BORROW RATE
+             2381  Rates.EYE-USDC                              EULER YIELD (ETHEREUM) USDC BORROW RATE
+             2903  Rates.US10Y/USD                             UNITED STATES 10 YEAR GOVERNMENT BONDS PRICE / US DOLLAR
+             2904  Rates.US1Y/USD                              UNITED STATES 1 YEAR GOVERNMENT BONDS PRICE / US DOLLAR
+             2905  Rates.US2Y/USD                              UNITED STATES 2 YEAR GOVERNMENT BONDS PRICE / US DOLLAR
+             2906  Rates.US20Y/USD                             UNITED STATES 20 YEAR GOVERNMENT BONDS PRICE / US DOLLAR
+             2907  Rates.US30Y/USD                             UNITED STATES 30 YEAR GOVERNMENT BONDS PRICE / US DOLLAR
+             2908  Rates.US3Y/USD                              UNITED STATES 3 YEAR GOVERNMENT BONDS PRICE / US DOLLAR
+             2909  Rates.US5Y/USD                              UNITED STATES 5 YEAR GOVERNMENT BONDS PRICE / US DOLLAR
+             2910  Rates.US7Y/USD                              UNITED STATES 7 YEAR GOVERNMENT BONDS PRICE / US DOLLAR
+
+==============================================================================
+BUCKET C — crypto (45)  [no benchmarkMapping added]
+==============================================================================
+Got: top-level allowedPublisherIds: [] only;
+     marketSchedules untouched (no Datascope identifier exists).
+
+   1801  Crypto.ECHO/USD                             ECHO PROTOCOL / US DOLLAR
+   1802  Crypto.ES/USD                               ECLIPSE / US DOLLAR
+   1805  Crypto.FRAG/USD                             FRAGMETRIC / US DOLLAR
+   1809  Crypto.GP/USD                               GRAPHITE PROTOCOL / US DOLLAR
+   1811  Crypto.H/USD                                HUMANITY / US DOLLAR
+   1818  Crypto.IKA/USD                              IKA NETWORK / US DOLLAR
+   1819  Crypto.KAPT/USD                             KOFI APTOS / US DOLLAR
+   1820  Crypto.KTA/USD                              KEETA / US DOLLAR
+   1828  Crypto.MYX/USD                              MYX FINANCE / US DOLLAR
+   1835  Crypto.PSG/USD                              PARIS SAINT GERMAIN FAN TOKEN / US DOLLAR
+   1840  Crypto.RHEA/USD                             RHEA FINANCE / US DOLLAR
+   1844  Crypto.TAC/USD                              TAC PROTOCOL / US DOLLAR
+   1849  Crypto.UP/USD                               DOUBLEUP / US DOLLAR
+   1850  Crypto.URANUS/USD                           URANUS COIN / US DOLLAR
+   1851  Crypto.USX/USD                              SOLSTICE STABLECOIN / US DOLLAR
+   2309  Crypto.REX33/USD                            ETHEREX LIQUID STAKING TOKEN / US DOLLAR
+   2317  Crypto.ALKIMI/USD                           ALKIMI / US DOLLAR
+   2318  Crypto.APEX/USD                             APEX PROTOCOL / US DOLLAR
+   2320  Crypto.BUCKET.USDB/USD                      BUCKET USD / US DOLLAR
+   2321  Crypto.CAMP/USD                             CAMP NETWORK / US DOLLAR
+   2324  Crypto.DOLO/USD                             DOLOMITE / US DOLLAR
+   2325  Crypto.FDIT/USD                             FIDELITY DIGITAL INTEREST TOKEN / US DOLLAR
+   2326  Crypto.FF/USD                               FALCON FINANCE / US DOLLAR
+   2327  Crypto.FLUID/USD                            FLUID / US DOLLAR
+   2332  Crypto.HEMI/USD                             HEMI / US DOLLAR
+   2333  Crypto.HOLO/USD                             HOLOWORLD / US DOLLAR
+   2335  Crypto.ICX/USD                              ICON / US DOLLAR
+   2337  Crypto.NOBODY/USD                           NOBODY SAUSAGE / US DOLLAR
+   2338  Crypto.PROVE/USD                            SUCCINT / US DOLLAR
+   2341  Crypto.STBL/USD                             STBL / US DOLLAR
+   2346  Crypto.USDAI/USD                            USD.AI / US DOLLAR
+   2348  Crypto.USELESS/USD                          USELESS / US DOLLAR
+   2383  Crypto.4/USD                                4 / US DOLLAR
+   2389  Crypto.EVAA/USD                             EVAA PROTOCOL / US DOLLAR
+   2391  Crypto.GOLD/USD                             ORO GOLD / US DOLLAR
+   2394  Crypto.LMTS/USD                             LIMITLESS / US DOLLAR
+   2395  Crypto.META/USD                             METADAO / US DOLLAR
+   2399  Crypto.P33/USD                              PHARAOH LIQUID STAKING TOKEN / US DOLLAR
+   2400  Crypto.RION/USD                             HYPERION / US DOLLAR
+   2405  Crypto.USDU/USD                             UNITAS US DOLLAR / US DOLLAR
+   2687  Crypto.USDF/USD                             FALCON USD / US DOLLAR
+   2700  Crypto.MMT/USD                              MOMENTUM / US DOLLAR
+   2701  Crypto.SEDA/USD                             SEDA / US DOLLAR
+   3028  Crypto.USDCV/USD                            SOCIETE GENERALE USD COINVERTIBLE / US DOLLAR
+   3100  Crypto.NEX/USD                              NEXUS / US DOLLAR
+
+==============================================================================
+BUCKET C — crypto-index (4)  [no benchmarkMapping added]
+==============================================================================
+Got: top-level allowedPublisherIds: [] only;
+     marketSchedules untouched (no Datascope identifier exists).
+
+   2392  Crypto.Index.FORD/USD                       SUPERSTATE FORWARD INDUSTRIES INC / US DOLLAR INDEX
+   2393  Crypto.Index.GLXY/USD                       SUPERSTATE GALAXY DIGITAL INC CLASS A COMMON STOCK / US DOLL
+   3206  Crypto.Index.XAGM/USD                       MATRIXDOCK XAGM ISSUE PRICE / US DOLLAR
+   3207  Crypto.Index.XAUM/USD                       MATRIXDOCK XAUM ISSUE PRICE / US DOLLAR
+
+==============================================================================
+BUCKET C — crypto-redemption-rate (38)  [no benchmarkMapping added]
+==============================================================================
+Got: top-level allowedPublisherIds: [] only;
+     marketSchedules untouched (no Datascope identifier exists).
+
+   1794  Crypto.BBHLP/USDC.RR                        BLUEBERRY HYPERLIQUIDITY PROVIDER / USD COIN REDEMPTION RATE
+   1799  Crypto.DEJAAA/USD.RR                        DEFI JANUS AAA CLO STRATEGY FUND / US DOLLAR REDEMPTION RATE
+   1800  Crypto.DEJTRSY/USD.RR                       DEFI JANUS HENDERSON ANEMOY TREASURY FUND / US DOLLAR REDEMP
+   1804  Crypto.EUSX/USX.RR                          SOLSTICE YIELD-BEARING STABLECOIN / SOLSTICE STABLECOIN REDE
+   1806  Crypto.FRAGSOL/SOL.RR                       FRAGMETRIC RESTAKED SOLANA / SOLANA REDEMPTION RATE
+   1812  Crypto.HAHYPE/HYPE.RR                       HARMONIX HYPE / HYPE REDEMPTION RATE
+   1813  Crypto.HLP0/USDC.RR                         HYPERLIQUIDITY PROVIDER ZERO / USD COIN REDEMPTION RATE
+   1816  Crypto.HWHLP/USDC.RR                        HYPERWAVE HYPERLIQUIDITY PROVIDER / USD COIN REDEMPTION RATE
+   1817  Crypto.HWHYPE/HYPE.RR                       HYPERWAVE HYPE / HYPE REDEMPTION RATE
+   1825  Crypto.MPST/USDC.RR                         MAXI PAYFI STRATEGY TOKEN / USD COIN REDEMPTION RATE
+   1848  Crypto.TSUSDE/USDE.RR                       TON STAKED ETHENA USDE / ETHENA USDE REDEMPTION RATE
+   1852  Crypto.VKHYPE/KHYPE.RR                      VEDA VAULT KINETIQ HYPE / KINETIQ HYPE REDEMPTION RATE
+   1853  Crypto.WHLP/USDC.RR                         WRAPPED HYPERLIQUIDITY PROVIDER / USD COIN REDEMPTION RATE
+   1855  Crypto.XAUM/USD.RR                          MATRIXDOCK XAUM ISSUE PRICE / US DOLLAR
+   2322  Crypto.CASH/RD.RR                           CASH STABLECOIN / RESERVE DOLLAR COLLATERALIZATION
+   2328  Crypto.FORD.SS/FORD.RR                      SUPERSTATE FORWARD INDUSTRIES INC REDEMPTION RATE
+   2334  Crypto.HYUSD/JITOSOL.RR                     HYLO US DOLLAR / JITO STAKED SOL REDEMPTION RATE
+   2339  Crypto.SHYUSD/JITOSOL.RR                    STAKED HYLO US DOLLAR / JITO STAKED SOL REDEMPTION RATE
+   2340  Crypto.SKAITO/KAITO.RR                      STAKED KAITO / KAITO REDEMPTION RATE
+   2342  Crypto.SUSDV/USDV.RR                        STAKED SOLOMON US DOLLAR / SOLOMON US DOLLAR REDEMPTION RATE
+   2343  Crypto.SWBERA/BERA.RR                       POL STAKED WRAPPED BERACHAIN / BERACHAIN REDEMPTION RATE
+   2344  Crypto.THBILL/USDC.RR                       THEO SHORT DURATION US TREASURY FUND / USD COIN REDEMPTION R
+   2347  Crypto.USDV/USD.RR                          SOLOMON US DOLLAR / US DOLLAR REDEMPTION RATE
+   2349  Crypto.VSUI/SUI.RR                          VOLO STAKED SUI / SUI REDEMPTION RATE
+   2350  Crypto.WVLP/USDT.RR                         HYPERBEAT WRAPPED VENTUALS LIQUIDITY PROVIDER / TETHER REDEM
+   2351  Crypto.XSOL/JITOSOL.RR                      HYLO LEVERAGED SOL / JITO STAKED SOL REDEMPTION RATE
+   2401  Crypto.SCHUSD/CHUSD.RR                      STAKED CHATEAU US DOLLAR / CHATEAU US DOLLAR REDEMPTION RATE
+   2402  Crypto.SHYPE/HYPE.RR                        KINTSU STAKED HYPE / HYPE REDEMPTION RATE
+   2403  Crypto.SPL.SUSDU/USDU.RR                    UNITAS (SOLANA) STAKED US DOLLAR / UNITAS (SOLANA) US DOLLAR
+   2404  Crypto.STAVAX/AVAX.RR                       HYPHA STAKED AVALANCHE / AVALANCHE REDEMPTION RATE
+   2406  Crypto.VHYPE/HYPE.RR                        VENTUALS STAKED HYPERLIQUID / HYPERLIQUID REDEMPTION RATE
+   2688  Crypto.HWUSD/USDC.RR                        HYPERWAVE US DOLLAR / USD COIN REDEMPTION RATE
+   3204  Crypto.EXSOL/SOL.RR                         EXCEED STAKED SOLANA / SOLANA REDEMPTION RATE
+   3241  Crypto.HEMIBTC/BTC.RR                       HEMI BITCOIN / BITCOIN COLLATERALIZATION RATIO
+   3242  Crypto.LIMUSD/USDC.RR                       LIMINAL US DOLLAR / USD COIN REDEMPTION RATE
+   3243  Crypto.EXUSDC/USDC.RR                       EXCEED USD COIN / USD COIN REDEMPTION RATE
+   3244  Crypto.HASUI/SUI.RR                         HAEDAL STAKED SUI / SUI REDEMPTION RATE
+   3245  Crypto.AFSUI/SUI.RR                         AFTERMATH STAKED SUI / SUI REDEMPTION RATE
+
+==============================================================================
+BUCKET C — kalshi (19)  [no benchmarkMapping added]
+==============================================================================
+Got: top-level allowedPublisherIds: [] only;
+     marketSchedules untouched (no Datascope identifier exists).
+
+   2666  KLP.KXF1_25_LN/USD                          Lando Norris to win the Formula 1 Drivers Championship?
+   2667  KLP.KXF1_25_MV/USD                          Max Verstappen to win the Formula 1 Drivers Championship?
+   2668  KLP.KXF1_25_OP/USD                          Oscar Piastri to win the Formula 1 Drivers Championship?
+   2669  KLP.KXMAYORNYCPARTY_25_AC/USD               Andrew Cuomo party rep to win the NYC Mayor race in 2025?
+   2670  KLP.KXMAYORNYCPARTY_25_D/USD                Democratic party rep to win the NYC Mayor race in 2025?
+   2671  KLP.KXMAYORNYCPARTY_25_R/USD                Republican party rep to win the NYC Mayor race in 2025?
+   2672  KLP.KXMLB_25_CHC/USD                        Chicago C to win the World Series?
+   2673  KLP.KXMLB_25_DET/USD                        Detroit to win the World Series?
+   2674  KLP.KXMLB_25_LAD/USD                        Los Angeles D to win the World Series?
+   2675  KLP.KXMLB_25_MIL/USD                        Milwaukee to win the World Series?
+   2676  KLP.KXMLB_25_NYY/USD                        New York Y to win the World Series?
+   2677  KLP.KXMLB_25_PHI/USD                        Philadelphia to win the World Series?
+   2678  KLP.KXMLB_25_SEA/USD                        Seattle to win the World Series?
+   2679  KLP.KXMLB_25_TOR/USD                        Toronto to win the World Series?
+   2680  KLP.KXRCC_25DEC31_T1/USD                    Fed to cut rates 1 time?
+   2681  KLP.KXRCC_25DEC31_T2/USD                    Fed to cut rates 2 times?
+   2682  KLP.KXRCC_25DEC31_T3/USD                    Fed to cut rates 3 times?
+   2683  KLP.KXRCC_25DEC31_T4/USD                    Fed to cut rates 4 times?
+   2684  KLP.KXRCC_25DEC31_T5/USD                    Fed to cut rates 5 times?
+
+==============================================================================
+BUCKET C — nav (3)  [no benchmarkMapping added]
+==============================================================================
+Got: top-level allowedPublisherIds: [] only;
+     marketSchedules untouched (no Datascope identifier exists).
+
+   1829  Crypto.NAV.ONYC/USD                         ONRE REINSURANCE UNDERWRITING POOL / US DOLLAR
+   2397  Crypto.NAV.CHUSD/USDT0                      CHATEAU US DOLLAR / USDT0 NET ASSET VALUE
+   2992  Crypto.NAV.USX/USD                          SOLSTICE STABLECOIN / US DOLLAR COLLATERALIZATION
+
+==============================================================================
+SKIPPED — INACTIVE feeds missing allowedPublisherIds (61)  [no change]
+==============================================================================
+Reactivate via edit_config.py --set-state if you want to edit these.
+
+   1784  Commodities.BRENTV5/USD                     DEPRECATED FEED - PYTH BRENT 29 AUGUST 2025 / US DOLLAR
+   1785  Commodities.BRENTX5/USD                     DEPRECATED FEED - PYTH BRENT 30 SEPTEMBER 2025 / US DOLLAR
+   1787  Commodities.WTIU5/USD                       DEPRECATED FEED - PYTH WTI 20 AUGUST 2025 / US DOLLAR
+   1788  Commodities.WTIV5/USD                       DEPRECATED FEED - PYTH WTI 22 SEPTEMBER 2025 / US DOLLAR
+   1789  Commodities.WTIX5/USD                       DEPRECATED FEED - PYTH WTI 21 OCTOBER 2025 / US DOLLAR
+   1793  Crypto.AMBRX/USD                            AMBER XSTOCK / US DOLLAR
+   1810  Crypto.GUN/USD                              GUNZ / US DOLLAR
+   1838  Crypto.REUSD/USD.RR                         RE PROTOCOL US DOLLAR / US DOLLAR REDEMPTION RATE
+   1839  Crypto.REUSDE/USD.RR                        RE PROTOCOL ETHENA USDE / US DOLLAR REDEMPTION RATE
+   1845  Crypto.Treehouse.TETH/USD                   TREEHOUSE ETHEREUM / US DOLLAR
+   1856  Crypto.YBTC-B/BTC.RR                        YIELD BITCOIN.B / BITCOIN REDEMPTION RATE
+   2270  Equity.US.AAL/USD.EXT                       DEPRECATED FEED - AMERICAN AIRLINES GROUP INC / US DOLLAR -
+   2272  Equity.US.BABA/USD.EXT                      DEPRECATED FEED - ALIBABA GROUP LIMITED / US DOLLAR - EXTEND
+   2280  Equity.US.DMU5/USD                          DM U5 19 SEPTEMBER 2025 / US DOLLAR
+   2283  Equity.US.EMU5/USD                          EM U5 19 SEPTEMBER 2025 / US DOLLAR
+   2295  Equity.US.NMU5/USD                          NM U5 19 SEPTEMBER 2025 / US DOLLAR
+   2304  Equity.US.VERB/USD                          VERB TECHNOLOGY COMPANY INC
+   2330  Crypto.GTBTC/USD                            GATE WRAPPED BITCOIN / US DOLLAR
+   2331  Crypto.GTSOL/USD                            GATE STAKED SOLANA / US DOLLAR
+   2345  Crypto.TLP/USD.RR                           TYPUS LIQUIDITY PROVIDER TOKEN / US DOLLAR REDEMPTION RATE
+   2385  Crypto.EBTC/USD.RR                          DEPRECATED FEED - EMBER BTC / US DOLLAR REDEMPTION RATE
+   2386  Crypto.EGUSDC/USD.RR                        DEPRECATED FEED - EMBER GAMMA USDC / US DOLLAR REDEMPTION RA
+   2387  Crypto.ESUI/USD.RR                          DEPRECATED FEED - EMBER SUI / US DOLLAR REDEMPTION RATE
+   2388  Crypto.ETHIRD/USD.RR                        DEPRECATED FEED - EMBER THIRD EYE / US DOLLAR REDEMPTION RAT
+   2390  Crypto.EXBTC/USD.RR                         DEPRECTAED FEED - EMBER XBTC / US DOLLAR REDEMPTION RATE
+   2697  Commodities.BRENTJ6/USD                     DEPRECATED FEED - PYTH BRENT 27 FEBRUARY 2026 / US DOLLAR
+   2915  Equity.US.FCDH6/USD                         DEPRECATED FEED - FCD H6 30 MARCH 2026 / US DOLLAR
+   2918  Equity.HK.HKHZ5/HKD                         DEPRECATED FEED - HKH Z5 30 DECEMBER 2025 / HONG KONG DOLLAR
+   2919  Equity.HK.HKHF6/HKD                         DEPRECATED FEED - HKH F6 29 JANUARY 2026 / HONG KONG DOLLAR
+   2920  Equity.HK.HKHG6/HKD                         DEPRECATED FEED - HKH G6 29 FEBRUARY 2026 / HONG KONG DOLLAR
+   2954  Equity.HK.HKHH6/HKD                         DEPRECATED FEED - HKH H6 MARCH 2026 / HONG KONG DOLLAR
+   2955  Equity.HK.HKHJ6/HKD                         DEPRECATED FEED - HKH J6 APRIL 2026 / HONG KONG DOLLAR
+   2956  Equity.US.ALH6/USD                          DEPRECATED FEED - ALUMINIUM H6 APRIL 2026 / US DOLLAR
+   2957  Equity.US.ALJ6/USD                          DEPRECATED FEED - ALUMINIUM J6 MAY 2026 / US DOLLAR
+   2958  Equity.US.ALK6/USD                          DEPRECATED FEED - ALUMINIUM K6 JUNE 2026 / US DOLLAR
+   2959  Equity.US.PTJ6/USD                          DEPRECATED FEED - PLATINUM J6 APRIL 2026 / US DOLLAR
+   2960  Equity.US.PTN6/USD                          DEPRECATED FEED - PLATINUM N6 JULY 2026 / US DOLLAR
+   2961  Equity.US.PTV6/USD                          DEPRECATED FEED - PLATINUM V6 OCT 2026 / US DOLLAR
+   2962  Equity.US.PLH6/USD                          DEPRECATED FEED - PLALADIUM H6 MARCH 2026 / US DOLLAR
+   2963  Equity.US.PLM6/USD                          DEPRECATED FEED - PLALADIUM M6 JUNE 2026 / US DOLLAR
+   2964  Equity.US.PLU6/USD                          DEPRECATED FEED - PLALADIUM U6 SEPT 2026 / US DOLLAR
+   2965  Equity.US.URG6/USD                          DEPRECATED FEED - URANIUM G6 FEBRUARY 2026 / US DOLLAR
+   2966  Equity.US.URH6/USD                          DEPRECATED FEED - URANIUM H6 MARCH 2026 / US DOLLAR
+   2967  Equity.US.URJ6/USD                          DEPRECATED FEED - URANIUM J6 APRIL 2026 / US DOLLAR
+   2993  Equity.KR.KSH6/KRW                          KSPI 200 12 MARCH 2026 / SOUTH KOREAN WON
+   2999  Commodities.NLG6/USD                        DEPRECATED FEED - NICKEL 18 FEBRUARY 2026 / US DOLLAR
+   3000  Commodities.NLH6/USD                        DEPRECATED FEED - PYTH PRICE IN USD FOR NICKEL 18 MARCH 2026
+   3001  Commodities.NLJ6/USD                        PYTH PRICE IN USD FOR NICKEL 15 APRIL 2026
+   3002  Equity.KR.KQH6/KRW                          KSDQ 150 12 MARCH 2026 / SOUTH KOREAN WON
+   3008  Commodities.LEH6/USD                        DEPRECATED FEED - LEAD 17 MARCH 2026 / US DOLLAR
+   3011  Commodities.TIH6/USD                        DEPRECATED FEED - PYTH PRICE IN USD FOR TIN 17 MARCH 2026
+   3014  Commodities.RSH6/USD                        DEPRECATED FEED - PYTH PRICE IN USD FOR RAW SUGAR 27 FEBRUAR
+   3015  Commodities.RSK6/USc                        DEPRECATED FEED - PYTH PRICE IN US CENTS FOR RAW SUGAR 30 AP
+   3020  Commodities.GOH6/USD                        PYTH PRICE IN USD FOR LS GASOIL 12 MARCH 2026
+   3024  Commodities.NGDH6/USD                       DEPRECATED FEED - PYTH PRICE IN USD FOR HH NATURAL GAS 25 FE
+   3197  Commodities.NLK6/USD                        PYTH PRICE IN USD FOR NICKEL 19 MAY 2026
+   3198  Commodities.NLM6/USD                        PYTH PRICE IN USD FOR NICKEL 16 JUNE 2026
+   3199  Commodities.NLN6/USD                        PYTH PRICE IN USD FOR NICKEL 14 JULY 2026
+   3200  Commodities.NLQ6/USD                        PYTH PRICE IN USD FOR NICKEL 18 AUGUST 2026
+   3201  Commodities.NLU6/USD                        PYTH PRICE IN USD FOR NICKEL 15 SEPTEMBER 2026
+   3208  Commodities.CFK6/USc                        PYTH PRICE IN US CENTS FOR COFFEE 18 MAY 2026
+
+
+##############################################################################
+# PHASE 2 — backfill_benchmark.py (run later same day, 2026-05-17)
+##############################################################################
+# Tool:   tools/backfill-apids/backfill_benchmark.py
+# Input:  after.json (post-phase-1, snapshotted as after.json.bak2)
+# Output: after.json (post-phase-2)
+# Scope:  feeds that already had top-level allowedPublisherIds but
+#         were missing benchmarkMapping in 1+ session. Limited to
+#         COMING_SOON equity/metal feeds; .Index synthetics excluded.
+# Totals: 292 feeds modified
+#
+
+==============================================================================
+PHASE-2 BUCKET A — Standard US equities expanded to 4 sessions (78)
+==============================================================================
+Got: top-level allowedPublisherIds preserved (already populated);
+     marketSchedules expanded to REGULAR / PRE_MARKET / POST_MARKET / OVER_NIGHT
+     using AAPL/feedId=922 schedule templates;
+     REGULAR session inherits existing top-level allowedPublisherIds;
+     PRE_MARKET / POST_MARKET / OVER_NIGHT start with apids: [];
+     each session: minPublishers carried over from feed-level;
+     benchmarkMapping = bare ticker (REG/PRE/POST), <ticker>.BLUE (OVER_NIGHT).
+
+    990  Equity.US.BITS/USD                          (12 pubs carried)  GLOBAL X BLOCKCHAIN & BITCOIN STRATEGY ETF / US DO
+    997  Equity.US.BR/USD                            (12 pubs carried)  BROADRIDGE FINANCIAL SOLUTIONS INC / US DOLLAR
+   1005  Equity.US.BTF/USD                           (12 pubs carried)  VALKYRIE BITCOIN STRATEGY ETF / US DOLLAR
+   1012  Equity.US.CANG/USD                          (12 pubs carried)  CANGO INC / US DOLLAR
+   1073  Equity.US.DEFI/USD                          (12 pubs carried)  HASHDEX BITCOIN ETF / US DOLLAR
+   1164  Equity.US.GOVT/USD                          (12 pubs carried)  ISHARES US TREASURY BOND ETF / US DOLLAR
+   1275  Equity.US.MINT/USD                          (12 pubs carried)  PIMCO ENHANCED SHORT MATURITY ACTIVE ETF / US DOLL
+   1319  Equity.US.O/USD                             (12 pubs carried)  REALTY INCOME CORPORATION / US DOLLAR
+   1328  Equity.US.PALL/USD                          (12 pubs carried)  ABERDEEN PHYSICAL PALLADIUM SHARES ETF / US DOLLAR
+   1354  Equity.US.PPL/USD                           (12 pubs carried)  PPL CORPORATION / US DOLLAR
+   1365  Equity.US.RCL/USD                           (12 pubs carried)  ROYAL CARIBBEAN CRUISES LTD / US DOLLAR
+   1370  Equity.US.RIO/USD                           (12 pubs carried)  RIO TINTO GROUP / US DOLLAR
+   1374  Equity.US.RL/USD                            (12 pubs carried)  RALPH LAUREN CORPORATION / US DOLLAR
+   1386  Equity.US.SHV/USD                           (12 pubs carried)  ISHARES SHORT TREASURY BOND ETF / US DOLLAR
+   1402  Equity.US.STRK/USD                          (12 pubs carried)  MICROSTRATEGY INCORPORATED / US DOLLAR
+   1406  Equity.US.SW/USD                            (12 pubs carried)  SMURFIT WESTROCK PLC / US DOLLAR
+   1407  Equity.US.SWDA/USD                          (12 pubs carried)  ISHARES CORE MSCI WORLD UCITS ETF / US DOLLAR
+   1465  Equity.US.USFR/USD                          (12 pubs carried)  WISDOMTREE FLOATING RATE TREASURY FUND / US DOLLAR
+   1489  Equity.US.WM/USD                            (12 pubs carried)  WASTE MANAGEMENT INC / US DOLLAR
+   1670  Equity.US.1211-SR/USD                       (12 pubs carried)  MA'ADEN / US DOLLAR
+   1672  Equity.US.AEM/USD                           (12 pubs carried)  AGNICO EAGLE MINES / US DOLLAR
+   1673  Equity.US.AGG/USD                           (12 pubs carried)  ISHARES CORE US AGGREGATE BOND ETF / US DOLLAR
+   1677  Equity.US.BHP/USD                           (12 pubs carried)  BHP GROUP / US DOLLAR
+   1678  Equity.US.BIL/USD                           (12 pubs carried)  SPDR BLOOMBERG 1-3 MONTH T-BILL ETF / US DOLLAR
+   1681  Equity.US.BSV/USD                           (12 pubs carried)  VANGUARD SHORT-TERM BOND ETF / US DOLLAR
+   1685  Equity.US.DFAC/USD                          (12 pubs carried)  DIMENSIONAL US CORE EQUITY 2 ETF / US DOLLAR
+   1686  Equity.US.DGRO/USD                          (12 pubs carried)  ISHARES CORE DIV GROWTH ETF / US DOLLAR
+   1687  Equity.US.GLCNF/USD                         (12 pubs carried)  DEPRECATED FEED - GLENCORE / US DOLLAR
+   1688  Equity.US.GMBXF/USD                         (12 pubs carried)  DEPRECATED FEED - GRUPO MEXICO / US DOLLAR
+   1690  Equity.US.GRND/USD                          (12 pubs carried)  GRINDR INC / US DOLLAR
+   1693  Equity.US.IEFA/USD                          (12 pubs carried)  ISHARES CORE MSCI EAFE ETF / US DOLLAR
+   1695  Equity.US.IJH/USD                           (12 pubs carried)  ISHARES CORE S&P MID-CAP ETF / US DOLLAR
+   1696  Equity.US.IJR/USD                           (12 pubs carried)  ISHARES CORE S&P SMALL-CAP ETF / US DOLLAR
+   1697  Equity.US.ITOT/USD                          (12 pubs carried)  ISHARES CORE S&P TOTAL US STOCK MKT ETF / US DOLLA
+   1699  Equity.US.IVE/USD                           (12 pubs carried)  ISHARES S&P 500 VALUE ETF / US DOLLAR
+   1700  Equity.US.IVW/USD                           (12 pubs carried)  ISHARES S&P 500 GROWTH ETF / US DOLLAR
+   1701  Equity.US.IWB/USD                           (12 pubs carried)  ISHARES RUSSELL 1000 ETF / US DOLLAR
+   1702  Equity.US.IWD/USD                           (12 pubs carried)  ISHARES RUSSELL 1000 VALUE ETF / US DOLLAR
+   1705  Equity.US.IWR/USD                           (12 pubs carried)  ISHARES RUSSELL MID-CAP ETF / US DOLLAR
+   1707  Equity.US.JEPI/USD                          (12 pubs carried)  JPMORGAN EQUITY PREMIUM INCOME ETF / US DOLLAR
+   1710  Equity.US.JPST/USD                          (12 pubs carried)  JPMORGAN ULTRA-SHORT INCOME ETF / US DOLLAR
+   1714  Equity.US.MBB/USD                           (12 pubs carried)  ISHARES MBS ETF / US DOLLAR
+   1718  Equity.US.MUB/USD                           (12 pubs carried)  ISHARES NATIONAL MUNI BOND ETF / US DOLLAR
+   1724  Equity.US.QUAL/USD                          (12 pubs carried)  ISHARES MSCI USA QUALITY FACTOR ETF / US DOLLAR
+   1728  Equity.US.SCHB/USD                          (12 pubs carried)  SCHWAB US BROAD MKT ETF / US DOLLAR
+   1729  Equity.US.SCHD/USD                          (12 pubs carried)  SCHWAB US DIV EQUITY ETF / US DOLLAR
+   1730  Equity.US.SCHF/USD                          (12 pubs carried)  SCHWAB INTL EQUITY ETF / US DOLLAR
+   1731  Equity.US.SCHG/USD                          (12 pubs carried)  SCHWAB US LARGE-CAP GROWTH ETF / US DOLLAR
+   1732  Equity.US.SCHX/USD                          (12 pubs carried)  SCHWAB US LARGE-CAP ETF / US DOLLAR
+   1734  Equity.US.SGOV/USD                          (12 pubs carried)  ISHARES 0-3 MONTH TREASURY BOND ETF / US DOLLAR
+   1735  Equity.US.SH/USD                            (12 pubs carried)  PROSHARES SHORT S&P500 / US DOLLAR
+   1736  Equity.US.SHY/USD                           (12 pubs carried)  ISHARES 1-3 YEAR TREASURY BOND ETF / US DOLLAR
+   1737  Equity.US.SNAP/USD                          (12 pubs carried)  SNAP INC / US DOLLAR
+   1740  Equity.US.SPDW/USD                          (12 pubs carried)  SPDR PORTFOLIO DEVELOPED WORLD EX-US ETF / US DOLL
+   1742  Equity.US.SPYG/USD                          (12 pubs carried)  SPYG / US DOLLAR
+   1743  Equity.US.SPYV/USD                          (12 pubs carried)  SPYV / US DOLLAR
+   1748  Equity.US.USMV/USD                          (12 pubs carried)  ISHARES MSCI USA MIN VOL FACTOR ETF / US DOLLAR
+   1750  Equity.US.VB/USD                            (12 pubs carried)  VANGUARD SMALL-CAP ETF / US DOLLAR
+   1751  Equity.US.VBR/USD                           (12 pubs carried)  VANGUARD SMALL-CAP VALUE ETF / US DOLLAR
+   1754  Equity.US.VEA/USD                           (12 pubs carried)  VANGUARD FTSE DEVELOPED MKTS ETF / US DOLLAR
+   1755  Equity.US.VEU/USD                           (12 pubs carried)  VANGUARD FTSE ALL WORLD EX US ETF / US DOLLAR
+   1757  Equity.US.VGK/USD                           (12 pubs carried)  VANGUARD FTSE EUROPEAN ETF / US DOLLAR
+   1758  Equity.US.VGT/USD                           (12 pubs carried)  VANGUARD INFORMATION TECH ETF / US DOLLAR
+   1759  Equity.US.VIG/USD                           (12 pubs carried)  VANGUARD DIV APPRECIATION ETF / US DOLLAR
+   1760  Equity.US.VNGDF/USD                         (12 pubs carried)  VANGUARD S&P 500 UCITS ETF USD DIS / US DOLLAR
+   1761  Equity.US.VNQ/USD                           (12 pubs carried)  VANGUARD REAL ESTATE ETF / US DOLLAR
+   1762  Equity.US.VO/USD                            (12 pubs carried)  VANGUARD MID-CAP ETF / US DOLLAR
+   1763  Equity.US.VONG/USD                          (12 pubs carried)  VANGUARD RUSSELL 1000 GROWTH ETF / US DOLLAR
+   1764  Equity.US.VT/USD                            (12 pubs carried)  VANGUARD TOTAL WORLD STOCK INDEX ETF / US DOLLAR
+   1765  Equity.US.VTEB/USD                          (12 pubs carried)  VANGUARD TAX-EXEMPT BOND ETF / US DOLLAR
+   1767  Equity.US.VTV/USD                           (12 pubs carried)  VANGUARD VALUE ETF / US DOLLAR
+   1768  Equity.US.VUG/USD                           (12 pubs carried)  VANGUARD GROWTH ETF / US DOLLAR
+   1769  Equity.US.VV/USD                            (12 pubs carried)  VANGUARD LARGE-CAP ETF / US DOLLAR
+   1770  Equity.US.VWO/USD                           (12 pubs carried)  VANGUARD FTSE EMERGING MKTS ETF / US DOLLAR
+   1773  Equity.US.VYM/USD                           (12 pubs carried)  VANGUARD HIGH DIV YIELD ETF / US DOLLAR
+   1774  Equity.US.XLF/USD                           (12 pubs carried)  SPDR SELECT SECTOR FUND - FINANCIAL / US DOLLAR
+   1778  Equity.US.YANG/USD                          (12 pubs carried)  DIREXION DAILY FTSE CHINA BEAR 3X SHARES / US DOLL
+   1779  Equity.US.YINN/USD                          (12 pubs carried)  DIREXION DAILY FTSE CHINA BULL 3X SHARES / US DOLL
+
+==============================================================================
+PHASE-2 BUCKET B — equity-CA (1)
+==============================================================================
+Got: top-level allowedPublisherIds preserved;
+     REGULAR session marketSchedule preserved;
+     empty-identifier benchmarkMapping skeleton added to REGULAR.
+
+   1603  Equity.CA.HODL/CAD                          (12 pubs)  SOL STRATEGIES INC / CANADIAN DOLLAR
+
+==============================================================================
+PHASE-2 BUCKET B — equity-CN (2)
+==============================================================================
+Got: top-level allowedPublisherIds preserved;
+     REGULAR session marketSchedule preserved;
+     empty-identifier benchmarkMapping skeleton added to REGULAR.
+
+   1604  Equity.CN.510310/CNY                        (12 pubs)  HS 300 ETF / CHINESE YUAN
+   1605  Equity.CN.510330/CNY                        (12 pubs)  CHINAAMC 300 / CHINESE YUAN
+
+==============================================================================
+PHASE-2 BUCKET B — equity-FR (1)
+==============================================================================
+Got: top-level allowedPublisherIds preserved;
+     REGULAR session marketSchedule preserved;
+     empty-identifier benchmarkMapping skeleton added to REGULAR.
+
+    779  Equity.FR.C3M/EUR                           (12 pubs)  AMUNDI ETF GOVIES 0-6 MONTHS EURO INVESTMENT GRADE
+
+==============================================================================
+PHASE-2 BUCKET B — equity-GB (105)
+==============================================================================
+Got: top-level allowedPublisherIds preserved;
+     REGULAR session marketSchedule preserved;
+     empty-identifier benchmarkMapping skeleton added to REGULAR.
+
+    780  Equity.GB.AAF/GBP                           (12 pubs)  AIRTEL AFRICA PLC / BRITISH POUND
+    781  Equity.GB.AAL/GBP                           (12 pubs)  ANGLO AMERICAN / BRITISH POUND
+    782  Equity.GB.ABF/GBP                           (12 pubs)  ASSOCIATED BRITISH FOODS PLC / BRITISH POUND
+    783  Equity.GB.ADM/GBP                           (12 pubs)  ADMIRAL GROUP / BRITISH POUND
+    784  Equity.GB.AHT/GBP                           (12 pubs)  ASHTEAD GROUP PLC / BRITISH POUND
+    785  Equity.GB.ALW/GBP                           (12 pubs)  ALLIANCE WITAN PLC / BRITISH POUND
+    786  Equity.GB.ANTO/GBP                          (12 pubs)  ANTOFAGASTA PLC / BRITISH POUND
+    787  Equity.GB.AUTO/GBP                          (12 pubs)  AUTO TRADER GROUP PLC / BRITISH POUND
+    788  Equity.GB.AV/GBP                            (12 pubs)  AVIVA PLC / BRITISH POUND
+    789  Equity.GB.AZN/GBP                           (12 pubs)  ASTRAZENECA PLC / BRITISH POUND
+    790  Equity.GB.BA/GBP                            (12 pubs)  BAE SYSTEMS PLC / BRITISH POUND
+    791  Equity.GB.BARC/GBP                          (12 pubs)  BARCLAYS PLC / BRITISH POUND
+    792  Equity.GB.BATS/GBP                          (12 pubs)  BRITISH AMERICAN TOBACCO PLC / BRITISH POUND
+    793  Equity.GB.BEZ/GBP                           (12 pubs)  BEAZLEY PLC / BRITISH POUND
+    794  Equity.GB.BKG/GBP                           (12 pubs)  BERKELEY GROUP HOLDINGS PLC / BRITISH POUND
+    795  Equity.GB.BLND/GBP                          (12 pubs)  BRITISH LAND CO PLC / BRITISH POUND
+    796  Equity.GB.BNZL/GBP                          (12 pubs)  BUNZL PLC / BRITISH POUND
+    797  Equity.GB.BP/GBP                            (12 pubs)  BP PLC / BRITISH POUND
+    798  Equity.GB.BTA/GBP                           (12 pubs)  BT GROUP PLC / BRITISH POUND
+    799  Equity.GB.BTRW/GBP                          (12 pubs)  BARRATT REDROW PLC / BRITISH POUND
+    800  Equity.GB.CCH/GBP                           (12 pubs)  COCA-COLA HBC AG / BRITISH POUND
+    801  Equity.GB.CNA/GBP                           (12 pubs)  CENTRICA PLC / BRITISH POUND
+    802  Equity.GB.CPG/GBP                           (12 pubs)  COMPASS GROUP PLC / BRITISH POUND
+    803  Equity.GB.CRDA/GBP                          (12 pubs)  CRODA INTERNATIONAL PLC / BRITISH POUND
+    804  Equity.GB.CSPX/USD                          (12 pubs)  ISHARES CORE S&P 500 UCITS ETF / US DOLLAR
+    805  Equity.GB.CTEC/GBP                          (12 pubs)  CONVATEC GROUP PLC / BRITISH POUND
+    806  Equity.GB.DCC/GBP                           (12 pubs)  DCC PLC / BRITISH POUND
+    807  Equity.GB.DGE/GBP                           (12 pubs)  DIAGEO PLC / BRITISH POUND
+    808  Equity.GB.DPLM/GBP                          (12 pubs)  DIPLOMA PLC / BRITISH POUND
+    809  Equity.GB.EDV/GBP                           (12 pubs)  ENDEAVOUR MINING PLC / BRITISH POUND
+    810  Equity.GB.ENT/GBP                           (12 pubs)  ENTAIN PLC / BRITISH POUND
+    811  Equity.GB.EXPN/GBP                          (12 pubs)  EXPERIAN PLC / BRITISH POUND
+    812  Equity.GB.EZJ/GBP                           (12 pubs)  EASYJET PLC / BRITISH POUND
+    813  Equity.GB.FCIT/GBP                          (12 pubs)  F&C INVESTMENT TRUST PLC / BRITISH POUND
+    814  Equity.GB.FRES/GBP                          (12 pubs)  FRESNILLO / BRITISH POUND
+    815  Equity.GB.GAW/GBP                           (12 pubs)  GAMES WORKSHOP GROUP / BRITISH POUND
+    816  Equity.GB.GLEN/GBP                          (12 pubs)  GLENCORE PLC / BRITISH POUND
+    817  Equity.GB.GSK/GBP                           (12 pubs)  GSK PLC / BRITISH POUND
+    818  Equity.GB.HIK/GBP                           (12 pubs)  HIKMA PHARMACEUTICALS / BRITISH POUND
+    820  Equity.GB.HLMA/GBP                          (12 pubs)  HALMA PLC / BRITISH POUND
+    821  Equity.GB.HLN/GBP                           (12 pubs)  HALEON PLC / BRITISH POUND
+    822  Equity.GB.HSBA/GBP                          (12 pubs)  HSBC HOLDINGS PLC / BRITISH POUND
+    823  Equity.GB.HSX/GBP                           (12 pubs)  HISCOX LTD / BRITISH POUND
+    824  Equity.GB.HWDN/GBP                          (12 pubs)  HOWDEN JOINERY GROUP PLC / BRITISH POUND
+    825  Equity.GB.IAG/GBP                           (12 pubs)  INTERNATIONAL CONSOLIDATED AIRLINES GROUP SA / BRI
+    826  Equity.GB.IB01/USD                          (12 pubs)  ISHARES $ TREASURY BOND 0-1YR UCITS ETF / US DOLLA
+    827  Equity.GB.IBTA/USD                          (12 pubs)  ISHARES $ TREASURY BOND 1-3YR UCITS ETF / US DOLLA
+    828  Equity.GB.ICG/GBP                           (12 pubs)  INTERMEDIATE CAPITAL GROUP PLC / BRITISH POUND
+    829  Equity.GB.IHG/GBP                           (12 pubs)  INTERCONTINENTAL HOTELS GROUP PLC / BRITISH POUND
+    830  Equity.GB.III/GBP                           (12 pubs)  3I GROUP PLC / BRITISH POUND
+    831  Equity.GB.IMB/GBP                           (12 pubs)  IMPERIAL BRANDS GROUP / BRITISH POUND
+    832  Equity.GB.IMI/GBP                           (12 pubs)  IMI PLC / BRITISH POUND
+    833  Equity.GB.INF/GBP                           (12 pubs)  INFORMA PLC / BRITISH POUND
+    834  Equity.GB.ISF/GBP                           (12 pubs)  ISHARES CORE FTSE 100 UCITS ETF DIST / BRITISH POU
+    835  Equity.GB.ITRK/GBP                          (12 pubs)  INTERTEK GROUP PLC / BRITISH POUND
+    836  Equity.GB.JD/GBP                            (12 pubs)  JD SPORTS FASHION PLC / BRITISH POUND
+    837  Equity.GB.KGF/GBP                           (12 pubs)  KINGFISHER / BRITISH POUND
+    838  Equity.GB.LAND/GBP                          (12 pubs)  LAND SECURITIES GROUP PLC / BRITISH POUND
+    839  Equity.GB.LGEN/GBP                          (12 pubs)  LEGAL & GENERAL GROUP PLC / BRITISH POUND
+    840  Equity.GB.LLOY/GBP                          (12 pubs)  LLOYDS BANKING GROUP PLC / BRITISH POUND
+    841  Equity.GB.LMP/GBP                           (12 pubs)  LONDONMETRIC PROPERTY PLC / BRITISH POUND
+    842  Equity.GB.LSEG/GBP                          (12 pubs)  LONDON STOCK EXCHANGE GROUP PLC / BRITISH POUND
+    843  Equity.GB.MKS/GBP                           (12 pubs)  MARKS & SPENCER GROUP PLC / BRITISH POUND
+    844  Equity.GB.MNDI/GBP                          (12 pubs)  MONDI PLC / BRITISH POUND
+    845  Equity.GB.MNG/GBP                           (12 pubs)  M&G PLC / BRITISH POUND
+    846  Equity.GB.MRO/GBP                           (12 pubs)  MELROSE INDUSTRIES PLC / BRITISH POUND
+    847  Equity.GB.NG/GBP                            (12 pubs)  NATIONAL GRID / BRITISH POUND
+    848  Equity.GB.NWG/GBP                           (12 pubs)  NATWEST GROUP PLC / BRITISH POUND
+    849  Equity.GB.NXT/GBP                           (12 pubs)  NEXT PLC / BRITISH POUND
+    850  Equity.GB.PHNX/GBP                          (12 pubs)  PHOENIX GROUP HOLDINGS PLC / BRITISH POUND
+    851  Equity.GB.PRU/GBP                           (12 pubs)  PRUDENTIAL PLC / BRITISH POUND
+    852  Equity.GB.PSH/GBP                           (12 pubs)  PERSHING SQUARE HOLDINGS LTD / BRITISH POUND
+    853  Equity.GB.PSN/GBP                           (12 pubs)  PERSIMMON PLC / BRITISH POUND
+    854  Equity.GB.PSON/GBP                          (12 pubs)  PEARSON PLC / BRITISH POUND
+    855  Equity.GB.REL/GBP                           (12 pubs)  RELX PLC / BRITISH POUND
+    856  Equity.GB.RIO/GBP                           (12 pubs)  RIO TINTO PLC / BRITISH POUND
+    857  Equity.GB.RKT/GBP                           (12 pubs)  RECKITT BENCKISER GROUP PLC / BRITISH POUND
+    858  Equity.GB.RMV/GBP                           (12 pubs)  RIGHTMOVE PLC / BRITISH POUND
+    859  Equity.GB.RR/GBP                            (12 pubs)  ROLLS ROYCE HOLDINGS PLC / BRITISH POUND
+    860  Equity.GB.RTO/GBP                           (12 pubs)  RENTOKIL INITIAL PLC / BRITISH POUND
+    861  Equity.GB.SBRY/GBP                          (12 pubs)  SAINSBURY J PLC / BRITISH POUND
+    862  Equity.GB.SDR/GBP                           (12 pubs)  SCHRODERS PLC / BRITISH POUND
+    863  Equity.GB.SGE/GBP                           (12 pubs)  SAGE GROUP PLC / BRITISH POUND
+    864  Equity.GB.SGRO/GBP                          (12 pubs)  SEGRO PLC / BRITISH POUND
+    865  Equity.GB.SHEL/GBP                          (12 pubs)  SHELL PLC / BRITISH POUND
+    867  Equity.GB.SMIN/GBP                          (12 pubs)  SMITHS GROUP PLC / BRITISH POUND
+    868  Equity.GB.SMT/GBP                           (12 pubs)  SCOTTISH MORTGAGE INVESTMENT TRUST PLC / BRITISH P
+    869  Equity.GB.SN/GBP                            (12 pubs)  SMITH & NEPHEW PLC / BRITISH POUND
+    870  Equity.GB.SPX/GBP                           (12 pubs)  SPIRAX GROUP PLC / BRITISH POUND
+    871  Equity.GB.SSE/GBP                           (12 pubs)  SSE PLC / BRITISH POUND
+    872  Equity.GB.STAN/GBP                          (12 pubs)  STANDARD CHARTERED PLC / BRITISH POUND
+    873  Equity.GB.STJ/GBP                           (12 pubs)  ST JAMES'S PLACE PLC / BRITISH POUND
+    874  Equity.GB.SVT/GBP                           (12 pubs)  SEVERN TRENT PLC / BRITISH POUND
+    875  Equity.GB.TSCO/GBP                          (12 pubs)  TESCO PLC / BRITISH POUND
+    876  Equity.GB.TW/GBP                            (12 pubs)  TAYLOR WIMPEY PLC / BRITISH POUND
+    877  Equity.GB.ULVR/GBP                          (12 pubs)  UNILEVER PLC / BRITISH POUND
+    878  Equity.GB.UTG/GBP                           (12 pubs)  UNITE GROUP / BRITISH POUND
+    879  Equity.GB.UU/GBP                            (12 pubs)  UNITED UTILITIES GROUP PLC / BRITISH POUND
+    880  Equity.GB.VOD/GBP                           (12 pubs)  VODAFONE GROUP PLC / BRITISH POUND
+    881  Equity.GB.WEIR/GBP                          (12 pubs)  WEIR GROUP PLC / BRITISH POUND
+    882  Equity.GB.WPP/GBP                           (12 pubs)  WPP PLC / BRITISH POUND
+    883  Equity.GB.WTB/GBP                           (12 pubs)  WHITBREAD PLC / BRITISH POUND
+   1606  Equity.GB.BAB/GBP                           (12 pubs)  BABCOCK INTERNATIONAL GROUP / BRITISH POUND
+   1607  Equity.GB.CCEP/GBP                          (12 pubs)  COCA-COLA EUROPACIFIC PARTNERS / BRITISH POUND
+   1608  Equity.GB.PCT/GBP                           (12 pubs)  POLAR CAPITAL TECHNOLOGY TRUST PLC / BRITISH POUND
+
+==============================================================================
+PHASE-2 BUCKET B — equity-HK (84)
+==============================================================================
+Got: top-level allowedPublisherIds preserved;
+     REGULAR session marketSchedule preserved;
+     empty-identifier benchmarkMapping skeleton added to REGULAR.
+
+    884  Equity.HK.0002-HK/HKD                       (12 pubs)  CLP HOLDINGS / HONG KONG DOLLAR
+    885  Equity.HK.0003-HK/HKD                       (12 pubs)  HK & CHINA GAS / HONG KONG DOLLAR
+    886  Equity.HK.0012-HK/HKD                       (12 pubs)  HENDERSON LAND / HONG KONG DOLLAR
+    887  Equity.HK.0017-HK/HKD                       (12 pubs)  NEW WORLD DEV / HONG KONG DOLLAR
+    888  Equity.HK.0027-HK/HKD                       (12 pubs)  GALAXY ENT / HONG KONG DOLLAR
+    889  Equity.HK.0101-HK/HKD                       (12 pubs)  HANG LUNG PPT / HONG KONG DOLLAR
+    890  Equity.HK.0241-HK/HKD                       (12 pubs)  ALI HEALTH / HONG KONG DOLLAR
+    891  Equity.HK.0267-HK/HKD                       (12 pubs)  CITIC / HONG KONG DOLLAR
+    892  Equity.HK.0669-HK/HKD                       (12 pubs)  TECHTRONIC IND / HONG KONG DOLLAR
+    893  Equity.HK.0700-HK/HKD                       (12 pubs)  TENCET HOLDINGS LTD / HONG KONG DOLLAR
+    894  Equity.HK.0883-HK/HKD                       (12 pubs)  CNOOC / HONG KONG DOLLAR
+    895  Equity.HK.0939-HK/HKD                       (12 pubs)  CONSTRUCTION BANK / HONG KONG DOLLAR
+    896  Equity.HK.0992-HK/HKD                       (12 pubs)  LENOVO GROUP / HONG KONG DOLLAR
+    897  Equity.HK.1038-HK/HKD                       (12 pubs)  CKI HOLDINGS / HONG KONG DOLLAR
+    898  Equity.HK.1044-HK/HKD                       (12 pubs)  HENGAN INT'L / HONG KONG DOLLAR
+    899  Equity.HK.1093-HK/HKD                       (12 pubs)  CSPC PHARMA / HONG KONG DOLLAR
+    900  Equity.HK.1109-HK/HKD                       (12 pubs)  CHINA RES LAND / HONG KONG DOLLAR
+    901  Equity.HK.1209-HK/HKD                       (12 pubs)  CHINA RES MIXC / HONG KONG DOLLAR
+    902  Equity.HK.1211-HK/HKD                       (12 pubs)  BYD ORD SHS H / HONG KONG DOLLAR
+    903  Equity.HK.1398-HK/HKD                       (12 pubs)  ICBC / HONG KONG DOLLAR
+    904  Equity.HK.1810-HK/HKD                       (12 pubs)  XIAOMI-W / HONG KONG DOLLAR
+    905  Equity.HK.2015-HK/HKD                       (12 pubs)  LI AUTO INC / HONG KONG DOLLAR
+    906  Equity.HK.2020-HK/HKD                       (12 pubs)  ANTA SPORTS PRODUCTS LIMITED / HONG KONG DOLLAR
+    907  Equity.HK.2269-HK/HKD                       (12 pubs)  WUXI BIOLOGICS CAYMAN INC / HONG KONG DOLLAR
+    908  Equity.HK.2319-HK/HKD                       (12 pubs)  CHINA MENGNIU DAIRY COMPANY LIMITED / HONG KONG DO
+    909  Equity.HK.2331-HK/HKD                       (12 pubs)  LI NING COMPANY LIMITED / HONG KONG DOLLAR
+    910  Equity.HK.2628-HK/HKD                       (12 pubs)  CHINA LIFE INSURANCE COMPANY LIMITED / HONG KONG D
+    911  Equity.HK.2688-HK/HKD                       (12 pubs)  ENN ENERGY HOLDINGS LIMITED / HONG KONG DOLLAR
+    912  Equity.HK.3690-HK/HKD                       (12 pubs)  MEITUAN / HONG KONG DOLLAR
+    913  Equity.HK.6690-HK/HKD                       (12 pubs)  HAIER SMART HOME CO LTD / HONG KONG DOLLAR
+    914  Equity.HK.9618-HK/HKD                       (12 pubs)  JDCOM INC / HONG KONG DOLLAR
+    915  Equity.HK.9633-HK/HKD                       (12 pubs)  NONGFU SPRING CO LTD / HONG KONG DOLLAR
+    916  Equity.HK.9888-HK/HKD                       (12 pubs)  BAIDU INC / HONG KONG DOLLAR
+    917  Equity.HK.9988-HK/HKD                       (12 pubs)  ALIBABA GROUP HOLDING LIMITED / HONG KONG DOLLAR
+   1609  Equity.HK.0001-HK/HKD                       (12 pubs)  CK HUTCHISON HOLDINGS LIMITED / HONG KONG DOLLAR
+   1610  Equity.HK.0005-HK/HKD                       (12 pubs)  HSBC HOLDINGS PLC / HONG KONG DOLLAR
+   1611  Equity.HK.0006-HK/HKD                       (12 pubs)  POWER ASSETS HOLDINGS LTD / HONG KONG DOLLAR
+   1612  Equity.HK.0011-HK/HKD                       (12 pubs)  HANG SENG BANK / HONG KONG DOLLAR
+   1613  Equity.HK.0016-HK/HKD                       (12 pubs)  SUN HUNG KAI PROPERTIES LTD / HONG KONG DOLLAR
+   1614  Equity.HK.0066-HK/HKD                       (12 pubs)  MTR CORPORATION LTD / HONG KONG DOLLAR
+   1615  Equity.HK.0175-HK/HKD                       (12 pubs)  GEELY AUTOMOBILE HOLDINGS LIMITED / HONG KONG DOLL
+   1616  Equity.HK.0285-HK/HKD                       (12 pubs)  BYD ELECTRONIC INTERNATIONAL CO LT / HONG KONG DOL
+   1617  Equity.HK.0288-HK/HKD                       (12 pubs)  WH GROUP LIMITED / HONG KONG DOLLAR
+   1618  Equity.HK.0291-HK/HKD                       (12 pubs)  CHINA RESOURCES BEER HOLDINGS CO / HONG KONG DOLLA
+   1619  Equity.HK.0316-HK/HKD                       (12 pubs)  ORIENT OVERSEAS INT / HONG KONG DOLLAR
+   1620  Equity.HK.0322-HK/HKD                       (12 pubs)  TINGYICAYMAN ISLANDSHLDG CORP / HONG KONG DOLLAR
+   1621  Equity.HK.0386-HK/HKD                       (12 pubs)  CHINA PETROLEUM & CHEMICAL CORP / HONG KONG DOLLAR
+   1622  Equity.HK.0388-HK/HKD                       (12 pubs)  HONG KONG EXCHANGES & CLEARING / HONG KONG DOLLAR
+   1623  Equity.HK.0688-HK/HKD                       (12 pubs)  CHINA OVERSEAS LAND & INVESTMNTS / HONG KONG DOLLA
+   1624  Equity.HK.0762-HK/HKD                       (12 pubs)  CHINA UNICOM HONG KONG LIMITED / HONG KONG DOLLAR
+   1625  Equity.HK.0823-HK/HKD                       (12 pubs)  LINK REAL ESTATE INVESTMENT TRUSTDREI / HONG KONG
+   1626  Equity.HK.0836-HK/HKD                       (12 pubs)  CHINA RESOURCES POWER HLDGS CO / HONG KONG DOLLAR
+   1627  Equity.HK.0857-HK/HKD                       (12 pubs)  PETROCHINA CO / HONG KONG DOLLAR
+   1628  Equity.HK.0868-HK/HKD                       (12 pubs)  XINYI GLASS HLDGS / HONG KONG DOLLAR
+   1629  Equity.HK.0881-HK/HKD                       (12 pubs)  ZHONGSHENG GROUP HOLDINGS LIMITED / HONG KONG DOLL
+   1630  Equity.HK.0941-HK/HKD                       (12 pubs)  CHINA MOBILE LTD / HONG KONG DOLLAR
+   1631  Equity.HK.0960-HK/HKD                       (12 pubs)  LONGFOR GROUP HLDGS LTD / HONG KONG DOLLAR
+   1632  Equity.HK.0968-HK/HKD                       (12 pubs)  XINYI SOLAR HOLDINGS LIMITED / HONG KONG DOLLAR
+   1633  Equity.HK.0981-HK/HKD                       (12 pubs)  SEMICONDUCTOR MANUFACTURING INTL CO / HONG KONG DO
+   1634  Equity.HK.1024-HK/HKD                       (12 pubs)  KUAISHOU TECHNOLOGY / HONG KONG DOLLAR
+   1635  Equity.HK.1088-HK/HKD                       (12 pubs)  CHINA SHENHUA ENERGY COMPANY LTD / HONG KONG DOLLA
+   1636  Equity.HK.1099-HK/HKD                       (12 pubs)  SINOPHARM GROUP CO LTD / HONG KONG DOLLAR
+   1637  Equity.HK.1113-HK/HKD                       (12 pubs)  CK ASSET HOLDINGS LTD / HONG KONG DOLLAR
+   1638  Equity.HK.1177-HK/HKD                       (12 pubs)  SINO BIOPHARMACEUTICAL / HONG KONG DOLLAR
+   1639  Equity.HK.1299-HK/HKD                       (12 pubs)  AIA GROUP LIMITED / HONG KONG DOLLAR
+   1640  Equity.HK.1378-HK/HKD                       (12 pubs)  CHINA HONGQIAO GROUP LTD / HONG KONG DOLLAR
+   1641  Equity.HK.1876-HK/HKD                       (12 pubs)  BUDWEISER BREWING COMPANY APAC LTD / HONG KONG DOL
+   1642  Equity.HK.1928-HK/HKD                       (12 pubs)  SANDS CHINA LTD / HONG KONG DOLLAR
+   1643  Equity.HK.1929-HK/HKD                       (12 pubs)  CHOW TAI FOOK JEWELLERY GROUP LTD / HONG KONG DOLL
+   1644  Equity.HK.1997-HK/HKD                       (12 pubs)  WHARF REAL ESTATE INVESTMENT CO LTD / HONG KONG DO
+   1645  Equity.HK.2313-HK/HKD                       (12 pubs)  SHENZHOU INTERNATIONAL GROUP HLDGS / HONG KONG DOL
+   1646  Equity.HK.2318-HK/HKD                       (12 pubs)  PING AN INSURANCEGROUPCOOF CHINA / HONG KONG DOLLA
+   1647  Equity.HK.2359-HK/HKD                       (12 pubs)  WUXI APPTEC CO LTD / HONG KONG DOLLAR
+   1648  Equity.HK.2382-HK/HKD                       (12 pubs)  SUNNY OPTICAL TECHNOLOGY GROUP / HONG KONG DOLLAR
+   1649  Equity.HK.2388-HK/HKD                       (12 pubs)  BOC HONG KONGHLDGS LTD / HONG KONG DOLLAR
+   1650  Equity.HK.2899-HK/HKD                       (12 pubs)  ZIJIN MINING GROUP COLTD / HONG KONG DOLLAR
+   1651  Equity.HK.3692-HK/HKD                       (12 pubs)  HANSOH PHARMACEUTICAL GROUP CO LTD / HONG KONG DOL
+   1652  Equity.HK.3968-HK/HKD                       (12 pubs)  CHINA MERCHANTS BANK CO LTD / HONG KONG DOLLAR
+   1653  Equity.HK.3988-HK/HKD                       (12 pubs)  BANK OF CHINA LTD / HONG KONG DOLLAR
+   1654  Equity.HK.6618-HK/HKD                       (12 pubs)  JD HEALTH INTERNATIONAL INC / HONG KONG DOLLAR
+   1655  Equity.HK.6862-HK/HKD                       (12 pubs)  HAIDILAO INTL HLDG LTD / HONG KONG DOLLAR
+   1656  Equity.HK.9901-HK/HKD                       (12 pubs)  NEW ORIENTAL ED & TECHNOLOGY GP INC / HONG KONG DO
+   1657  Equity.HK.9961-HK/HKD                       (12 pubs)  TRIP COM GROUP LTD / HONG KONG DOLLAR
+   1658  Equity.HK.9999-HK/HKD                       (12 pubs)  NETEASE INC / HONG KONG DOLLAR
+
+==============================================================================
+PHASE-2 BUCKET B — equity-IE (6)
+==============================================================================
+Got: top-level allowedPublisherIds preserved;
+     REGULAR session marketSchedule preserved;
+     empty-identifier benchmarkMapping skeleton added to REGULAR.
+
+    918  Equity.IE.EUE/EUR                           (12 pubs)  ISHARES CORE EURO STOXX 50 UCITS ETF EUR / EURO
+   1659  Equity.IE.CSP1/GBP                          (12 pubs)  ISHARES VII CORE S&P 500 ETF (ACC) / BRITISH POUND
+   1660  Equity.IE.VUSA/CHF                          (12 pubs)  VANGUARD FUNDS S&P 500 UCITS ETF USD DIS / SWISS F
+   1661  Equity.IE.VUSA/EUR                          (12 pubs)  VANGUARD FUNDS S&P 500 UCITS ETF USD DIS / EURO
+   1662  Equity.IE.VUSA/GBP                          (12 pubs)  VANGUARD FUNDS VANGUARD S&P 500 UCITS ETF / BRITIS
+   1663  Equity.IE.VUSD/USD                          (12 pubs)  VANGUARD FUNDS VANGUARD S&P 500 UCITS ETF / US DOL
+
+==============================================================================
+PHASE-2 BUCKET B — equity-JP (6)
+==============================================================================
+Got: top-level allowedPublisherIds preserved;
+     REGULAR session marketSchedule preserved;
+     empty-identifier benchmarkMapping skeleton added to REGULAR.
+
+   1664  Equity.JP.1305/JPY                          (12 pubs)  DAIWA IFREEETF TOPIX (YEARLY DIV TYPE) / JAPANESE
+   1665  Equity.JP.1306/JPY                          (12 pubs)  NOMURA NEXT FUNDS TOPIX ETF / JAPANESE YEN
+   1666  Equity.JP.1308/JPY                          (12 pubs)  NIKKO EXCHANGE TRADED INDEX TOPIX / JAPANESE YEN
+   1667  Equity.JP.1320/JPY                          (12 pubs)  DAIWA IFREEETF NIKKEI225 (YEARLY DIV TYPE) / JAPAN
+   1668  Equity.JP.1321/JPY                          (12 pubs)  NOMURA NEXT FUNDS NIKKEI 225 ETF / JAPANESE YEN
+   1669  Equity.JP.1330/JPY                          (12 pubs)  NIKKO EXCHANGE TRADED INDEX FUND 225 / JAPANESE YE
+
+==============================================================================
+PHASE-2 BUCKET B — equity-NL (1)
+==============================================================================
+Got: top-level allowedPublisherIds preserved;
+     REGULAR session marketSchedule preserved;
+     empty-identifier benchmarkMapping skeleton added to REGULAR.
+
+    920  Equity.NL.BCOIN/USD                         (12 pubs)  JACOBI FT WILSHIRE BITCOIN ETF / US DOLLAR
+
+==============================================================================
+PHASE-2 BUCKET B — equity-US (1)
+==============================================================================
+Got: top-level allowedPublisherIds preserved;
+     REGULAR session marketSchedule preserved;
+     empty-identifier benchmarkMapping skeleton added to REGULAR.
+
+   1703  Equity.US.IWDA/USD                          (12 pubs)  ISHARES III CORE MSCI WORLD ETF (ACC) / US DOLLAR
+
+==============================================================================
+PHASE-2 BUCKET B — metal (7)
+==============================================================================
+Got: top-level allowedPublisherIds preserved;
+     REGULAR session marketSchedule preserved;
+     empty-identifier benchmarkMapping skeleton added to REGULAR.
+
+   2949  Metal.XCU/USD                               (12 pubs)  SPOT COPPER / US DOLLAR
+   2950  Metal.XTI/USD                               (12 pubs)  SPOT TITANIUM / US DOLLAR
+   2951  Metal.XAL/USD                               (12 pubs)  SPOT ALUMINIUM / US DOLLAR
+   2952  Metal.XGR/USD                               (12 pubs)  SPOT GRAPHITE / US DOLLAR
+   2953  Metal.XCO/USD                               (12 pubs)  SPOT COBALT / US DOLLAR
+   2968  Metal.XLI/USD                               (12 pubs)  SPOT LITHIUM / US DOLLAR
+   2969  Metal.XNI/USD                               (12 pubs)  SPOT NICKEL / US DOLLAR
+
+==============================================================================
+PHASE-2 INTENTIONALLY SKIPPED — still missing benchmarkMapping by design
+==============================================================================
+These feeds have top-level allowedPublisherIds but no benchmarkMapping,
+and were left as-is. They are mostly Pyth-native synthetics or fall
+outside the equity/metal eligibility set.
+
+  commodity / STABLE  (1):
+     3063  Commodities.Index.PYTHOIL/USD               PYTH PRICE IN USD FOR PYTHOIL 24/7
+
+  custom / STABLE  (5):
+     2922  Custom.PRF1/USD                             PRIVATE FEED 1 / US DOLLAR
+     2924  Custom.PRF2/USD                             PRIVATE FEED 2 / US DOLLAR
+     2925  Custom.PRF3/USD                             PRIVATE FEED 3 / US DOLLAR
+     2926  Custom.PRF4/USD                             PRIVATE FEED 4 / US DOLLAR
+     2927  Custom.PRF5/USD                             PRIVATE FEED 5 / US DOLLAR
+
+  equity / COMING_SOON  (9):
+     3187  Equity.Index.MSTR/USD                       PYTH PRICE IN USD FOR MSTR 24/7
+     3189  Equity.Index.HOOD/USD                       PYTH PRICE IN USD FOR HOOD 24/7
+     3190  Equity.Index.COIN/USD                       PYTH PRICE IN USD FOR COIN 24/7
+     3191  Equity.Index.AAPL/USD                       PYTH PRICE IN USD FOR AAPL 24/7
+     3192  Equity.Index.AMZN/USD                       PYTH PRICE IN USD FOR AMZN 24/7
+     3193  Equity.Index.PLTR/USD                       PYTH PRICE IN USD FOR PLTR 24/7
+     3194  Equity.Index.GOOGL/USD                      PYTH PRICE IN USD FOR GOOGL 24/7
+     3195  Equity.Index.ORCL/USD                       PYTH PRICE IN USD FOR ORCL 24/7
+     3196  Equity.Index.MSFT/USD                       PYTH PRICE IN USD FOR MSFT 24/7
+
+  equity / STABLE  (3):
+     3185  Equity.Index.TSLA/USD                       PYTH PRICE IN USD FOR TSLA 24/7
+     3186  Equity.Index.CRCL/USD                       PYTH PRICE IN USD FOR CRCL 24/7
+     3188  Equity.Index.NVDA/USD                       PYTH PRICE IN USD FOR NVDA 24/7
+
+  fx / STABLE  (7):
+      315  FX.AUD/USD                                  AUSTRALIAN DOLLAR / US DOLLAR
+      333  FX.GBP/USD                                  BRITISH POUND / US DOLLAR
+      340  FX.USD/JPY                                  US DOLLAR / JAPANESE YEN
+     1514  FX.USD/NOK                                  US DOLLAR / NORWEGIAN KRONE
+     1517  FX.USD/SEK                                  US DOLLAR / SWEDISH KRONA
+     3183  FX.Index.EUR/USD                            PYTH PRICE IN USD FOR EUR 24/7
+     3184  FX.Index.USD/JPY                            PYTH PRICE IN JPY FOR USD 24/7
+
+  metal / STABLE  (2):
+     3153  Metal.Index.GOLD/USD                        PYTH PRICE IN USD FOR GOLD 24/7
+     3154  Metal.Index.SILVER/USD                      PYTH PRICE IN USD FOR SILVER 24/7
+
+  rates / STABLE  (5):
+     1522  Rates.BGCR                                  BROAD GENERAL COLLATERAL RATE
+     1523  Rates.EFFR                                  EFFECTIVE FEDERAL FUNDS RATE
+     1524  Rates.OBFR                                  OVERNIGHT BANK FUNDING RATE
+     1525  Rates.SOFR                                  SECURED OVERNIGHT FINANCING RATE
+     1526  Rates.TGCR                                  TRI-PARTY GENERAL COLLATERAL RATE
