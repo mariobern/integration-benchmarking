@@ -427,6 +427,80 @@ class TestEquityIndexFuturesResolver:
         assert resolve_equity_futures_ric("Equity.US.US30U5/USD") == "YMU25"
 
 
+class TestRootLength:
+    """Length of the base ticker before any class-letter suffix."""
+
+    def test_three_char_plain(self):
+        from generate_ric_mapping import _root_length
+
+        assert _root_length("IBM") == 3
+
+    def test_four_char_plain(self):
+        from generate_ric_mapping import _root_length
+
+        assert _root_length("TWTR") == 4
+
+    def test_dotted_class_letter(self):
+        from generate_ric_mapping import _root_length
+
+        assert _root_length("BRK.B") == 3
+
+    def test_dotted_class_letter_lowercase(self):
+        from generate_ric_mapping import _root_length
+
+        assert _root_length("brk.b") == 3
+
+    def test_hyphenated_class_letter(self):
+        from generate_ric_mapping import _root_length
+
+        assert _root_length("BRK-B") == 3
+
+    def test_single_char_ticker(self):
+        from generate_ric_mapping import _root_length
+
+        assert _root_length("A") == 1
+
+    def test_two_char_ticker(self):
+        from generate_ric_mapping import _root_length
+
+        assert _root_length("AB") == 2
+
+    def test_four_char_no_dot(self):
+        from generate_ric_mapping import _root_length
+
+        assert _root_length("BABA") == 4
+
+    def test_dotted_non_class_suffix_not_stripped(self):
+        # ".WS" (warrants) is not a single class letter, so it should NOT be stripped.
+        from generate_ric_mapping import _root_length
+
+        assert _root_length("FOO.WS") == 6
+
+
+class TestUSConsolidatedSuffix:
+    """LSEG consolidated-tape suffix rule for NYSE/Arca/American/Cboe BZX."""
+
+    def test_three_char_root_is_bare(self):
+        from generate_ric_mapping import _us_consolidated_suffix
+
+        assert _us_consolidated_suffix(3) == ""
+
+    def test_four_char_root_gets_dot_k(self):
+        from generate_ric_mapping import _us_consolidated_suffix
+
+        assert _us_consolidated_suffix(4) == ".K"
+
+    def test_five_char_root_gets_dot_k(self):
+        from generate_ric_mapping import _us_consolidated_suffix
+
+        assert _us_consolidated_suffix(5) == ".K"
+
+    def test_one_char_root_is_bare(self):
+        from generate_ric_mapping import _us_consolidated_suffix
+
+        assert _us_consolidated_suffix(1) == ""
+
+
 class TestEquityResolver:
     def test_nasdaq_ticker(self, tmp_path):
         from generate_ric_mapping import EquityResolver
@@ -454,7 +528,7 @@ class TestEquityResolver:
         )
         resolver = EquityResolver(cache_dir=tmp_path)
         resolver._load_from_files(nasdaq_file, other_file)
-        assert resolver.resolve("JPM") == "JPM.N"
+        assert resolver.resolve("JPM") == "JPM"
 
     def test_dotted_ticker(self, tmp_path):
         from generate_ric_mapping import EquityResolver
@@ -467,7 +541,107 @@ class TestEquityResolver:
         )
         resolver = EquityResolver(cache_dir=tmp_path)
         resolver._load_from_files(nasdaq_file, other_file)
-        assert resolver.resolve("BRK.B") == "BRKb.N"
+        assert resolver.resolve("BRK.B") == "BRKb"
+
+    def test_consolidated_short_root_nyse_is_bare(self, tmp_path):
+        from generate_ric_mapping import EquityResolver
+
+        nasdaq_file = tmp_path / "nasdaqlisted.txt"
+        nasdaq_file.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other_file = tmp_path / "otherlisted.txt"
+        other_file.write_text(
+            "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue\n"
+            "IBM|International Business Machines|N|||100|N\n"
+        )
+        resolver = EquityResolver(cache_dir=tmp_path)
+        resolver._load_from_files(nasdaq_file, other_file)
+        assert resolver.resolve("IBM") == "IBM"
+
+    def test_consolidated_long_root_nyse_gets_dot_k(self, tmp_path):
+        from generate_ric_mapping import EquityResolver
+
+        nasdaq_file = tmp_path / "nasdaqlisted.txt"
+        nasdaq_file.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other_file = tmp_path / "otherlisted.txt"
+        other_file.write_text(
+            "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue\n"
+            "TWTR|Twitter Inc|N|||100|N\n"
+        )
+        resolver = EquityResolver(cache_dir=tmp_path)
+        resolver._load_from_files(nasdaq_file, other_file)
+        assert resolver.resolve("TWTR") == "TWTR.K"
+
+    def test_consolidated_short_root_arca_is_bare(self, tmp_path):
+        from generate_ric_mapping import EquityResolver
+
+        nasdaq_file = tmp_path / "nasdaqlisted.txt"
+        nasdaq_file.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other_file = tmp_path / "otherlisted.txt"
+        other_file.write_text(
+            "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue\n"
+            "SPY|SPDR S&P 500 ETF Trust|P|||100|N\n"
+        )
+        resolver = EquityResolver(cache_dir=tmp_path)
+        resolver._load_from_files(nasdaq_file, other_file)
+        assert resolver.resolve("SPY") == "SPY"
+
+    def test_consolidated_long_root_cboe_bzx_gets_dot_k(self, tmp_path):
+        from generate_ric_mapping import EquityResolver
+
+        nasdaq_file = tmp_path / "nasdaqlisted.txt"
+        nasdaq_file.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other_file = tmp_path / "otherlisted.txt"
+        other_file.write_text(
+            "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue\n"
+            "CBOE|Cboe Global Markets|Z|||100|N\n"
+        )
+        resolver = EquityResolver(cache_dir=tmp_path)
+        resolver._load_from_files(nasdaq_file, other_file)
+        assert resolver.resolve("CBOE") == "CBOE.K"
+
+    def test_consolidated_nyse_american_long_root_gets_dot_k(self, tmp_path):
+        from generate_ric_mapping import EquityResolver
+
+        nasdaq_file = tmp_path / "nasdaqlisted.txt"
+        nasdaq_file.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other_file = tmp_path / "otherlisted.txt"
+        other_file.write_text(
+            "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue\n"
+            "LIVE|Live Ventures Inc|A|||100|N\n"
+        )
+        resolver = EquityResolver(cache_dir=tmp_path)
+        resolver._load_from_files(nasdaq_file, other_file)
+        assert resolver.resolve("LIVE") == "LIVE.K"
+
+    def test_consolidated_iex_unchanged(self, tmp_path):
+        from generate_ric_mapping import EquityResolver
+
+        nasdaq_file = tmp_path / "nasdaqlisted.txt"
+        nasdaq_file.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other_file = tmp_path / "otherlisted.txt"
+        other_file.write_text(
+            "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue\n"
+            "INTC|Intel Corp|V|||100|N\n"
+        )
+        resolver = EquityResolver(cache_dir=tmp_path)
+        resolver._load_from_files(nasdaq_file, other_file)
+        assert resolver.resolve("INTC") == "INTC.K"
+
+    def test_consolidated_dotted_long_root(self, tmp_path):
+        # Hypothetical 4-char-root ticker with class letter: root=LONG (4), class=b
+        # Expected RIC: "LONGb.K"
+        from generate_ric_mapping import EquityResolver
+
+        nasdaq_file = tmp_path / "nasdaqlisted.txt"
+        nasdaq_file.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other_file = tmp_path / "otherlisted.txt"
+        other_file.write_text(
+            "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue\n"
+            "LONG.B|Long Corp Class B|N|||100|N\n"
+        )
+        resolver = EquityResolver(cache_dir=tmp_path)
+        resolver._load_from_files(nasdaq_file, other_file)
+        assert resolver.resolve("LONG.B") == "LONGb.K"
 
 
 class TestRICResolver:
@@ -488,6 +662,37 @@ class TestRICResolver:
         assert result.ric == "AAPL.O"
         assert result.asset_class == "Common Stock"
         assert result.pyth_lazer_id == 922
+
+    def test_resolve_equity_fallback_short_root_is_bare(self, symbols_path, tmp_path):
+        from generate_ric_mapping import RICResolver
+
+        # AAPL is in the lazer_symbols fixture but absent from both NASDAQ Trader files,
+        # forcing the low-confidence fallback path.
+        nasdaq = tmp_path / "nasdaqlisted.txt"
+        nasdaq.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other = tmp_path / "otherlisted.txt"
+        other.write_text("ACT Symbol|Security Name|Exchange|CQS|ETF|Lot|Test\n")
+        resolver = RICResolver(symbols_path, equity_cache_dir=tmp_path)
+        resolver._equity._load_from_files(nasdaq, other)
+        result = resolver.resolve("AAPL")
+        # AAPL root length = 4 -> ".K"
+        assert result.ric == "AAPL.K"
+        assert result.confidence == "low"
+        assert any("verify exchange suffix" in w for w in result.warnings)
+
+    def test_resolve_equity_fallback_long_root_gets_dot_k(self, symbols_path, tmp_path):
+        # Confirms the >=4 branch of the fallback. Reuses the AAPL fixture entry which
+        # has a 4-char root; .K is expected.
+        from generate_ric_mapping import RICResolver
+
+        nasdaq = tmp_path / "nasdaqlisted.txt"
+        nasdaq.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other = tmp_path / "otherlisted.txt"
+        other.write_text("ACT Symbol|Security Name|Exchange|CQS|ETF|Lot|Test\n")
+        resolver = RICResolver(symbols_path, equity_cache_dir=tmp_path)
+        resolver._equity._load_from_files(nasdaq, other)
+        result = resolver.resolve("AAPL")
+        assert result.ric == "AAPL.K"
 
     def test_resolve_fx(self, symbols_path):
         from generate_ric_mapping import RICResolver
