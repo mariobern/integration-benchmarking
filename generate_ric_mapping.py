@@ -208,14 +208,6 @@ OTHER_LISTED_URL = f"{NASDAQ_TRADER_BASE_URL}/otherlisted.txt"
 EQUITY_CACHE_DIR = Path(".nasdaq_cache")
 EQUITY_CACHE_TTL = 24 * 60 * 60  # 24 hours
 
-OTHER_EXCHANGE_SUFFIX_MAP = {
-    "N": ".N",  # NYSE
-    "P": ".P",  # NYSE Arca
-    "Z": ".Z",  # BATS
-    "A": ".A",  # NYSE American (AMEX)
-    "V": ".K",  # IEXG -> .K in RIC
-}
-
 
 def ticker_to_ric_base(ticker: str) -> str:
     """Convert dotted ticker to RIC base (BRK.B -> BRKb)."""
@@ -337,18 +329,28 @@ class EquityResolver:
         self._load_from_files(nasdaq_path, other_path)
 
     def resolve(self, ticker: str) -> Optional[str]:
-        """Resolve ticker to RIC (e.g., AAPL -> AAPL.O, BRK.B -> BRKb.N)."""
+        """Resolve ticker to RIC.
+
+        NASDAQ listings -> "<base>.O".
+        IEX (`V`) listings -> "<base>.K".
+        All other US-consolidated venues (NYSE `N`, NYSE Arca `P`,
+        NYSE American `A`, Cboe BZX `Z`, unknown codes) -> LSEG consolidated
+        rule: "<base>.K" when the ticker root is 4+ characters, otherwise the
+        bare base with no suffix at all (e.g. "IBM", "SPY", "BRKa").
+        """
         self._ensure_loaded()
         upper = ticker.upper()
         ric_base = ticker_to_ric_base(upper)
+        root_len = _root_length(upper)
 
         for form in [upper, ric_base]:
             if form in self._nasdaq:
                 return f"{ric_base}.O"
             if form in self._other:
                 exchange, _ = self._other[form]
-                suffix = OTHER_EXCHANGE_SUFFIX_MAP.get(exchange, ".N")
-                return f"{ric_base}{suffix}"
+                if exchange == "V":
+                    return f"{ric_base}.K"
+                return f"{ric_base}{_us_consolidated_suffix(root_len)}"
         return None
 
     def get_name(self, ticker: str) -> Optional[str]:

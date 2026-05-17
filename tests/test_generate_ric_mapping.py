@@ -528,7 +528,7 @@ class TestEquityResolver:
         )
         resolver = EquityResolver(cache_dir=tmp_path)
         resolver._load_from_files(nasdaq_file, other_file)
-        assert resolver.resolve("JPM") == "JPM.N"
+        assert resolver.resolve("JPM") == "JPM"
 
     def test_dotted_ticker(self, tmp_path):
         from generate_ric_mapping import EquityResolver
@@ -541,7 +541,107 @@ class TestEquityResolver:
         )
         resolver = EquityResolver(cache_dir=tmp_path)
         resolver._load_from_files(nasdaq_file, other_file)
-        assert resolver.resolve("BRK.B") == "BRKb.N"
+        assert resolver.resolve("BRK.B") == "BRKb"
+
+    def test_consolidated_short_root_nyse_is_bare(self, tmp_path):
+        from generate_ric_mapping import EquityResolver
+
+        nasdaq_file = tmp_path / "nasdaqlisted.txt"
+        nasdaq_file.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other_file = tmp_path / "otherlisted.txt"
+        other_file.write_text(
+            "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue\n"
+            "IBM|International Business Machines|N|||100|N\n"
+        )
+        resolver = EquityResolver(cache_dir=tmp_path)
+        resolver._load_from_files(nasdaq_file, other_file)
+        assert resolver.resolve("IBM") == "IBM"
+
+    def test_consolidated_long_root_nyse_gets_dot_k(self, tmp_path):
+        from generate_ric_mapping import EquityResolver
+
+        nasdaq_file = tmp_path / "nasdaqlisted.txt"
+        nasdaq_file.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other_file = tmp_path / "otherlisted.txt"
+        other_file.write_text(
+            "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue\n"
+            "TWTR|Twitter Inc|N|||100|N\n"
+        )
+        resolver = EquityResolver(cache_dir=tmp_path)
+        resolver._load_from_files(nasdaq_file, other_file)
+        assert resolver.resolve("TWTR") == "TWTR.K"
+
+    def test_consolidated_short_root_arca_is_bare(self, tmp_path):
+        from generate_ric_mapping import EquityResolver
+
+        nasdaq_file = tmp_path / "nasdaqlisted.txt"
+        nasdaq_file.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other_file = tmp_path / "otherlisted.txt"
+        other_file.write_text(
+            "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue\n"
+            "SPY|SPDR S&P 500 ETF Trust|P|||100|N\n"
+        )
+        resolver = EquityResolver(cache_dir=tmp_path)
+        resolver._load_from_files(nasdaq_file, other_file)
+        assert resolver.resolve("SPY") == "SPY"
+
+    def test_consolidated_long_root_cboe_bzx_gets_dot_k(self, tmp_path):
+        from generate_ric_mapping import EquityResolver
+
+        nasdaq_file = tmp_path / "nasdaqlisted.txt"
+        nasdaq_file.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other_file = tmp_path / "otherlisted.txt"
+        other_file.write_text(
+            "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue\n"
+            "CBOE|Cboe Global Markets|Z|||100|N\n"
+        )
+        resolver = EquityResolver(cache_dir=tmp_path)
+        resolver._load_from_files(nasdaq_file, other_file)
+        assert resolver.resolve("CBOE") == "CBOE.K"
+
+    def test_consolidated_nyse_american_long_root_gets_dot_k(self, tmp_path):
+        from generate_ric_mapping import EquityResolver
+
+        nasdaq_file = tmp_path / "nasdaqlisted.txt"
+        nasdaq_file.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other_file = tmp_path / "otherlisted.txt"
+        other_file.write_text(
+            "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue\n"
+            "LIVE|Live Ventures Inc|A|||100|N\n"
+        )
+        resolver = EquityResolver(cache_dir=tmp_path)
+        resolver._load_from_files(nasdaq_file, other_file)
+        assert resolver.resolve("LIVE") == "LIVE.K"
+
+    def test_consolidated_iex_unchanged(self, tmp_path):
+        from generate_ric_mapping import EquityResolver
+
+        nasdaq_file = tmp_path / "nasdaqlisted.txt"
+        nasdaq_file.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other_file = tmp_path / "otherlisted.txt"
+        other_file.write_text(
+            "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue\n"
+            "INTC|Intel Corp|V|||100|N\n"
+        )
+        resolver = EquityResolver(cache_dir=tmp_path)
+        resolver._load_from_files(nasdaq_file, other_file)
+        assert resolver.resolve("INTC") == "INTC.K"
+
+    def test_consolidated_dotted_long_root(self, tmp_path):
+        # Hypothetical 4-char-root ticker with class letter: root=LONG (4), class=b
+        # Expected RIC: "LONGb.K"
+        from generate_ric_mapping import EquityResolver
+
+        nasdaq_file = tmp_path / "nasdaqlisted.txt"
+        nasdaq_file.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other_file = tmp_path / "otherlisted.txt"
+        other_file.write_text(
+            "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue\n"
+            "LONG.B|Long Corp Class B|N|||100|N\n"
+        )
+        resolver = EquityResolver(cache_dir=tmp_path)
+        resolver._load_from_files(nasdaq_file, other_file)
+        assert resolver.resolve("LONG.B") == "LONGb.K"
 
 
 class TestRICResolver:
