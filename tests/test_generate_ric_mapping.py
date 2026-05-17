@@ -663,6 +663,37 @@ class TestRICResolver:
         assert result.asset_class == "Common Stock"
         assert result.pyth_lazer_id == 922
 
+    def test_resolve_equity_fallback_short_root_is_bare(self, symbols_path, tmp_path):
+        from generate_ric_mapping import RICResolver
+
+        # AAPL is in the lazer_symbols fixture but absent from both NASDAQ Trader files,
+        # forcing the low-confidence fallback path.
+        nasdaq = tmp_path / "nasdaqlisted.txt"
+        nasdaq.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other = tmp_path / "otherlisted.txt"
+        other.write_text("ACT Symbol|Security Name|Exchange|CQS|ETF|Lot|Test\n")
+        resolver = RICResolver(symbols_path, equity_cache_dir=tmp_path)
+        resolver._equity._load_from_files(nasdaq, other)
+        result = resolver.resolve("AAPL")
+        # AAPL root length = 4 -> ".K"
+        assert result.ric == "AAPL.K"
+        assert result.confidence == "low"
+        assert any("verify exchange suffix" in w for w in result.warnings)
+
+    def test_resolve_equity_fallback_long_root_gets_dot_k(self, symbols_path, tmp_path):
+        # Confirms the >=4 branch of the fallback. Reuses the AAPL fixture entry which
+        # has a 4-char root; .K is expected.
+        from generate_ric_mapping import RICResolver
+
+        nasdaq = tmp_path / "nasdaqlisted.txt"
+        nasdaq.write_text("Symbol|Security Name|Market Category|Test Issue\n")
+        other = tmp_path / "otherlisted.txt"
+        other.write_text("ACT Symbol|Security Name|Exchange|CQS|ETF|Lot|Test\n")
+        resolver = RICResolver(symbols_path, equity_cache_dir=tmp_path)
+        resolver._equity._load_from_files(nasdaq, other)
+        result = resolver.resolve("AAPL")
+        assert result.ric == "AAPL.K"
+
     def test_resolve_fx(self, symbols_path):
         from generate_ric_mapping import RICResolver
 

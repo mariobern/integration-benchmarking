@@ -625,7 +625,8 @@ class RICResolver:
                     result.confidence = "medium"
                 else:
                     ric_base = ticker_to_ric_base(equity_ticker)
-                    result.ric = f"{ric_base}.N"
+                    suffix = _us_consolidated_suffix(_root_length(equity_ticker))
+                    result.ric = f"{ric_base}{suffix}"
                     result.confidence = "low"
                     result.warnings.append(
                         f"Defaulting to {result.ric} — verify exchange suffix"
