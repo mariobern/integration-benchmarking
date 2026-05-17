@@ -247,6 +247,15 @@ def _root_length(ticker: str) -> int:
     return len(upper)
 
 
+def _us_consolidated_suffix(root_len: int) -> str:
+    """LSEG consolidated-tape suffix for NYSE / NYSE Arca / NYSE American / Cboe BZX.
+
+    Returns ".K" when the ticker root has 4 or more characters; otherwise the
+    consolidated RIC is bare (no suffix at all).
+    """
+    return ".K" if root_len >= 4 else ""
+
+
 class EquityResolver:
     """Resolve US equity/ETF tickers to RICs using NASDAQ Trader."""
 

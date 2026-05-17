@@ -477,6 +477,30 @@ class TestRootLength:
         assert _root_length("FOO.WS") == 6
 
 
+class TestUSConsolidatedSuffix:
+    """LSEG consolidated-tape suffix rule for NYSE/Arca/American/Cboe BZX."""
+
+    def test_three_char_root_is_bare(self):
+        from generate_ric_mapping import _us_consolidated_suffix
+
+        assert _us_consolidated_suffix(3) == ""
+
+    def test_four_char_root_gets_dot_k(self):
+        from generate_ric_mapping import _us_consolidated_suffix
+
+        assert _us_consolidated_suffix(4) == ".K"
+
+    def test_five_char_root_gets_dot_k(self):
+        from generate_ric_mapping import _us_consolidated_suffix
+
+        assert _us_consolidated_suffix(5) == ".K"
+
+    def test_one_char_root_is_bare(self):
+        from generate_ric_mapping import _us_consolidated_suffix
+
+        assert _us_consolidated_suffix(1) == ""
+
+
 class TestEquityResolver:
     def test_nasdaq_ticker(self, tmp_path):
         from generate_ric_mapping import EquityResolver
