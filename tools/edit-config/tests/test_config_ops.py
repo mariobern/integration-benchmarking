@@ -148,6 +148,15 @@ class TestAddPublisher:
         with pytest.raises(OpError, match="no per-session"):
             op.apply(feed)
 
+    def test_session_regular_on_non_equity_raises(self, feeds):
+        # Non-US-equity feeds have no per-session REGULAR roster (only top-level).
+        # --session REGULAR must error so users don't think they targeted something
+        # specific when only the top-level list exists.
+        feed = feed_by_id(feeds, 1)
+        op = AddPublisher(publisher_id=80, session="REGULAR")
+        with pytest.raises(OpError, match="session.*does not exist"):
+            op.apply(feed)
+
     def test_noop_when_already_present(self, feeds):
         feed = feed_by_id(feeds, 1)
         op = AddPublisher(publisher_id=3)  # 3 already in [1, 3, 7, 11]
@@ -229,16 +238,18 @@ class TestRemovePublisher:
         assert len(changes) == 1
         assert changes[0].location == "PRE_MARKET"
 
-    def test_session_all_leaves_top_level(self, feeds):
+    def test_session_all_removes_everywhere(self, feeds):
+        # session=ALL mirrors AddPublisher: removes from top-level AND every
+        # per-session list.
         feed = feed_by_id(feeds, 922)
         op = RemovePublisher(publisher_id=22, session="ALL")
         changes, _ = op.apply(feed)
-        assert 22 in feed["allowedPublisherIds"]
+        assert 22 not in feed["allowedPublisherIds"]
         for name in SESSION_NAMES:
             sess = get_session(feed, name)
             if sess and "allowedPublisherIds" in sess:
                 assert 22 not in sess["allowedPublisherIds"]
-        assert all(c.location != "top_level" for c in changes)
+        assert any(c.location == "top_level" for c in changes)
 
     def test_session_none_warns_about_consistency(self, feeds):
         feed = feed_by_id(feeds, 922)
@@ -253,6 +264,15 @@ class TestRemovePublisher:
         op = RemovePublisher(publisher_id=999)
         changes, _ = op.apply(feed)
         assert changes == []
+
+    def test_session_regular_on_non_equity_raises(self, feeds):
+        # Non-US-equity feeds have no per-session REGULAR roster (only top-level).
+        # --session REGULAR must error rather than silently editing top-level.
+        feed = feed_by_id(feeds, 1)
+        target = feed["allowedPublisherIds"][0]
+        op = RemovePublisher(publisher_id=target, session="REGULAR")
+        with pytest.raises(OpError, match="session.*does not exist"):
+            op.apply(feed)
 
     def test_warns_when_at_or_below_min_publishers(self, feeds):
         feed = feed_by_id(feeds, 922)

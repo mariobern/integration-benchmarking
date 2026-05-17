@@ -222,6 +222,15 @@ class RemovePublisher:
                 )
             )
         elif self.session == "ALL":
+            # Mirror AddPublisher: "ALL" means top-level + every per-session list.
+            if "allowedPublisherIds" in feed:
+                targets.append(
+                    (
+                        "top_level",
+                        feed["allowedPublisherIds"],
+                        feed.get("minPublishers"),
+                    )
+                )
             for name in SESSION_NAMES:
                 sess = get_session(feed, name)
                 if sess and "allowedPublisherIds" in sess:

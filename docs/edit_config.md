@@ -40,9 +40,13 @@ python3 tools/edit-config/edit_config.py --config after.json [OPERATION] [TARGET
 
 `--session {REGULAR,PRE_MARKET,POST_MARKET,OVER_NIGHT,ALL,NONE}`
 
-Defaults: top-level + REGULAR for equity feeds with sessions; top-level only for non-equity. `NONE` = top-level only. `ALL` = top-level + all 4 sessions.
+Default (no `--session`): top-level + REGULAR for equity feeds with per-session rosters; top-level only for feeds without per-session rosters (crypto, fx, commodity, metals, rates, single-session equities, etc.).
 
-`remove_publisher` default differs: removes from EVERYWHERE in this feed.
+- `NONE` = top-level only.
+- `ALL` = top-level + every per-session roster. Symmetric for add and remove. Errors if the feed has no per-session rosters.
+- Explicit `REGULAR`/`PRE_MARKET`/`POST_MARKET`/`OVER_NIGHT` = that session roster only (no top-level). Errors if the named session has no roster on this feed — on non-per-session feeds, drop `--session` entirely and use the default scope to edit top-level.
+
+`remove_publisher` default differs: removes from EVERYWHERE in this feed (top-level + every per-session roster present).
 
 ### Execution
 
