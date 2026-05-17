@@ -227,6 +227,26 @@ def ticker_to_ric_base(ticker: str) -> str:
     return upper
 
 
+def _root_length(ticker: str) -> int:
+    """Length of the base ticker before any class-letter suffix.
+
+    A trailing `.X` or `-X` where X is a single alphabetic character is treated
+    as a class-letter suffix and stripped before measuring. Other dotted suffixes
+    (e.g. `.WS` for warrants) are preserved.
+
+    Examples:
+        IBM    -> 3
+        TWTR   -> 4
+        BRK.B  -> 3
+        BRK-B  -> 3
+        FOO.WS -> 6
+    """
+    upper = ticker.upper()
+    if len(upper) >= 2 and upper[-2] in ".-" and upper[-1].isalpha():
+        return len(upper) - 2
+    return len(upper)
+
+
 class EquityResolver:
     """Resolve US equity/ETF tickers to RICs using NASDAQ Trader."""
 

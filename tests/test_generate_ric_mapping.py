@@ -427,6 +427,56 @@ class TestEquityIndexFuturesResolver:
         assert resolve_equity_futures_ric("Equity.US.US30U5/USD") == "YMU25"
 
 
+class TestRootLength:
+    """Length of the base ticker before any class-letter suffix."""
+
+    def test_three_char_plain(self):
+        from generate_ric_mapping import _root_length
+
+        assert _root_length("IBM") == 3
+
+    def test_four_char_plain(self):
+        from generate_ric_mapping import _root_length
+
+        assert _root_length("TWTR") == 4
+
+    def test_dotted_class_letter(self):
+        from generate_ric_mapping import _root_length
+
+        assert _root_length("BRK.B") == 3
+
+    def test_dotted_class_letter_lowercase(self):
+        from generate_ric_mapping import _root_length
+
+        assert _root_length("brk.b") == 3
+
+    def test_hyphenated_class_letter(self):
+        from generate_ric_mapping import _root_length
+
+        assert _root_length("BRK-B") == 3
+
+    def test_single_char_ticker(self):
+        from generate_ric_mapping import _root_length
+
+        assert _root_length("A") == 1
+
+    def test_two_char_ticker(self):
+        from generate_ric_mapping import _root_length
+
+        assert _root_length("AB") == 2
+
+    def test_four_char_no_dot(self):
+        from generate_ric_mapping import _root_length
+
+        assert _root_length("BABA") == 4
+
+    def test_dotted_non_class_suffix_not_stripped(self):
+        # ".WS" (warrants) is not a single class letter, so it should NOT be stripped.
+        from generate_ric_mapping import _root_length
+
+        assert _root_length("FOO.WS") == 6
+
+
 class TestEquityResolver:
     def test_nasdaq_ticker(self, tmp_path):
         from generate_ric_mapping import EquityResolver
