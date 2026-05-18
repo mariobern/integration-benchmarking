@@ -195,7 +195,7 @@ from edit_config_lib.config_text_surgery import find_ric_identifier_spans
 
 
 def test_find_ric_identifier_spans_single_empty():
-    block = '''{
+    block = """{
   "feedId": 884,
   "marketSchedules": [
     {
@@ -211,7 +211,7 @@ def test_find_ric_identifier_spans_single_empty():
       }
     }
   ]
-}'''
+}"""
     spans = find_ric_identifier_spans(block)
     assert len(spans) == 1
     start, end, value = spans[0]
@@ -220,7 +220,7 @@ def test_find_ric_identifier_spans_single_empty():
 
 
 def test_find_ric_identifier_spans_populated_is_returned_too():
-    block = '''{
+    block = """{
   "marketSchedules": [
     {
       "benchmarkMapping": {
@@ -232,7 +232,7 @@ def test_find_ric_identifier_spans_populated_is_returned_too():
       }
     }
   ]
-}'''
+}"""
     spans = find_ric_identifier_spans(block)
     assert len(spans) == 1
     start, end, value = spans[0]
@@ -241,12 +241,12 @@ def test_find_ric_identifier_spans_populated_is_returned_too():
 
 
 def test_find_ric_identifier_spans_multiple_schedules():
-    block = '''{
+    block = """{
   "marketSchedules": [
     {"benchmarkMapping": {"datascope_ric": {"identifiers": [{"identifier": ""}]}}},
     {"benchmarkMapping": {"datascope_ric": {"identifiers": [{"identifier": "X"}]}}}
   ]
-}'''
+}"""
     spans = find_ric_identifier_spans(block)
     assert [v for _, _, v in spans] == ["", "X"]
     assert spans[0][0] < spans[1][0]

@@ -496,9 +496,9 @@ def test_set_ric_mapping_fills_empty_identifier():
     assert warnings == []
     # working copy was updated
     assert (
-        feed["marketSchedules"][0]["benchmarkMapping"]["datascope_ric"][
-            "identifiers"
-        ][0]["identifier"]
+        feed["marketSchedules"][0]["benchmarkMapping"]["datascope_ric"]["identifiers"][
+            0
+        ]["identifier"]
         == "0002.HK"
     )
 
