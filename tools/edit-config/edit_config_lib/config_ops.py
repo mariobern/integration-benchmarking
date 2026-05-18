@@ -479,6 +479,87 @@ class BumpMinPublishers:
 
 VALID_STATES = ("STABLE", "COMING_SOON", "INACTIVE")
 
+
+@dataclass
+class SetRicMapping:
+    """Fill empty `datascope_ric.identifiers[].identifier` slots from a CSV-derived mapping.
+
+    `prefix_to_ric` maps a feed-symbol prefix (e.g. `"Equity.HK.0700-HK/"`)
+    to the RIC string to write (e.g. `"0700.HK"`).
+
+    Per-slot semantics:
+      - empty string  -> Change (fill with the RIC).
+      - any non-empty -> Warning (skipped, no overwrite).
+
+    Per-feed semantics:
+      - feed.symbol does not match any prefix -> silent skip (no warnings).
+      - feed has no datascope_ric.identifiers[] slots -> Warning.
+    """
+
+    prefix_to_ric: dict[str, str]
+
+    def apply(self, feed: dict) -> tuple[list[Change], list[Warning]]:
+        feed_id = feed["feedId"]
+        symbol = feed.get("symbol", "")
+
+        ric = None
+        for prefix, candidate in self.prefix_to_ric.items():
+            if symbol.startswith(prefix):
+                ric = candidate
+                break
+        if ric is None:
+            return [], []
+
+        slots: list[dict] = []
+        for schedule in feed.get("marketSchedules", []):
+            bm = schedule.get("benchmarkMapping", {})
+            ds = bm.get("datascope_ric", {})
+            for ident in ds.get("identifiers", []) or []:
+                if isinstance(ident, dict) and "identifier" in ident:
+                    slots.append(ident)
+
+        if not slots:
+            return [], [
+                Warning(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    message=(
+                        f"feed {feed_id}: no datascope_ric identifier slots — skipped"
+                    ),
+                )
+            ]
+
+        changes: list[Change] = []
+        warnings: list[Warning] = []
+        for i, slot in enumerate(slots):
+            current = slot["identifier"]
+            if current == "":
+                changes.append(
+                    Change(
+                        feed_id=feed_id,
+                        symbol=symbol,
+                        location="datascope_ric_identifier",
+                        field="identifier",
+                        before="",
+                        after=ric,
+                        index=i,
+                    )
+                )
+                slot["identifier"] = ric
+            else:
+                warnings.append(
+                    Warning(
+                        feed_id=feed_id,
+                        symbol=symbol,
+                        message=(
+                            f"feed {feed_id}: identifier slot {i} already populated "
+                            f"({current!r}) — skipped"
+                        ),
+                    )
+                )
+        return changes, warnings
+
+
 _STATE_WARNINGS = {
     ("STABLE", "COMING_SOON"): "regression: STABLE feed downgraded to COMING_SOON",
     ("STABLE", "INACTIVE"): "deactivation of live STABLE feed",
