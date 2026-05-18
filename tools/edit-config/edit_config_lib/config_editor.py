@@ -330,6 +330,7 @@ from edit_config_lib.config_text_surgery import (
     find_int_field_span,
     find_string_field_span,
     find_matching_close,
+    find_ric_identifier_spans,
 )
 
 
@@ -359,7 +360,26 @@ def _apply_changes_to_feed_block(block: str, changes: list[Change]) -> str:
             if ms_close is not None:
                 ms_match = (ms_open, ms_close + 1)
 
+    # Pre-compute ric identifier spans once if any change targets them.
+    ric_spans: list[tuple[int, int, str]] | None = None
+    if any(c.location == "datascope_ric_identifier" for c in changes):
+        ric_spans = find_ric_identifier_spans(block)
+
     for change in changes:
+        if change.location == "datascope_ric_identifier":
+            assert ric_spans is not None
+            if change.index is None:
+                raise RuntimeError("datascope_ric_identifier change missing index")
+            if change.index >= len(ric_spans):
+                raise RuntimeError(
+                    f"identifier slot index {change.index} out of range "
+                    f"({len(ric_spans)} slots)"
+                )
+            start_rel, end_rel, _current = ric_spans[change.index]
+            replacement = f'"{change.after}"'
+            edits.append((start_rel, end_rel, replacement))
+            continue
+
         if change.location == "top_level":
             scope_block, scope_offset = block, 0
             # For top-level int fields, scope the lookup to the tail after marketSchedules.
