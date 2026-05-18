@@ -201,9 +201,7 @@ def _render_benchmark_skeleton(identifier: str, prop_indent: str) -> str:
     identifier. Used when the feed has no original benchmarkMapping."""
     bm = {
         "datascope_ric": {
-            "identifiers": [
-                {"identifier": identifier, "validFrom": VALID_FROM_EPOCH}
-            ]
+            "identifiers": [{"identifier": identifier, "validFrom": VALID_FROM_EPOCH}]
         }
     }
     return _render_benchmark_mapping_from_obj(bm, prop_indent)
@@ -234,9 +232,7 @@ def _render_session_block(
     return "".join(parts)
 
 
-def _render_expanded_market_schedules(
-    feed: dict, base_indent: str = "      "
-) -> str:
+def _render_expanded_market_schedules(feed: dict, base_indent: str = "      ") -> str:
     """Render the full `"marketSchedules": [ ... ]` property text for a
     US-equity feed being expanded to 4 sessions."""
     min_pubs = feed["minPublishers"]
@@ -286,11 +282,7 @@ def _render_expanded_market_schedules(
         ),
     ]
     body = ",\n".join(blocks)
-    return (
-        f'{base_indent}"marketSchedules": [\n'
-        f"{body}\n"
-        f"{base_indent}],\n"
-    )
+    return f'{base_indent}"marketSchedules": [\n' f"{body}\n" f"{base_indent}],\n"
 
 
 def _replace_market_schedules(feed_text: str, new_ms_text: str) -> str:
@@ -350,11 +342,7 @@ def _render_single_session_with_skeleton(
     parts.append(f'{prop_indent}"session": "{session_name}"\n')
     parts.append(f"{session_indent}}}")
     block = "".join(parts)
-    return (
-        f'{base_indent}"marketSchedules": [\n'
-        f"{block}\n"
-        f"{base_indent}],\n"
-    )
+    return f'{base_indent}"marketSchedules": [\n' f"{block}\n" f"{base_indent}],\n"
 
 
 # ---------------------------------------------------------------------------
@@ -432,9 +420,8 @@ def _summarize(expand, top_non_crypto, top_no_bm, skipped) -> None:
         print(f"    expand sample: {sample}{' ...' if len(expand) > 3 else ''}")
     if top_non_crypto:
         from collections import Counter
-        prefixes = Counter(
-            ".".join(f["symbol"].split(".")[:2]) for f in top_non_crypto
-        )
+
+        prefixes = Counter(".".join(f["symbol"].split(".")[:2]) for f in top_non_crypto)
         top_pref = ", ".join(f"{p}={n}" for p, n in prefixes.most_common(6))
         print(f"    non-crypto by prefix: {top_pref}")
 
