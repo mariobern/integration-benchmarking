@@ -8,6 +8,7 @@ from edit_config_lib.ric_csv import (
     RicEntry,
     load_ric_csv,
     derive_symbol_prefix,
+    build_prefix_index,
     LoadError,
 )
 
@@ -44,9 +45,7 @@ def test_load_ric_csv_raises_on_missing_columns(tmp_path):
 def test_load_ric_csv_raises_on_duplicate_ric(tmp_path):
     p = tmp_path / "dup.csv"
     p.write_text(
-        "Exchange Code,Ticker,RIC\n"
-        "HKG,700,0700.HK\n"
-        "HKG,701,0700.HK\n",
+        "Exchange Code,Ticker,RIC\n" "HKG,700,0700.HK\n" "HKG,701,0700.HK\n",
         encoding="utf-8",
     )
     with pytest.raises(LoadError, match="duplicate RIC"):
@@ -61,3 +60,24 @@ def test_derive_symbol_prefix_hk():
 def test_derive_symbol_prefix_unknown_suffix_returns_none():
     assert derive_symbol_prefix("AAPL.O") is None
     assert derive_symbol_prefix("EUR=") is None
+
+
+def test_build_prefix_index_hk():
+    entries = [
+        RicEntry(ticker="700", ric="0700.HK", exchange_code="HKG"),
+        RicEntry(ticker="883", ric="0883.HK", exchange_code="HKG"),
+    ]
+    result = build_prefix_index(entries)
+    assert result == {
+        "Equity.HK.0700-HK/": "0700.HK",
+        "Equity.HK.0883-HK/": "0883.HK",
+    }
+
+
+def test_build_prefix_index_filters_non_hk():
+    entries = [
+        RicEntry(ticker="700", ric="0700.HK", exchange_code="HKG"),
+        RicEntry(ticker="AAPL", ric="AAPL.O", exchange_code="XNMS"),
+    ]
+    result = build_prefix_index(entries)
+    assert result == {"Equity.HK.0700-HK/": "0700.HK"}
