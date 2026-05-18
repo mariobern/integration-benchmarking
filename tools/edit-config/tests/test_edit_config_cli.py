@@ -334,3 +334,82 @@ class TestCliInProcess:
         out = capsys.readouterr().out
         assert rc == 0
         assert "@@ feedId 1" in out
+
+
+FIXTURES = Path(__file__).parent / "fixtures"
+TOOL = Path(__file__).resolve().parents[1] / "edit_config.py"
+
+
+def _run_cli_ric(args: list[str]) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(TOOL), *args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_cli_set_ric_mapping_dry_run(tmp_path):
+    config = tmp_path / "after.json"
+    shutil.copy(FIXTURES / "hk_sample.json", config)
+    csv_path = FIXTURES / "hk-syms-sample.csv"
+
+    result = _run_cli_ric(
+        [
+            "--config", str(config),
+            "--set-ric-mapping",
+            "--from-csv", str(csv_path),
+            "--dry-run",
+        ]
+    )
+    assert result.returncode == 0, result.stderr
+    assert config.read_text() == (FIXTURES / "hk_sample.json").read_text()
+    out = result.stdout + result.stderr
+    assert "884" in out
+    assert "0700.HK" in out
+
+
+def test_cli_set_ric_mapping_apply(tmp_path):
+    config = tmp_path / "after.json"
+    shutil.copy(FIXTURES / "hk_sample.json", config)
+    csv_path = FIXTURES / "hk-syms-sample.csv"
+
+    result = _run_cli_ric(
+        [
+            "--config", str(config),
+            "--set-ric-mapping",
+            "--from-csv", str(csv_path),
+        ]
+    )
+    assert result.returncode == 0, result.stderr
+    data = json.loads(config.read_text())
+    feeds_by_id = {f["feedId"]: f for f in data["feeds"]}
+    assert (
+        feeds_by_id[884]["marketSchedules"][0]["benchmarkMapping"][
+            "datascope_ric"
+        ]["identifiers"][0]["identifier"]
+        == "0700.HK"
+    )
+    assert (
+        feeds_by_id[885]["marketSchedules"][0]["benchmarkMapping"][
+            "datascope_ric"
+        ]["identifiers"][0]["identifier"]
+        == "STALE.HK"
+    )
+    assert (
+        feeds_by_id[886]["marketSchedules"][0]["benchmarkMapping"][
+            "datascope_ric"
+        ]["identifiers"][0]["identifier"]
+        == ""
+    )
+    assert feeds_by_id[1000]["symbol"] == "Crypto.BTC/USD"
+
+
+def test_cli_set_ric_mapping_requires_from_csv(tmp_path):
+    config = tmp_path / "after.json"
+    shutil.copy(FIXTURES / "hk_sample.json", config)
+    result = _run_cli_ric(
+        ["--config", str(config), "--set-ric-mapping"]
+    )
+    assert result.returncode != 0
+    assert "--from-csv" in (result.stdout + result.stderr)
