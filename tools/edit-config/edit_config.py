@@ -22,6 +22,37 @@ from edit_config_lib.config_editor import (  # noqa: E402
     simulate_plan,
     write_with_backup,
 )
+from edit_config_lib.config_ops import Change, SetRicMapping, Warning  # noqa: E402
+
+
+def _set_ric_mapping_summary_lines(
+    op: SetRicMapping,
+    changes: list[Change],
+    warnings: list[Warning],
+) -> list[str]:
+    """Return extra summary lines for a SetRicMapping operation."""
+    fills = sorted(
+        {c.after for c in changes if c.location == "datascope_ric_identifier"}
+    )
+    # Determine which RICs triggered a skip-warning (matched a feed but already populated).
+    skip_rics: set[str] = set()
+    for w in warnings:
+        if "already populated" not in w.message:
+            continue
+        for prefix, ric in op.prefix_to_ric.items():
+            if w.symbol.startswith(prefix):
+                skip_rics.add(ric)
+                break
+    consumed = set(fills) | skip_rics
+    unmatched = sorted(r for r in op.prefix_to_ric.values() if r not in consumed)
+    unmatched_detail = f"  ({', '.join(unmatched)})" if unmatched else ""
+    return [
+        "",
+        "RIC mapping summary:",
+        f"  identifiers filled:   {len(fills)}",
+        f"  identifiers skipped:  {len(skip_rics)}  (already populated)",
+        f"  CSV rows unmatched:   {len(unmatched)}{unmatched_detail}",
+    ]
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -163,6 +194,14 @@ def main(argv: list[str] | None = None) -> int:
             f"(reactivate via --set-state to edit)."
         )
     print(summary)
+
+    # Per-op supplementary summaries.
+    for planned in plan:
+        if isinstance(planned.op, SetRicMapping):
+            for line in _set_ric_mapping_summary_lines(
+                planned.op, result.changes, result.warnings
+            ):
+                print(line)
 
     if not is_apply:
         print("[DRY RUN] No changes written. Re-run with --apply to write.")
