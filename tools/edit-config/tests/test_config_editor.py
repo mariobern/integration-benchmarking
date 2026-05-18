@@ -686,6 +686,93 @@ class TestWriteWithBackup:
         assert (tmp_path / "after.json.bak").read_text() == "ORIGINAL"
 
 
+class TestApplyChangesRicIdentifier:
+    def test_apply_changes_fills_ric_identifier(self):
+        raw = """{
+  "feeds": [
+    {
+      "feedId": 884,
+      "symbol": "Equity.HK.0002-HK/HKD",
+      "marketSchedules": [
+        {
+          "benchmarkMapping": {
+            "datascope_ric": {
+              "identifiers": [
+                {
+                  "identifier": "",
+                  "validFrom": "1970-01-01T00:00:00.000000000Z"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}"""
+        changes = [
+            Change(
+                feed_id=884,
+                symbol="Equity.HK.0002-HK/HKD",
+                location="datascope_ric_identifier",
+                field="identifier",
+                before="",
+                after="0002.HK",
+                index=0,
+            )
+        ]
+        out = apply_changes(raw, changes)
+        assert '"identifier": "0002.HK"' in out
+        # Everything else byte-identical.
+        assert out.replace('"identifier": "0002.HK"', '"identifier": ""') == raw
+
+    def test_apply_changes_fills_correct_slot_index(self):
+        raw = """{
+  "feeds": [
+    {
+      "feedId": 1,
+      "symbol": "S",
+      "marketSchedules": [
+        {
+          "benchmarkMapping": {
+            "datascope_ric": {
+              "identifiers": [
+                {"identifier": ""},
+                {"identifier": ""}
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}"""
+        changes = [
+            Change(
+                feed_id=1,
+                symbol="S",
+                location="datascope_ric_identifier",
+                field="identifier",
+                before="",
+                after="B",
+                index=1,
+            ),
+            Change(
+                feed_id=1,
+                symbol="S",
+                location="datascope_ric_identifier",
+                field="identifier",
+                before="",
+                after="A",
+                index=0,
+            ),
+        ]
+        out = apply_changes(raw, changes)
+        a_pos = out.find('"identifier": "A"')
+        b_pos = out.find('"identifier": "B"')
+        assert 0 <= a_pos < b_pos
+
+
 class TestRunLinter:
     def test_runs_existing_linter_on_fixture(self, tmp_path):
         # Copy the fixture so we don't run on the real after.json
