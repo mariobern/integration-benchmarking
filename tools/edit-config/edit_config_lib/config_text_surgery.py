@@ -169,3 +169,36 @@ def find_string_field_span(block: str, key: str) -> tuple[int, int] | None:
     if match is None:
         return None
     return (match.start(1), match.end(1))
+
+
+def find_ric_identifier_spans(block: str) -> list[tuple[int, int, str]]:
+    """Locate every `"identifier"` string value inside any
+    `datascope_ric.identifiers[]` array within `block`.
+
+    Returns (start, end, current_value) per slot in document order.
+    `start..end` covers the value INCLUDING the surrounding double quotes.
+    """
+    out: list[tuple[int, int, str]] = []
+    for dm in re.finditer(r'"datascope_ric"\s*:\s*\{', block):
+        dr_open = dm.end() - 1
+        dr_close = find_matching_close(block, dr_open)
+        if dr_close is None:
+            continue
+        dr_block = block[dr_open : dr_close + 1]
+        ids_match = re.search(r'"identifiers"\s*:\s*\[', dr_block)
+        if ids_match is None:
+            continue
+        ids_open_rel = ids_match.end() - 1
+        ids_close_rel = find_matching_close(dr_block, ids_open_rel)
+        if ids_close_rel is None:
+            continue
+        ids_block = dr_block[ids_open_rel : ids_close_rel + 1]
+        for m in re.finditer(
+            r'"identifier"\s*:\s*("[^"\\]*(?:\\.[^"\\]*)*")', ids_block
+        ):
+            abs_start = dr_open + ids_open_rel + m.start(1)
+            abs_end = dr_open + ids_open_rel + m.end(1)
+            value = block[abs_start + 1 : abs_end - 1]
+            out.append((abs_start, abs_end, value))
+    out.sort(key=lambda t: t[0])
+    return out
