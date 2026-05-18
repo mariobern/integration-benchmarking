@@ -189,3 +189,74 @@ class TestFindStringFieldSpan:
         assert feed[s] == '"'
         assert feed[e - 1] == '"'
         assert feed[s:e] == '"STABLE"'
+
+
+from edit_config_lib.config_text_surgery import find_ric_identifier_spans
+
+
+def test_find_ric_identifier_spans_single_empty():
+    block = '''{
+  "feedId": 884,
+  "marketSchedules": [
+    {
+      "benchmarkMapping": {
+        "datascope_ric": {
+          "identifiers": [
+            {
+              "identifier": "",
+              "validFrom": "1970-01-01T00:00:00.000000000Z"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}'''
+    spans = find_ric_identifier_spans(block)
+    assert len(spans) == 1
+    start, end, value = spans[0]
+    assert block[start:end] == '""'
+    assert value == ""
+
+
+def test_find_ric_identifier_spans_populated_is_returned_too():
+    block = '''{
+  "marketSchedules": [
+    {
+      "benchmarkMapping": {
+        "datascope_ric": {
+          "identifiers": [
+            {"identifier": "0700.HK", "validFrom": "1970-01-01T00:00:00.000000000Z"}
+          ]
+        }
+      }
+    }
+  ]
+}'''
+    spans = find_ric_identifier_spans(block)
+    assert len(spans) == 1
+    start, end, value = spans[0]
+    assert block[start:end] == '"0700.HK"'
+    assert value == "0700.HK"
+
+
+def test_find_ric_identifier_spans_multiple_schedules():
+    block = '''{
+  "marketSchedules": [
+    {"benchmarkMapping": {"datascope_ric": {"identifiers": [{"identifier": ""}]}}},
+    {"benchmarkMapping": {"datascope_ric": {"identifiers": [{"identifier": "X"}]}}}
+  ]
+}'''
+    spans = find_ric_identifier_spans(block)
+    assert [v for _, _, v in spans] == ["", "X"]
+    assert spans[0][0] < spans[1][0]
+
+
+def test_find_ric_identifier_spans_no_datascope_ric():
+    block = '{"marketSchedules": [{"benchmarkMapping": {}}]}'
+    assert find_ric_identifier_spans(block) == []
+
+
+def test_find_ric_identifier_spans_no_marketSchedules():
+    block = '{"feedId": 1}'
+    assert find_ric_identifier_spans(block) == []
