@@ -21,10 +21,11 @@ class Change:
 
     feed_id: int
     symbol: str
-    location: str  # "top_level" or one of SESSION_NAMES
-    field: str  # "allowedPublisherIds", "minPublishers", "state"
+    location: str  # "top_level", a SESSION_NAME, or "datascope_ric_identifier"
+    field: str  # "allowedPublisherIds", "minPublishers", "state", "identifier"
     before: Any
     after: Any
+    index: int | None = None  # for list-positional fields (e.g. ric identifier slot)
 
 
 @dataclass(frozen=True)
