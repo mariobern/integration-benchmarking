@@ -773,6 +773,26 @@ class TestApplyChangesRicIdentifier:
         assert 0 <= a_pos < b_pos
 
 
+def test_parse_yaml_spec_set_ric_mapping(tmp_path):
+    from pathlib import Path
+    from edit_config_lib.config_editor import parse_yaml_spec
+    from edit_config_lib.config_ops import SetRicMapping
+
+    csv_path = Path(__file__).parent / "fixtures" / "hk-syms-sample.csv"
+    spec = tmp_path / "spec.yaml"
+    spec.write_text(
+        "version: 1\n"
+        "operations:\n"
+        f"  - op: set_ric_mapping\n"
+        f"    from_csv: {csv_path}\n",
+        encoding="utf-8",
+    )
+    planned = parse_yaml_spec(str(spec))
+    assert len(planned) == 1
+    assert isinstance(planned[0].op, SetRicMapping)
+    assert "Equity.HK.0700-HK/" in planned[0].op.prefix_to_ric
+
+
 class TestRunLinter:
     def test_runs_existing_linter_on_fixture(self, tmp_path):
         # Copy the fixture so we don't run on the real after.json
