@@ -416,3 +416,27 @@ def test_cli_set_ric_mapping_requires_from_csv(tmp_path):
     result = _run_cli_ric(["--config", str(config), "--set-ric-mapping"])
     assert result.returncode != 0
     assert "--from-csv" in (result.stdout + result.stderr)
+
+
+def test_cli_set_ric_mapping_reports_unmatched_csv_rows(tmp_path):
+    """RIC mapping summary block appears, and unmatched RIC 1211.HK is listed."""
+    config = tmp_path / "after.json"
+    shutil.copy(FIXTURES / "hk_sample.json", config)
+    csv_path = FIXTURES / "hk-syms-sample.csv"
+
+    result = _run_cli_ric(
+        [
+            "--config",
+            str(config),
+            "--set-ric-mapping",
+            "--from-csv",
+            str(csv_path),
+            "--apply",
+        ]
+    )
+    assert result.returncode == 0, result.stderr
+    out = result.stdout + result.stderr
+    assert "RIC mapping summary" in out
+    assert "1211.HK" in out  # unmatched — no feed in fixture has this symbol
+    assert "0700.HK" in out  # filled into feed 884
+    assert "885" in out  # skipped feed (already populated)
