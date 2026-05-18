@@ -43,6 +43,17 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     op_group.add_argument("--set-state", choices=("STABLE", "COMING_SOON", "INACTIVE"))
     op_group.add_argument("--from-spec", type=str, help="YAML spec path")
+    op_group.add_argument(
+        "--set-ric-mapping",
+        action="store_true",
+        help="Fill empty datascope_ric.identifier values from a CSV (use --from-csv).",
+    )
+
+    p.add_argument(
+        "--from-csv",
+        type=str,
+        help="CSV path for --set-ric-mapping (LSEG-style: requires Ticker, RIC, Exchange Code columns).",
+    )
 
     # Targeting
     p.add_argument(

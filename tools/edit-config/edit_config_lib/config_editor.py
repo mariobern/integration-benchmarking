@@ -47,7 +47,9 @@ from edit_config_lib.config_ops import (
     SetMinPublishers,
     BumpMinPublishers,
     SetState,
+    SetRicMapping,
 )
+from edit_config_lib.ric_csv import load_ric_csv, build_prefix_index, LoadError
 from edit_config_lib.config_selector import parse_selector_text, read_selector_file
 
 
@@ -63,6 +65,7 @@ _OP_FLAGS = (
     "set_min_publishers",
     "bump_min_publishers",
     "set_state",
+    "set_ric_mapping",
 )
 
 
@@ -92,23 +95,48 @@ def _parse_signed_int(s: str) -> int:
     return int(s)
 
 
+def _flag_set(args, name: str) -> bool:
+    val = getattr(args, name, None)
+    if name == "set_ric_mapping":
+        return bool(val)
+    return val is not None
+
+
 def build_op_from_args(args) -> list[PlannedOp]:
     """Build a single-element PlannedOp list from argparse Namespace.
 
     Raises ValueError on missing/multiple operation flags, missing
     targeting, etc.
     """
-    selected = [name for name in _OP_FLAGS if getattr(args, name) is not None]
+    selected = [name for name in _OP_FLAGS if _flag_set(args, name)]
     if not selected:
         raise ValueError(
             "no operation specified (use one of --add-publisher, "
             "--remove-publisher, --set-min-publishers, "
-            "--bump-min-publishers, --set-state)"
+            "--bump-min-publishers, --set-state, --set-ric-mapping)"
         )
     if len(selected) > 1:
         raise ValueError(f"exactly one operation flag allowed; got {selected}")
 
     name = selected[0]
+
+    if name == "set_ric_mapping":
+        if not getattr(args, "from_csv", None):
+            raise ValueError("--set-ric-mapping requires --from-csv PATH")
+        try:
+            entries = load_ric_csv(args.from_csv)
+        except LoadError as e:
+            raise ValueError(str(e)) from e
+        prefix_to_ric = build_prefix_index(entries)
+        if not prefix_to_ric:
+            raise ValueError(
+                f"--from-csv {args.from_csv}: no rows produced a known feed prefix "
+                f"(v1 supports HK rows only)"
+            )
+        op = SetRicMapping(prefix_to_ric=prefix_to_ric)
+        filters = FilterSet()  # matches every feed; deliberately skip validate()
+        return [PlannedOp(op=op, filters=filters)]
+
     filters = _build_filters_from_args(args)
 
     if name == "add_publisher":

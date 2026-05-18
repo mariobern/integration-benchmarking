@@ -23,7 +23,7 @@
           "marketSchedule": "Asia/Hong_Kong;C"
         }
       ],
-      "metadata": {"asset_type": "Equity"},
+      "metadata": { "asset_type": "Equity" },
       "minChannel": "REAL_TIME",
       "minPublishers": 1,
       "state": "COMING_SOON",
@@ -51,7 +51,7 @@
           "marketSchedule": "Asia/Hong_Kong;C"
         }
       ],
-      "metadata": {"asset_type": "Equity"},
+      "metadata": { "asset_type": "Equity" },
       "minChannel": "REAL_TIME",
       "minPublishers": 1,
       "state": "COMING_SOON",
@@ -79,7 +79,7 @@
           "marketSchedule": "Asia/Hong_Kong;C"
         }
       ],
-      "metadata": {"asset_type": "Equity"},
+      "metadata": { "asset_type": "Equity" },
       "minChannel": "REAL_TIME",
       "minPublishers": 1,
       "state": "COMING_SOON",
@@ -93,7 +93,7 @@
       "isEnabledInShard": true,
       "kind": "PRICE",
       "marketSchedules": [],
-      "metadata": {"asset_type": "Crypto"},
+      "metadata": { "asset_type": "Crypto" },
       "minChannel": "REAL_TIME",
       "minPublishers": 1,
       "state": "STABLE",
