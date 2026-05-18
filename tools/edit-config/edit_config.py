@@ -31,9 +31,8 @@ def _set_ric_mapping_summary_lines(
     warnings: list[Warning],
 ) -> list[str]:
     """Return extra summary lines for a SetRicMapping operation."""
-    fills = sorted(
-        {c.after for c in changes if c.location == "datascope_ric_identifier"}
-    )
+    fill_count = sum(1 for c in changes if c.location == "datascope_ric_identifier")
+    filled_rics = {c.after for c in changes if c.location == "datascope_ric_identifier"}
     # Determine which RICs triggered a skip-warning (matched a feed but already populated).
     skip_rics: set[str] = set()
     for w in warnings:
@@ -43,13 +42,13 @@ def _set_ric_mapping_summary_lines(
             if w.symbol.startswith(prefix):
                 skip_rics.add(ric)
                 break
-    consumed = set(fills) | skip_rics
+    consumed = filled_rics | skip_rics
     unmatched = sorted(r for r in op.prefix_to_ric.values() if r not in consumed)
     unmatched_detail = f"  ({', '.join(unmatched)})" if unmatched else ""
     return [
         "",
         "RIC mapping summary:",
-        f"  identifiers filled:   {len(fills)}",
+        f"  identifiers filled:   {fill_count}",
         f"  identifiers skipped:  {len(skip_rics)}  (already populated)",
         f"  CSV rows unmatched:   {len(unmatched)}{unmatched_detail}",
     ]

@@ -95,9 +95,13 @@ def _parse_signed_int(s: str) -> int:
     return int(s)
 
 
+# store_true flags default to False; other op flags default to None.
+_BOOL_OP_FLAGS = frozenset({"set_ric_mapping"})
+
+
 def _flag_set(args, name: str) -> bool:
     val = getattr(args, name, None)
-    if name == "set_ric_mapping":
+    if name in _BOOL_OP_FLAGS:
         return bool(val)
     return val is not None
 
