@@ -59,6 +59,33 @@ def test_dry_run_does_not_modify(config_copy):
     assert config_copy.read_bytes() == before
 
 
+def test_apply_preserves_compact_formatting(config_copy):
+    """Regression: --apply must not expand compact arrays.
+
+    Before the text-surgery refactor, --apply re-serialized via
+    json.dump(indent=2) which expanded every array, blowing up file size
+    by ~16% and line count by ~50%. This test pins that behavior.
+    """
+    before_lines = config_copy.read_text().count("\n")
+    r = _run(
+        [
+            "--config",
+            str(config_copy),
+            "--remove-session",
+            "OVER_NIGHT",
+            "--feed-id",
+            "922",
+            "--apply",
+            "--no-backup",
+        ]
+    )
+    assert r.returncode == 0, r.stderr
+    after_lines = config_copy.read_text().count("\n")
+    # Removing one OVER_NIGHT block should drop ~10 lines, not add hundreds.
+    assert after_lines < before_lines, (before_lines, after_lines)
+    assert before_lines - after_lines < 30, (before_lines, after_lines)
+
+
 def test_apply_writes_backup_and_changes(config_copy):
     r = _run(
         [

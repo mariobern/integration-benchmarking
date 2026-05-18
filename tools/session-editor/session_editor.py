@@ -179,13 +179,49 @@ def _summarize_outcomes(plan, outcomes_per_op) -> None:
             print(f"  {n:>5}  {reason}")
 
 
-def _atomic_write(path: Path, data: dict) -> None:
+def _atomic_write_text(path: Path, text: str) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
-    text = json.dumps(data, indent=2)
-    if not text.endswith("\n"):
-        text += "\n"
     tmp.write_text(text, encoding="utf-8")
     tmp.replace(path)
+
+
+def _build_text_edits(plan, outcomes_per_op, raw: str):
+    """Translate successful per-feed outcomes into TextEdits on raw JSON.
+
+    Returns (edits, errors). Skips outcomes where action != added/removed.
+    """
+    from session_editor_lib.text_apply import (
+        TextApplyError,
+        plan_add_session,
+        plan_remove_session,
+    )
+    from session_editor_lib.ops import AddSession, RemoveSession
+
+    edits = []
+    errors = []
+    for item, op_outcomes in zip(plan, outcomes_per_op):
+        op = item.op
+        for outcome in op_outcomes:
+            if outcome.action not in ("added", "removed"):
+                continue
+            try:
+                if isinstance(op, RemoveSession):
+                    edit = plan_remove_session(raw, outcome.feed_id, op.session)
+                elif isinstance(op, AddSession):
+                    edit = plan_add_session(
+                        raw,
+                        outcome.feed_id,
+                        op.session,
+                        op.min_publishers,
+                    )
+                else:
+                    continue
+            except TextApplyError as e:
+                errors.append(f"feedId={outcome.feed_id} {op.session}: {e}")
+                continue
+            if edit is not None:
+                edits.append(edit)
+    return edits, errors
 
 
 def _verify_templates(feeds: list[dict]) -> int:
@@ -221,7 +257,8 @@ def _verify_templates(feeds: list[dict]) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     config_path = Path(args.config)
-    data = json.loads(config_path.read_text(encoding="utf-8"))
+    raw_text = config_path.read_text(encoding="utf-8")
+    data = json.loads(raw_text)
     feeds = data["feeds"]
     print(f"Reading {config_path} ({len(feeds)} feeds)...")
 
@@ -279,14 +316,29 @@ def main(argv: list[str] | None = None) -> int:
         print("Nothing to apply.")
         return 0
 
+    # Translate the simulation outcomes into text-level edits so the file's
+    # original formatting (compact arrays, etc.) is preserved.
+    edits, text_errors = _build_text_edits(plan, result.outcomes, raw_text)
+    if text_errors:
+        print("ERROR: could not translate plan to text edits:", file=sys.stderr)
+        for err in text_errors:
+            print(f"  {err}", file=sys.stderr)
+        return 3
+    if not edits:
+        print("Nothing to apply.")
+        return 0
+
+    from session_editor_lib.text_apply import apply_edits
+
+    new_text = apply_edits(raw_text, edits)
+
     if not args.no_backup:
         backup = config_path.with_suffix(config_path.suffix + ".bak")
         backup.write_bytes(config_path.read_bytes())
         print(f"Wrote backup → {backup}")
 
-    data["feeds"] = result.after_feeds
-    _atomic_write(config_path, data)
-    print(f"Applied. Wrote {config_path}.")
+    _atomic_write_text(config_path, new_text)
+    print(f"Applied {len(edits)} text edit(s). Wrote {config_path}.")
     return 0
 
 
