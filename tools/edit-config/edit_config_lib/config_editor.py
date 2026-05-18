@@ -165,6 +165,7 @@ _OP_REQUIRED_FIELDS = {
     "set_min_publishers": {"value"},
     "bump_min_publishers": {"delta"},
     "set_state": {"value"},
+    "set_ric_mapping": {"from_csv"},
 }
 
 _TARGETING_KEYS = {
@@ -253,6 +254,17 @@ def _build_op_from_yaml_entry(entry: dict):
         return BumpMinPublishers(delta=entry["delta"], session=session)
     if op_name == "set_state":
         return SetState(value=entry["value"])
+    if op_name == "set_ric_mapping":
+        try:
+            entries = load_ric_csv(entry["from_csv"])
+        except LoadError as e:
+            raise ValueError(str(e))
+        prefix_to_ric = build_prefix_index(entries)
+        if not prefix_to_ric:
+            raise ValueError(
+                f"set_ric_mapping from_csv {entry['from_csv']!r}: no rows produced a known feed prefix"
+            )
+        return SetRicMapping(prefix_to_ric=prefix_to_ric)
     raise AssertionError(f"unhandled op {op_name}")
 
 
@@ -275,7 +287,10 @@ def parse_yaml_spec(path: str) -> list[PlannedOp]:
         if "op" not in entry:
             raise ValueError(f"operation #{i + 1}: missing 'op' field")
         op = _build_op_from_yaml_entry(entry)
-        filters = _filters_from_yaml_entry(entry)
+        if entry["op"] == "set_ric_mapping":
+            filters = FilterSet()  # CSV is the selector
+        else:
+            filters = _filters_from_yaml_entry(entry)
         planned.append(PlannedOp(op=op, filters=filters))
 
     return planned
