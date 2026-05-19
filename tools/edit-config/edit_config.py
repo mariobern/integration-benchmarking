@@ -158,8 +158,20 @@ def main(argv: list[str] | None = None) -> int:
     print("Plan:")
     for i, planned in enumerate(plan, start=1):
         op_type = type(planned.op).__name__
-        matched = result.matched_counts[i - 1]
-        print(f"  [{i}] {op_type} → {matched} feed(s) matched")
+        if isinstance(planned.op, SetRicMapping):
+            # No FilterSet for this op — CSV prefixes are the real selector.
+            # Count feeds whose symbol matches any CSV-derived prefix.
+            prefixes = tuple(planned.op.prefix_to_ric.keys())
+            csv_matched = sum(
+                1 for f in feeds if f.get("symbol", "").startswith(prefixes)
+            )
+            print(
+                f"  [{i}] {op_type} → {csv_matched} feed(s) matched by CSV prefix "
+                f"(see RIC mapping summary below)"
+            )
+        else:
+            matched = result.matched_counts[i - 1]
+            print(f"  [{i}] {op_type} → {matched} feed(s) matched")
 
     # Errors and warnings
     print()

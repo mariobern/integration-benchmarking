@@ -55,25 +55,28 @@ def load_ric_csv(path: str) -> list[RicEntry]:
     return entries
 
 
-def derive_symbol_prefix(ric: str) -> str | None:
-    """Map a RIC to the expected Lazer feed symbol prefix.
+def derive_symbol_prefixes(ric: str) -> list[str]:
+    """Map a RIC to the candidate Lazer feed symbol prefixes.
 
-    v1 supports only HK equities: `NNNN.HK` -> `Equity.HK.NNNN-HK/`.
-    Returns None for RICs we don't know how to map.
+    v1 supports only HK equities: `NNNN.HK` -> both `Equity.HK.NNNN-HK/`
+    (legacy form) and `Equity.HK.NNNN/` (current form).
+    Returns [] for RICs we don't know how to map.
     """
     if ric.endswith(".HK"):
         head = ric[: -len(".HK")]
         if head.isdigit():
-            return f"Equity.HK.{head}-HK/"
-    return None
+            return [f"Equity.HK.{head}-HK/", f"Equity.HK.{head}/"]
+    return []
 
 
 def build_prefix_index(entries: list[RicEntry]) -> dict[str, str]:
-    """Build `{symbol_prefix: ric}` for entries with a derivable prefix."""
+    """Build `{symbol_prefix: ric}` for entries with derivable prefix(es).
+
+    An entry may contribute multiple prefixes (e.g. HK feeds support both
+    `Equity.HK.NNNN-HK/` and `Equity.HK.NNNN/`); all map to the same RIC.
+    """
     out: dict[str, str] = {}
     for e in entries:
-        prefix = derive_symbol_prefix(e.ric)
-        if prefix is None:
-            continue
-        out[prefix] = e.ric
+        for prefix in derive_symbol_prefixes(e.ric):
+            out[prefix] = e.ric
     return out
