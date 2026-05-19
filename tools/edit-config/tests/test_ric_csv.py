@@ -7,7 +7,7 @@ import pytest
 from edit_config_lib.ric_csv import (
     RicEntry,
     load_ric_csv,
-    derive_symbol_prefix,
+    derive_symbol_prefixes,
     build_prefix_index,
     LoadError,
 )
@@ -52,14 +52,20 @@ def test_load_ric_csv_raises_on_duplicate_ric(tmp_path):
         load_ric_csv(str(p))
 
 
-def test_derive_symbol_prefix_hk():
-    assert derive_symbol_prefix("0700.HK") == "Equity.HK.0700-HK/"
-    assert derive_symbol_prefix("0002.HK") == "Equity.HK.0002-HK/"
+def test_derive_symbol_prefixes_hk():
+    assert derive_symbol_prefixes("0700.HK") == [
+        "Equity.HK.0700-HK/",
+        "Equity.HK.0700/",
+    ]
+    assert derive_symbol_prefixes("0002.HK") == [
+        "Equity.HK.0002-HK/",
+        "Equity.HK.0002/",
+    ]
 
 
-def test_derive_symbol_prefix_unknown_suffix_returns_none():
-    assert derive_symbol_prefix("AAPL.O") is None
-    assert derive_symbol_prefix("EUR=") is None
+def test_derive_symbol_prefixes_unknown_suffix_returns_empty():
+    assert derive_symbol_prefixes("AAPL.O") == []
+    assert derive_symbol_prefixes("EUR=") == []
 
 
 def test_build_prefix_index_hk():
@@ -70,7 +76,9 @@ def test_build_prefix_index_hk():
     result = build_prefix_index(entries)
     assert result == {
         "Equity.HK.0700-HK/": "0700.HK",
+        "Equity.HK.0700/": "0700.HK",
         "Equity.HK.0883-HK/": "0883.HK",
+        "Equity.HK.0883/": "0883.HK",
     }
 
 
@@ -80,4 +88,7 @@ def test_build_prefix_index_filters_non_hk():
         RicEntry(ticker="AAPL", ric="AAPL.O", exchange_code="XNMS"),
     ]
     result = build_prefix_index(entries)
-    assert result == {"Equity.HK.0700-HK/": "0700.HK"}
+    assert result == {
+        "Equity.HK.0700-HK/": "0700.HK",
+        "Equity.HK.0700/": "0700.HK",
+    }
