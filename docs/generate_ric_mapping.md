@@ -2,7 +2,7 @@
 
 ## Overview
 
-`generate_ric_mapping.py` generates `pyth_mappings_export`-format CSV files for onboarding new tickers into Datascope benchmarking. Given ticker(s), looks them up in `lazer_symbols.json`, derives the Reuters Instrument Code (RIC) using asset-class-specific rules, and outputs a CSV ready for Datascope instrument onboarding. Supports all benchmarkable asset classes.
+`generate_ric_mapping.py` generates `pyth_mappings_export`-format CSV files for onboarding new tickers into Datascope benchmarking. Given ticker(s) or feed ID(s), looks them up in the reference file (`after.json` by default; `lazer_symbols.json` also supported), derives the Reuters Instrument Code (RIC) using asset-class-specific rules, and outputs a CSV ready for Datascope instrument onboarding. Supports all benchmarkable asset classes.
 
 ## Running RIC Mapping Generator
 
@@ -16,14 +16,17 @@ python generate_ric_mapping.py --ticker AAPL EURUSD AUDCAD XAUUSD CCH6 US10Y EMH
 # From a file (one ticker per line or CSV)
 python generate_ric_mapping.py --ticker-file new_tickers.txt
 
+# By feed ID (feedId in after.json / pyth_lazer_id in lazer_symbols.json)
+python generate_ric_mapping.py --feed-id 922 327 346
+
 # Custom output path
 python generate_ric_mapping.py --ticker AAPL --output my_mappings.csv
 
 # Append to existing pyth_mappings file
 python generate_ric_mapping.py --ticker AAPL --append-to pyth_mappings_export.csv
 
-# Custom lazer_symbols.json path
-python generate_ric_mapping.py --ticker AAPL --symbols after.json
+# Use lazer_symbols.json instead of the default after.json
+python generate_ric_mapping.py --ticker AAPL --symbols lazer_symbols.json
 
 # Force re-download NASDAQ Trader data
 python generate_ric_mapping.py --ticker AAPL --force-refresh
@@ -31,14 +34,17 @@ python generate_ric_mapping.py --ticker AAPL --force-refresh
 
 ## Arguments
 
-| Argument          | Description                                    | Default              |
-| ----------------- | ---------------------------------------------- | -------------------- |
-| `--ticker`        | Ticker(s) to resolve (space-separated)         | -                    |
-| `--ticker-file`   | File with tickers (one per line or CSV)        | -                    |
-| `--output`        | Output CSV path                                | `ric_mappings.csv`   |
-| `--symbols`       | Path to lazer_symbols.json                     | `lazer_symbols.json` |
-| `--force-refresh` | Re-download NASDAQ Trader data                 | False                |
-| `--append-to`     | Append to existing CSV instead of creating new | -                    |
+One of `--ticker`, `--ticker-file`, or `--feed-id` is required (mutually exclusive).
+
+| Argument          | Description                                                                 | Default            |
+| ----------------- | --------------------------------------------------------------------------- | ------------------ |
+| `--ticker`        | Ticker(s) to resolve (space-separated)                                      | -                  |
+| `--ticker-file`   | File with tickers (one per line or CSV)                                     | -                  |
+| `--feed-id`       | Feed ID(s) to resolve (`feedId` in after.json / `pyth_lazer_id` in symbols) | -                  |
+| `--output`        | Output CSV path                                                             | `ric_mappings.csv` |
+| `--symbols`       | Reference file path; `after.json` or `lazer_symbols.json` (auto-detected)   | `after.json`       |
+| `--force-refresh` | Re-download NASDAQ Trader data                                              | False              |
+| `--append-to`     | Append to existing CSV instead of creating new                              | -                  |
 
 ## RIC Resolution Rules
 
@@ -68,7 +74,7 @@ HGH26,RIC,future.cch6,Commodities.CCH6/USD,2931,1970-01-01 00:00:00,,CCH6,COPPER
 ## Edge Cases
 
 - **Dotted tickers** (BRK.B) -- RIC uses `BRKb.N` format (lowercase class, no dot)
-- **Duplicate names** in lazer_symbols.json (e.g., AAPL with `.EXT` suffix, AAL as GB and US equity) -- prefers US, non-EXT, benchmarkable entries
+- **Duplicate names** in the reference file (e.g., AAPL with `.EXT` suffix, AAL as GB and US equity) -- prefers US, non-EXT, benchmarkable entries
 - **Non-benchmarkable assets** (crypto, funding-rate, nav, etc.) -- skipped with warning
 - **Non-US equities** (Equity.GB.\_, Equity.FR.\_) -- out of scope, skipped with warning
 - **Unknown tickers** -- warning with fuzzy match suggestion
@@ -102,4 +108,8 @@ print(result.confidence)   # medium
 
 # Batch resolve
 results = resolver.resolve_batch(["AAPL", "EURUSD", "CCH6", "US10Y"])
+
+# Resolve by feed ID
+result = resolver.resolve_by_id(922)
+results = resolver.resolve_ids_batch([922, 327, 346])
 ```

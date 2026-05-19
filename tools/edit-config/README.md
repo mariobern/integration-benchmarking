@@ -29,6 +29,15 @@ python3 tools/edit-config/edit_config.py --config after.json \
 | `tests/`                                 | pytest suite (unit, integration, CLI)                         |
 | `tests/fixtures/`                        | Sample `after.json` slice and YAML specs                      |
 
+## Operations
+
+- `--add-publisher / --remove-publisher` — manage allowed publishers per feed
+- `--set-min-publishers / --bump-min-publishers` — control minimum quorum
+- `--set-state` — change feed state (STABLE / COMING_SOON / INACTIVE)
+- `--set-ric-mapping --from-csv PATH` — fill empty `datascope_ric.identifier`
+  values from an LSEG CSV (HK equities in v1). See
+  [docs/edit_config.md#--set-ric-mapping--fill-empty-datascope_ric-identifiers](../../docs/edit_config.md#--set-ric-mapping--fill-empty-datascope_ric-identifiers).
+
 ## Docs
 
 - Full reference: [`docs/edit_config.md`](../../docs/edit_config.md)

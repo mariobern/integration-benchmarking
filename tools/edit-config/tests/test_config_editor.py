@@ -686,6 +686,113 @@ class TestWriteWithBackup:
         assert (tmp_path / "after.json.bak").read_text() == "ORIGINAL"
 
 
+class TestApplyChangesRicIdentifier:
+    def test_apply_changes_fills_ric_identifier(self):
+        raw = """{
+  "feeds": [
+    {
+      "feedId": 884,
+      "symbol": "Equity.HK.0002-HK/HKD",
+      "marketSchedules": [
+        {
+          "benchmarkMapping": {
+            "datascope_ric": {
+              "identifiers": [
+                {
+                  "identifier": "",
+                  "validFrom": "1970-01-01T00:00:00.000000000Z"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}"""
+        changes = [
+            Change(
+                feed_id=884,
+                symbol="Equity.HK.0002-HK/HKD",
+                location="datascope_ric_identifier",
+                field="identifier",
+                before="",
+                after="0002.HK",
+                index=0,
+            )
+        ]
+        out = apply_changes(raw, changes)
+        assert '"identifier": "0002.HK"' in out
+        # Everything else byte-identical.
+        assert out.replace('"identifier": "0002.HK"', '"identifier": ""') == raw
+
+    def test_apply_changes_fills_correct_slot_index(self):
+        raw = """{
+  "feeds": [
+    {
+      "feedId": 1,
+      "symbol": "S",
+      "marketSchedules": [
+        {
+          "benchmarkMapping": {
+            "datascope_ric": {
+              "identifiers": [
+                {"identifier": ""},
+                {"identifier": ""}
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}"""
+        changes = [
+            Change(
+                feed_id=1,
+                symbol="S",
+                location="datascope_ric_identifier",
+                field="identifier",
+                before="",
+                after="B",
+                index=1,
+            ),
+            Change(
+                feed_id=1,
+                symbol="S",
+                location="datascope_ric_identifier",
+                field="identifier",
+                before="",
+                after="A",
+                index=0,
+            ),
+        ]
+        out = apply_changes(raw, changes)
+        a_pos = out.find('"identifier": "A"')
+        b_pos = out.find('"identifier": "B"')
+        assert 0 <= a_pos < b_pos
+
+
+def test_parse_yaml_spec_set_ric_mapping(tmp_path):
+    from pathlib import Path
+    from edit_config_lib.config_editor import parse_yaml_spec
+    from edit_config_lib.config_ops import SetRicMapping
+
+    csv_path = Path(__file__).parent / "fixtures" / "hk-syms-sample.csv"
+    spec = tmp_path / "spec.yaml"
+    spec.write_text(
+        "version: 1\n"
+        "operations:\n"
+        f"  - op: set_ric_mapping\n"
+        f"    from_csv: {csv_path}\n",
+        encoding="utf-8",
+    )
+    planned = parse_yaml_spec(str(spec))
+    assert len(planned) == 1
+    assert isinstance(planned[0].op, SetRicMapping)
+    assert "Equity.HK.0700-HK/" in planned[0].op.prefix_to_ric
+
+
 class TestRunLinter:
     def test_runs_existing_linter_on_fixture(self, tmp_path):
         # Copy the fixture so we don't run on the real after.json

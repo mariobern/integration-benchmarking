@@ -47,7 +47,9 @@ from edit_config_lib.config_ops import (
     SetMinPublishers,
     BumpMinPublishers,
     SetState,
+    SetRicMapping,
 )
+from edit_config_lib.ric_csv import load_ric_csv, build_prefix_index, LoadError
 from edit_config_lib.config_selector import parse_selector_text, read_selector_file
 
 
@@ -63,6 +65,7 @@ _OP_FLAGS = (
     "set_min_publishers",
     "bump_min_publishers",
     "set_state",
+    "set_ric_mapping",
 )
 
 
@@ -92,23 +95,52 @@ def _parse_signed_int(s: str) -> int:
     return int(s)
 
 
+# store_true flags default to False; other op flags default to None.
+_BOOL_OP_FLAGS = frozenset({"set_ric_mapping"})
+
+
+def _flag_set(args, name: str) -> bool:
+    val = getattr(args, name, None)
+    if name in _BOOL_OP_FLAGS:
+        return bool(val)
+    return val is not None
+
+
 def build_op_from_args(args) -> list[PlannedOp]:
     """Build a single-element PlannedOp list from argparse Namespace.
 
     Raises ValueError on missing/multiple operation flags, missing
     targeting, etc.
     """
-    selected = [name for name in _OP_FLAGS if getattr(args, name) is not None]
+    selected = [name for name in _OP_FLAGS if _flag_set(args, name)]
     if not selected:
         raise ValueError(
             "no operation specified (use one of --add-publisher, "
             "--remove-publisher, --set-min-publishers, "
-            "--bump-min-publishers, --set-state)"
+            "--bump-min-publishers, --set-state, --set-ric-mapping)"
         )
     if len(selected) > 1:
         raise ValueError(f"exactly one operation flag allowed; got {selected}")
 
     name = selected[0]
+
+    if name == "set_ric_mapping":
+        if not getattr(args, "from_csv", None):
+            raise ValueError("--set-ric-mapping requires --from-csv PATH")
+        try:
+            entries = load_ric_csv(args.from_csv)
+        except LoadError as e:
+            raise ValueError(str(e)) from e
+        prefix_to_ric = build_prefix_index(entries)
+        if not prefix_to_ric:
+            raise ValueError(
+                f"--from-csv {args.from_csv}: no rows produced a known feed prefix "
+                f"(v1 supports HK rows only)"
+            )
+        op = SetRicMapping(prefix_to_ric=prefix_to_ric)
+        filters = FilterSet()  # matches every feed; deliberately skip validate()
+        return [PlannedOp(op=op, filters=filters)]
+
     filters = _build_filters_from_args(args)
 
     if name == "add_publisher":
@@ -137,6 +169,7 @@ _OP_REQUIRED_FIELDS = {
     "set_min_publishers": {"value"},
     "bump_min_publishers": {"delta"},
     "set_state": {"value"},
+    "set_ric_mapping": {"from_csv"},
 }
 
 _TARGETING_KEYS = {
@@ -225,6 +258,17 @@ def _build_op_from_yaml_entry(entry: dict):
         return BumpMinPublishers(delta=entry["delta"], session=session)
     if op_name == "set_state":
         return SetState(value=entry["value"])
+    if op_name == "set_ric_mapping":
+        try:
+            entries = load_ric_csv(entry["from_csv"])
+        except LoadError as e:
+            raise ValueError(str(e))
+        prefix_to_ric = build_prefix_index(entries)
+        if not prefix_to_ric:
+            raise ValueError(
+                f"set_ric_mapping from_csv {entry['from_csv']!r}: no rows produced a known feed prefix"
+            )
+        return SetRicMapping(prefix_to_ric=prefix_to_ric)
     raise AssertionError(f"unhandled op {op_name}")
 
 
@@ -247,7 +291,10 @@ def parse_yaml_spec(path: str) -> list[PlannedOp]:
         if "op" not in entry:
             raise ValueError(f"operation #{i + 1}: missing 'op' field")
         op = _build_op_from_yaml_entry(entry)
-        filters = _filters_from_yaml_entry(entry)
+        if entry["op"] == "set_ric_mapping":
+            filters = FilterSet()  # CSV is the selector
+        else:
+            filters = _filters_from_yaml_entry(entry)
         planned.append(PlannedOp(op=op, filters=filters))
 
     return planned
@@ -330,6 +377,7 @@ from edit_config_lib.config_text_surgery import (
     find_int_field_span,
     find_string_field_span,
     find_matching_close,
+    find_ric_identifier_spans,
 )
 
 
@@ -359,7 +407,26 @@ def _apply_changes_to_feed_block(block: str, changes: list[Change]) -> str:
             if ms_close is not None:
                 ms_match = (ms_open, ms_close + 1)
 
+    # Pre-compute ric identifier spans once if any change targets them.
+    ric_spans: list[tuple[int, int, str]] | None = None
+    if any(c.location == "datascope_ric_identifier" for c in changes):
+        ric_spans = find_ric_identifier_spans(block)
+
     for change in changes:
+        if change.location == "datascope_ric_identifier":
+            assert ric_spans is not None
+            if change.index is None:
+                raise RuntimeError("datascope_ric_identifier change missing index")
+            if change.index >= len(ric_spans):
+                raise RuntimeError(
+                    f"identifier slot index {change.index} out of range "
+                    f"({len(ric_spans)} slots)"
+                )
+            start_rel, end_rel, _current = ric_spans[change.index]
+            replacement = f'"{change.after}"'
+            edits.append((start_rel, end_rel, replacement))
+            continue
+
         if change.location == "top_level":
             scope_block, scope_offset = block, 0
             # For top-level int fields, scope the lookup to the tail after marketSchedules.

@@ -2,7 +2,8 @@
 """
 Universal RIC Mapping Generator for Pyth Network.
 
-Given ticker(s), looks them up in lazer_symbols.json, derives the Reuters
+Given ticker(s) or feed ID(s), looks them up in the reference file
+(after.json by default, or lazer_symbols.json), derives the Reuters
 Instrument Code (RIC) using asset-class-specific rules, and outputs a CSV
 matching the pyth_mappings_export format for Datascope onboarding.
 
@@ -13,7 +14,9 @@ Usage:
     python generate_ric_mapping.py --ticker AAPL
     python generate_ric_mapping.py --ticker AAPL AUDCAD CCH6 XAU US10Y
     python generate_ric_mapping.py --ticker-file new_tickers.txt
+    python generate_ric_mapping.py --feed-id 922 327 346
     python generate_ric_mapping.py --ticker AAPL --output my_mappings.csv
+    python generate_ric_mapping.py --ticker AAPL --symbols lazer_symbols.json
 """
 
 import argparse
@@ -28,7 +31,7 @@ from typing import Optional
 
 # --- Constants ---
 
-DEFAULT_SYMBOLS_PATH = Path("lazer_symbols.json")
+DEFAULT_SYMBOLS_PATH = Path("after.json")
 
 # Asset types that have Datascope benchmarks (RIC-resolvable)
 BENCHMARKABLE_ASSET_TYPES = {"equity", "fx", "metal", "commodity", "rates"}
@@ -390,12 +393,46 @@ class RICResult:
 # --- Symbol Index ---
 
 
+def _normalize_after_feed(feed: dict) -> dict:
+    """Flatten an after.json feed entry into the lazer_symbols.json entry shape.
+
+    after.json nests name/description/asset_type under `metadata`, and uses
+    `feedId` instead of `pyth_lazer_id`. Mapping both formats to one shape lets
+    the rest of this module stay format-agnostic.
+    """
+    meta = feed.get("metadata") or {}
+    return {
+        "pyth_lazer_id": feed.get("feedId"),
+        "name": meta.get("name", ""),
+        "symbol": feed.get("symbol", ""),
+        "description": meta.get("description", ""),
+        "asset_type": meta.get("asset_type", ""),
+        "quote_currency": meta.get("quote_currency", ""),
+    }
+
+
+def _load_entries(raw) -> list[dict]:
+    """Accept either a flat list (lazer_symbols.json) or {"feeds": [...]} (after.json)."""
+    if isinstance(raw, dict) and "feeds" in raw:
+        feeds = raw.get("feeds") or []
+        if not isinstance(feeds, list):
+            raise ValueError("Malformed reference file: 'feeds' must be a list")
+        return [_normalize_after_feed(f) for f in feeds]
+    if not isinstance(raw, list):
+        raise ValueError(
+            "Malformed reference file: expected a list (lazer_symbols.json) "
+            "or an object with a 'feeds' list (after.json)"
+        )
+    return raw
+
+
 class SymbolIndex:
     """Index over lazer_symbols.json for fast ticker lookups."""
 
     def __init__(self, symbols_path: Path = DEFAULT_SYMBOLS_PATH) -> None:
         with open(symbols_path) as f:
-            self._entries: list[dict] = json.load(f)
+            raw = json.load(f)
+        self._entries: list[dict] = _load_entries(raw)
 
         # Build indexes
         self._by_name: dict[str, dict] = {}
@@ -558,9 +595,16 @@ class RICResolver:
         if not entry:
             return RICResult(
                 ticker=ticker,
-                warnings=[f"Ticker '{ticker}' not found in lazer_symbols.json"],
+                warnings=[f"Ticker '{ticker}' not found in reference file"],
             )
+        return self._resolve_from_entry(entry, ticker)
 
+    def _resolve_from_entry(self, entry: dict, ticker: str) -> RICResult:
+        """Run the asset-class dispatch on a pre-fetched entry.
+
+        Used by both name-based and feedId-based resolution so the latter can
+        bypass name-collision preference rules.
+        """
         asset_type = entry.get("asset_type", "")
         symbol = entry.get("symbol", "")
         description = entry.get("description", "")
@@ -645,6 +689,25 @@ class RICResolver:
     def resolve_batch(self, tickers: list[str]) -> list[RICResult]:
         """Resolve multiple tickers."""
         return [self.resolve(t) for t in tickers]
+
+    def resolve_by_id(self, feed_id: int) -> RICResult:
+        """Resolve a feed by its numeric ID (feedId / pyth_lazer_id).
+
+        Goes directly through the entry rather than re-looking-up by name,
+        so duplicate-name preference rules don't silently redirect to a
+        different feed than the one requested.
+        """
+        entry = self._index.lookup_by_id(feed_id)
+        if not entry:
+            return RICResult(
+                ticker=str(feed_id),
+                warnings=[f"feedId {feed_id} not found in reference file"],
+            )
+        display = entry.get("name") or str(feed_id)
+        return self._resolve_from_entry(entry, display)
+
+    def resolve_ids_batch(self, feed_ids: list[int]) -> list[RICResult]:
+        return [self.resolve_by_id(fid) for fid in feed_ids]
 
 
 # --- CSV Output ---
@@ -770,14 +833,21 @@ Examples:
   python generate_ric_mapping.py --ticker AAPL
   python generate_ric_mapping.py --ticker AAPL AUDCAD CCH6 XAU US10Y
   python generate_ric_mapping.py --ticker-file new_tickers.txt
+  python generate_ric_mapping.py --feed-id 922 327 346
   python generate_ric_mapping.py --ticker AAPL --output my_mappings.csv
-  python generate_ric_mapping.py --ticker AAPL --symbols after.json
+  python generate_ric_mapping.py --ticker AAPL --symbols lazer_symbols.json
 """,
     )
 
     input_group = parser.add_mutually_exclusive_group(required=True)
     input_group.add_argument("--ticker", nargs="+", help="Ticker(s) to resolve")
     input_group.add_argument("--ticker-file", type=Path, help="File with tickers")
+    input_group.add_argument(
+        "--feed-id",
+        nargs="+",
+        type=int,
+        help="Feed ID(s) to resolve (feedId in after.json / pyth_lazer_id in lazer_symbols.json)",
+    )
 
     parser.add_argument(
         "--output",
@@ -789,7 +859,7 @@ Examples:
         "--symbols",
         type=Path,
         default=DEFAULT_SYMBOLS_PATH,
-        help="Path to lazer_symbols.json",
+        help="Path to reference file: after.json (default) or lazer_symbols.json (auto-detected)",
     )
     parser.add_argument(
         "--force-refresh", action="store_true", help="Re-download NASDAQ Trader data"
@@ -807,25 +877,29 @@ Examples:
         print(f"Error: {args.symbols} not found", file=sys.stderr)
         sys.exit(1)
 
-    if args.ticker:
-        tickers = args.ticker
-    else:
-        if not args.ticker_file.exists():
-            print(f"Error: {args.ticker_file} not found", file=sys.stderr)
-            sys.exit(1)
-        tickers = parse_tickers_from_file(args.ticker_file)
-
-    if not tickers:
-        print("Error: No tickers provided", file=sys.stderr)
-        sys.exit(1)
-
-    print(f"Resolving RICs for {len(tickers)} ticker(s)...")
     resolver = RICResolver(
         symbols_path=args.symbols,
         force_refresh=args.force_refresh,
     )
 
-    results = resolver.resolve_batch(tickers)
+    if args.feed_id:
+        print(f"Resolving RICs for {len(args.feed_id)} feed ID(s)...")
+        results = resolver.resolve_ids_batch(args.feed_id)
+    else:
+        if args.ticker:
+            tickers = args.ticker
+        else:
+            if not args.ticker_file.exists():
+                print(f"Error: {args.ticker_file} not found", file=sys.stderr)
+                sys.exit(1)
+            tickers = parse_tickers_from_file(args.ticker_file)
+
+        if not tickers:
+            print("Error: No tickers provided", file=sys.stderr)
+            sys.exit(1)
+
+        print(f"Resolving RICs for {len(tickers)} ticker(s)...")
+        results = resolver.resolve_batch(tickers)
     print_summary(results)
 
     output_path = args.append_to or args.output

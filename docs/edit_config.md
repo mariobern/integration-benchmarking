@@ -24,6 +24,7 @@ python3 tools/edit-config/edit_config.py --config after.json [OPERATION] [TARGET
 | `--set-min-publishers INT`                  | Set `minPublishers` to a value                        |
 | `--bump-min-publishers ±INT`                | Adjust `minPublishers` by signed delta (clamped at 1) |
 | `--set-state STABLE\|COMING_SOON\|INACTIVE` | Change feed state                                     |
+| `--set-ric-mapping --from-csv PATH`         | Fill empty `datascope_ric.identifier` values          |
 | `--from-spec PATH`                          | Apply a batched YAML spec (multiple ops)              |
 
 ### Targeting (≥1 required when not using `--from-spec`)
@@ -68,6 +69,41 @@ python3 tools/config-linter/config_linter.py --config after.json
 
 - `0` — success (warnings allowed)
 - `1` — validation or runtime error (no write happens)
+
+### `--set-ric-mapping` — fill empty `datascope_ric` identifiers
+
+Backfills `marketSchedules[].benchmarkMapping.datascope_ric.identifiers[].identifier`
+values from an LSEG-style CSV. Useful when feeds are bootstrapped with empty
+identifier strings and the RICs are delivered separately.
+
+```bash
+python3 tools/edit-config/edit_config.py \
+    --config after.json \
+    --set-ric-mapping \
+    --from-csv hk-syms.csv
+```
+
+(Default is dry-run; add `--apply` to write changes.)
+
+The CSV must have `Ticker`, `RIC`, and `Exchange Code` columns. v1 supports HK
+equities only — rows whose RIC does not map to a known feed-symbol prefix are
+reported as unmatched in the summary.
+
+Per-slot rules:
+
+- Empty `identifier` → filled with the CSV RIC.
+- Non-empty `identifier` → skipped (warning emitted, never overwritten).
+- Feed symbol with no CSV match → feed left untouched (no warning).
+- CSV row that matched no feed → reported in summary.
+
+YAML spec form:
+
+```yaml
+version: 1
+operations:
+  - op: set_ric_mapping
+    from_csv: hk-syms.csv
+```
 
 ## YAML spec format
 

@@ -142,6 +142,49 @@ class TestSymbolIndex:
         assert entry is not None
         assert entry["name"] == "AAPL"
 
+    def test_after_json_format(self, tmp_path):
+        """SymbolIndex should accept the after.json shape (dict with 'feeds')."""
+        from generate_ric_mapping import SymbolIndex
+
+        after = {
+            "feeds": [
+                {
+                    "feedId": 922,
+                    "symbol": "Equity.US.AAPL/USD",
+                    "state": "STABLE",
+                    "metadata": {
+                        "asset_type": "equity",
+                        "name": "AAPL",
+                        "description": "APPLE INC",
+                        "quote_currency": "USD",
+                    },
+                },
+                {
+                    "feedId": 327,
+                    "symbol": "FX.EUR/USD",
+                    "metadata": {
+                        "asset_type": "fx",
+                        "name": "EURUSD",
+                        "description": "EURO / US DOLLAR",
+                        "quote_currency": "USD",
+                    },
+                },
+            ]
+        }
+        p = tmp_path / "after.json"
+        p.write_text(json.dumps(after))
+        idx = SymbolIndex(p)
+
+        by_name = idx.lookup("AAPL")
+        assert by_name is not None
+        assert by_name["symbol"] == "Equity.US.AAPL/USD"
+        assert by_name["asset_type"] == "equity"
+        assert by_name["pyth_lazer_id"] == 922
+
+        by_id = idx.lookup_by_id(327)
+        assert by_id is not None
+        assert by_id["name"] == "EURUSD"
+
 
 class TestFXResolver:
     def test_usd_pair_base_eur(self):
@@ -766,6 +809,57 @@ class TestRICResolver:
         result = resolver.resolve("RSK6")
         assert result.ric == "SBK26"
         assert result.asset_class == "Commodity Future"
+
+    def test_resolve_by_feed_id(self, symbols_path, tmp_path):
+        """Resolving by feedId should return the same result as resolving by name."""
+        from generate_ric_mapping import RICResolver
+
+        resolver = RICResolver(symbols_path, equity_cache_dir=tmp_path / "nasdaq")
+        by_id = resolver.resolve_by_id(327)
+        assert by_id.pyth_lazer_id == 327
+        assert by_id.asset_class == "Forex"
+        assert by_id.ric == "EUR="
+
+    def test_resolve_by_feed_id_not_found(self, symbols_path):
+        from generate_ric_mapping import RICResolver
+
+        resolver = RICResolver(symbols_path)
+        result = resolver.resolve_by_id(99999999)
+        assert result.ric == ""
+        assert any("99999999" in w for w in result.warnings)
+
+    def test_resolve_by_feed_id_name_collision(self, tmp_path):
+        """When two feeds share a name, resolve_by_id must honor the requested ID,
+        not the name-preference winner."""
+        from generate_ric_mapping import RICResolver
+
+        # Two FX feeds with the same name but different feedIds and symbols
+        collision = [
+            {
+                "pyth_lazer_id": 1001,
+                "name": "EURUSD",
+                "symbol": "FX.EUR/USD",
+                "description": "EURO / US DOLLAR",
+                "asset_type": "fx",
+                "quote_currency": "USD",
+            },
+            {
+                "pyth_lazer_id": 1002,
+                "name": "EURUSD",
+                "symbol": "FX.EUR/USD.EXT",
+                "description": "EURO / US DOLLAR (EXT)",
+                "asset_type": "fx",
+                "quote_currency": "USD",
+            },
+        ]
+        p = tmp_path / "lazer_symbols.json"
+        p.write_text(json.dumps(collision))
+        resolver = RICResolver(p)
+
+        # Requesting the non-preferred ID (1002) must return that exact entry.
+        result = resolver.resolve_by_id(1002)
+        assert result.pyth_lazer_id == 1002
+        assert result.pythnet_id == "FX.EUR/USD.EXT"
 
     def test_resolve_us500_futures(self, symbols_path):
         from generate_ric_mapping import RICResolver

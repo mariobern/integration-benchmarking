@@ -451,3 +451,110 @@ class TestSetState:
         op = SetState(value="DELETED")
         with pytest.raises(OpError, match="invalid state"):
             op.apply(feed)
+
+
+# ---------------------------------------------------------------------------
+# SetRicMapping
+# ---------------------------------------------------------------------------
+from edit_config_lib.config_ops import SetRicMapping
+
+
+def _hk_feed(feed_id: int, ticker: str, identifier: str = "") -> dict:
+    return {
+        "feedId": feed_id,
+        "symbol": f"Equity.HK.{ticker}-HK/HKD",
+        "state": "COMING_SOON",
+        "marketSchedules": [
+            {
+                "benchmarkMapping": {
+                    "datascope_ric": {
+                        "identifiers": [
+                            {
+                                "identifier": identifier,
+                                "validFrom": "1970-01-01T00:00:00.000000000Z",
+                            }
+                        ]
+                    }
+                }
+            }
+        ],
+    }
+
+
+def test_set_ric_mapping_fills_empty_identifier():
+    feed = _hk_feed(884, "0002")
+    op = SetRicMapping(prefix_to_ric={"Equity.HK.0002-HK/": "0002.HK"})
+    changes, warnings = op.apply(feed)
+    assert len(changes) == 1
+    c = changes[0]
+    assert c.feed_id == 884
+    assert c.location == "datascope_ric_identifier"
+    assert c.field == "identifier"
+    assert c.before == ""
+    assert c.after == "0002.HK"
+    assert c.index == 0
+    assert warnings == []
+    # working copy was updated
+    assert (
+        feed["marketSchedules"][0]["benchmarkMapping"]["datascope_ric"]["identifiers"][
+            0
+        ]["identifier"]
+        == "0002.HK"
+    )
+
+
+def test_set_ric_mapping_skips_populated_identifier_with_warning():
+    feed = _hk_feed(884, "0002", identifier="EXISTING.HK")
+    op = SetRicMapping(prefix_to_ric={"Equity.HK.0002-HK/": "0002.HK"})
+    changes, warnings = op.apply(feed)
+    assert changes == []
+    assert len(warnings) == 1
+    assert "already populated" in warnings[0].message
+
+
+def test_set_ric_mapping_skips_unmatched_symbol():
+    feed = _hk_feed(884, "0002")
+    op = SetRicMapping(prefix_to_ric={"Equity.HK.0700-HK/": "0700.HK"})
+    changes, warnings = op.apply(feed)
+    assert changes == []
+    assert warnings == []
+
+
+def test_set_ric_mapping_skips_feed_without_datascope_ric_structure():
+    feed = {
+        "feedId": 999,
+        "symbol": "Equity.HK.0002-HK/HKD",
+        "state": "COMING_SOON",
+        "marketSchedules": [{"benchmarkMapping": {}}],
+    }
+    op = SetRicMapping(prefix_to_ric={"Equity.HK.0002-HK/": "0002.HK"})
+    changes, warnings = op.apply(feed)
+    assert changes == []
+    assert len(warnings) == 1
+    assert "no datascope_ric identifier slots" in warnings[0].message
+
+
+def test_set_ric_mapping_handles_multi_slot_feed():
+    feed = {
+        "feedId": 884,
+        "symbol": "Equity.HK.0002-HK/HKD",
+        "state": "COMING_SOON",
+        "marketSchedules": [
+            {
+                "benchmarkMapping": {
+                    "datascope_ric": {
+                        "identifiers": [
+                            {"identifier": ""},
+                            {"identifier": "ALREADY.HK"},
+                        ]
+                    }
+                }
+            }
+        ],
+    }
+    op = SetRicMapping(prefix_to_ric={"Equity.HK.0002-HK/": "0002.HK"})
+    changes, warnings = op.apply(feed)
+    assert len(changes) == 1
+    assert changes[0].index == 0
+    assert changes[0].after == "0002.HK"
+    assert len(warnings) == 1

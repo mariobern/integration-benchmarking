@@ -1,0 +1,103 @@
+{
+  "featureFlags": {},
+  "feeds": [
+    {
+      "allowedPublisherIds": [1, 3, 4],
+      "expiryTime": "5.000000000s",
+      "exponent": -5,
+      "feedId": 884,
+      "isEnabledInShard": true,
+      "kind": "PRICE",
+      "marketSchedules": [
+        {
+          "benchmarkMapping": {
+            "datascope_ric": {
+              "identifiers": [
+                {
+                  "identifier": "",
+                  "validFrom": "1970-01-01T00:00:00.000000000Z"
+                }
+              ]
+            }
+          },
+          "marketSchedule": "Asia/Hong_Kong;C"
+        }
+      ],
+      "metadata": { "asset_type": "Equity" },
+      "minChannel": "REAL_TIME",
+      "minPublishers": 1,
+      "state": "COMING_SOON",
+      "symbol": "Equity.HK.0700-HK/HKD"
+    },
+    {
+      "allowedPublisherIds": [1, 3, 4],
+      "expiryTime": "5.000000000s",
+      "exponent": -5,
+      "feedId": 885,
+      "isEnabledInShard": true,
+      "kind": "PRICE",
+      "marketSchedules": [
+        {
+          "benchmarkMapping": {
+            "datascope_ric": {
+              "identifiers": [
+                {
+                  "identifier": "STALE.HK",
+                  "validFrom": "1970-01-01T00:00:00.000000000Z"
+                }
+              ]
+            }
+          },
+          "marketSchedule": "Asia/Hong_Kong;C"
+        }
+      ],
+      "metadata": { "asset_type": "Equity" },
+      "minChannel": "REAL_TIME",
+      "minPublishers": 1,
+      "state": "COMING_SOON",
+      "symbol": "Equity.HK.0883-HK/HKD"
+    },
+    {
+      "allowedPublisherIds": [1, 3, 4],
+      "expiryTime": "5.000000000s",
+      "exponent": -5,
+      "feedId": 886,
+      "isEnabledInShard": true,
+      "kind": "PRICE",
+      "marketSchedules": [
+        {
+          "benchmarkMapping": {
+            "datascope_ric": {
+              "identifiers": [
+                {
+                  "identifier": "",
+                  "validFrom": "1970-01-01T00:00:00.000000000Z"
+                }
+              ]
+            }
+          },
+          "marketSchedule": "Asia/Hong_Kong;C"
+        }
+      ],
+      "metadata": { "asset_type": "Equity" },
+      "minChannel": "REAL_TIME",
+      "minPublishers": 1,
+      "state": "COMING_SOON",
+      "symbol": "Equity.HK.9999-HK/HKD"
+    },
+    {
+      "allowedPublisherIds": [1, 3, 4],
+      "expiryTime": "5.000000000s",
+      "exponent": -8,
+      "feedId": 1000,
+      "isEnabledInShard": true,
+      "kind": "PRICE",
+      "marketSchedules": [],
+      "metadata": { "asset_type": "Crypto" },
+      "minChannel": "REAL_TIME",
+      "minPublishers": 1,
+      "state": "STABLE",
+      "symbol": "Crypto.BTC/USD"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+Exchange Code,Exchange Description,Ticker,RIC,Security Description,Security Long Description,Asset Category,Asset Category Description,Asset SubType,Asset SubType Description,GICS Sector Code,GICS Sector Code Description,GICS Industry Code,GICS Industry Code Description,GICS Industry Description Code,GICS Industry Description Code Description,GICS Industry Group Code,GICS Industry Group Code Description
+HKG,The Stock Exchange of Hong Kong Ltd,700,0700.HK,TENCENT ORD,Tencent Holdings Ord Shs,ORD,Ordinary,ODSH,Ordinary shares,,,,,,,,
+HKG,The Stock Exchange of Hong Kong Ltd,883,0883.HK,CNOOC ORD,CNOOC Ord Shs,ORD,Ordinary,ODSH,Ordinary shares,,,,,,,,
+HKG,The Stock Exchange of Hong Kong Ltd,1211,1211.HK,BYD ORD,BYD Ord Shs,ORD,Ordinary,ODSH,Ordinary shares,,,,,,,,
