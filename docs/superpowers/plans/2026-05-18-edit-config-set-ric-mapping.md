@@ -15,12 +15,14 @@
 ## File Structure
 
 **Create:**
+
 - `tools/edit-config/edit_config_lib/ric_csv.py` — CSV loading + HK prefix derivation.
 - `tools/edit-config/tests/test_ric_csv.py` — unit tests for CSV loader.
 - `tools/edit-config/tests/fixtures/hk_sample.json` — small fixture: empty / populated / unmatched / non-HK feeds.
 - `tools/edit-config/tests/fixtures/hk-syms-sample.csv` — matching + unmatched CSV rows.
 
 **Modify:**
+
 - `tools/edit-config/edit_config_lib/config_ops.py` — add `index` to `Change`, add `SetRicMapping` op.
 - `tools/edit-config/edit_config_lib/config_text_surgery.py` — add `find_ric_identifier_spans()`.
 - `tools/edit-config/edit_config_lib/config_editor.py` — wire CLI + YAML + apply path.
@@ -36,6 +38,7 @@
 ## Task 1: CSV loader skeleton + tests (RED)
 
 **Files:**
+
 - Create: `tools/edit-config/tests/test_ric_csv.py`
 - Create: `tools/edit-config/tests/fixtures/hk-syms-sample.csv`
 
@@ -140,6 +143,7 @@ git commit -m "test: failing tests for ric_csv loader"
 ## Task 2: CSV loader implementation (GREEN)
 
 **Files:**
+
 - Create: `tools/edit-config/edit_config_lib/ric_csv.py`
 
 - [ ] **Step 1: Implement the module**
@@ -256,6 +260,7 @@ git commit -m "feat: add ric_csv loader for LSEG-style HK CSVs"
 ## Task 3: text-surgery locator for `datascope_ric` identifier spans (RED → GREEN)
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config_lib/config_text_surgery.py`
 - Modify: `tools/edit-config/tests/test_config_text_surgery.py`
 
@@ -406,6 +411,7 @@ git commit -m "feat: locator for datascope_ric identifier spans"
 ## Task 4: Extend `Change` with `index` field
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config_lib/config_ops.py`
 
 - [ ] **Step 1: Add optional `index` to `Change`**
@@ -446,6 +452,7 @@ git commit -m "refactor: add optional index field to Change for positional edits
 ## Task 5: `SetRicMapping` op (RED)
 
 **Files:**
+
 - Modify: `tools/edit-config/tests/test_config_ops.py`
 
 - [ ] **Step 1: Add failing tests**
@@ -575,6 +582,7 @@ git commit -m "test: failing tests for SetRicMapping op"
 ## Task 6: `SetRicMapping` op (GREEN)
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config_lib/config_ops.py`
 
 - [ ] **Step 1: Implement the op**
@@ -682,6 +690,7 @@ git commit -m "feat: SetRicMapping op for filling datascope_ric identifiers"
 ## Task 7: Wire `SetRicMapping` into `apply_changes` text-surgery path (RED → GREEN)
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config_lib/config_editor.py`
 - Modify: `tools/edit-config/tests/test_config_editor.py` (if exists; otherwise extend an existing test file — see step 1)
 
@@ -859,6 +868,7 @@ git commit -m "feat: apply_changes handles datascope_ric_identifier edits"
 ## Task 8: CLI flag `--set-ric-mapping --from-csv` (RED → GREEN)
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config.py`
 - Modify: `tools/edit-config/edit_config_lib/config_editor.py`
 - Create: `tools/edit-config/tests/fixtures/hk_sample.json`
@@ -894,7 +904,7 @@ Create `tools/edit-config/tests/fixtures/hk_sample.json`. Keep the schema close 
           "marketSchedule": "Asia/Hong_Kong;C"
         }
       ],
-      "metadata": {"asset_type": "Equity"},
+      "metadata": { "asset_type": "Equity" },
       "minChannel": "REAL_TIME",
       "minPublishers": 1,
       "state": "COMING_SOON",
@@ -922,7 +932,7 @@ Create `tools/edit-config/tests/fixtures/hk_sample.json`. Keep the schema close 
           "marketSchedule": "Asia/Hong_Kong;C"
         }
       ],
-      "metadata": {"asset_type": "Equity"},
+      "metadata": { "asset_type": "Equity" },
       "minChannel": "REAL_TIME",
       "minPublishers": 1,
       "state": "COMING_SOON",
@@ -950,7 +960,7 @@ Create `tools/edit-config/tests/fixtures/hk_sample.json`. Keep the schema close 
           "marketSchedule": "Asia/Hong_Kong;C"
         }
       ],
-      "metadata": {"asset_type": "Equity"},
+      "metadata": { "asset_type": "Equity" },
       "minChannel": "REAL_TIME",
       "minPublishers": 1,
       "state": "COMING_SOON",
@@ -964,7 +974,7 @@ Create `tools/edit-config/tests/fixtures/hk_sample.json`. Keep the schema close 
       "isEnabledInShard": true,
       "kind": "PRICE",
       "marketSchedules": [],
-      "metadata": {"asset_type": "Crypto"},
+      "metadata": { "asset_type": "Crypto" },
       "minChannel": "REAL_TIME",
       "minPublishers": 1,
       "state": "STABLE",
@@ -1234,6 +1244,7 @@ git commit -m "feat: --set-ric-mapping --from-csv CLI flag"
 ## Task 9: Summary output — list unmatched CSV rows
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config_lib/config_editor.py` (or `config_diff.py` — whichever module formats the summary printed to stdout)
 
 - [ ] **Step 1: Locate where the summary is printed**
@@ -1288,6 +1299,7 @@ git commit -m "feat: report unmatched CSV rows in --set-ric-mapping summary"
 ## Task 10: YAML spec support
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config_lib/config_editor.py`
 - Modify: `tools/edit-config/tests/test_config_editor.py` (or a YAML-spec-specific test file if one exists)
 
@@ -1391,6 +1403,7 @@ git commit -m "feat: YAML spec support for set_ric_mapping op"
 ## Task 11: Documentation
 
 **Files:**
+
 - Modify: `tools/edit-config/README.md`
 - Modify: `docs/edit_config.md`
 
@@ -1462,6 +1475,7 @@ python3 tools/edit-config/edit_config.py \
 ```
 
 Verify:
+
 - Reports ~89 identifiers filled (one per CSV row that matches a feed).
 - Reports ~7 unmatched CSV rows OR ~7 feeds without a CSV match (the spec says 89 CSV vs 96 feeds — confirm which side has surplus).
 - Does NOT modify the file.
@@ -1511,6 +1525,7 @@ git commit -m "chore: pre-commit fixups"
 ## Self-Review
 
 **Spec coverage:** Every spec section is covered:
+
 - Operation + CLI shape -> Tasks 4, 6, 8
 - HK matching rule -> Task 2
 - Skip-non-empty, skip-no-match semantics -> Task 5/6

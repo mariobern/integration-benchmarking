@@ -37,9 +37,9 @@ The operation only writes the `identifier` string field. It uses the existing `c
 
 ### Matching rule (v1: HK only)
 
-| CSV `RIC`   | Expected symbol prefix    |
-| ----------- | -------------------------- |
-| `0700.HK`   | `Equity.HK.0700-HK/`       |
+| CSV `RIC` | Expected symbol prefix |
+| --------- | ---------------------- |
+| `0700.HK` | `Equity.HK.0700-HK/`   |
 
 Non-HK rows in the CSV would fail to produce a prefix and be reported as unmatched. Other exchanges can be added later as additional rules; we are intentionally not generalising in v1.
 
