@@ -52,6 +52,7 @@ feed_id,date,mode
 1021,2026-05-04,us-equities
 1060,2026-05-04,us-equities-pre
 922,2026-04-13,us-equities-overnight
+2503,2026-05-04,hk-equities
 ```
 
 - Empty rows are skipped.
@@ -60,14 +61,15 @@ feed_id,date,mode
 
 ## Time Window Resolution
 
-When `--start-time` / `--end-time` are not both provided, the window is computed per row from the `mode` column. NY-time market windows are converted to UTC via `zoneinfo` (handles EDT/EST automatically based on the date).
+When `--start-time` / `--end-time` are not both provided, the window is computed per row from the `mode` column. Local market windows are converted to UTC via `zoneinfo` (handles EDT/EST automatically based on the date; HKT is fixed UTC+8 with no DST).
 
-| Mode                                                          | NY-time window    |
-| ------------------------------------------------------------- | ----------------- |
-| `us-equities-pre`                                             | 08:30:00–09:30:00 |
-| `us-equities-post`                                            | 16:30:00–17:30:00 |
-| `us-equities-overnight`                                       | 20:00:00–21:00:00 |
-| `us-equities` _(or any other value, including unknown modes)_ | 09:30:00–10:30:00 |
+| Mode                                                          | Local window      | Timezone           |
+| ------------------------------------------------------------- | ----------------- | ------------------ |
+| `us-equities-pre`                                             | 08:30:00–09:30:00 | `America/New_York` |
+| `us-equities-post`                                            | 16:30:00–17:30:00 | `America/New_York` |
+| `us-equities-overnight`                                       | 20:00:00–21:00:00 | `America/New_York` |
+| `hk-equities`                                                 | 09:30:00–10:30:00 | `Asia/Hong_Kong`   |
+| `us-equities` _(or any other value, including unknown modes)_ | 09:30:00–10:30:00 | `America/New_York` |
 
 Providing **both** `--start-time` and `--end-time` bypasses mode-based computation for every row.
 
@@ -100,3 +102,15 @@ Exit code: `0` if all rows succeeded, `1` if any row failed.
 - **Missing CSV file** → hard error, exit `1`.
 - **Per-row engine failure** → logged, recorded in the failed list, batch continues. Final exit code is `1`.
 - **Malformed CSV row** (blank / fewer than 3 columns) → warning, row skipped.
+
+### Engine Exit Codes
+
+Per-row engine exits propagate up through the soft-failure loop. Useful codes to know:
+
+| Engine exit code | Meaning                                                                                                                                                                            |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`              | Analysis ran end-to-end; artifacts written under `--output-path`.                                                                                                                  |
+| `2`              | No benchmark data available for the feed/date/mode tuple (e.g., non-trading day, holiday, or feed not yet ingested into Datascope). Engine prints a diagnostic and skips analysis. |
+| other non-zero   | Unexpected engine error (e.g., ClickHouse connection failure). See engine stderr.                                                                                                  |
+
+All non-zero engine exits are treated as soft failures by the bulk runner and contribute to the `Failed:` list and final `1` exit code.

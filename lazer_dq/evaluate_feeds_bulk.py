@@ -27,6 +27,20 @@ def compute_times_from_mode(date: str, mode: str) -> tuple[str, str]:
     EDT/EST automatically based on the date.
     """
     mode_lower = mode.lower()
+
+    def _local_to_utc(t: str, tz: str) -> str:
+        dt = datetime.strptime(f"{date} {t}", "%Y-%m-%d %H:%M:%S")
+        dt_local = dt.replace(tzinfo=ZoneInfo(tz))
+        dt_utc = dt_local.astimezone(ZoneInfo("UTC"))
+        return dt_utc.strftime("%H:%M:%S")
+
+    # HK equities use HKEX morning-session local window, all others use NY time.
+    if mode_lower == "hk-equities":
+        return (
+            _local_to_utc("09:30:00", "Asia/Hong_Kong"),
+            _local_to_utc("10:30:00", "Asia/Hong_Kong"),
+        )
+
     if mode_lower == "us-equities-pre":
         start_ny, end_ny = "08:30:00", "09:30:00"
     elif mode_lower == "us-equities-post":
@@ -36,13 +50,10 @@ def compute_times_from_mode(date: str, mode: str) -> tuple[str, str]:
     else:
         start_ny, end_ny = "09:30:00", "10:30:00"
 
-    def _ny_to_utc(t: str) -> str:
-        dt = datetime.strptime(f"{date} {t}", "%Y-%m-%d %H:%M:%S")
-        dt_ny = dt.replace(tzinfo=ZoneInfo("America/New_York"))
-        dt_utc = dt_ny.astimezone(ZoneInfo("UTC"))
-        return dt_utc.strftime("%H:%M:%S")
-
-    return _ny_to_utc(start_ny), _ny_to_utc(end_ny)
+    return (
+        _local_to_utc(start_ny, "America/New_York"),
+        _local_to_utc(end_ny, "America/New_York"),
+    )
 
 
 def run_standalone(

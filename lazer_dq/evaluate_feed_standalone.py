@@ -12,6 +12,7 @@ Run directly:
         --cluster lazer-prod --start-time 14:30:00 --end-time 21:00:00
 """
 import argparse
+import sys
 
 # === CELL 1 ===
 import pandas as pd
@@ -841,7 +842,7 @@ def parse_args():
     parser.add_argument(
         "--mode",
         required=True,
-        help="Mode (e.g. fx, metals, us-equities, us-equities-pre, us-equities-post, us-equities-overnight, us-futures, us-treasuries)",
+        help="Mode (e.g. fx, metals, us-equities, us-equities-pre, us-equities-post, us-equities-overnight, hk-equities, us-futures, us-treasuries)",
     )
     parser.add_argument(
         "--cluster", required=True, help="Cluster name (e.g. lazer-prod)"
@@ -924,6 +925,13 @@ def main():
         connect_timeout=30,
         send_receive_timeout=300,
     )
+
+    # Initialize names that downstream branches may reference even when no
+    # publisher / price-feed / benchmark data is loaded. Without these,
+    # missing-data paths raise UnboundLocalError instead of reporting cleanly.
+    symbol = None
+    ticker = None
+    ric = None
 
     # === CELL 5 ===
     # query mapping for feed_id and exponent
@@ -1049,7 +1057,10 @@ def main():
         lazer_feed_query = None
     print("Querying Price Feed data...")
     try:
-        df_feed_data = client_lazer.query_df(lazer_feed_query)
+        if lazer_feed_query is None:
+            df_feed_data = pd.DataFrame()
+        else:
+            df_feed_data = client_lazer.query_df(lazer_feed_query)
 
         if len(df_feed_data) > 0:
             print(
@@ -1112,8 +1123,11 @@ def main():
               AND price IS NOT NULL
             ORDER BY benchmark_timestamp ASC, pyth_lazer_id
         """
-    elif (
-        mode == "us-equities" or mode == "us-equities-pre" or mode == "us-equities-post"
+    elif mode in (
+        "us-equities",
+        "us-equities-pre",
+        "us-equities-post",
+        "hk-equities",
     ):
         benchmark_query = f"""
             SELECT
@@ -1142,6 +1156,8 @@ def main():
                 AND qualifiers NOT LIKE '%132[IRGCOND]%'
                 AND qualifiers NOT LIKE '%4385[IRGCOND]%'
                 AND qualifiers NOT LIKE '%DAP[IRGCOND]%'
+                AND qualifiers NOT LIKE '%102[ODDSALCOND]%'
+                AND qualifiers NOT LIKE '%101[IRGSALCOND]%'
                 AND NOT match(qualifiers, 'PD_[A-Za-z0-9_]*')
                 )
                 )
@@ -1212,6 +1228,7 @@ def main():
             ORDER BY benchmark_timestamp ASC, pyth_lazer_id
         """
 
+    df_benchmark_data = pd.DataFrame()
     try:
         df_benchmark_data = client_analytics.query_df(benchmark_query)
 
@@ -1227,6 +1244,15 @@ def main():
             df_benchmark_data.dropna(subset=["benchmark_price"], inplace=True)
             filtered_count = original_count - len(df_benchmark_data)
 
+            # Metals benchmark is noisy; apply EMA smoothing to benchmark_price.
+            if mode == "metals":
+                df_benchmark_data.sort_values("benchmark_timestamp", inplace=True)
+                df_benchmark_data["benchmark_price"] = (
+                    df_benchmark_data["benchmark_price"]
+                    .ewm(span=10, adjust=False)
+                    .mean()
+                )
+
             print(
                 f"Benchmark data: {len(df_benchmark_data)} rows (filtered {filtered_count} rows with NaN values)"
             )
@@ -1240,6 +1266,15 @@ def main():
 
     # === CELL 12 ===
     print(df_benchmark_data.head())
+
+    # Bail out cleanly when there is no benchmark data — downstream
+    # merge_benchmark_and_publisher_data assumes a `benchmark_timestamp` column.
+    if df_benchmark_data.empty:
+        print(
+            f"No benchmark data available for feed {feed_id} on {date} "
+            f"(mode={mode}, ric={ric}, ticker={ticker}); skipping analysis."
+        )
+        sys.exit(2)
 
     # === CELL 16 bottom: run analysis ===
     df_aligned_prices, metrics_df, figs = run_analysis(
