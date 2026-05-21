@@ -102,3 +102,15 @@ Exit code: `0` if all rows succeeded, `1` if any row failed.
 - **Missing CSV file** → hard error, exit `1`.
 - **Per-row engine failure** → logged, recorded in the failed list, batch continues. Final exit code is `1`.
 - **Malformed CSV row** (blank / fewer than 3 columns) → warning, row skipped.
+
+### Engine Exit Codes
+
+Per-row engine exits propagate up through the soft-failure loop. Useful codes to know:
+
+| Engine exit code | Meaning                                                                                                                                                                            |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`              | Analysis ran end-to-end; artifacts written under `--output-path`.                                                                                                                  |
+| `2`              | No benchmark data available for the feed/date/mode tuple (e.g., non-trading day, holiday, or feed not yet ingested into Datascope). Engine prints a diagnostic and skips analysis. |
+| other non-zero   | Unexpected engine error (e.g., ClickHouse connection failure). See engine stderr.                                                                                                  |
+
+All non-zero engine exits are treated as soft failures by the bulk runner and contribute to the `Failed:` list and final `1` exit code.
