@@ -53,6 +53,30 @@ def test_time_computation_default_mode():
     )
 
 
+def test_time_computation_hk_equities():
+    # HKT is fixed UTC+8 year-round (no DST): 09:30 HKT -> 01:30 UTC, 10:30 HKT -> 02:30 UTC.
+    assert compute_times_from_mode("2026-05-04", "hk-equities") == (
+        "01:30:00",
+        "02:30:00",
+    )
+
+
+def test_time_computation_hk_equities_winter():
+    # No DST in HK — winter date must produce identical UTC times as summer.
+    assert compute_times_from_mode("2026-12-15", "hk-equities") == (
+        "01:30:00",
+        "02:30:00",
+    )
+
+
+def test_time_computation_hk_equities_case_insensitive():
+    # mode_lower normalization should accept mixed-case input.
+    assert compute_times_from_mode("2026-05-04", "HK-Equities") == (
+        "01:30:00",
+        "02:30:00",
+    )
+
+
 # ---------- run_standalone ----------
 
 

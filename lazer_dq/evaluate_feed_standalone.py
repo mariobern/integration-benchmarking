@@ -841,7 +841,7 @@ def parse_args():
     parser.add_argument(
         "--mode",
         required=True,
-        help="Mode (e.g. fx, metals, us-equities, us-equities-pre, us-equities-post, us-equities-overnight, us-futures, us-treasuries)",
+        help="Mode (e.g. fx, metals, us-equities, us-equities-pre, us-equities-post, us-equities-overnight, hk-equities, us-futures, us-treasuries)",
     )
     parser.add_argument(
         "--cluster", required=True, help="Cluster name (e.g. lazer-prod)"
@@ -1112,8 +1112,11 @@ def main():
               AND price IS NOT NULL
             ORDER BY benchmark_timestamp ASC, pyth_lazer_id
         """
-    elif (
-        mode == "us-equities" or mode == "us-equities-pre" or mode == "us-equities-post"
+    elif mode in (
+        "us-equities",
+        "us-equities-pre",
+        "us-equities-post",
+        "hk-equities",
     ):
         benchmark_query = f"""
             SELECT
@@ -1142,6 +1145,8 @@ def main():
                 AND qualifiers NOT LIKE '%132[IRGCOND]%'
                 AND qualifiers NOT LIKE '%4385[IRGCOND]%'
                 AND qualifiers NOT LIKE '%DAP[IRGCOND]%'
+                AND qualifiers NOT LIKE '%102[ODDSALCOND]%'
+                AND qualifiers NOT LIKE '%101[IRGSALCOND]%'
                 AND NOT match(qualifiers, 'PD_[A-Za-z0-9_]*')
                 )
                 )
@@ -1226,6 +1231,15 @@ def main():
             original_count = len(df_benchmark_data)
             df_benchmark_data.dropna(subset=["benchmark_price"], inplace=True)
             filtered_count = original_count - len(df_benchmark_data)
+
+            # Metals benchmark is noisy; apply EMA smoothing to benchmark_price.
+            if mode == "metals":
+                df_benchmark_data.sort_values("benchmark_timestamp", inplace=True)
+                df_benchmark_data["benchmark_price"] = (
+                    df_benchmark_data["benchmark_price"]
+                    .ewm(span=10, adjust=False)
+                    .mean()
+                )
 
             print(
                 f"Benchmark data: {len(df_benchmark_data)} rows (filtered {filtered_count} rows with NaN values)"
