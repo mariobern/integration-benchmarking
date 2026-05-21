@@ -167,5 +167,7 @@ Always run `pre-commit run --files <changed files>` before committing. Hooks: bl
 - **Publisher 71** may fail due to infinite t_statistic values (numeric precision edge case)
 - **ClickHouse parameterized queries** use `{param_name:String}` syntax with `parameters=dict`
 - **`docs/asset-classes.md`** — update the `Last updated:` date at the top every time this file is modified
-- **US equities qualifier filter** — benchmark queries for `us-equities` mode filter out irregular trade conditions (IRGCOND qualifiers) from Datascope data
+- **Equities qualifier filter** — benchmark queries for `us-equities*` and `hk-equities` modes (in `lazer_dq/evaluate_feed_standalone.py`) filter out irregular trade conditions: IRGCOND qualifiers, plus `102[ODDSALCOND]` (odd-lot sales) and `101[IRGSALCOND]` (irregular sales)
+- **`hk-equities` mode (lazer_dq)** — uses `09:30:00–10:30:00 Asia/Hong_Kong` (HKT = UTC+8, no DST) for the per-row window in `evaluate_feeds_bulk`; benchmark query reuses the global-equities table (`datascope_global_equities_benchmark_data`)
+- **Metals benchmark smoothing** — `lazer_dq/evaluate_feed_standalone.py` applies EMA (`span=10`) to `benchmark_price` when `mode == "metals"` because the metals benchmark is noisy
 - **Aggregate feed (publisher 0)** — `feed_readiness.py` and `quick_benchmark.py` evaluate the aggregated price feed as publisher 0 by default; disable with `--no-agg`. Publisher 0 is excluded from passing/failing counts and readiness determination.
