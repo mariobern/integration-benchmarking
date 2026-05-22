@@ -610,3 +610,54 @@ def test_main_missing_csv_exits_nonzero(tmp_path, monkeypatch, capsys):
         main()
     assert exc.value.code == 1
     assert "not found" in capsys.readouterr().out
+
+
+# ---------- ASSET_CLASS_CONFIG registry ----------
+
+from lazer_dq.summarize_feeds import ASSET_CLASS_CONFIG
+
+
+def test_registry_has_us_equities_entry_with_all_required_keys():
+    assert "us-equities" in ASSET_CLASS_CONFIG
+    cfg = ASSET_CLASS_CONFIG["us-equities"]
+    assert cfg["modes"] == [
+        "us-equities",
+        "us-equities-pre",
+        "us-equities-post",
+        "us-equities-overnight",
+    ]
+    assert cfg["sessions"] == {
+        "us-equities": "REGULAR",
+        "us-equities-pre": "PRE_MARKET",
+        "us-equities-post": "POST_MARKET",
+        "us-equities-overnight": "OVER_NIGHT",
+    }
+    assert cfg["default_max_ros"] == {
+        "us-equities": 1.0,
+        "us-equities-pre": 2.0,
+        "us-equities-post": 2.0,
+        "us-equities-overnight": 3.0,
+    }
+    assert cfg["default_min_hit"] == {
+        "us-equities": 80.0,
+        "us-equities-pre": 50.0,
+        "us-equities-post": 50.0,
+        "us-equities-overnight": 25.0,
+    }
+
+
+def test_registry_has_hk_equities_entry():
+    assert "hk-equities" in ASSET_CLASS_CONFIG
+    cfg = ASSET_CLASS_CONFIG["hk-equities"]
+    assert cfg["modes"] == ["hk-equities"]
+    assert cfg["sessions"] == {"hk-equities": "REGULAR"}
+    assert cfg["default_max_ros"] == {"hk-equities": 1.0}
+    assert cfg["default_min_hit"] == {"hk-equities": 80.0}
+
+
+def test_legacy_constants_still_match_us_equities_registry_entry():
+    """Back-compat: MODE_ORDER / MODE_TO_SESSION still exist for any external importer."""
+    from lazer_dq.summarize_feeds import MODE_ORDER, MODE_TO_SESSION
+
+    assert MODE_ORDER == ASSET_CLASS_CONFIG["us-equities"]["modes"]
+    assert MODE_TO_SESSION == ASSET_CLASS_CONFIG["us-equities"]["sessions"]

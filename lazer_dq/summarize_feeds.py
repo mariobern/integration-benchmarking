@@ -14,35 +14,52 @@ import csv as csv_mod
 import sys
 from pathlib import Path
 
-# Mode → after.json session-label mapping.
-MODE_TO_SESSION = {
-    "us-equities": "REGULAR",
-    "us-equities-pre": "PRE_MARKET",
-    "us-equities-post": "POST_MARKET",
-    "us-equities-overnight": "OVER_NIGHT",
+# Asset-class registry. Adding a new asset class = adding one entry here.
+# Each entry declares:
+#   modes:           ordered list of dq_reports/<cluster>/<mode>/ directory names to read.
+#   sessions:        mode -> after.json session-label, for the 'allowed' sheet.
+#   default_max_ros: per-mode max rmse_over_spread threshold.
+#   default_min_hit: per-mode min hit_rate_0.1pct (%) threshold.
+ASSET_CLASS_CONFIG: dict = {
+    "us-equities": {
+        "modes": [
+            "us-equities",
+            "us-equities-pre",
+            "us-equities-post",
+            "us-equities-overnight",
+        ],
+        "sessions": {
+            "us-equities": "REGULAR",
+            "us-equities-pre": "PRE_MARKET",
+            "us-equities-post": "POST_MARKET",
+            "us-equities-overnight": "OVER_NIGHT",
+        },
+        "default_max_ros": {
+            "us-equities": 1.0,
+            "us-equities-pre": 2.0,
+            "us-equities-post": 2.0,
+            "us-equities-overnight": 3.0,
+        },
+        "default_min_hit": {
+            "us-equities": 80.0,
+            "us-equities-pre": 50.0,
+            "us-equities-post": 50.0,
+            "us-equities-overnight": 25.0,
+        },
+    },
+    "hk-equities": {
+        "modes": ["hk-equities"],
+        "sessions": {"hk-equities": "REGULAR"},
+        "default_max_ros": {"hk-equities": 1.0},
+        "default_min_hit": {"hk-equities": 80.0},
+    },
 }
 
-# Stable mode order for both sheets.
-MODE_ORDER = [
-    "us-equities",
-    "us-equities-pre",
-    "us-equities-post",
-    "us-equities-overnight",
-]
+# Back-compat aliases — kept so any external code importing these names keeps working.
+# Internal code should prefer ASSET_CLASS_CONFIG[<slug>][...] going forward.
+MODE_TO_SESSION = ASSET_CLASS_CONFIG["us-equities"]["sessions"]
+MODE_ORDER = ASSET_CLASS_CONFIG["us-equities"]["modes"]
 
-# Default per-mode thresholds (CLI flags override).
-DEFAULT_MAX_ROS = {
-    "us-equities": 1.0,
-    "us-equities-pre": 2.0,
-    "us-equities-post": 2.0,
-    "us-equities-overnight": 3.0,
-}
-DEFAULT_MIN_HIT = {
-    "us-equities": 80.0,
-    "us-equities-pre": 50.0,
-    "us-equities-post": 50.0,
-    "us-equities-overnight": 25.0,
-}
 DEFAULT_MIN_N_OBS = 1000
 DEFAULT_TOP_N = 10
 DEFAULT_FALLBACK_TOP = 3
@@ -519,36 +536,50 @@ Example:
     parser.add_argument(
         "--max-rmse-over-spread-regular",
         type=float,
-        default=DEFAULT_MAX_ROS["us-equities"],
+        default=ASSET_CLASS_CONFIG["us-equities"]["default_max_ros"]["us-equities"],
     )
     parser.add_argument(
-        "--min-hit-rate-regular", type=float, default=DEFAULT_MIN_HIT["us-equities"]
+        "--min-hit-rate-regular",
+        type=float,
+        default=ASSET_CLASS_CONFIG["us-equities"]["default_min_hit"]["us-equities"],
     )
     parser.add_argument(
         "--max-rmse-over-spread-pre",
         type=float,
-        default=DEFAULT_MAX_ROS["us-equities-pre"],
+        default=ASSET_CLASS_CONFIG["us-equities"]["default_max_ros"]["us-equities-pre"],
     )
     parser.add_argument(
-        "--min-hit-rate-pre", type=float, default=DEFAULT_MIN_HIT["us-equities-pre"]
+        "--min-hit-rate-pre",
+        type=float,
+        default=ASSET_CLASS_CONFIG["us-equities"]["default_min_hit"]["us-equities-pre"],
     )
     parser.add_argument(
         "--max-rmse-over-spread-post",
         type=float,
-        default=DEFAULT_MAX_ROS["us-equities-post"],
+        default=ASSET_CLASS_CONFIG["us-equities"]["default_max_ros"][
+            "us-equities-post"
+        ],
     )
     parser.add_argument(
-        "--min-hit-rate-post", type=float, default=DEFAULT_MIN_HIT["us-equities-post"]
+        "--min-hit-rate-post",
+        type=float,
+        default=ASSET_CLASS_CONFIG["us-equities"]["default_min_hit"][
+            "us-equities-post"
+        ],
     )
     parser.add_argument(
         "--max-rmse-over-spread-overnight",
         type=float,
-        default=DEFAULT_MAX_ROS["us-equities-overnight"],
+        default=ASSET_CLASS_CONFIG["us-equities"]["default_max_ros"][
+            "us-equities-overnight"
+        ],
     )
     parser.add_argument(
         "--min-hit-rate-overnight",
         type=float,
-        default=DEFAULT_MIN_HIT["us-equities-overnight"],
+        default=ASSET_CLASS_CONFIG["us-equities"]["default_min_hit"][
+            "us-equities-overnight"
+        ],
     )
     parser.add_argument("--min-n-observations", type=int, default=DEFAULT_MIN_N_OBS)
     parser.add_argument("--top-n", type=int, default=DEFAULT_TOP_N)
