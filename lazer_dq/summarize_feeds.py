@@ -454,8 +454,13 @@ def _build_per_feed_data(
     min_hit_map,
     min_obs,
     fallback_top,
+    modes,
 ):
-    """Returns (per_feed_data, skipped_feeds, fallback_count, modes_with_data_count)."""
+    """Returns (per_feed_data, skipped_feeds, fallback_count, modes_with_data_count).
+
+    `modes` is the ordered list of dq_reports subdirectory names to read for each feed
+    (drawn from ASSET_CLASS_CONFIG[<asset_class>]["modes"]).
+    """
     per_feed_data: dict = {}
     skipped: list[int] = []
     fallback_count = 0
@@ -464,7 +469,7 @@ def _build_per_feed_data(
     for feed_id in feed_ids:
         mode_data: dict = {}
         any_data = False
-        for mode in MODE_ORDER:
+        for mode in modes:
             raw = load_stats(reports_dir, cluster, mode, feed_id, date)
             if raw is None:
                 mode_data[mode] = None
@@ -632,6 +637,7 @@ Example:
         min_hit_map,
         args.min_n_observations,
         args.fallback_top,
+        modes=MODE_ORDER,
     )
 
     feeds_with_data = len(feed_ids) - len(skipped)

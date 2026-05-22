@@ -115,11 +115,20 @@ STATS_HEADER = (
 )
 
 
-def _write_stats_csv(reports_dir: Path, cluster, mode, feed_id, date, body_rows):
-    """Build dq_reports/<cluster>/<mode>/<feed_id>/<date>/stats.csv."""
+def _write_stats_csv(
+    reports_dir: Path, cluster, mode, feed_id, date, body_rows, header=None
+):
+    """Build dq_reports/<cluster>/<mode>/<feed_id>/<date>/stats.csv.
+
+    `header` defaults to the canonical STATS_HEADER. Tests that need a
+    minimal/custom column set (e.g. just the columns the code actually reads)
+    can pass their own header line.
+    """
+    if header is None:
+        header = STATS_HEADER
     p = reports_dir / cluster / mode / str(feed_id) / date / "stats.csv"
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(STATS_HEADER + "".join(body_rows))
+    p.write_text(header + "".join(body_rows))
     return p
 
 
@@ -661,3 +670,42 @@ def test_legacy_constants_still_match_us_equities_registry_entry():
 
     assert MODE_ORDER == ASSET_CLASS_CONFIG["us-equities"]["modes"]
     assert MODE_TO_SESSION == ASSET_CLASS_CONFIG["us-equities"]["sessions"]
+
+
+# ---------- _build_per_feed_data with custom modes ----------
+
+from lazer_dq.summarize_feeds import _build_per_feed_data
+
+
+def test_build_per_feed_data_honors_modes_parameter(tmp_path):
+    """Only the modes passed in are looked up under reports_dir; others are not touched."""
+    reports = tmp_path / "dq_reports"
+    # Write a stats.csv ONLY for hk-equities.
+    _write_stats_csv(
+        reports,
+        "lazer-prod",
+        "hk-equities",
+        884,
+        "2026-05-19",
+        body_rows=["5,5000,0.001,0.5,90.0\n"],
+        header="publisher_id,n_observations,rmse,rmse_over_spread,hit_rate_0.1pct\n",
+    )
+    per_feed, skipped, fb_count, modes_with_data = _build_per_feed_data(
+        feed_ids=[884],
+        reports_dir=reports,
+        cluster="lazer-prod",
+        date="2026-05-19",
+        excluded={0},
+        top_n=10,
+        max_ros_map={"hk-equities": 1.0},
+        min_hit_map={"hk-equities": 80.0},
+        min_obs=1000,
+        fallback_top=3,
+        modes=["hk-equities"],
+    )
+    assert skipped == []
+    assert modes_with_data == 1
+    assert per_feed[884]["hk-equities"] is not None
+    assert per_feed[884]["hk-equities"]["ranked"][0]["publisher_id"] == "5"
+    # Crucially: no us-equities key at all.
+    assert "us-equities" not in per_feed[884]
