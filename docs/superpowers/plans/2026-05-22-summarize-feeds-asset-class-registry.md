@@ -13,6 +13,7 @@
 ## Task 1: Add the registry and prove us-equities still resolves through it
 
 **Files:**
+
 - Modify: `lazer_dq/summarize_feeds.py` (top of file, lines 17-48)
 - Test: `lazer_dq/tests/test_summarize_feeds.py` (append new section)
 
@@ -75,10 +76,12 @@ def test_legacy_constants_still_match_us_equities_registry_entry():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
+
 ```bash
 source venv/bin/activate
 pytest lazer_dq/tests/test_summarize_feeds.py::test_registry_has_us_equities_entry_with_all_required_keys -v
 ```
+
 Expected: FAIL with `ImportError: cannot import name 'ASSET_CLASS_CONFIG'`.
 
 - [ ] **Step 3: Add the registry**
@@ -142,6 +145,7 @@ DEFAULT_FALLBACK_TOP = 3
 ```bash
 pytest lazer_dq/tests/test_summarize_feeds.py -v
 ```
+
 Expected: all new registry tests PASS, all existing tests still PASS.
 
 - [ ] **Step 5: Commit**
@@ -158,6 +162,7 @@ git commit -m "refactor(lazer_dq): introduce ASSET_CLASS_CONFIG registry"
 The function currently closes over module-level `MODE_ORDER`. Make it accept the mode list as a parameter so it can be driven by the registry.
 
 **Files:**
+
 - Modify: `lazer_dq/summarize_feeds.py` (`_build_per_feed_data`, lines 429-484)
 - Test: `lazer_dq/tests/test_summarize_feeds.py`
 
@@ -212,6 +217,7 @@ def test_build_per_feed_data_honors_modes_parameter(tmp_path):
 ```bash
 pytest lazer_dq/tests/test_summarize_feeds.py::test_build_per_feed_data_honors_modes_parameter -v
 ```
+
 Expected: FAIL — `_build_per_feed_data()` got unexpected keyword argument `modes`.
 
 - [ ] **Step 3: Add `modes` parameter to `_build_per_feed_data`**
@@ -326,6 +332,7 @@ to:
 ```bash
 pytest lazer_dq/tests/test_summarize_feeds.py -v
 ```
+
 Expected: new test PASSES, all existing tests still PASS.
 
 - [ ] **Step 6: Commit**
@@ -342,6 +349,7 @@ git commit -m "refactor(lazer_dq): pass modes through _build_per_feed_data"
 The current implementation hard-codes the 24-column layout with `mode_starts = {"us-equities": 2, "us-equities-pre": 8, ...}` and `for col_idx in range(1, 25)`. Make both parametric on `len(modes)` → 6N columns.
 
 **Files:**
+
 - Modify: `lazer_dq/summarize_feeds.py` (`write_rankings_sheet`, lines 190-302)
 - Test: `lazer_dq/tests/test_summarize_feeds.py`
 
@@ -448,6 +456,7 @@ def test_write_rankings_sheet_four_modes_uses_24_columns(tmp_path):
 ```bash
 pytest lazer_dq/tests/test_summarize_feeds.py::test_write_rankings_sheet_one_mode_uses_6_columns -v
 ```
+
 Expected: FAIL — `write_rankings_sheet()` got unexpected keyword argument `modes`.
 
 - [ ] **Step 3: Parametrize `write_rankings_sheet`**
@@ -580,6 +589,7 @@ Find the `write_rankings_sheet(ws_rank, per_feed_data, args.date, args.cluster)`
 ```bash
 pytest lazer_dq/tests/test_summarize_feeds.py -v
 ```
+
 Expected: new rankings tests PASS, all existing tests still PASS (the existing integration test exercises the 4-mode layout and verifies column positions).
 
 - [ ] **Step 6: Commit**
@@ -594,6 +604,7 @@ git commit -m "refactor(lazer_dq): parametrize write_rankings_sheet on mode list
 ## Task 4: Parametrize `write_allowed_sheet` on the mode list + sessions map
 
 **Files:**
+
 - Modify: `lazer_dq/summarize_feeds.py` (`write_allowed_sheet`, lines 313-427)
 - Test: `lazer_dq/tests/test_summarize_feeds.py`
 
@@ -646,6 +657,7 @@ def test_write_allowed_sheet_one_mode_emits_two_rows_per_feed(tmp_path):
 ```bash
 pytest lazer_dq/tests/test_summarize_feeds.py::test_write_allowed_sheet_one_mode_emits_two_rows_per_feed -v
 ```
+
 Expected: FAIL — `write_allowed_sheet()` got unexpected keyword argument `modes`.
 
 - [ ] **Step 3: Parametrize `write_allowed_sheet`**
@@ -787,6 +799,7 @@ Find the `write_allowed_sheet(ws_allow, per_feed_data, skipped, args.date, args.
 ```bash
 pytest lazer_dq/tests/test_summarize_feeds.py -v
 ```
+
 Expected: new test PASSES, all existing tests still PASS.
 
 - [ ] **Step 6: Commit**
@@ -803,6 +816,7 @@ git commit -m "refactor(lazer_dq): parametrize write_allowed_sheet on modes+sess
 This is where the user-facing change lands. After this task, `python -m lazer_dq.summarize_feeds --csv equity_hk_feed_ids.csv --asset-class hk-equities --cluster lazer-prod --date 2026-05-19` works.
 
 **Files:**
+
 - Modify: `lazer_dq/summarize_feeds.py` (top: add helper; `main()`: add flag + validation; pick maps from registry)
 - Test: `lazer_dq/tests/test_summarize_feeds.py`
 
@@ -949,6 +963,7 @@ def test_main_rejects_mode_mismatch(tmp_path, monkeypatch, capsys):
 ```bash
 pytest lazer_dq/tests/test_summarize_feeds.py::test_validate_csv_modes_accepts_matching_modes lazer_dq/tests/test_summarize_feeds.py::test_main_hk_equities_end_to_end -v
 ```
+
 Expected: FAIL — `validate_csv_modes` not defined; `main()` doesn't recognize `--asset-class`.
 
 - [ ] **Step 3: Add `validate_csv_modes` helper**
@@ -1088,6 +1103,7 @@ with:
 ```bash
 pytest lazer_dq/tests/test_summarize_feeds.py -v
 ```
+
 Expected: all tests PASS (new + existing).
 
 - [ ] **Step 6: Manual smoke test against real data**
@@ -1102,6 +1118,7 @@ python -m lazer_dq.summarize_feeds \
     --asset-class hk-equities \
     --output /tmp/hk_summary.xlsx
 ```
+
 Expected: exits 0, prints "Summary written to /tmp/hk_summary.xlsx", a non-zero "Feeds with at least one mode" count, and the file exists. Open it (`ls -la /tmp/hk_summary.xlsx`) to confirm size > 5KB.
 
 - [ ] **Step 7: Verify the existing us-equities flow still works**
@@ -1120,6 +1137,7 @@ git commit -m "feat(lazer_dq): add --asset-class flag with hk-equities support"
 ## Task 6: Documentation
 
 **Files:**
+
 - Modify: `CLAUDE.md` (Scripts table + new gotcha)
 - Modify: `lazer_dq/summarize_feeds.py` (module docstring + argparse epilog)
 
@@ -1182,6 +1200,7 @@ In `/home/mariobern/integration-benchmarking/CLAUDE.md`, find the "Key Gotchas" 
 source venv/bin/activate
 pre-commit run --files lazer_dq/summarize_feeds.py lazer_dq/tests/test_summarize_feeds.py CLAUDE.md
 ```
+
 Expected: black, prettier, trailing-whitespace, end-of-file-fixer all PASS (or auto-fix and you re-stage).
 
 - [ ] **Step 5: Final test run**
@@ -1189,6 +1208,7 @@ Expected: black, prettier, trailing-whitespace, end-of-file-fixer all PASS (or a
 ```bash
 pytest lazer_dq/tests/test_summarize_feeds.py -v
 ```
+
 Expected: all tests PASS.
 
 - [ ] **Step 6: Commit**
