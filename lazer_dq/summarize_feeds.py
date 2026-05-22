@@ -5,9 +5,19 @@ Two sheets per run:
   rankings — top-N publishers per (feed, mode) by rmse_over_spread, modes side-by-side
   allowed  — paste-ready allowedPublisherIds JSON arrays per feed/session
 
+Per-asset-class layout. Pick the asset class with --asset-class:
+  us-equities (default) — 4 modes: regular, pre, post, overnight (24-col layout)
+  hk-equities           — 1 mode:  regular (6-col layout)
+
+Adding a new asset class = adding one entry to ASSET_CLASS_CONFIG.
+
 Run:
     python3 -m lazer_dq.summarize_feeds \
         --csv MV_Mario_3_pre.csv --cluster lazer-prod --date 2026-05-06
+
+    python3 -m lazer_dq.summarize_feeds \
+        --csv equity_hk_feed_ids.csv --asset-class hk-equities \
+        --cluster lazer-prod --date 2026-05-19
 """
 import argparse
 import csv as csv_mod
@@ -546,9 +556,15 @@ def main():
         description="Generate one Excel summary workbook from evaluate_feeds_bulk DQ outputs.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
-Example:
+Examples:
+  # Default (us-equities, 4 modes):
   python3 -m lazer_dq.summarize_feeds \\
       --csv MV_Mario_3_pre.csv --cluster lazer-prod --date 2026-05-06
+
+  # HK equities:
+  python3 -m lazer_dq.summarize_feeds \\
+      --csv equity_hk_feed_ids.csv --asset-class hk-equities \\
+      --cluster lazer-prod --date 2026-05-19
 """,
     )
     parser.add_argument(
