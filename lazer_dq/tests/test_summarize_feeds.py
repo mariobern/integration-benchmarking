@@ -797,3 +797,40 @@ def test_write_rankings_sheet_four_modes_uses_24_columns(tmp_path):
     assert ws.cell(row=3, column=8).value == "us-equities-pre"
     assert ws.cell(row=3, column=14).value == "us-equities-post"
     assert ws.cell(row=3, column=20).value == "us-equities-overnight"
+
+
+# ---------- write_allowed_sheet parametric layout ----------
+
+from lazer_dq.summarize_feeds import write_allowed_sheet
+
+
+def test_write_allowed_sheet_one_mode_emits_two_rows_per_feed(tmp_path):
+    """For hk-equities (1 mode): each feed gets 1 aggregate + 1 session row."""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    per_feed = {
+        884: {
+            "hk-equities": {
+                "ranked": [_ranked_row(5), _ranked_row(7)],
+                "filtered": [_ranked_row(5), _ranked_row(7)],
+                "is_fallback": False,
+            }
+        }
+    }
+    write_allowed_sheet(
+        ws,
+        per_feed,
+        skipped_feeds=[],
+        date="2026-05-19",
+        cluster="lazer-prod",
+        modes=["hk-equities"],
+        sessions={"hk-equities": "REGULAR"},
+    )
+    assert ws.cell(row=3, column=1).value == 884
+    assert ws.cell(row=3, column=2).value == "(aggregate)"
+    assert "5, 7" in ws.cell(row=3, column=3).value
+    assert ws.cell(row=4, column=1).value == 884
+    assert ws.cell(row=4, column=2).value == "REGULAR"
+    assert "5, 7" in ws.cell(row=4, column=3).value

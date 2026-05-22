@@ -326,7 +326,13 @@ def _format_allowed_pub_ids(ids: list[int]) -> str:
 
 
 def write_allowed_sheet(
-    ws, per_feed_data: dict, skipped_feeds: list[int], date: str, cluster: str
+    ws,
+    per_feed_data: dict,
+    skipped_feeds: list,
+    date: str,
+    cluster: str,
+    modes: list,
+    sessions: dict,
 ) -> None:
     """Populate the 'allowed' worksheet.
 
@@ -371,7 +377,7 @@ def write_allowed_sheet(
     for feed_id, mode_data in per_feed_data.items():
         # Build per-session arrays (None if mode missing or no data after filter).
         per_session_arrays: list[list[int] | None] = []
-        for mode in MODE_ORDER:
+        for mode in modes:
             md = mode_data.get(mode) if mode_data else None
             if md is None:
                 per_session_arrays.append(None)
@@ -394,8 +400,8 @@ def write_allowed_sheet(
         row += 1
 
         # Per-session rows.
-        for mode, ids in zip(MODE_ORDER, per_session_arrays):
-            session_label = MODE_TO_SESSION[mode]
+        for mode, ids in zip(modes, per_session_arrays):
+            session_label = sessions[mode]
             md = mode_data.get(mode) if mode_data else None
             ws.cell(row=row, column=1, value=feed_id)
             ws.cell(row=row, column=2, value=session_label)
@@ -653,7 +659,15 @@ Example:
     write_rankings_sheet(
         ws_rank, per_feed_data, args.date, args.cluster, modes=MODE_ORDER
     )
-    write_allowed_sheet(ws_allow, per_feed_data, skipped, args.date, args.cluster)
+    write_allowed_sheet(
+        ws_allow,
+        per_feed_data,
+        skipped,
+        args.date,
+        args.cluster,
+        modes=MODE_ORDER,
+        sessions=MODE_TO_SESSION,
+    )
 
     out_path = (
         Path(args.output)
