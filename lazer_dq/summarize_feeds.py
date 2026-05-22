@@ -204,20 +204,20 @@ def compute_aggregate(per_session_arrays) -> list[int]:
     return sorted(union)
 
 
-def write_rankings_sheet(ws, per_feed_data: dict, date: str, cluster: str) -> None:
+def write_rankings_sheet(
+    ws, per_feed_data: dict, date: str, cluster: str, modes: list
+) -> None:
     """Populate the 'rankings' worksheet.
 
-    Layout (24 cols A:X):
-      Row 1: workbook title (merged A:X), bold, font 14
-      Row 2: blank
-      Row 3: mode-block headers — "us-equities" merged B:F, "us-equities-pre" H:L,
-             "us-equities-post" N:R, "us-equities-overnight" T:X, bold + light-gray fill
-      Row 4: per-column sub-headers — "rank" in A, then "pub | n_obs | rmse | r/s | hit%" × 4
-      Row 5+: per-feed sections (banner + 10 data rows + blank divider)
+    Layout is parametric on len(modes):
+      - 1 rank column (A) +
+      - N × 5-col mode blocks (pub | n_obs | rmse | r/s | hit%) +
+      - (N-1) × 1-col spacers between blocks
+      = 6N total columns.
 
-    Column allocation:
-      A=rank | B-F=us-equities | G=spacer | H-L=us-equities-pre | M=spacer
-      N-R=us-equities-post | S=spacer | T-X=us-equities-overnight
+    Examples:
+      - 4 modes (us-equities) → 24 cols, blocks at B/H/N/T (unchanged from prior layout).
+      - 1 mode  (hk-equities) → 6 cols, single block at B.
     """
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
@@ -228,21 +228,21 @@ def write_rankings_sheet(ws, per_feed_data: dict, date: str, cluster: str) -> No
     gray = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
     center = Alignment(horizontal="center")
 
-    mode_starts = {  # 1-indexed start columns of each 5-col mode block
-        "us-equities": 2,  # B
-        "us-equities-pre": 8,  # H
-        "us-equities-post": 14,  # N
-        "us-equities-overnight": 20,  # T
-    }
+    n_modes = len(modes)
+    total_cols = 6 * n_modes  # 1 rank + 5N blocks + (N-1) spacers = 6N
+    # mode_starts[m] is the 1-indexed start column of each 5-col mode block.
+    # Block 0 starts at column 2 (B). Each subsequent block starts 6 columns later
+    # (5 data cols + 1 spacer).
+    mode_starts = {mode: 2 + 6 * i for i, mode in enumerate(modes)}
     sub_headers = ["pub", "n_obs", "rmse", "r/s", "hit%"]
 
     # Row 1: title.
     ws.cell(row=1, column=1, value=f"DQ Summary — {cluster} — {date}").font = bold_xl
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=24)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_cols)
     ws.cell(row=1, column=1).alignment = center
 
     # Row 3: mode-block headers.
-    for mode in MODE_ORDER:
+    for mode in modes:
         col = mode_starts[mode]
         c = ws.cell(row=3, column=col, value=mode)
         c.font = bold
@@ -254,7 +254,7 @@ def write_rankings_sheet(ws, per_feed_data: dict, date: str, cluster: str) -> No
     a4 = ws.cell(row=4, column=1, value="rank")
     a4.font = bold
     a4.fill = gray
-    for mode in MODE_ORDER:
+    for mode in modes:
         start = mode_starts[mode]
         for i, label in enumerate(sub_headers):
             c = ws.cell(row=4, column=start + i, value=label)
@@ -271,25 +271,23 @@ def write_rankings_sheet(ws, per_feed_data: dict, date: str, cluster: str) -> No
         banner = ws.cell(row=row, column=1, value=f"=== Feed {feed_id} ===")
         banner.data_type = "s"
         banner.font = bold_lg
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=24)
+        ws.merge_cells(
+            start_row=row, start_column=1, end_row=row, end_column=total_cols
+        )
         row += 1
 
-        # Top-N data rows.
         ranked_per_mode = {
-            m: (mode_data[m]["ranked"] if mode_data.get(m) else None)
-            for m in MODE_ORDER
+            m: (mode_data[m]["ranked"] if mode_data.get(m) else None) for m in modes
         }
-        # Determine row count = max ranked length, capped at top_n (already capped upstream).
         n_rows = max((len(r) for r in ranked_per_mode.values() if r), default=0)
         if n_rows == 0:
-            # Every mode is None → still emit a single "(no data)" row for visibility.
             ws.cell(row=row, column=2, value="(no data)")
-            row += 2  # blank divider after
+            row += 2
             continue
 
         for i in range(n_rows):
-            ws.cell(row=row + i, column=1, value=i + 1)  # rank
-        for mode in MODE_ORDER:
+            ws.cell(row=row + i, column=1, value=i + 1)
+        for mode in modes:
             start = mode_starts[mode]
             ranked = ranked_per_mode[mode]
             if ranked is None:
@@ -309,10 +307,10 @@ def write_rankings_sheet(ws, per_feed_data: dict, date: str, cluster: str) -> No
                     column=start + 4,
                     value=round(float(r["hit_rate_0.1pct"]), 2),
                 )
-        row += n_rows + 1  # data rows + blank divider
+        row += n_rows + 1
 
-    # Reasonable column widths.
-    for col_idx in range(1, 25):
+    # Column widths.
+    for col_idx in range(1, total_cols + 1):
         letter = get_column_letter(col_idx)
         ws.column_dimensions[letter].width = 9
     ws.column_dimensions["A"].width = 6  # rank
@@ -652,7 +650,9 @@ Example:
     ws_rank = wb.active
     ws_rank.title = "rankings"
     ws_allow = wb.create_sheet("allowed")
-    write_rankings_sheet(ws_rank, per_feed_data, args.date, args.cluster)
+    write_rankings_sheet(
+        ws_rank, per_feed_data, args.date, args.cluster, modes=MODE_ORDER
+    )
     write_allowed_sheet(ws_allow, per_feed_data, skipped, args.date, args.cluster)
 
     out_path = (

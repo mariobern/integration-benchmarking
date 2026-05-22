@@ -709,3 +709,91 @@ def test_build_per_feed_data_honors_modes_parameter(tmp_path):
     assert per_feed[884]["hk-equities"]["ranked"][0]["publisher_id"] == "5"
     # Crucially: no us-equities key at all.
     assert "us-equities" not in per_feed[884]
+
+
+# ---------- write_rankings_sheet parametric layout ----------
+
+from lazer_dq.summarize_feeds import write_rankings_sheet
+
+
+def _ranked_row(pub_id, n_obs=5000, rmse=0.001, ros=0.5, hit=90.0):
+    return {
+        "publisher_id": str(pub_id),
+        "n_observations": str(n_obs),
+        "rmse": str(rmse),
+        "rmse_over_spread": str(ros),
+        "hit_rate_0.1pct": str(hit),
+    }
+
+
+def test_write_rankings_sheet_one_mode_uses_6_columns(tmp_path):
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    per_feed = {
+        884: {
+            "hk-equities": {
+                "ranked": [_ranked_row(5), _ranked_row(7)],
+                "filtered": [_ranked_row(5)],
+                "is_fallback": False,
+            }
+        }
+    }
+    write_rankings_sheet(
+        ws,
+        per_feed,
+        date="2026-05-19",
+        cluster="lazer-prod",
+        modes=["hk-equities"],
+    )
+    out = tmp_path / "out.xlsx"
+    wb.save(out)
+
+    from openpyxl import load_workbook
+
+    wb2 = load_workbook(out)
+    ws2 = wb2["Sheet"]
+    assert ws2.cell(row=3, column=2).value == "hk-equities"
+    assert ws2.cell(row=4, column=1).value == "rank"
+    assert ws2.cell(row=4, column=2).value == "pub"
+    assert ws2.cell(row=4, column=6).value == "hit%"
+    assert ws2.cell(row=4, column=7).value is None
+    assert ws2.cell(row=7, column=1).value == 1
+    assert ws2.cell(row=7, column=2).value == 5
+
+
+def test_write_rankings_sheet_four_modes_uses_24_columns(tmp_path):
+    """Regression: us-equities layout is unchanged (24 cols, 5-col blocks + spacers at G/M/S)."""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    per_feed = {
+        922: {
+            "us-equities": {
+                "ranked": [_ranked_row(5)],
+                "filtered": [_ranked_row(5)],
+                "is_fallback": False,
+            },
+            "us-equities-pre": None,
+            "us-equities-post": None,
+            "us-equities-overnight": None,
+        }
+    }
+    write_rankings_sheet(
+        ws,
+        per_feed,
+        date="2026-05-19",
+        cluster="lazer-prod",
+        modes=[
+            "us-equities",
+            "us-equities-pre",
+            "us-equities-post",
+            "us-equities-overnight",
+        ],
+    )
+    assert ws.cell(row=3, column=2).value == "us-equities"
+    assert ws.cell(row=3, column=8).value == "us-equities-pre"
+    assert ws.cell(row=3, column=14).value == "us-equities-post"
+    assert ws.cell(row=3, column=20).value == "us-equities-overnight"
