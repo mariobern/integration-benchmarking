@@ -119,6 +119,37 @@ def discover_feeds(csv_path) -> list[int]:
     return seen
 
 
+def validate_csv_modes(csv_path, allowed_modes: list) -> None:
+    """Verify every CSV row's column-3 mode is in allowed_modes.
+
+    Rows with empty column 3 (legacy feed-id-only CSVs) are accepted.
+    On mismatch, print an explanatory error and sys.exit(1).
+    """
+    bad: list = []
+    allowed_set = set(allowed_modes)
+    with open(csv_path, "r") as f:
+        reader = csv_mod.reader(f)
+        for row in reader:
+            if not row or not row[0].strip():
+                continue
+            if len(row) < 3:
+                continue  # legacy feed-id-only row
+            mode = row[2].strip()
+            if not mode:
+                continue
+            if mode not in allowed_set:
+                bad.append((row[0].strip(), mode))
+    if bad:
+        sample = ", ".join(f"{fid} ({m})" for fid, m in bad[:5])
+        more = f" (and {len(bad) - 5} more)" if len(bad) > 5 else ""
+        print(
+            f"Error: CSV contains modes not in --asset-class={allowed_modes!r}.\n"
+            f"       Allowed modes: {sorted(allowed_set)}\n"
+            f"       Mismatched rows: {sample}{more}"
+        )
+        sys.exit(1)
+
+
 def load_stats(reports_dir, cluster: str, mode: str, feed_id: int, date: str):
     """Read dq_reports/<cluster>/<mode>/<feed_id>/<date>/stats.csv.
 
@@ -543,6 +574,13 @@ Example:
         help="Output .xlsx path (default: dq_summary_<cluster>_<date>.xlsx)",
     )
     parser.add_argument(
+        "--asset-class",
+        choices=sorted(ASSET_CLASS_CONFIG.keys()),
+        default="us-equities",
+        help="Asset class to summarize (default: us-equities). Determines which "
+        "dq_reports/<cluster>/<mode>/ directories are read and the workbook layout.",
+    )
+    parser.add_argument(
         "--max-rmse-over-spread-regular",
         type=float,
         default=ASSET_CLASS_CONFIG["us-equities"]["default_max_ros"]["us-equities"],
@@ -612,23 +650,36 @@ Example:
         sys.exit(1)
 
     excluded = load_excluded_publishers(md_path)
+
+    asset_cfg = ASSET_CLASS_CONFIG[args.asset_class]
+    modes = asset_cfg["modes"]
+    sessions = asset_cfg["sessions"]
+
+    validate_csv_modes(csv_path, allowed_modes=modes)
+
     feed_ids = discover_feeds(csv_path)
     if not feed_ids:
         print(f"Error: no feed_ids parsed from '{csv_path}'.")
         sys.exit(1)
 
-    max_ros_map = {
-        "us-equities": args.max_rmse_over_spread_regular,
-        "us-equities-pre": args.max_rmse_over_spread_pre,
-        "us-equities-post": args.max_rmse_over_spread_post,
-        "us-equities-overnight": args.max_rmse_over_spread_overnight,
-    }
-    min_hit_map = {
-        "us-equities": args.min_hit_rate_regular,
-        "us-equities-pre": args.min_hit_rate_pre,
-        "us-equities-post": args.min_hit_rate_post,
-        "us-equities-overnight": args.min_hit_rate_overnight,
-    }
+    if args.asset_class == "us-equities":
+        # us-equities keeps its existing flat per-mode CLI flags.
+        max_ros_map = {
+            "us-equities": args.max_rmse_over_spread_regular,
+            "us-equities-pre": args.max_rmse_over_spread_pre,
+            "us-equities-post": args.max_rmse_over_spread_post,
+            "us-equities-overnight": args.max_rmse_over_spread_overnight,
+        }
+        min_hit_map = {
+            "us-equities": args.min_hit_rate_regular,
+            "us-equities-pre": args.min_hit_rate_pre,
+            "us-equities-post": args.min_hit_rate_post,
+            "us-equities-overnight": args.min_hit_rate_overnight,
+        }
+    else:
+        # Other asset classes use the registry defaults (no per-mode CLI overrides yet).
+        max_ros_map = dict(asset_cfg["default_max_ros"])
+        min_hit_map = dict(asset_cfg["default_min_hit"])
 
     per_feed_data, skipped, fb_count, modes_with_data = _build_per_feed_data(
         feed_ids,
@@ -641,7 +692,7 @@ Example:
         min_hit_map,
         args.min_n_observations,
         args.fallback_top,
-        modes=MODE_ORDER,
+        modes=modes,
     )
 
     feeds_with_data = len(feed_ids) - len(skipped)
@@ -656,17 +707,15 @@ Example:
     ws_rank = wb.active
     ws_rank.title = "rankings"
     ws_allow = wb.create_sheet("allowed")
-    write_rankings_sheet(
-        ws_rank, per_feed_data, args.date, args.cluster, modes=MODE_ORDER
-    )
+    write_rankings_sheet(ws_rank, per_feed_data, args.date, args.cluster, modes=modes)
     write_allowed_sheet(
         ws_allow,
         per_feed_data,
         skipped,
         args.date,
         args.cluster,
-        modes=MODE_ORDER,
-        sessions=MODE_TO_SESSION,
+        modes=modes,
+        sessions=sessions,
     )
 
     out_path = (
@@ -685,7 +734,7 @@ Example:
         print(f"Feeds skipped (no data anywhere): {len(skipped)} → {skipped}")
     else:
         print("Feeds skipped (no data anywhere): 0")
-    print(f"Modes with data: {modes_with_data}/{len(feed_ids) * 4} cells")
+    print(f"Modes with data: {modes_with_data}/{len(feed_ids) * len(modes)} cells")
     print(f"Excluded publishers: 0 + {test_count} .Test (sample: {sample_excluded})")
     print(f"Fallbacks triggered: {fb_count} cells")
     sys.exit(0)

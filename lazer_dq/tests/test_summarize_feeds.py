@@ -834,3 +834,127 @@ def test_write_allowed_sheet_one_mode_emits_two_rows_per_feed(tmp_path):
     assert ws.cell(row=4, column=1).value == 884
     assert ws.cell(row=4, column=2).value == "REGULAR"
     assert "5, 7" in ws.cell(row=4, column=3).value
+
+
+# ---------- validate_csv_modes ----------
+
+from lazer_dq.summarize_feeds import validate_csv_modes
+
+
+def test_validate_csv_modes_accepts_matching_modes(tmp_path):
+    csv = tmp_path / "ok.csv"
+    csv.write_text("884,2026-05-19,hk-equities\n" "885,2026-05-19,hk-equities\n")
+    assert validate_csv_modes(csv, allowed_modes=["hk-equities"]) is None
+
+
+def test_validate_csv_modes_accepts_empty_third_column(tmp_path):
+    """Back-compat: feed-id-only CSVs (no mode column) are still accepted."""
+    csv = tmp_path / "legacy.csv"
+    csv.write_text("884\n885\n")
+    assert validate_csv_modes(csv, allowed_modes=["hk-equities"]) is None
+
+
+def test_validate_csv_modes_rejects_mismatched_modes(tmp_path, capsys):
+    csv = tmp_path / "bad.csv"
+    csv.write_text("884,2026-05-19,us-equities\n" "885,2026-05-19,us-equities\n")
+    with pytest.raises(SystemExit) as exc:
+        validate_csv_modes(csv, allowed_modes=["hk-equities"])
+    assert exc.value.code != 0
+    out = capsys.readouterr().out
+    assert "us-equities" in out
+    assert "hk-equities" in out
+
+
+# ---------- main() with --asset-class hk-equities ----------
+
+
+def test_main_hk_equities_end_to_end(tmp_path, monkeypatch):
+    """Full run for a 1-feed hk-equities CSV produces a workbook with the HK layout."""
+    reports = tmp_path / "dq_reports"
+    _write_stats_csv(
+        reports,
+        "lazer-prod",
+        "hk-equities",
+        884,
+        "2026-05-19",
+        body_rows=[
+            "5,5000,0.001,0.5,90.0\n",
+            "7,5000,0.001,0.6,92.0\n",
+        ],
+        header="publisher_id,n_observations,rmse,rmse_over_spread,hit_rate_0.1pct\n",
+    )
+    csv = tmp_path / "hk.csv"
+    csv.write_text("884,2026-05-19,hk-equities\n")
+    md = tmp_path / "publishers.md"
+    md.write_text("| ID | Name | Active |\n| 0 | Zero.Test | Yes |\n")
+    out = tmp_path / "out.xlsx"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "summarize_feeds",
+            "--csv",
+            str(csv),
+            "--cluster",
+            "lazer-prod",
+            "--date",
+            "2026-05-19",
+            "--reports-dir",
+            str(reports),
+            "--publishers-md",
+            str(md),
+            "--asset-class",
+            "hk-equities",
+            "--output",
+            str(out),
+        ],
+    )
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 0
+    assert out.exists()
+
+    wb = load_workbook(out)
+    rank = wb["rankings"]
+    assert rank.cell(row=3, column=2).value == "hk-equities"
+    assert rank.cell(row=4, column=7).value is None
+
+    allowed = wb["allowed"]
+    assert allowed.cell(row=3, column=2).value == "(aggregate)"
+    assert allowed.cell(row=4, column=2).value == "REGULAR"
+
+
+def test_main_rejects_mode_mismatch(tmp_path, monkeypatch, capsys):
+    """--asset-class hk-equities + CSV containing us-equities rows -> exit non-zero."""
+    csv = tmp_path / "mixed.csv"
+    csv.write_text("884,2026-05-19,us-equities\n")
+    md = tmp_path / "publishers.md"
+    md.write_text("# empty\n")
+    reports = tmp_path / "dq_reports"
+    (reports / "lazer-prod").mkdir(parents=True)
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "summarize_feeds",
+            "--csv",
+            str(csv),
+            "--cluster",
+            "lazer-prod",
+            "--date",
+            "2026-05-19",
+            "--reports-dir",
+            str(reports),
+            "--publishers-md",
+            str(md),
+            "--asset-class",
+            "hk-equities",
+        ],
+    )
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code != 0
+    out = capsys.readouterr().out
+    assert "us-equities" in out
