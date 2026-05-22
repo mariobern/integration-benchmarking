@@ -115,11 +115,20 @@ STATS_HEADER = (
 )
 
 
-def _write_stats_csv(reports_dir: Path, cluster, mode, feed_id, date, body_rows):
-    """Build dq_reports/<cluster>/<mode>/<feed_id>/<date>/stats.csv."""
+def _write_stats_csv(
+    reports_dir: Path, cluster, mode, feed_id, date, body_rows, header=None
+):
+    """Build dq_reports/<cluster>/<mode>/<feed_id>/<date>/stats.csv.
+
+    `header` defaults to the canonical STATS_HEADER. Tests that need a
+    minimal/custom column set (e.g. just the columns the code actually reads)
+    can pass their own header line.
+    """
+    if header is None:
+        header = STATS_HEADER
     p = reports_dir / cluster / mode / str(feed_id) / date / "stats.csv"
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(STATS_HEADER + "".join(body_rows))
+    p.write_text(header + "".join(body_rows))
     return p
 
 
@@ -610,3 +619,342 @@ def test_main_missing_csv_exits_nonzero(tmp_path, monkeypatch, capsys):
         main()
     assert exc.value.code == 1
     assert "not found" in capsys.readouterr().out
+
+
+# ---------- ASSET_CLASS_CONFIG registry ----------
+
+from lazer_dq.summarize_feeds import ASSET_CLASS_CONFIG
+
+
+def test_registry_has_us_equities_entry_with_all_required_keys():
+    assert "us-equities" in ASSET_CLASS_CONFIG
+    cfg = ASSET_CLASS_CONFIG["us-equities"]
+    assert cfg["modes"] == [
+        "us-equities",
+        "us-equities-pre",
+        "us-equities-post",
+        "us-equities-overnight",
+    ]
+    assert cfg["sessions"] == {
+        "us-equities": "REGULAR",
+        "us-equities-pre": "PRE_MARKET",
+        "us-equities-post": "POST_MARKET",
+        "us-equities-overnight": "OVER_NIGHT",
+    }
+    assert cfg["default_max_ros"] == {
+        "us-equities": 1.0,
+        "us-equities-pre": 2.0,
+        "us-equities-post": 2.0,
+        "us-equities-overnight": 3.0,
+    }
+    assert cfg["default_min_hit"] == {
+        "us-equities": 80.0,
+        "us-equities-pre": 50.0,
+        "us-equities-post": 50.0,
+        "us-equities-overnight": 25.0,
+    }
+
+
+def test_registry_has_hk_equities_entry():
+    assert "hk-equities" in ASSET_CLASS_CONFIG
+    cfg = ASSET_CLASS_CONFIG["hk-equities"]
+    assert cfg["modes"] == ["hk-equities"]
+    assert cfg["sessions"] == {"hk-equities": "REGULAR"}
+    assert cfg["default_max_ros"] == {"hk-equities": 1.0}
+    assert cfg["default_min_hit"] == {"hk-equities": 80.0}
+
+
+def test_legacy_constants_still_match_us_equities_registry_entry():
+    """Back-compat: MODE_ORDER / MODE_TO_SESSION still exist for any external importer."""
+    from lazer_dq.summarize_feeds import MODE_ORDER, MODE_TO_SESSION
+
+    assert MODE_ORDER == ASSET_CLASS_CONFIG["us-equities"]["modes"]
+    assert MODE_TO_SESSION == ASSET_CLASS_CONFIG["us-equities"]["sessions"]
+
+
+# ---------- _build_per_feed_data with custom modes ----------
+
+from lazer_dq.summarize_feeds import _build_per_feed_data
+
+
+def test_build_per_feed_data_honors_modes_parameter(tmp_path):
+    """Only the modes passed in are looked up under reports_dir; others are not touched."""
+    reports = tmp_path / "dq_reports"
+    # Write a stats.csv ONLY for hk-equities.
+    _write_stats_csv(
+        reports,
+        "lazer-prod",
+        "hk-equities",
+        884,
+        "2026-05-19",
+        body_rows=["5,5000,0.001,0.5,90.0\n"],
+        header="publisher_id,n_observations,rmse,rmse_over_spread,hit_rate_0.1pct\n",
+    )
+    per_feed, skipped, fb_count, modes_with_data = _build_per_feed_data(
+        feed_ids=[884],
+        reports_dir=reports,
+        cluster="lazer-prod",
+        date="2026-05-19",
+        excluded={0},
+        top_n=10,
+        max_ros_map={"hk-equities": 1.0},
+        min_hit_map={"hk-equities": 80.0},
+        min_obs=1000,
+        fallback_top=3,
+        modes=["hk-equities"],
+    )
+    assert skipped == []
+    assert modes_with_data == 1
+    assert per_feed[884]["hk-equities"] is not None
+    assert per_feed[884]["hk-equities"]["ranked"][0]["publisher_id"] == "5"
+    # Crucially: no us-equities key at all.
+    assert "us-equities" not in per_feed[884]
+
+
+# ---------- write_rankings_sheet parametric layout ----------
+
+from lazer_dq.summarize_feeds import write_rankings_sheet
+
+
+def _ranked_row(pub_id, n_obs=5000, rmse=0.001, ros=0.5, hit=90.0):
+    return {
+        "publisher_id": str(pub_id),
+        "n_observations": str(n_obs),
+        "rmse": str(rmse),
+        "rmse_over_spread": str(ros),
+        "hit_rate_0.1pct": str(hit),
+    }
+
+
+def test_write_rankings_sheet_one_mode_uses_6_columns(tmp_path):
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    per_feed = {
+        884: {
+            "hk-equities": {
+                "ranked": [_ranked_row(5), _ranked_row(7)],
+                "filtered": [_ranked_row(5)],
+                "is_fallback": False,
+            }
+        }
+    }
+    write_rankings_sheet(
+        ws,
+        per_feed,
+        date="2026-05-19",
+        cluster="lazer-prod",
+        modes=["hk-equities"],
+    )
+    out = tmp_path / "out.xlsx"
+    wb.save(out)
+
+    from openpyxl import load_workbook
+
+    wb2 = load_workbook(out)
+    ws2 = wb2["Sheet"]
+    assert ws2.cell(row=3, column=2).value == "hk-equities"
+    assert ws2.cell(row=4, column=1).value == "rank"
+    assert ws2.cell(row=4, column=2).value == "pub"
+    assert ws2.cell(row=4, column=6).value == "hit%"
+    assert ws2.cell(row=4, column=7).value is None
+    assert ws2.cell(row=7, column=1).value == 1
+    assert ws2.cell(row=7, column=2).value == 5
+
+
+def test_write_rankings_sheet_four_modes_uses_24_columns(tmp_path):
+    """Regression: us-equities layout is unchanged (24 cols, 5-col blocks + spacers at G/M/S)."""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    per_feed = {
+        922: {
+            "us-equities": {
+                "ranked": [_ranked_row(5)],
+                "filtered": [_ranked_row(5)],
+                "is_fallback": False,
+            },
+            "us-equities-pre": None,
+            "us-equities-post": None,
+            "us-equities-overnight": None,
+        }
+    }
+    write_rankings_sheet(
+        ws,
+        per_feed,
+        date="2026-05-19",
+        cluster="lazer-prod",
+        modes=[
+            "us-equities",
+            "us-equities-pre",
+            "us-equities-post",
+            "us-equities-overnight",
+        ],
+    )
+    assert ws.cell(row=3, column=2).value == "us-equities"
+    assert ws.cell(row=3, column=8).value == "us-equities-pre"
+    assert ws.cell(row=3, column=14).value == "us-equities-post"
+    assert ws.cell(row=3, column=20).value == "us-equities-overnight"
+
+
+# ---------- write_allowed_sheet parametric layout ----------
+
+from lazer_dq.summarize_feeds import write_allowed_sheet
+
+
+def test_write_allowed_sheet_one_mode_emits_two_rows_per_feed(tmp_path):
+    """For hk-equities (1 mode): each feed gets 1 aggregate + 1 session row."""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    per_feed = {
+        884: {
+            "hk-equities": {
+                "ranked": [_ranked_row(5), _ranked_row(7)],
+                "filtered": [_ranked_row(5), _ranked_row(7)],
+                "is_fallback": False,
+            }
+        }
+    }
+    write_allowed_sheet(
+        ws,
+        per_feed,
+        skipped_feeds=[],
+        date="2026-05-19",
+        cluster="lazer-prod",
+        modes=["hk-equities"],
+        sessions={"hk-equities": "REGULAR"},
+    )
+    assert ws.cell(row=3, column=1).value == 884
+    assert ws.cell(row=3, column=2).value == "(aggregate)"
+    assert "5, 7" in ws.cell(row=3, column=3).value
+    assert ws.cell(row=4, column=1).value == 884
+    assert ws.cell(row=4, column=2).value == "REGULAR"
+    assert "5, 7" in ws.cell(row=4, column=3).value
+
+
+# ---------- validate_csv_modes ----------
+
+from lazer_dq.summarize_feeds import validate_csv_modes
+
+
+def test_validate_csv_modes_accepts_matching_modes(tmp_path):
+    csv = tmp_path / "ok.csv"
+    csv.write_text("884,2026-05-19,hk-equities\n" "885,2026-05-19,hk-equities\n")
+    assert validate_csv_modes(csv, allowed_modes=["hk-equities"]) is None
+
+
+def test_validate_csv_modes_accepts_empty_third_column(tmp_path):
+    """Back-compat: feed-id-only CSVs (no mode column) are still accepted."""
+    csv = tmp_path / "legacy.csv"
+    csv.write_text("884\n885\n")
+    assert validate_csv_modes(csv, allowed_modes=["hk-equities"]) is None
+
+
+def test_validate_csv_modes_rejects_mismatched_modes(tmp_path, capsys):
+    csv = tmp_path / "bad.csv"
+    csv.write_text("884,2026-05-19,us-equities\n" "885,2026-05-19,us-equities\n")
+    with pytest.raises(SystemExit) as exc:
+        validate_csv_modes(csv, allowed_modes=["hk-equities"])
+    assert exc.value.code != 0
+    out = capsys.readouterr().out
+    assert "us-equities" in out
+    assert "hk-equities" in out
+
+
+# ---------- main() with --asset-class hk-equities ----------
+
+
+def test_main_hk_equities_end_to_end(tmp_path, monkeypatch):
+    """Full run for a 1-feed hk-equities CSV produces a workbook with the HK layout."""
+    reports = tmp_path / "dq_reports"
+    _write_stats_csv(
+        reports,
+        "lazer-prod",
+        "hk-equities",
+        884,
+        "2026-05-19",
+        body_rows=[
+            "5,5000,0.001,0.5,90.0\n",
+            "7,5000,0.001,0.6,92.0\n",
+        ],
+        header="publisher_id,n_observations,rmse,rmse_over_spread,hit_rate_0.1pct\n",
+    )
+    csv = tmp_path / "hk.csv"
+    csv.write_text("884,2026-05-19,hk-equities\n")
+    md = tmp_path / "publishers.md"
+    md.write_text("| ID | Name | Active |\n| 0 | Zero.Test | Yes |\n")
+    out = tmp_path / "out.xlsx"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "summarize_feeds",
+            "--csv",
+            str(csv),
+            "--cluster",
+            "lazer-prod",
+            "--date",
+            "2026-05-19",
+            "--reports-dir",
+            str(reports),
+            "--publishers-md",
+            str(md),
+            "--asset-class",
+            "hk-equities",
+            "--output",
+            str(out),
+        ],
+    )
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 0
+    assert out.exists()
+
+    wb = load_workbook(out)
+    rank = wb["rankings"]
+    assert rank.cell(row=3, column=2).value == "hk-equities"
+    assert rank.cell(row=4, column=7).value is None
+
+    allowed = wb["allowed"]
+    assert allowed.cell(row=3, column=2).value == "(aggregate)"
+    assert allowed.cell(row=4, column=2).value == "REGULAR"
+
+
+def test_main_rejects_mode_mismatch(tmp_path, monkeypatch, capsys):
+    """--asset-class hk-equities + CSV containing us-equities rows -> exit non-zero."""
+    csv = tmp_path / "mixed.csv"
+    csv.write_text("884,2026-05-19,us-equities\n")
+    md = tmp_path / "publishers.md"
+    md.write_text("# empty\n")
+    reports = tmp_path / "dq_reports"
+    (reports / "lazer-prod").mkdir(parents=True)
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "summarize_feeds",
+            "--csv",
+            str(csv),
+            "--cluster",
+            "lazer-prod",
+            "--date",
+            "2026-05-19",
+            "--reports-dir",
+            str(reports),
+            "--publishers-md",
+            str(md),
+            "--asset-class",
+            "hk-equities",
+        ],
+    )
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code != 0
+    out = capsys.readouterr().out
+    assert "us-equities" in out

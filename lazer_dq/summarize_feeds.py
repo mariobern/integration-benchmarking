@@ -5,44 +5,71 @@ Two sheets per run:
   rankings — top-N publishers per (feed, mode) by rmse_over_spread, modes side-by-side
   allowed  — paste-ready allowedPublisherIds JSON arrays per feed/session
 
+Per-asset-class layout. Pick the asset class with --asset-class:
+  us-equities (default) — 4 modes: regular, pre, post, overnight (24-col layout)
+  hk-equities           — 1 mode:  regular (6-col layout)
+
+Adding a new asset class = adding one entry to ASSET_CLASS_CONFIG.
+
 Run:
     python3 -m lazer_dq.summarize_feeds \
         --csv MV_Mario_3_pre.csv --cluster lazer-prod --date 2026-05-06
+
+    python3 -m lazer_dq.summarize_feeds \
+        --csv equity_hk_feed_ids.csv --asset-class hk-equities \
+        --cluster lazer-prod --date 2026-05-19
 """
 import argparse
 import csv as csv_mod
 import sys
 from pathlib import Path
 
-# Mode → after.json session-label mapping.
-MODE_TO_SESSION = {
-    "us-equities": "REGULAR",
-    "us-equities-pre": "PRE_MARKET",
-    "us-equities-post": "POST_MARKET",
-    "us-equities-overnight": "OVER_NIGHT",
+# Asset-class registry. Adding a new asset class = adding one entry here.
+# Each entry declares:
+#   modes:           ordered list of dq_reports/<cluster>/<mode>/ directory names to read.
+#   sessions:        mode -> after.json session-label, for the 'allowed' sheet.
+#   default_max_ros: per-mode max rmse_over_spread threshold.
+#   default_min_hit: per-mode min hit_rate_0.1pct (%) threshold.
+ASSET_CLASS_CONFIG: dict = {
+    "us-equities": {
+        "modes": [
+            "us-equities",
+            "us-equities-pre",
+            "us-equities-post",
+            "us-equities-overnight",
+        ],
+        "sessions": {
+            "us-equities": "REGULAR",
+            "us-equities-pre": "PRE_MARKET",
+            "us-equities-post": "POST_MARKET",
+            "us-equities-overnight": "OVER_NIGHT",
+        },
+        "default_max_ros": {
+            "us-equities": 1.0,
+            "us-equities-pre": 2.0,
+            "us-equities-post": 2.0,
+            "us-equities-overnight": 3.0,
+        },
+        "default_min_hit": {
+            "us-equities": 80.0,
+            "us-equities-pre": 50.0,
+            "us-equities-post": 50.0,
+            "us-equities-overnight": 25.0,
+        },
+    },
+    "hk-equities": {
+        "modes": ["hk-equities"],
+        "sessions": {"hk-equities": "REGULAR"},
+        "default_max_ros": {"hk-equities": 1.0},
+        "default_min_hit": {"hk-equities": 80.0},
+    },
 }
 
-# Stable mode order for both sheets.
-MODE_ORDER = [
-    "us-equities",
-    "us-equities-pre",
-    "us-equities-post",
-    "us-equities-overnight",
-]
+# Back-compat aliases — kept so any external code importing these names keeps working.
+# Internal code should prefer ASSET_CLASS_CONFIG[<slug>][...] going forward.
+MODE_TO_SESSION = ASSET_CLASS_CONFIG["us-equities"]["sessions"]
+MODE_ORDER = ASSET_CLASS_CONFIG["us-equities"]["modes"]
 
-# Default per-mode thresholds (CLI flags override).
-DEFAULT_MAX_ROS = {
-    "us-equities": 1.0,
-    "us-equities-pre": 2.0,
-    "us-equities-post": 2.0,
-    "us-equities-overnight": 3.0,
-}
-DEFAULT_MIN_HIT = {
-    "us-equities": 80.0,
-    "us-equities-pre": 50.0,
-    "us-equities-post": 50.0,
-    "us-equities-overnight": 25.0,
-}
 DEFAULT_MIN_N_OBS = 1000
 DEFAULT_TOP_N = 10
 DEFAULT_FALLBACK_TOP = 3
@@ -100,6 +127,37 @@ def discover_feeds(csv_path) -> list[int]:
                 seen.append(feed_id)
                 seen_set.add(feed_id)
     return seen
+
+
+def validate_csv_modes(csv_path, allowed_modes: list) -> None:
+    """Verify every CSV row's column-3 mode is in allowed_modes.
+
+    Rows with empty column 3 (legacy feed-id-only CSVs) are accepted.
+    On mismatch, print an explanatory error and sys.exit(1).
+    """
+    bad: list = []
+    allowed_set = set(allowed_modes)
+    with open(csv_path, "r") as f:
+        reader = csv_mod.reader(f)
+        for row in reader:
+            if not row or not row[0].strip():
+                continue
+            if len(row) < 3:
+                continue  # legacy feed-id-only row
+            mode = row[2].strip()
+            if not mode:
+                continue
+            if mode not in allowed_set:
+                bad.append((row[0].strip(), mode))
+    if bad:
+        sample = ", ".join(f"{fid} ({m})" for fid, m in bad[:5])
+        more = f" (and {len(bad) - 5} more)" if len(bad) > 5 else ""
+        print(
+            f"Error: CSV contains modes not in --asset-class={allowed_modes!r}.\n"
+            f"       Allowed modes: {sorted(allowed_set)}\n"
+            f"       Mismatched rows: {sample}{more}"
+        )
+        sys.exit(1)
 
 
 def load_stats(reports_dir, cluster: str, mode: str, feed_id: int, date: str):
@@ -187,20 +245,20 @@ def compute_aggregate(per_session_arrays) -> list[int]:
     return sorted(union)
 
 
-def write_rankings_sheet(ws, per_feed_data: dict, date: str, cluster: str) -> None:
+def write_rankings_sheet(
+    ws, per_feed_data: dict, date: str, cluster: str, modes: list
+) -> None:
     """Populate the 'rankings' worksheet.
 
-    Layout (24 cols A:X):
-      Row 1: workbook title (merged A:X), bold, font 14
-      Row 2: blank
-      Row 3: mode-block headers — "us-equities" merged B:F, "us-equities-pre" H:L,
-             "us-equities-post" N:R, "us-equities-overnight" T:X, bold + light-gray fill
-      Row 4: per-column sub-headers — "rank" in A, then "pub | n_obs | rmse | r/s | hit%" × 4
-      Row 5+: per-feed sections (banner + 10 data rows + blank divider)
+    Layout is parametric on len(modes):
+      - 1 rank column (A) +
+      - N × 5-col mode blocks (pub | n_obs | rmse | r/s | hit%) +
+      - (N-1) × 1-col spacers between blocks
+      = 6N total columns.
 
-    Column allocation:
-      A=rank | B-F=us-equities | G=spacer | H-L=us-equities-pre | M=spacer
-      N-R=us-equities-post | S=spacer | T-X=us-equities-overnight
+    Examples:
+      - 4 modes (us-equities) → 24 cols, blocks at B/H/N/T (unchanged from prior layout).
+      - 1 mode  (hk-equities) → 6 cols, single block at B.
     """
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
@@ -211,21 +269,21 @@ def write_rankings_sheet(ws, per_feed_data: dict, date: str, cluster: str) -> No
     gray = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
     center = Alignment(horizontal="center")
 
-    mode_starts = {  # 1-indexed start columns of each 5-col mode block
-        "us-equities": 2,  # B
-        "us-equities-pre": 8,  # H
-        "us-equities-post": 14,  # N
-        "us-equities-overnight": 20,  # T
-    }
+    n_modes = len(modes)
+    total_cols = 6 * n_modes  # 1 rank + 5N blocks + (N-1) spacers = 6N
+    # mode_starts[m] is the 1-indexed start column of each 5-col mode block.
+    # Block 0 starts at column 2 (B). Each subsequent block starts 6 columns later
+    # (5 data cols + 1 spacer).
+    mode_starts = {mode: 2 + 6 * i for i, mode in enumerate(modes)}
     sub_headers = ["pub", "n_obs", "rmse", "r/s", "hit%"]
 
     # Row 1: title.
     ws.cell(row=1, column=1, value=f"DQ Summary — {cluster} — {date}").font = bold_xl
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=24)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_cols)
     ws.cell(row=1, column=1).alignment = center
 
     # Row 3: mode-block headers.
-    for mode in MODE_ORDER:
+    for mode in modes:
         col = mode_starts[mode]
         c = ws.cell(row=3, column=col, value=mode)
         c.font = bold
@@ -237,7 +295,7 @@ def write_rankings_sheet(ws, per_feed_data: dict, date: str, cluster: str) -> No
     a4 = ws.cell(row=4, column=1, value="rank")
     a4.font = bold
     a4.fill = gray
-    for mode in MODE_ORDER:
+    for mode in modes:
         start = mode_starts[mode]
         for i, label in enumerate(sub_headers):
             c = ws.cell(row=4, column=start + i, value=label)
@@ -254,25 +312,23 @@ def write_rankings_sheet(ws, per_feed_data: dict, date: str, cluster: str) -> No
         banner = ws.cell(row=row, column=1, value=f"=== Feed {feed_id} ===")
         banner.data_type = "s"
         banner.font = bold_lg
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=24)
+        ws.merge_cells(
+            start_row=row, start_column=1, end_row=row, end_column=total_cols
+        )
         row += 1
 
-        # Top-N data rows.
         ranked_per_mode = {
-            m: (mode_data[m]["ranked"] if mode_data.get(m) else None)
-            for m in MODE_ORDER
+            m: (mode_data[m]["ranked"] if mode_data.get(m) else None) for m in modes
         }
-        # Determine row count = max ranked length, capped at top_n (already capped upstream).
         n_rows = max((len(r) for r in ranked_per_mode.values() if r), default=0)
         if n_rows == 0:
-            # Every mode is None → still emit a single "(no data)" row for visibility.
             ws.cell(row=row, column=2, value="(no data)")
-            row += 2  # blank divider after
+            row += 2
             continue
 
         for i in range(n_rows):
-            ws.cell(row=row + i, column=1, value=i + 1)  # rank
-        for mode in MODE_ORDER:
+            ws.cell(row=row + i, column=1, value=i + 1)
+        for mode in modes:
             start = mode_starts[mode]
             ranked = ranked_per_mode[mode]
             if ranked is None:
@@ -292,10 +348,10 @@ def write_rankings_sheet(ws, per_feed_data: dict, date: str, cluster: str) -> No
                     column=start + 4,
                     value=round(float(r["hit_rate_0.1pct"]), 2),
                 )
-        row += n_rows + 1  # data rows + blank divider
+        row += n_rows + 1
 
-    # Reasonable column widths.
-    for col_idx in range(1, 25):
+    # Column widths.
+    for col_idx in range(1, total_cols + 1):
         letter = get_column_letter(col_idx)
         ws.column_dimensions[letter].width = 9
     ws.column_dimensions["A"].width = 6  # rank
@@ -311,7 +367,13 @@ def _format_allowed_pub_ids(ids: list[int]) -> str:
 
 
 def write_allowed_sheet(
-    ws, per_feed_data: dict, skipped_feeds: list[int], date: str, cluster: str
+    ws,
+    per_feed_data: dict,
+    skipped_feeds: list,
+    date: str,
+    cluster: str,
+    modes: list,
+    sessions: dict,
 ) -> None:
     """Populate the 'allowed' worksheet.
 
@@ -356,7 +418,7 @@ def write_allowed_sheet(
     for feed_id, mode_data in per_feed_data.items():
         # Build per-session arrays (None if mode missing or no data after filter).
         per_session_arrays: list[list[int] | None] = []
-        for mode in MODE_ORDER:
+        for mode in modes:
             md = mode_data.get(mode) if mode_data else None
             if md is None:
                 per_session_arrays.append(None)
@@ -379,8 +441,8 @@ def write_allowed_sheet(
         row += 1
 
         # Per-session rows.
-        for mode, ids in zip(MODE_ORDER, per_session_arrays):
-            session_label = MODE_TO_SESSION[mode]
+        for mode, ids in zip(modes, per_session_arrays):
+            session_label = sessions[mode]
             md = mode_data.get(mode) if mode_data else None
             ws.cell(row=row, column=1, value=feed_id)
             ws.cell(row=row, column=2, value=session_label)
@@ -437,8 +499,13 @@ def _build_per_feed_data(
     min_hit_map,
     min_obs,
     fallback_top,
+    modes,
 ):
-    """Returns (per_feed_data, skipped_feeds, fallback_count, modes_with_data_count)."""
+    """Returns (per_feed_data, skipped_feeds, fallback_count, modes_with_data_count).
+
+    `modes` is the ordered list of dq_reports subdirectory names to read for each feed
+    (drawn from ASSET_CLASS_CONFIG[<asset_class>]["modes"]).
+    """
     per_feed_data: dict = {}
     skipped: list[int] = []
     fallback_count = 0
@@ -447,7 +514,7 @@ def _build_per_feed_data(
     for feed_id in feed_ids:
         mode_data: dict = {}
         any_data = False
-        for mode in MODE_ORDER:
+        for mode in modes:
             raw = load_stats(reports_dir, cluster, mode, feed_id, date)
             if raw is None:
                 mode_data[mode] = None
@@ -489,9 +556,15 @@ def main():
         description="Generate one Excel summary workbook from evaluate_feeds_bulk DQ outputs.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
-Example:
+Examples:
+  # Default (us-equities, 4 modes):
   python3 -m lazer_dq.summarize_feeds \\
       --csv MV_Mario_3_pre.csv --cluster lazer-prod --date 2026-05-06
+
+  # HK equities:
+  python3 -m lazer_dq.summarize_feeds \\
+      --csv equity_hk_feed_ids.csv --asset-class hk-equities \\
+      --cluster lazer-prod --date 2026-05-19
 """,
     )
     parser.add_argument(
@@ -517,38 +590,59 @@ Example:
         help="Output .xlsx path (default: dq_summary_<cluster>_<date>.xlsx)",
     )
     parser.add_argument(
-        "--max-rmse-over-spread-regular",
-        type=float,
-        default=DEFAULT_MAX_ROS["us-equities"],
+        "--asset-class",
+        choices=sorted(ASSET_CLASS_CONFIG.keys()),
+        default="us-equities",
+        help="Asset class to summarize (default: us-equities). Determines which "
+        "dq_reports/<cluster>/<mode>/ directories are read and the workbook layout.",
     )
     parser.add_argument(
-        "--min-hit-rate-regular", type=float, default=DEFAULT_MIN_HIT["us-equities"]
+        "--max-rmse-over-spread-regular",
+        type=float,
+        default=ASSET_CLASS_CONFIG["us-equities"]["default_max_ros"]["us-equities"],
+    )
+    parser.add_argument(
+        "--min-hit-rate-regular",
+        type=float,
+        default=ASSET_CLASS_CONFIG["us-equities"]["default_min_hit"]["us-equities"],
     )
     parser.add_argument(
         "--max-rmse-over-spread-pre",
         type=float,
-        default=DEFAULT_MAX_ROS["us-equities-pre"],
+        default=ASSET_CLASS_CONFIG["us-equities"]["default_max_ros"]["us-equities-pre"],
     )
     parser.add_argument(
-        "--min-hit-rate-pre", type=float, default=DEFAULT_MIN_HIT["us-equities-pre"]
+        "--min-hit-rate-pre",
+        type=float,
+        default=ASSET_CLASS_CONFIG["us-equities"]["default_min_hit"]["us-equities-pre"],
     )
     parser.add_argument(
         "--max-rmse-over-spread-post",
         type=float,
-        default=DEFAULT_MAX_ROS["us-equities-post"],
+        default=ASSET_CLASS_CONFIG["us-equities"]["default_max_ros"][
+            "us-equities-post"
+        ],
     )
     parser.add_argument(
-        "--min-hit-rate-post", type=float, default=DEFAULT_MIN_HIT["us-equities-post"]
+        "--min-hit-rate-post",
+        type=float,
+        default=ASSET_CLASS_CONFIG["us-equities"]["default_min_hit"][
+            "us-equities-post"
+        ],
     )
     parser.add_argument(
         "--max-rmse-over-spread-overnight",
         type=float,
-        default=DEFAULT_MAX_ROS["us-equities-overnight"],
+        default=ASSET_CLASS_CONFIG["us-equities"]["default_max_ros"][
+            "us-equities-overnight"
+        ],
     )
     parser.add_argument(
         "--min-hit-rate-overnight",
         type=float,
-        default=DEFAULT_MIN_HIT["us-equities-overnight"],
+        default=ASSET_CLASS_CONFIG["us-equities"]["default_min_hit"][
+            "us-equities-overnight"
+        ],
     )
     parser.add_argument("--min-n-observations", type=int, default=DEFAULT_MIN_N_OBS)
     parser.add_argument("--top-n", type=int, default=DEFAULT_TOP_N)
@@ -572,23 +666,36 @@ Example:
         sys.exit(1)
 
     excluded = load_excluded_publishers(md_path)
+
+    asset_cfg = ASSET_CLASS_CONFIG[args.asset_class]
+    modes = asset_cfg["modes"]
+    sessions = asset_cfg["sessions"]
+
+    validate_csv_modes(csv_path, allowed_modes=modes)
+
     feed_ids = discover_feeds(csv_path)
     if not feed_ids:
         print(f"Error: no feed_ids parsed from '{csv_path}'.")
         sys.exit(1)
 
-    max_ros_map = {
-        "us-equities": args.max_rmse_over_spread_regular,
-        "us-equities-pre": args.max_rmse_over_spread_pre,
-        "us-equities-post": args.max_rmse_over_spread_post,
-        "us-equities-overnight": args.max_rmse_over_spread_overnight,
-    }
-    min_hit_map = {
-        "us-equities": args.min_hit_rate_regular,
-        "us-equities-pre": args.min_hit_rate_pre,
-        "us-equities-post": args.min_hit_rate_post,
-        "us-equities-overnight": args.min_hit_rate_overnight,
-    }
+    if args.asset_class == "us-equities":
+        # us-equities keeps its existing flat per-mode CLI flags.
+        max_ros_map = {
+            "us-equities": args.max_rmse_over_spread_regular,
+            "us-equities-pre": args.max_rmse_over_spread_pre,
+            "us-equities-post": args.max_rmse_over_spread_post,
+            "us-equities-overnight": args.max_rmse_over_spread_overnight,
+        }
+        min_hit_map = {
+            "us-equities": args.min_hit_rate_regular,
+            "us-equities-pre": args.min_hit_rate_pre,
+            "us-equities-post": args.min_hit_rate_post,
+            "us-equities-overnight": args.min_hit_rate_overnight,
+        }
+    else:
+        # Other asset classes use the registry defaults (no per-mode CLI overrides yet).
+        max_ros_map = dict(asset_cfg["default_max_ros"])
+        min_hit_map = dict(asset_cfg["default_min_hit"])
 
     per_feed_data, skipped, fb_count, modes_with_data = _build_per_feed_data(
         feed_ids,
@@ -601,6 +708,7 @@ Example:
         min_hit_map,
         args.min_n_observations,
         args.fallback_top,
+        modes=modes,
     )
 
     feeds_with_data = len(feed_ids) - len(skipped)
@@ -615,8 +723,16 @@ Example:
     ws_rank = wb.active
     ws_rank.title = "rankings"
     ws_allow = wb.create_sheet("allowed")
-    write_rankings_sheet(ws_rank, per_feed_data, args.date, args.cluster)
-    write_allowed_sheet(ws_allow, per_feed_data, skipped, args.date, args.cluster)
+    write_rankings_sheet(ws_rank, per_feed_data, args.date, args.cluster, modes=modes)
+    write_allowed_sheet(
+        ws_allow,
+        per_feed_data,
+        skipped,
+        args.date,
+        args.cluster,
+        modes=modes,
+        sessions=sessions,
+    )
 
     out_path = (
         Path(args.output)
@@ -634,7 +750,7 @@ Example:
         print(f"Feeds skipped (no data anywhere): {len(skipped)} → {skipped}")
     else:
         print("Feeds skipped (no data anywhere): 0")
-    print(f"Modes with data: {modes_with_data}/{len(feed_ids) * 4} cells")
+    print(f"Modes with data: {modes_with_data}/{len(feed_ids) * len(modes)} cells")
     print(f"Excluded publishers: 0 + {test_count} .Test (sample: {sample_excluded})")
     print(f"Fallbacks triggered: {fb_count} cells")
     sys.exit(0)
