@@ -47,11 +47,11 @@ Run once per workbook (each file is one asset class / one date).
   top-level set to 2 only on COMING_SOON promotion.
 - Publishers `{0, 1, 9, 13, 15}` (aggregate sentinel + Lazer) are stripped from
   every list defensively, with a warning.
-- A COMING_SOON feed is promoted **only if at least one publisher survives
-  filtering**. If the summary listed only excluded publishers and nothing
-  remains, the feed is left `COMING_SOON` and reported as
-  "Skipped (no publishers after filter)" — never promoted to STABLE with an
-  empty allow-list.
+- A COMING_SOON feed is promoted **only if at least 3 publishers survive
+  filtering** (across all sessions). Feeds with 0, 1, or 2 surviving publishers
+  have insufficient redundancy and are left `COMING_SOON`, reported as
+  "Skipped (<3 publishers after filter)" — never promoted to STABLE. (The
+  threshold also guarantees the top-level `minPublishers: 2` is satisfiable.)
 
 ## Safety
 

@@ -383,9 +383,9 @@ def test_apply_filters_lazer_and_warns():
     raw = _config_with([_feed(600, "COMING_SOON", [("REGULAR", [1])], top=[1])])
     summary = {
         600: {
-            "aggregate": [1, 9, 24, 35],
+            "aggregate": [1, 9, 24, 35, 42],
             "sessions": {
-                "REGULAR": [1, 9, 24, 35],
+                "REGULAR": [1, 9, 24, 35, 42],
                 "PRE_MARKET": None,
                 "POST_MARKET": None,
                 "OVER_NIGHT": None,
@@ -396,8 +396,8 @@ def test_apply_filters_lazer_and_warns():
     out, stats = apply_summary_to_config(raw, summary)
     data = json.loads(out)
     feed = {f["feedId"]: f for f in data["feeds"]}[600]
-    assert feed["marketSchedules"][0]["allowedPublisherIds"] == [24, 35]
-    assert feed["allowedPublisherIds"] == [24, 35]
+    assert feed["marketSchedules"][0]["allowedPublisherIds"] == [24, 35, 42]
+    assert feed["allowedPublisherIds"] == [24, 35, 42]
     assert stats["filtered_any"] is True
 
 
@@ -419,10 +419,56 @@ def test_apply_does_not_promote_when_all_publishers_filtered():
     data = json.loads(out)
     feed = {f["feedId"]: f for f in data["feeds"]}[700]
 
+    assert feed["state"] == "COMING_SOON"  # NOT promoted (0 survive filtering)
+    assert stats["promoted"] == 0
+    assert stats["skipped_too_few_publishers"] == 1
+    assert stats["filtered_any"] is True
+
+
+def test_apply_does_not_promote_fewer_than_three_publishers():
+    # 2 publishers survive filtering -> below the redundancy gate -> not promoted.
+    raw = _config_with([_feed(800, "COMING_SOON", [("REGULAR", [1])], top=[1])])
+    summary = {
+        800: {
+            "aggregate": [24, 35],
+            "sessions": {
+                "REGULAR": [24, 35],
+                "PRE_MARKET": None,
+                "POST_MARKET": None,
+                "OVER_NIGHT": None,
+            },
+        }
+    }
+
+    out, stats = apply_summary_to_config(raw, summary)
+    assert out == raw  # block untouched; no partial edits
+    feed = {f["feedId"]: f for f in json.loads(out)["feeds"]}[800]
     assert feed["state"] == "COMING_SOON"  # NOT promoted
     assert stats["promoted"] == 0
-    assert stats["skipped_no_publishers"] == 1
-    assert stats["filtered_any"] is True
+    assert stats["sessions_added"] == 0
+    assert stats["skipped_too_few_publishers"] == 1
+
+
+def test_apply_promotes_with_exactly_three_publishers():
+    # Exactly 3 survivors clears the gate.
+    raw = _config_with([_feed(810, "COMING_SOON", [("REGULAR", [1])], top=[1])])
+    summary = {
+        810: {
+            "aggregate": [24, 35, 42],
+            "sessions": {
+                "REGULAR": [24, 35, 42],
+                "PRE_MARKET": None,
+                "POST_MARKET": None,
+                "OVER_NIGHT": None,
+            },
+        }
+    }
+
+    out, stats = apply_summary_to_config(raw, summary)
+    feed = {f["feedId"]: f for f in json.loads(out)["feeds"]}[810]
+    assert feed["state"] == "STABLE"
+    assert feed["allowedPublisherIds"] == [24, 35, 42]
+    assert stats["promoted"] == 1
 
 
 import subprocess

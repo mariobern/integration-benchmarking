@@ -42,6 +42,10 @@ SESSION_MIN_PUBLISHERS = {
 REGULAR_LOW_PUB_THRESHOLD = 5
 REGULAR_LOW_PUB_MIN = 2
 
+# A COMING_SOON feed is promoted only if at least this many publishers survive
+# filtering (across all sessions). Fewer = insufficient redundancy; left COMING_SOON.
+MIN_PROMOTE_PUBLISHERS = 3
+
 
 def filter_publishers(ids: list[int]) -> tuple[list[int], list[int]]:
     """Drop EXCLUDED_PUBLISHERS. Return (kept_sorted_unique, removed_sorted)."""
@@ -323,7 +327,7 @@ def apply_summary_to_config(
         "promoted": 0,
         "sessions_added": 0,
         "skipped_no_data": 0,
-        "skipped_no_publishers": 0,
+        "skipped_too_few_publishers": 0,
         "skipped_stable_no_change": 0,
         "skipped_state": 0,
         "not_found": [],
@@ -360,6 +364,10 @@ def apply_summary_to_config(
         bench = _regular_benchmark_mapping(feed)
 
         if state == "COMING_SOON":
+            # First pass: compute filtered per-session lists + union. No edits yet,
+            # so a feed rejected by the redundancy gate below leaves `block`
+            # untouched and never over-counts sessions_added.
+            session_kept: dict[str, list[int]] = {}
             top_union: set[int] = set()
             for session in SESSION_ORDER:
                 raw_ids = fa["sessions"].get(session)
@@ -371,23 +379,29 @@ def apply_summary_to_config(
                     log(f"    filtered {removed} from {feed_id}/{session}")
                 if not kept:
                     continue
+                session_kept[session] = kept
                 top_union.update(kept)
+
+            if len(top_union) < MIN_PROMOTE_PUBLISHERS:
+                # Too few publishers survive filtering for adequate redundancy.
+                # Leave the feed COMING_SOON rather than promote it.
+                stats["skipped_too_few_publishers"] += 1
+                log(
+                    f"  SKIP (<{MIN_PROMOTE_PUBLISHERS} publishers): "
+                    f"feedId={feed_id}, have={sorted(top_union)}"
+                )
+                continue
+
+            # Second pass: apply edits now that the feed clears the gate.
+            block = re.sub(
+                r'"state":\s*"COMING_SOON"', '"state": "STABLE"', block, count=1
+            )
+            for session, kept in session_kept.items():
                 if session in existing_sessions:
                     block = overwrite_session(block, session, kept)
                 else:
                     block = add_session(block, session, kept, bench)
                     stats["sessions_added"] += 1
-            if not top_union:
-                # Aggregate had ids but everything filtered out (e.g. only
-                # excluded/Lazer publishers). Do NOT promote to STABLE with an
-                # empty allow-list; leave the feed COMING_SOON. No edits were
-                # written to `block` in this case (every session was skipped).
-                stats["skipped_no_publishers"] += 1
-                log(f"  SKIP (no publishers after filter): feedId={feed_id}")
-                continue
-            block = re.sub(
-                r'"state":\s*"COMING_SOON"', '"state": "STABLE"', block, count=1
-            )
             block = set_top_level_allowed(block, sorted(top_union))
             block = set_top_level_min_publishers(block, 2)
             stats["promoted"] += 1
@@ -472,7 +486,9 @@ def main() -> None:
     print(f"  Feeds promoted (COMING_SOON->STABLE): {stats['promoted']}")
     print(f"  Sessions added:                       {stats['sessions_added']}")
     print(f"  Skipped (no data):                    {stats['skipped_no_data']}")
-    print(f"  Skipped (no publishers after filter): {stats['skipped_no_publishers']}")
+    print(
+        f"  Skipped (<3 publishers after filter): {stats['skipped_too_few_publishers']}"
+    )
     print(
         f"  Skipped (STABLE, no new sessions):    {stats['skipped_stable_no_change']}"
     )
