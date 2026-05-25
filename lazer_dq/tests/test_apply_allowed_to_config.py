@@ -376,3 +376,27 @@ def test_apply_filters_lazer_and_warns():
     assert feed["marketSchedules"][0]["allowedPublisherIds"] == [24, 35]
     assert feed["allowedPublisherIds"] == [24, 35]
     assert stats["filtered_any"] is True
+
+
+def test_apply_does_not_promote_when_all_publishers_filtered():
+    raw = _config_with([_feed(700, "COMING_SOON", [("REGULAR", [1])], top=[1])])
+    summary = {
+        700: {
+            "aggregate": [1, 9, 13],
+            "sessions": {
+                "REGULAR": [1, 9, 13],
+                "PRE_MARKET": None,
+                "POST_MARKET": None,
+                "OVER_NIGHT": None,
+            },
+        }
+    }
+
+    out, stats = apply_summary_to_config(raw, summary)
+    data = json.loads(out)
+    feed = {f["feedId"]: f for f in data["feeds"]}[700]
+
+    assert feed["state"] == "COMING_SOON"  # NOT promoted
+    assert stats["promoted"] == 0
+    assert stats["skipped_no_publishers"] == 1
+    assert stats["filtered_any"] is True

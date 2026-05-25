@@ -293,6 +293,7 @@ def apply_summary_to_config(
         "promoted": 0,
         "sessions_added": 0,
         "skipped_no_data": 0,
+        "skipped_no_publishers": 0,
         "skipped_state": 0,
         "not_found": [],
         "filtered_any": False,
@@ -328,9 +329,6 @@ def apply_summary_to_config(
         bench = _regular_benchmark_mapping(feed)
 
         if state == "COMING_SOON":
-            block = re.sub(
-                r'"state":\s*"COMING_SOON"', '"state": "STABLE"', block, count=1
-            )
             top_union: set[int] = set()
             for session in SESSION_ORDER:
                 raw_ids = fa["sessions"].get(session)
@@ -348,6 +346,17 @@ def apply_summary_to_config(
                 else:
                     block = add_session(block, session, kept, bench)
                     stats["sessions_added"] += 1
+            if not top_union:
+                # Aggregate had ids but everything filtered out (e.g. only
+                # excluded/Lazer publishers). Do NOT promote to STABLE with an
+                # empty allow-list; leave the feed COMING_SOON. No edits were
+                # written to `block` in this case (every session was skipped).
+                stats["skipped_no_publishers"] += 1
+                log(f"  SKIP (no publishers after filter): feedId={feed_id}")
+                continue
+            block = re.sub(
+                r'"state":\s*"COMING_SOON"', '"state": "STABLE"', block, count=1
+            )
             block = set_top_level_allowed(block, sorted(top_union))
             block = set_top_level_min_publishers(block, 1)
             stats["promoted"] += 1
