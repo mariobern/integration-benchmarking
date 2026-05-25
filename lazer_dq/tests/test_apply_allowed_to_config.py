@@ -55,3 +55,20 @@ def test_parse_allowed_sheet_reads_lists_and_no_data(tmp_path):
     assert result[100]["sessions"]["PRE_MARKET"] is None
     assert result[200]["aggregate"] is None
     assert result[200]["sessions"]["REGULAR"] is None
+
+
+def test_parse_allowed_sheet_ignores_skipped_footer_rows(tmp_path):
+    xlsx = tmp_path / "dq_footer.xlsx"
+    _write_allowed_workbook(
+        xlsx,
+        [
+            (100, "(aggregate)", _agg([24, 35]), None),
+            (100, "REGULAR", _agg([24, 35]), None),
+            (None, None, None, None),  # divider
+            # Simulated "Feeds skipped" footer: bare integer feed id, no session.
+            (777, None, None, None),
+        ],
+    )
+    result = parse_allowed_sheet(xlsx)
+    assert set(result.keys()) == {100}  # 777 footer row must NOT become a feed
+    assert result[100]["aggregate"] == [24, 35]

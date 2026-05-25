@@ -58,8 +58,9 @@ def parse_allowed_sheet(path) -> dict[int, dict]:
 
     Returns {feed_id: {"aggregate": list[int]|None,
                        "sessions": {SESSION: list[int]|None}}}.
-    Rows whose Feed ID column is not an int (title, header, dividers, footer)
-    are skipped.
+    Rows that are not genuine data rows are skipped: those whose Feed ID column
+    is not an int (title, header, dividers), and the bare-integer "Feeds skipped"
+    footer rows (whose Session cell is empty).
     """
     import openpyxl
 
@@ -72,8 +73,13 @@ def parse_allowed_sheet(path) -> dict[int, dict]:
     for row in ws.iter_rows(values_only=True):
         if not row or not isinstance(row[0], int):
             continue
-        feed_id = row[0]
         session = row[1]
+        # Only genuine data rows register a feed. This ignores the bare-integer
+        # "Feeds skipped (no data for any mode):" footer rows that summarize_feeds
+        # writes with an empty Session cell.
+        if session != "(aggregate)" and session not in SESSION_ORDER:
+            continue
+        feed_id = row[0]
         ids = _parse_ids_cell(row[2])
         entry = feeds.setdefault(
             feed_id,
@@ -81,6 +87,6 @@ def parse_allowed_sheet(path) -> dict[int, dict]:
         )
         if session == "(aggregate)":
             entry["aggregate"] = ids
-        elif session in entry["sessions"]:
+        else:
             entry["sessions"][session] = ids
     return feeds
