@@ -103,11 +103,10 @@ Each feed is reported across four modes in stable order:
 
 For each `(feed_id, mode)`:
 
-1. **Exclude** publishers in the excluded set (ID 0, `.Test`).
-2. **Drop** rows below `--min-n-observations`.
-3. **Rank** ascending by `rmse_over_spread`, keep top `--top-n`.
-4. **Filter** by per-mode thresholds (`max-rmse-over-spread-*`, `min-hit-rate-*`) and apply the redundancy floor:
-   - **Passers** = publishers meeting all three thresholds (`rmse_over_spread`, `hit_rate`, `n_observations`), sorted ascending by `rmse_over_spread`.
+1. **Exclude** publishers in the excluded set (ID 0, `.Test`) — applies to both sheets.
+2. **Rank** ascending by `rmse_over_spread`, keep top `--top-n`. This drives the `rankings` sheet and is _not_ filtered by the pass thresholds or `--min-n-observations`.
+3. **Filter** by per-mode thresholds (`max-rmse-over-spread-*`, `min-hit-rate-*`) and apply the redundancy floor. This drives the `allowed` sheet:
+   - **Passers** = publishers meeting all three thresholds — `rmse_over_spread`, `hit_rate`, and `n_observations ≥ --min-n-observations` — sorted ascending by `rmse_over_spread`.
    - If passers ≥ `--redundancy-floor` → return all passers (the floor is a minimum, never a cap).
    - If passers < `--redundancy-floor` → **top up** with the next-best below-threshold publishers, ranked by `rmse_over_spread`, each of which must clear `--min-n-observations` and have `rmse_over_spread ≤ --topup-ceiling-mult × max-rmse-over-spread-<mode>`. Take only as many as needed to reach the floor.
    - A publisher above the ceiling is never promoted, even if the feed stays below the floor.

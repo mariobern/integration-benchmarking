@@ -1111,3 +1111,68 @@ def test_main_rejects_mode_mismatch(tmp_path, monkeypatch, capsys):
     assert exc.value.code != 0
     out = capsys.readouterr().out
     assert "us-equities" in out
+
+
+def test_main_hk_equities_topup_path_end_to_end(tmp_path, monkeypatch, capsys):
+    """Full run: 1 passer + near-misses -> floor tops up. Verifies the yellow
+    Notes cell, the ceiling exclusion, and the new stdout counters end to end."""
+    reports = tmp_path / "dq_reports"
+    _write_stats_csv(
+        reports,
+        "lazer-prod",
+        "hk-equities",
+        884,
+        "2026-05-19",
+        body_rows=[
+            "5,5000,0.001,0.5,90.0\n",  # passer (r/s 0.5 <= 1.0)
+            "7,5000,0.002,1.3,90.0\n",  # top-up (1.0 < r/s <= 2.0 ceiling)
+            "9,5000,0.002,1.7,90.0\n",  # top-up
+            "11,5000,0.002,1.9,90.0\n",  # top-up
+            "13,5000,0.002,1.95,90.0\n",  # top-up (reaches floor of 5)
+            "15,5000,0.002,2.5,90.0\n",  # over 2x ceiling -> never promoted
+        ],
+        header="publisher_id,n_observations,rmse,rmse_over_spread,hit_rate_0.1pct\n",
+    )
+    csv = tmp_path / "hk.csv"
+    csv.write_text("884,2026-05-19,hk-equities\n")
+    md = tmp_path / "publishers.md"
+    md.write_text("| ID | Name | Active |\n| 0 | Zero.Test | Yes |\n")
+    out = tmp_path / "out.xlsx"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "summarize_feeds",
+            "--csv",
+            str(csv),
+            "--cluster",
+            "lazer-prod",
+            "--date",
+            "2026-05-19",
+            "--reports-dir",
+            str(reports),
+            "--publishers-md",
+            str(md),
+            "--asset-class",
+            "hk-equities",
+            "--output",
+            str(out),
+        ],
+    )
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 0
+
+    captured = capsys.readouterr().out
+    assert "Rows using top-ups: 1 cells" in captured
+    assert "Rows with 0 passers: 0 cells" in captured
+
+    wb = load_workbook(out, data_only=True)
+    allowed = wb["allowed"]
+    # Row 3 = aggregate, row 4 = REGULAR session (hk-equities has one mode).
+    assert allowed.cell(row=4, column=2).value == "REGULAR"
+    json_cell = allowed.cell(row=4, column=3).value
+    assert "5, 7, 9, 11, 13" in json_cell
+    assert "15" not in json_cell  # over the 2x ceiling, never promoted
+    assert allowed.cell(row=4, column=4).value == "1 passed + 4 top-up (≤2×)"
