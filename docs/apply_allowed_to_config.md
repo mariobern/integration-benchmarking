@@ -23,11 +23,12 @@ Run once per workbook (each file is one asset class / one date).
 
 ## Arguments
 
-| Argument    | Description                                   | Required |
-| ----------- | --------------------------------------------- | -------- |
-| `--xlsx`    | dq_summary workbook (reads the `allowed` tab) | Yes      |
-| `--config`  | after.json / after_1.json                     | Yes      |
-| `--dry-run` | Preview changes without writing               | No       |
+| Argument           | Description                                                           | Required |
+| ------------------ | --------------------------------------------------------------------- | -------- |
+| `--xlsx`           | dq_summary workbook (reads the `allowed` tab)                         | Yes      |
+| `--config`         | after.json / after_1.json                                             | Yes      |
+| `--dry-run`        | Preview changes without writing                                       | No       |
+| `--min-publishers` | Min surviving publishers to promote a COMING_SOON feed (default: `3`) | No       |
 
 ## Per-(feed, session) rules
 
@@ -47,11 +48,13 @@ Run once per workbook (each file is one asset class / one date).
   top-level set to 2 only on COMING_SOON promotion.
 - Publishers `{0, 1, 9, 13, 15}` (aggregate sentinel + Lazer) are stripped from
   every list defensively, with a warning.
-- A COMING_SOON feed is promoted **only if at least 3 publishers survive
-  filtering** (across all sessions). Feeds with 0, 1, or 2 surviving publishers
-  have insufficient redundancy and are left `COMING_SOON`, reported as
-  "Skipped (<3 publishers after filter)" — never promoted to STABLE. (The
-  threshold also guarantees the top-level `minPublishers: 2` is satisfiable.)
+- A COMING_SOON feed is promoted **only if at least `--min-publishers` survive
+  filtering** (across all sessions; default 3). Feeds below the threshold have
+  insufficient redundancy and are left `COMING_SOON`, reported as
+  "Skipped (<N publishers after filter)" — never promoted to STABLE. (At the
+  default of 3 this also guarantees the top-level `minPublishers: 2` is
+  satisfiable. Lower it, e.g. `--min-publishers 2`, for asset classes with
+  fewer publishers such as hk-equities.)
 
 ## Safety
 

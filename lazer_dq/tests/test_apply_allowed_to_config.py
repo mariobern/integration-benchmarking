@@ -471,6 +471,35 @@ def test_apply_promotes_with_exactly_three_publishers():
     assert stats["promoted"] == 1
 
 
+def test_apply_min_promote_publishers_param_lowers_gate():
+    # A 2-publisher feed is skipped at the default gate (3) but promotes when
+    # the caller lowers min_promote_publishers to 2.
+    raw = _config_with([_feed(820, "COMING_SOON", [("REGULAR", [1])], top=[1])])
+    summary = {
+        820: {
+            "aggregate": [24, 35],
+            "sessions": {
+                "REGULAR": [24, 35],
+                "PRE_MARKET": None,
+                "POST_MARKET": None,
+                "OVER_NIGHT": None,
+            },
+        }
+    }
+
+    # Default gate (3): not promoted.
+    out_default, stats_default = apply_summary_to_config(raw, summary)
+    assert stats_default["promoted"] == 0
+    assert stats_default["skipped_too_few_publishers"] == 1
+
+    # Lowered gate (2): promoted.
+    out_low, stats_low = apply_summary_to_config(raw, summary, min_promote_publishers=2)
+    feed = {f["feedId"]: f for f in json.loads(out_low)["feeds"]}[820]
+    assert feed["state"] == "STABLE"
+    assert feed["allowedPublisherIds"] == [24, 35]
+    assert stats_low["promoted"] == 1
+
+
 import subprocess
 import sys
 

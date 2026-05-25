@@ -310,12 +310,17 @@ def _regular_benchmark_mapping(feed: dict):
 
 
 def apply_summary_to_config(
-    raw: str, summary: dict[int, dict], log=None
+    raw: str,
+    summary: dict[int, dict],
+    log=None,
+    min_promote_publishers: int = MIN_PROMOTE_PUBLISHERS,
 ) -> tuple[str, dict]:
     """Apply the parsed summary to the raw config text.
 
     Returns (new_raw, stats). `log` is an optional callable(str) for per-feed
-    lines; defaults to a no-op. Implements the spec decision matrix.
+    lines; defaults to a no-op. `min_promote_publishers` is the redundancy gate:
+    a COMING_SOON feed is promoted only if at least this many publishers survive
+    filtering. Implements the spec decision matrix.
     """
     if log is None:
         log = lambda _msg: None  # noqa: E731
@@ -382,12 +387,12 @@ def apply_summary_to_config(
                 session_kept[session] = kept
                 top_union.update(kept)
 
-            if len(top_union) < MIN_PROMOTE_PUBLISHERS:
+            if len(top_union) < min_promote_publishers:
                 # Too few publishers survive filtering for adequate redundancy.
                 # Leave the feed COMING_SOON rather than promote it.
                 stats["skipped_too_few_publishers"] += 1
                 log(
-                    f"  SKIP (<{MIN_PROMOTE_PUBLISHERS} publishers): "
+                    f"  SKIP (<{min_promote_publishers} publishers): "
                     f"feedId={feed_id}, have={sorted(top_union)}"
                 )
                 continue
@@ -454,6 +459,15 @@ def main() -> None:
     parser.add_argument(
         "--dry-run", action="store_true", help="Preview changes; write nothing."
     )
+    parser.add_argument(
+        "--min-publishers",
+        type=int,
+        default=MIN_PROMOTE_PUBLISHERS,
+        help=(
+            "Minimum publishers (after filtering) required to promote a "
+            f"COMING_SOON feed to STABLE (default: {MIN_PROMOTE_PUBLISHERS})."
+        ),
+    )
     args = parser.parse_args()
 
     xlsx_path = Path(args.xlsx)
@@ -473,7 +487,9 @@ def main() -> None:
         print("\n=== DRY RUN (no files will be modified) ===\n")
 
     raw = config_path.read_text()
-    new_raw, stats = apply_summary_to_config(raw, summary, log=print)
+    new_raw, stats = apply_summary_to_config(
+        raw, summary, log=print, min_promote_publishers=args.min_publishers
+    )
 
     changed = stats["promoted"] + stats["sessions_added"]
     if not args.dry_run and changed > 0:
@@ -487,7 +503,8 @@ def main() -> None:
     print(f"  Sessions added:                       {stats['sessions_added']}")
     print(f"  Skipped (no data):                    {stats['skipped_no_data']}")
     print(
-        f"  Skipped (<3 publishers after filter): {stats['skipped_too_few_publishers']}"
+        f"  Skipped (<{args.min_publishers} publishers after filter): "
+        f"{stats['skipped_too_few_publishers']}"
     )
     print(
         f"  Skipped (STABLE, no new sessions):    {stats['skipped_stable_no_change']}"
