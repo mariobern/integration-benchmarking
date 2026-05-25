@@ -206,6 +206,22 @@ def test_rank_top_n_skips_rows_with_bad_rmse_over_spread(capsys):
 
 
 from lazer_dq.summarize_feeds import apply_filter
+from lazer_dq.summarize_feeds import _format_mult, _topup_note
+
+
+# ---------- _format_mult / _topup_note ----------
+
+
+def test_format_mult_drops_trailing_zero():
+    assert _format_mult(2.0) == "2"
+    assert _format_mult(1.5) == "1.5"
+    assert _format_mult(3.0) == "3"
+
+
+def test_topup_note_renders_counts_and_multiplier():
+    assert _topup_note(2, 3, 2.0) == "2 passed + 3 top-up (≤2×)"
+    assert _topup_note(0, 5, 2.0) == "0 passed + 5 top-up (≤2×)"
+    assert _topup_note(1, 4, 1.5) == "1 passed + 4 top-up (≤1.5×)"
 
 
 # ---------- apply_filter ----------

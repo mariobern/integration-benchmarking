@@ -73,6 +73,8 @@ MODE_ORDER = ASSET_CLASS_CONFIG["us-equities"]["modes"]
 DEFAULT_MIN_N_OBS = 1000
 DEFAULT_TOP_N = 10
 DEFAULT_FALLBACK_TOP = 3
+DEFAULT_REDUNDANCY_FLOOR = 5
+DEFAULT_TOPUP_CEILING_MULT = 2.0
 
 
 def load_excluded_publishers(publishers_md_path) -> set[int]:
@@ -355,6 +357,16 @@ def write_rankings_sheet(
         letter = get_column_letter(col_idx)
         ws.column_dimensions[letter].width = 9
     ws.column_dimensions["A"].width = 6  # rank
+
+
+def _format_mult(ceiling_mult: float) -> str:
+    """Render the ceiling multiplier without a trailing .0 (2.0 -> '2', 1.5 -> '1.5')."""
+    return f"{ceiling_mult:g}"
+
+
+def _topup_note(n_passed: int, n_topup: int, ceiling_mult: float) -> str:
+    """Notes-column text for a row that needed below-threshold top-ups."""
+    return f"{n_passed} passed + {n_topup} top-up (≤{_format_mult(ceiling_mult)}×)"
 
 
 def _format_allowed_pub_ids(ids: list[int]) -> str:
