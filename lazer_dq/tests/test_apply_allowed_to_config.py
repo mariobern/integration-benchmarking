@@ -72,3 +72,31 @@ def test_parse_allowed_sheet_ignores_skipped_footer_rows(tmp_path):
     result = parse_allowed_sheet(xlsx)
     assert set(result.keys()) == {100}  # 777 footer row must NOT become a feed
     assert result[100]["aggregate"] == [24, 35]
+
+
+from lazer_dq.apply_allowed_to_config import filter_publishers, get_min_publishers
+
+
+def test_filter_publishers_strips_zero_and_lazer():
+    kept, removed = filter_publishers([0, 1, 9, 13, 15, 24, 35, 42])
+    assert kept == [24, 35, 42]
+    assert removed == [0, 1, 9, 13, 15]
+
+
+def test_filter_publishers_keeps_sorted_unique():
+    kept, removed = filter_publishers([42, 24, 24, 35])
+    assert kept == [24, 35, 42]
+    assert removed == []
+
+
+def test_get_min_publishers_defaults():
+    assert get_min_publishers("REGULAR", 10) == 3
+    assert get_min_publishers("PRE_MARKET", 10) == 2
+    assert get_min_publishers("POST_MARKET", 10) == 2
+    assert get_min_publishers("OVER_NIGHT", 10) == 1
+
+
+def test_get_min_publishers_regular_low_count_rule():
+    assert get_min_publishers("REGULAR", 5) == 2
+    assert get_min_publishers("REGULAR", 1) == 2
+    assert get_min_publishers("REGULAR", 6) == 3

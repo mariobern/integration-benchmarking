@@ -31,6 +31,32 @@ SESSION_ORDER = ["REGULAR", "PRE_MARKET", "POST_MARKET", "OVER_NIGHT"]
 # {0} ∪ .Test but NOT Lazer ids, so we strip them defensively here.
 EXCLUDED_PUBLISHERS = {0, 1, 9, 13, 15}
 
+# minPublishers defaults per session.
+SESSION_MIN_PUBLISHERS = {
+    "REGULAR": 3,
+    "PRE_MARKET": 2,
+    "POST_MARKET": 2,
+    "OVER_NIGHT": 1,
+}
+# REGULAR sessions with this many or fewer publishers use a reduced floor.
+REGULAR_LOW_PUB_THRESHOLD = 5
+REGULAR_LOW_PUB_MIN = 2
+
+
+def filter_publishers(ids: list[int]) -> tuple[list[int], list[int]]:
+    """Drop EXCLUDED_PUBLISHERS. Return (kept_sorted_unique, removed_sorted)."""
+    id_set = set(ids)
+    kept = sorted(id_set - EXCLUDED_PUBLISHERS)
+    removed = sorted(id_set & EXCLUDED_PUBLISHERS)
+    return kept, removed
+
+
+def get_min_publishers(session: str, pub_count: int) -> int:
+    """minPublishers for a session, applying the REGULAR low-count reduction."""
+    if session == "REGULAR" and pub_count <= REGULAR_LOW_PUB_THRESHOLD:
+        return REGULAR_LOW_PUB_MIN
+    return SESSION_MIN_PUBLISHERS[session]
+
 
 def _parse_ids_cell(cell) -> list[int] | None:
     """Extract publisher ids from an 'allowedPublisherIds' cell.
