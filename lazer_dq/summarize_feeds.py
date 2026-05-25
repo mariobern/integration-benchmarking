@@ -72,7 +72,6 @@ MODE_ORDER = ASSET_CLASS_CONFIG["us-equities"]["modes"]
 
 DEFAULT_MIN_N_OBS = 1000
 DEFAULT_TOP_N = 10
-DEFAULT_FALLBACK_TOP = 3
 DEFAULT_REDUNDANCY_FLOOR = 5
 DEFAULT_TOPUP_CEILING_MULT = 2.0
 
@@ -199,21 +198,30 @@ def rank_top_n(stats, n: int, excluded: set[int]) -> list[dict]:
     return [r for _, r in keyed[:n]]
 
 
-def apply_filter(stats, max_ros: float, min_hit: float, min_obs: int, fallback_n: int):
-    """Apply per-mode thresholds. Return (passers, is_fallback).
+def apply_filter(
+    stats, max_ros: float, min_hit: float, min_obs: int, floor: int, ceiling_mult: float
+):
+    """Apply per-mode thresholds with a redundancy floor. Return (selected, n_passed, n_topup).
 
-    passers: list of stat dicts that pass all three thresholds, sorted ascending
-             by rmse_over_spread.
-    is_fallback: True iff zero rows passed AND input was non-empty (we then
-                 return the top-fallback_n by rmse_over_spread instead).
+    selected : passers (sorted ascending by rmse_over_spread) plus, when there
+               are fewer than `floor` passers, the next-best below-threshold
+               publishers ("top-ups") sorted by rmse_over_spread. Each top-up
+               must clear the n_observations floor AND have
+               rmse_over_spread <= ceiling_mult * max_ros. The floor is a
+               minimum, never a cap: if more than `floor` publishers pass, all
+               of them are returned.
+    n_passed : count meeting all three thresholds (r/s, hit_rate, n_obs).
+    n_topup  : count of below-threshold fillers added to reach the floor.
 
-    Empty input → ([], False). Rows with non-numeric metric fields are skipped silently.
+    Empty input -> ([], 0, 0). Rows with non-numeric metric fields are skipped.
+    Note: hit_rate gates passers only, not top-ups; the ceiling is the top-up
+    quality proxy.
     """
     if not stats:
-        return [], False
+        return [], 0, 0
 
     passers: list[tuple[float, dict]] = []
-    parseable: list[tuple[float, dict]] = []
+    non_passers: list[tuple[float, dict, int]] = []
     for r in stats:
         try:
             ros = float(r["rmse_over_spread"])
@@ -221,17 +229,27 @@ def apply_filter(stats, max_ros: float, min_hit: float, min_obs: int, fallback_n
             n_obs = int(r["n_observations"])
         except (ValueError, KeyError):
             continue
-        parseable.append((ros, r))
         if ros <= max_ros and hit >= min_hit and n_obs >= min_obs:
             passers.append((ros, r))
+        else:
+            non_passers.append((ros, r, n_obs))
 
-    if passers:
-        passers.sort(key=lambda x: x[0])
-        return [r for _, r in passers], False
+    passers.sort(key=lambda x: x[0])
+    n_passed = len(passers)
+    if n_passed >= floor:
+        return [r for _, r in passers], n_passed, 0
 
-    # Fallback: top-fallback_n by rmse_over_spread from parseable rows.
-    parseable.sort(key=lambda x: x[0])
-    return [r for _, r in parseable[:fallback_n]], True
+    # Top up with below-threshold publishers within the quality ceiling.
+    ceiling = ceiling_mult * max_ros
+    eligible = [
+        (ros, r)
+        for (ros, r, n_obs) in non_passers
+        if n_obs >= min_obs and ros <= ceiling
+    ]
+    eligible.sort(key=lambda x: x[0])
+    topups = eligible[: floor - n_passed]
+    selected = [r for _, r in passers] + [r for _, r in topups]
+    return selected, n_passed, len(topups)
 
 
 def compute_aggregate(per_session_arrays) -> list[int]:
@@ -386,6 +404,7 @@ def write_allowed_sheet(
     cluster: str,
     modes: list,
     sessions: dict,
+    ceiling_mult: float = DEFAULT_TOPUP_CEILING_MULT,
 ) -> None:
     """Populate the 'allowed' worksheet.
 
@@ -394,7 +413,7 @@ def write_allowed_sheet(
       A2: column headers — Feed ID | Session | allowedPublisherIds | Notes (bold + light gray)
       A3+: per-feed groups:
            row: <feed_id> | (aggregate)  | sorted-union JSON or "(no data)" |
-           row: <feed_id> | REGULAR      | JSON or "(no data)"              | optional FALLBACK note
+           row: <feed_id> | REGULAR      | JSON or "(no data)"              | optional "N passed + M top-up" note
            row: <feed_id> | PRE_MARKET   | …
            row: <feed_id> | POST_MARKET  | …
            row: <feed_id> | OVER_NIGHT   | …
@@ -435,7 +454,7 @@ def write_allowed_sheet(
             if md is None:
                 per_session_arrays.append(None)
             else:
-                # filtered is the threshold-passing list (or fallback set).
+                # filtered is the selected list: threshold passers plus any below-threshold top-ups.
                 ids = sorted({int(r["publisher_id"]) for r in md["filtered"]})
                 per_session_arrays.append(ids if ids else None)
 
@@ -464,16 +483,20 @@ def write_allowed_sheet(
                     row=row, column=4, value=f"mode missing for {date}"
                 ).fill = light_gray
             elif ids is None:
-                # Filter returned empty *after* parsing rows — rare, treat as no data.
+                # Had data, but nothing passed and no publisher sat within the ceiling.
                 ws.cell(row=row, column=3, value="(no data)")
                 ws.cell(
-                    row=row, column=4, value="filter empty after parse"
+                    row=row,
+                    column=4,
+                    value=f"0 passed, all > {_format_mult(ceiling_mult)}× ceiling",
                 ).fill = light_gray
             else:
                 ws.cell(row=row, column=3, value=_format_allowed_pub_ids(ids))
-                if md["is_fallback"]:
+                if md["n_topup"] > 0:
                     ws.cell(
-                        row=row, column=4, value="FALLBACK: 0 passed filter"
+                        row=row,
+                        column=4,
+                        value=_topup_note(md["n_passed"], md["n_topup"], ceiling_mult),
                     ).fill = yellow
             row += 1
 
@@ -510,17 +533,19 @@ def _build_per_feed_data(
     max_ros_map,
     min_hit_map,
     min_obs,
-    fallback_top,
+    floor,
+    ceiling_mult,
     modes,
 ):
-    """Returns (per_feed_data, skipped_feeds, fallback_count, modes_with_data_count).
+    """Returns (per_feed_data, skipped_feeds, topup_rows, zero_passer_rows, modes_with_data_count).
 
     `modes` is the ordered list of dq_reports subdirectory names to read for each feed
     (drawn from ASSET_CLASS_CONFIG[<asset_class>]["modes"]).
     """
     per_feed_data: dict = {}
     skipped: list[int] = []
-    fallback_count = 0
+    topup_rows = 0
+    zero_passer_rows = 0
     modes_with_data = 0
 
     for feed_id in feed_ids:
@@ -545,22 +570,25 @@ def _build_per_feed_data(
                 mode_data[mode] = None  # all rows excluded
                 continue
             ranked = rank_top_n(kept, n=top_n, excluded=set())  # already excluded
-            filtered, is_fallback = apply_filter(
-                kept, max_ros_map[mode], min_hit_map[mode], min_obs, fallback_top
+            selected, n_passed, n_topup = apply_filter(
+                kept, max_ros_map[mode], min_hit_map[mode], min_obs, floor, ceiling_mult
             )
             mode_data[mode] = {
                 "ranked": ranked,
-                "filtered": filtered,
-                "is_fallback": is_fallback,
+                "filtered": selected,
+                "n_passed": n_passed,
+                "n_topup": n_topup,
             }
             any_data = True
             modes_with_data += 1
-            if is_fallback:
-                fallback_count += 1
+            if n_topup > 0:
+                topup_rows += 1
+            if n_passed == 0:
+                zero_passer_rows += 1
         if not any_data:
             skipped.append(feed_id)
         per_feed_data[feed_id] = mode_data
-    return per_feed_data, skipped, fallback_count, modes_with_data
+    return per_feed_data, skipped, topup_rows, zero_passer_rows, modes_with_data
 
 
 def main():
@@ -658,7 +686,20 @@ Examples:
     )
     parser.add_argument("--min-n-observations", type=int, default=DEFAULT_MIN_N_OBS)
     parser.add_argument("--top-n", type=int, default=DEFAULT_TOP_N)
-    parser.add_argument("--fallback-top", type=int, default=DEFAULT_FALLBACK_TOP)
+    parser.add_argument(
+        "--redundancy-floor",
+        type=int,
+        default=DEFAULT_REDUNDANCY_FLOOR,
+        help="Minimum publishers per feed/session; top up below-threshold "
+        "near-misses to reach it (default: 5).",
+    )
+    parser.add_argument(
+        "--topup-ceiling-mult",
+        type=float,
+        default=DEFAULT_TOPUP_CEILING_MULT,
+        help="A top-up's rmse_over_spread must be <= this multiple of the "
+        "per-mode pass threshold (default: 2.0).",
+    )
     args = parser.parse_args()
 
     csv_path = Path(args.csv)
@@ -709,7 +750,13 @@ Examples:
         max_ros_map = dict(asset_cfg["default_max_ros"])
         min_hit_map = dict(asset_cfg["default_min_hit"])
 
-    per_feed_data, skipped, fb_count, modes_with_data = _build_per_feed_data(
+    (
+        per_feed_data,
+        skipped,
+        topup_rows,
+        zero_passer_rows,
+        modes_with_data,
+    ) = _build_per_feed_data(
         feed_ids,
         reports_dir,
         args.cluster,
@@ -719,7 +766,8 @@ Examples:
         max_ros_map,
         min_hit_map,
         args.min_n_observations,
-        args.fallback_top,
+        args.redundancy_floor,
+        args.topup_ceiling_mult,
         modes=modes,
     )
 
@@ -744,6 +792,7 @@ Examples:
         args.cluster,
         modes=modes,
         sessions=sessions,
+        ceiling_mult=args.topup_ceiling_mult,
     )
 
     out_path = (
@@ -764,7 +813,8 @@ Examples:
         print("Feeds skipped (no data anywhere): 0")
     print(f"Modes with data: {modes_with_data}/{len(feed_ids) * len(modes)} cells")
     print(f"Excluded publishers: 0 + {test_count} .Test (sample: {sample_excluded})")
-    print(f"Fallbacks triggered: {fb_count} cells")
+    print(f"Rows using top-ups: {topup_rows} cells")
+    print(f"Rows with 0 passers: {zero_passer_rows} cells")
     sys.exit(0)
 
 

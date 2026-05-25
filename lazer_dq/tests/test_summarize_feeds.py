@@ -227,83 +227,117 @@ def test_topup_note_renders_counts_and_multiplier():
 # ---------- apply_filter ----------
 
 
-def test_apply_filter_returns_passers_when_present():
+def test_apply_filter_returns_all_passers_when_at_or_above_floor():
+    # 6 publishers all pass; floor is a minimum, never a cap -> return all 6.
     stats = [
-        _stat(11, 0.5, hit=90, n_obs=10000),  # passes
-        _stat(20, 1.5, hit=90, n_obs=10000),  # fails ros
-        _stat(35, 0.3, hit=85, n_obs=10000),  # passes
+        _stat(11, 0.5),
+        _stat(20, 0.3),
+        _stat(35, 0.4),
+        _stat(42, 0.2),
+        _stat(50, 0.6),
+        _stat(60, 0.1),
     ]
-    passers, is_fallback = apply_filter(
-        stats, max_ros=1.0, min_hit=80, min_obs=1000, fallback_n=3
+    selected, n_passed, n_topup = apply_filter(
+        stats, max_ros=1.0, min_hit=80, min_obs=1000, floor=5, ceiling_mult=2.0
     )
-    assert is_fallback is False
-    assert {r["publisher_id"] for r in passers} == {"11", "35"}
-    # Sorted ascending by rmse_over_spread.
-    assert [r["publisher_id"] for r in passers] == ["35", "11"]
+    assert n_passed == 6
+    assert n_topup == 0
+    # All returned, sorted ascending by rmse_over_spread.
+    assert [r["publisher_id"] for r in selected] == ["60", "42", "20", "35", "11", "50"]
 
 
-def test_apply_filter_returns_fallback_when_zero_pass():
+def test_apply_filter_tops_up_to_floor_with_near_misses():
     stats = [
-        _stat(11, 5.0, hit=10, n_obs=10000),
-        _stat(20, 4.0, hit=10, n_obs=10000),
-        _stat(35, 6.0, hit=10, n_obs=10000),
-        _stat(42, 7.0, hit=10, n_obs=10000),
+        _stat(11, 0.5),  # passer
+        _stat(20, 0.3),  # passer
+        _stat(35, 1.4),  # near-miss (r/s > 1.0 but <= 2.0 ceiling)
+        _stat(42, 1.8),  # near-miss
+        _stat(50, 1.2),  # near-miss
+        _stat(60, 1.9),  # near-miss (6th best, not needed once floor reached)
     ]
-    passers, is_fallback = apply_filter(
-        stats, max_ros=1.0, min_hit=80, min_obs=1000, fallback_n=3
+    selected, n_passed, n_topup = apply_filter(
+        stats, max_ros=1.0, min_hit=80, min_obs=1000, floor=5, ceiling_mult=2.0
     )
-    assert is_fallback is True
-    # Top-3 by rmse_over_spread: 20 (4.0), 11 (5.0), 35 (6.0).
-    assert [r["publisher_id"] for r in passers] == ["20", "11", "35"]
+    assert n_passed == 2
+    assert n_topup == 3
+    ids = {r["publisher_id"] for r in selected}
+    # passers 11, 20 + 3 best near-misses by r/s: 50 (1.2), 35 (1.4), 42 (1.8).
+    assert ids == {"11", "20", "50", "35", "42"}
+    assert "60" not in ids
 
 
-def test_apply_filter_returns_partial_when_under_fallback_size():
-    stats = [_stat(11, 5.0, hit=10), _stat(20, 4.0, hit=10)]
-    passers, is_fallback = apply_filter(
-        stats, max_ros=1.0, min_hit=80, min_obs=1000, fallback_n=3
-    )
-    assert is_fallback is True
-    assert [r["publisher_id"] for r in passers] == ["20", "11"]
-
-
-def test_apply_filter_returns_empty_when_input_empty():
-    passers, is_fallback = apply_filter(
-        [], max_ros=1.0, min_hit=80, min_obs=1000, fallback_n=3
-    )
-    assert passers == []
-    assert is_fallback is False
-
-
-def test_apply_filter_excludes_low_n_observations():
+def test_apply_filter_ceiling_excludes_bad_topups_even_below_floor():
     stats = [
-        _stat(11, 0.1, hit=90, n_obs=500),  # fails n_obs
-        _stat(20, 0.2, hit=90, n_obs=10000),  # passes
+        _stat(11, 0.5),  # passer
+        _stat(20, 1.5),  # near-miss within 2.0 ceiling
+        _stat(35, 2.5),  # over ceiling -> never promoted
+        _stat(42, 3.0),  # over ceiling -> never promoted
     ]
-    passers, is_fallback = apply_filter(
-        stats, max_ros=1.0, min_hit=80, min_obs=1000, fallback_n=3
+    selected, n_passed, n_topup = apply_filter(
+        stats, max_ros=1.0, min_hit=80, min_obs=1000, floor=5, ceiling_mult=2.0
     )
-    assert is_fallback is False
-    assert [r["publisher_id"] for r in passers] == ["20"]
+    assert n_passed == 1
+    assert n_topup == 1
+    # Stays below the floor of 5; 35 and 42 are never promoted.
+    assert {r["publisher_id"] for r in selected} == {"11", "20"}
 
 
-def test_apply_filter_uses_per_mode_thresholds():
-    """Same publisher set, regular thresholds vs overnight thresholds → different counts."""
+def test_apply_filter_topups_must_meet_n_obs_floor():
     stats = [
-        _stat(11, 0.8, hit=60, n_obs=10000),
-        _stat(20, 1.5, hit=30, n_obs=10000),
-        _stat(35, 2.5, hit=20, n_obs=10000),
+        _stat(11, 0.5, n_obs=10000),  # passer
+        _stat(20, 1.5, n_obs=500),  # within ceiling but too few observations
+        _stat(35, 1.6, n_obs=10000),  # eligible near-miss
     ]
-    # Regular: max_ros=1.0, min_hit=80 → nobody passes → fallback top-3.
-    passers, fb = apply_filter(
-        stats, max_ros=1.0, min_hit=80, min_obs=1000, fallback_n=3
+    selected, n_passed, n_topup = apply_filter(
+        stats, max_ros=1.0, min_hit=80, min_obs=1000, floor=5, ceiling_mult=2.0
     )
-    assert fb is True and len(passers) == 3
-    # Overnight: max_ros=3.0, min_hit=25 → 11 and 20 pass.
-    passers, fb = apply_filter(
-        stats, max_ros=3.0, min_hit=25, min_obs=1000, fallback_n=3
+    assert n_passed == 1
+    assert n_topup == 1
+    assert {r["publisher_id"] for r in selected} == {"11", "35"}
+
+
+def test_apply_filter_hit_rate_does_not_gate_topups():
+    # All fail hit-rate (10 < 80) -> 0 passers. 11 passes r/s but fails hit,
+    # so it is a non-passer that is still eligible as a top-up.
+    stats = [
+        _stat(11, 0.5, hit=10),
+        _stat(20, 1.1, hit=10),
+        _stat(35, 1.5, hit=10),
+        _stat(42, 1.9, hit=10),
+        _stat(50, 1.3, hit=10),
+        _stat(60, 1.4, hit=10),
+    ]
+    selected, n_passed, n_topup = apply_filter(
+        stats, max_ros=1.0, min_hit=80, min_obs=1000, floor=5, ceiling_mult=2.0
     )
-    assert fb is False
-    assert {r["publisher_id"] for r in passers} == {"11", "20"}
+    assert n_passed == 0
+    assert n_topup == 5
+    # Best 5 by r/s: 11 (0.5), 20 (1.1), 50 (1.3), 60 (1.4), 35 (1.5); 42 (1.9) excluded.
+    assert {r["publisher_id"] for r in selected} == {"11", "20", "50", "60", "35"}
+    assert "42" not in {r["publisher_id"] for r in selected}
+
+
+def test_apply_filter_empty_when_all_over_ceiling():
+    stats = [
+        _stat(11, 2.5, hit=10),
+        _stat(20, 3.0, hit=10),
+        _stat(35, 5.0, hit=10),
+    ]
+    selected, n_passed, n_topup = apply_filter(
+        stats, max_ros=1.0, min_hit=80, min_obs=1000, floor=5, ceiling_mult=2.0
+    )
+    assert selected == []
+    assert n_passed == 0
+    assert n_topup == 0
+
+
+def test_apply_filter_returns_empty_for_empty_input():
+    selected, n_passed, n_topup = apply_filter(
+        [], max_ros=1.0, min_hit=80, min_obs=1000, floor=5, ceiling_mult=2.0
+    )
+    assert selected == []
+    assert n_passed == 0
+    assert n_topup == 0
 
 
 from lazer_dq.summarize_feeds import compute_aggregate
@@ -706,7 +740,13 @@ def test_build_per_feed_data_honors_modes_parameter(tmp_path):
         body_rows=["5,5000,0.001,0.5,90.0\n"],
         header="publisher_id,n_observations,rmse,rmse_over_spread,hit_rate_0.1pct\n",
     )
-    per_feed, skipped, fb_count, modes_with_data = _build_per_feed_data(
+    (
+        per_feed,
+        skipped,
+        topup_rows,
+        zero_passer_rows,
+        modes_with_data,
+    ) = _build_per_feed_data(
         feed_ids=[884],
         reports_dir=reports,
         cluster="lazer-prod",
@@ -716,13 +756,19 @@ def test_build_per_feed_data_honors_modes_parameter(tmp_path):
         max_ros_map={"hk-equities": 1.0},
         min_hit_map={"hk-equities": 80.0},
         min_obs=1000,
-        fallback_top=3,
+        floor=5,
+        ceiling_mult=2.0,
         modes=["hk-equities"],
     )
     assert skipped == []
     assert modes_with_data == 1
     assert per_feed[884]["hk-equities"] is not None
     assert per_feed[884]["hk-equities"]["ranked"][0]["publisher_id"] == "5"
+    # Publisher 5 (r/s 0.5, hit 90, 5000 obs) passes outright.
+    assert per_feed[884]["hk-equities"]["n_passed"] == 1
+    assert per_feed[884]["hk-equities"]["n_topup"] == 0
+    assert topup_rows == 0
+    assert zero_passer_rows == 0
     # Crucially: no us-equities key at all.
     assert "us-equities" not in per_feed[884]
 
@@ -752,7 +798,8 @@ def test_write_rankings_sheet_one_mode_uses_6_columns(tmp_path):
             "hk-equities": {
                 "ranked": [_ranked_row(5), _ranked_row(7)],
                 "filtered": [_ranked_row(5)],
-                "is_fallback": False,
+                "n_passed": 2,
+                "n_topup": 0,
             }
         }
     }
@@ -790,7 +837,8 @@ def test_write_rankings_sheet_four_modes_uses_24_columns(tmp_path):
             "us-equities": {
                 "ranked": [_ranked_row(5)],
                 "filtered": [_ranked_row(5)],
-                "is_fallback": False,
+                "n_passed": 2,
+                "n_topup": 0,
             },
             "us-equities-pre": None,
             "us-equities-post": None,
@@ -831,7 +879,8 @@ def test_write_allowed_sheet_one_mode_emits_two_rows_per_feed(tmp_path):
             "hk-equities": {
                 "ranked": [_ranked_row(5), _ranked_row(7)],
                 "filtered": [_ranked_row(5), _ranked_row(7)],
-                "is_fallback": False,
+                "n_passed": 2,
+                "n_topup": 0,
             }
         }
     }
@@ -843,6 +892,7 @@ def test_write_allowed_sheet_one_mode_emits_two_rows_per_feed(tmp_path):
         cluster="lazer-prod",
         modes=["hk-equities"],
         sessions={"hk-equities": "REGULAR"},
+        ceiling_mult=2.0,
     )
     assert ws.cell(row=3, column=1).value == 884
     assert ws.cell(row=3, column=2).value == "(aggregate)"
@@ -850,6 +900,93 @@ def test_write_allowed_sheet_one_mode_emits_two_rows_per_feed(tmp_path):
     assert ws.cell(row=4, column=1).value == 884
     assert ws.cell(row=4, column=2).value == "REGULAR"
     assert "5, 7" in ws.cell(row=4, column=3).value
+
+
+def test_write_allowed_sheet_topup_note_when_below_floor(tmp_path):
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    per_feed = {
+        884: {
+            "hk-equities": {
+                "ranked": [_ranked_row(5)],
+                "filtered": [_ranked_row(5), _ranked_row(7), _ranked_row(9)],
+                "n_passed": 1,
+                "n_topup": 2,
+            }
+        }
+    }
+    write_allowed_sheet(
+        ws,
+        per_feed,
+        skipped_feeds=[],
+        date="2026-05-19",
+        cluster="lazer-prod",
+        modes=["hk-equities"],
+        sessions={"hk-equities": "REGULAR"},
+        ceiling_mult=2.0,
+    )
+    # Session row is row 4; Notes is column 4.
+    assert ws.cell(row=4, column=4).value == "1 passed + 2 top-up (≤2×)"
+    assert "5, 7, 9" in ws.cell(row=4, column=3).value
+
+
+def test_write_allowed_sheet_all_passers_has_blank_note(tmp_path):
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    per_feed = {
+        884: {
+            "hk-equities": {
+                "ranked": [_ranked_row(5)],
+                "filtered": [_ranked_row(5), _ranked_row(7)],
+                "n_passed": 2,
+                "n_topup": 0,
+            }
+        }
+    }
+    write_allowed_sheet(
+        ws,
+        per_feed,
+        skipped_feeds=[],
+        date="2026-05-19",
+        cluster="lazer-prod",
+        modes=["hk-equities"],
+        sessions={"hk-equities": "REGULAR"},
+        ceiling_mult=2.0,
+    )
+    assert ws.cell(row=4, column=4).value is None
+
+
+def test_write_allowed_sheet_empty_by_ceiling_note(tmp_path):
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    per_feed = {
+        884: {
+            "hk-equities": {
+                "ranked": [_ranked_row(5, ros=3.0)],
+                "filtered": [],
+                "n_passed": 0,
+                "n_topup": 0,
+            }
+        }
+    }
+    write_allowed_sheet(
+        ws,
+        per_feed,
+        skipped_feeds=[],
+        date="2026-05-19",
+        cluster="lazer-prod",
+        modes=["hk-equities"],
+        sessions={"hk-equities": "REGULAR"},
+        ceiling_mult=2.0,
+    )
+    assert ws.cell(row=4, column=3).value == "(no data)"
+    assert ws.cell(row=4, column=4).value == "0 passed, all > 2× ceiling"
 
 
 # ---------- validate_csv_modes ----------
