@@ -314,6 +314,7 @@ def test_apply_adds_missing_session_to_stable_feed():
     assert feed["allowedPublisherIds"] == [11, 12, 24, 35]  # folded union
     assert feed["minPublishers"] == 3  # top-level untouched on STABLE
     assert stats["sessions_added"] == 1
+    assert stats["skipped_stable_no_change"] == 0  # a session WAS added
 
 
 def test_apply_leaves_existing_stable_session_untouched():
@@ -339,6 +340,8 @@ def test_apply_leaves_existing_stable_session_untouched():
 
     assert sess["PRE_MARKET"]["allowedPublisherIds"] == [99]  # NOT overwritten
     assert stats["sessions_added"] == 0
+    assert feed == {f["feedId"]: f for f in json.loads(raw)["feeds"]}[300]  # untouched
+    assert stats["skipped_stable_no_change"] == 1  # STABLE, nothing new to add
 
 
 def test_apply_skips_no_data_feed():

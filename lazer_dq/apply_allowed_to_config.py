@@ -324,6 +324,7 @@ def apply_summary_to_config(
         "sessions_added": 0,
         "skipped_no_data": 0,
         "skipped_no_publishers": 0,
+        "skipped_stable_no_change": 0,
         "skipped_state": 0,
         "not_found": [],
         "filtered_any": False,
@@ -414,6 +415,12 @@ def apply_summary_to_config(
                 existing_top = feed.get("allowedPublisherIds") or []
                 new_top = sorted(set(existing_top) | added)
                 block = set_top_level_allowed(block, new_top)
+            else:
+                # STABLE feed whose only data was for sessions already live:
+                # nothing to add, nothing changed. Counted so the summary
+                # reconciles to the input feed count.
+                stats["skipped_stable_no_change"] += 1
+                log(f"  SKIP (STABLE, no new sessions): feedId={feed_id}")
 
         raw = raw[:start] + block + raw[end:]
 
@@ -466,6 +473,9 @@ def main() -> None:
     print(f"  Sessions added:                       {stats['sessions_added']}")
     print(f"  Skipped (no data):                    {stats['skipped_no_data']}")
     print(f"  Skipped (no publishers after filter): {stats['skipped_no_publishers']}")
+    print(
+        f"  Skipped (STABLE, no new sessions):    {stats['skipped_stable_no_change']}"
+    )
     print(f"  Skipped (other state):                {stats['skipped_state']}")
     print(f"  Not found in config:                  {len(stats['not_found'])}")
     if stats["not_found"]:
