@@ -169,6 +169,26 @@ def test_overwrite_session_handles_null_array():
     assert '"minPublishers": 2' in out
 
 
+def test_overwrite_session_inserts_when_fields_absent():
+    # Real after.json shape: a COMING_SOON REGULAR entry with NO
+    # allowedPublisherIds and NO minPublishers key.
+    block = (
+        '{ "marketSchedules": [\n'
+        "        {\n"
+        '          "benchmarkMapping": {"datascope_ric": {}},\n'
+        '          "marketSchedule": "X",\n'
+        '          "session": "REGULAR"\n'
+        "        }\n"
+        "      ] }"
+    )
+    out = overwrite_session(block, "REGULAR", [24, 35, 42])
+    data = json.loads(out)  # must be valid JSON
+    reg = data["marketSchedules"][0]
+    assert reg["allowedPublisherIds"] == [24, 35, 42]
+    assert reg["minPublishers"] == 2  # 3 pubs => REGULAR low-count
+    assert reg["benchmarkMapping"] == {"datascope_ric": {}}  # preserved
+
+
 def test_add_session_inserts_entry_with_benchmark_mapping():
     block = (
         '{ "marketSchedules": [\n'

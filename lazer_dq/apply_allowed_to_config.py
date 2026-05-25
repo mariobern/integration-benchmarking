@@ -22,7 +22,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from lib.json_surgery import find_feed_block, find_session_block  # noqa: F401
+from lib.json_surgery import find_feed_block, find_session_block
 
 # Session names, in after.json order.
 SESSION_ORDER = ["REGULAR", "PRE_MARKET", "POST_MARKET", "OVER_NIGHT"]
@@ -210,8 +210,32 @@ def set_top_level_min_publishers(block: str, n: int) -> str:
     return block[:s] + f'"minPublishers": {n}' + block[e:]
 
 
+def _insert_field_after_open_brace(sblock: str, field_text: str) -> str:
+    """Insert `field_text` (e.g. '"minPublishers": 3,') as a new line right after
+    a block's opening '{', indented to match the block's existing fields.
+
+    Used when a session entry lacks a field we need to set. The trailing comma in
+    `field_text` is valid because a session entry always has at least the
+    "session" field following the insertion point.
+    """
+    brace = sblock.index("{")
+    m = re.search(r'\n(\s*)"', sblock)
+    if m:
+        indent = m.group(1)
+        nl = sblock.index("\n", brace)
+        return sblock[: nl + 1] + indent + field_text + "\n" + sblock[nl + 1 :]
+    # single-line fallback: '{ <field> ...'
+    return sblock[: brace + 1] + " " + field_text + sblock[brace + 1 :]
+
+
 def overwrite_session(block: str, session: str, ids: list[int]) -> str:
-    """Within a feed block, set a session's allowedPublisherIds + minPublishers."""
+    """Within a feed block, set a session's allowedPublisherIds + minPublishers.
+
+    Replaces each field in place when present; inserts it after the session's
+    opening '{' when absent. Many COMING_SOON session entries in after.json ship
+    without an allowedPublisherIds (and sometimes minPublishers) key, so the
+    insert path is the common case on real configs.
+    """
     bounds = find_session_block(block, session)
     if bounds is None:
         return block
@@ -220,13 +244,19 @@ def overwrite_session(block: str, session: str, ids: list[int]) -> str:
     min_pub = get_min_publishers(session, len(ids))
 
     pub_pat = r'"allowedPublisherIds":\s*(\[[^\]]*\]|null)'
+    pub_repl = f'"allowedPublisherIds": {_ids_inline(ids)}'
     if re.search(pub_pat, sblock):
-        sblock = re.sub(
-            pub_pat, f'"allowedPublisherIds": {_ids_inline(ids)}', sblock, count=1
-        )
+        sblock = re.sub(pub_pat, pub_repl, sblock, count=1)
+    else:
+        sblock = _insert_field_after_open_brace(sblock, pub_repl + ",")
+
     min_pat = r'"minPublishers":\s*\d+'
+    min_repl = f'"minPublishers": {min_pub}'
     if re.search(min_pat, sblock):
-        sblock = re.sub(min_pat, f'"minPublishers": {min_pub}', sblock, count=1)
+        sblock = re.sub(min_pat, min_repl, sblock, count=1)
+    else:
+        sblock = _insert_field_after_open_brace(sblock, min_repl + ",")
+
     return block[:s] + sblock + block[e:]
 
 
