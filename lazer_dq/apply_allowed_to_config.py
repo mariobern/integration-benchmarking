@@ -388,3 +388,61 @@ def apply_summary_to_config(
         raw = raw[:start] + block + raw[end:]
 
     return raw, stats
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Apply a dq_summary 'allowed' sheet to after.json."
+    )
+    parser.add_argument(
+        "--xlsx", required=True, help="dq_summary_<cluster>_<date>.xlsx"
+    )
+    parser.add_argument(
+        "--config", required=True, help="after.json / after_1.json config file"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Preview changes; write nothing."
+    )
+    args = parser.parse_args()
+
+    xlsx_path = Path(args.xlsx)
+    config_path = Path(args.config)
+    if not xlsx_path.exists():
+        print(f"ERROR: workbook not found: {xlsx_path}")
+        sys.exit(1)
+    if not config_path.exists():
+        print(f"ERROR: config not found: {config_path}")
+        sys.exit(1)
+
+    print(f"Reading allowed sheet from {xlsx_path}")
+    summary = parse_allowed_sheet(xlsx_path)
+    print(f"Found {len(summary)} feeds in the allowed sheet")
+
+    if args.dry_run:
+        print("\n=== DRY RUN (no files will be modified) ===\n")
+
+    raw = config_path.read_text()
+    new_raw, stats = apply_summary_to_config(raw, summary, log=print)
+
+    changed = stats["promoted"] + stats["sessions_added"]
+    if not args.dry_run and changed > 0:
+        backup = str(config_path) + ".bak"
+        shutil.copy2(config_path, backup)
+        config_path.write_text(new_raw)
+        print(f"\nBackup saved to {backup}")
+
+    print(f"\n{'=' * 50}\nSUMMARY\n{'=' * 50}")
+    print(f"  Feeds promoted (COMING_SOON->STABLE): {stats['promoted']}")
+    print(f"  Sessions added:                       {stats['sessions_added']}")
+    print(f"  Skipped (no data):                    {stats['skipped_no_data']}")
+    print(f"  Skipped (no publishers after filter): {stats['skipped_no_publishers']}")
+    print(f"  Skipped (other state):                {stats['skipped_state']}")
+    print(f"  Not found in config:                  {len(stats['not_found'])}")
+    if stats["not_found"]:
+        print(f"  Missing feed IDs: {stats['not_found']}")
+    if stats["filtered_any"]:
+        print("  NOTE: some Lazer/zero publishers were filtered (see lines above).")
+
+
+if __name__ == "__main__":
+    main()

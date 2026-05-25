@@ -400,3 +400,84 @@ def test_apply_does_not_promote_when_all_publishers_filtered():
     assert stats["promoted"] == 0
     assert stats["skipped_no_publishers"] == 1
     assert stats["filtered_any"] is True
+
+
+import subprocess
+import sys
+
+
+def _real_workbook(tmp_path):
+    xlsx = tmp_path / "dq_summary_test_2026-05-20.xlsx"
+    _write_allowed_workbook(
+        xlsx,
+        [
+            (100, "(aggregate)", _agg([24, 35, 42]), None),
+            (100, "REGULAR", _agg([24, 35, 42]), "0 passed + 3 top-up (≤2×)"),
+            (100, "PRE_MARKET", "(no data)", "mode missing"),
+            (100, "POST_MARKET", "(no data)", "mode missing"),
+            (100, "OVER_NIGHT", "(no data)", "mode missing"),
+        ],
+    )
+    return xlsx
+
+
+def _real_config(tmp_path):
+    cfg = tmp_path / "after_test.json"
+    cfg.write_text(
+        _config_with(
+            [_feed(100, "COMING_SOON", [("REGULAR", [1, 2, 3])], top=[1, 2, 3])]
+        )
+    )
+    return cfg
+
+
+def test_cli_dry_run_writes_nothing(tmp_path):
+    xlsx = _real_workbook(tmp_path)
+    cfg = _real_config(tmp_path)
+    before = cfg.read_text()
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "lazer_dq.apply_allowed_to_config",
+            "--xlsx",
+            str(xlsx),
+            "--config",
+            str(cfg),
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(Path(__file__).resolve().parents[2]),
+    )
+    assert result.returncode == 0, result.stderr
+    assert "DRY RUN" in result.stdout
+    assert cfg.read_text() == before  # unchanged
+    assert not (tmp_path / "after_test.json.bak").exists()
+
+
+def test_cli_real_run_writes_and_backs_up(tmp_path):
+    xlsx = _real_workbook(tmp_path)
+    cfg = _real_config(tmp_path)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "lazer_dq.apply_allowed_to_config",
+            "--xlsx",
+            str(xlsx),
+            "--config",
+            str(cfg),
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(Path(__file__).resolve().parents[2]),
+    )
+    assert result.returncode == 0, result.stderr
+    assert (cfg.parent / "after_test.json.bak").exists()
+    data = json.loads(cfg.read_text())
+    feed = {f["feedId"]: f for f in data["feeds"]}[100]
+    assert feed["state"] == "STABLE"
+    assert feed["allowedPublisherIds"] == [24, 35, 42]
