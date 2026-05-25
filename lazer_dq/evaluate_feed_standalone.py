@@ -707,13 +707,14 @@ def run_analysis(df_benchmark_data, df_publisher_data):
     df_aligned_prices = merge_benchmark_and_publisher_data(
         df_benchmark_data, df_publisher_data
     )
-    print(f"   Successfully aligned {len(df_aligned_prices):,} price observations")
 
-    if len(df_aligned_prices) == 0:
+    if df_aligned_prices is None or len(df_aligned_prices) == 0:
         print(
             "ERROR: No aligned data found. Check if timestamps overlap between Exchange and Pyth data."
         )
-        return None, None
+        return None, None, []
+
+    print(f"   Successfully aligned {len(df_aligned_prices):,} price observations")
 
     # Calculate metrics
     print("\n2. Calculating publisher metrics...")
@@ -1280,6 +1281,13 @@ def main():
     df_aligned_prices, metrics_df, figs = run_analysis(
         df_benchmark_data, df_publisher_data
     )
+
+    if df_aligned_prices is None or metrics_df is None:
+        print(
+            f"No alignable publisher/benchmark timestamps for feed {feed_id} on {date} "
+            f"(mode={mode}); skipping analysis."
+        )
+        sys.exit(2)
 
     # === CELL 18 ===
     output_plots(figs, output_path)
