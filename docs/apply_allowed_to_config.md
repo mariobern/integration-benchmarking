@@ -35,7 +35,7 @@ Run once per workbook (each file is one asset class / one date).
 | ----------- | ---------------------- | ----------------- | ----------------------------------------------------- |
 | COMING_SOON | yes                    | yes               | overwrite `allowedPublisherIds` + `minPublishers`     |
 | COMING_SOON | no                     | yes               | add the session entry                                 |
-| COMING_SOON | (any session has data) | —                 | flip → STABLE; top-level = union, `minPublishers` 1   |
+| COMING_SOON | (any session has data) | —                 | flip → STABLE; top-level = union, `minPublishers` 2   |
 | STABLE      | yes                    | yes               | leave untouched (live)                                |
 | STABLE      | no                     | yes               | add the session entry; fold publishers into top-level |
 | any         | —                      | `(no data)`       | leave untouched                                       |
@@ -44,7 +44,7 @@ Run once per workbook (each file is one asset class / one date).
 - Added sessions copy `benchmarkMapping` from the feed's REGULAR session and
   use the standard US-equity `marketSchedule` template for the session.
 - `minPublishers`: REGULAR 3 (→2 when ≤5 publishers), PRE/POST 2, OVERNIGHT 1;
-  top-level set to 1 only on COMING_SOON promotion.
+  top-level set to 2 only on COMING_SOON promotion.
 - Publishers `{0, 1, 9, 13, 15}` (aggregate sentinel + Lazer) are stripped from
   every list defensively, with a warning.
 - A COMING_SOON feed is promoted **only if at least one publisher survives

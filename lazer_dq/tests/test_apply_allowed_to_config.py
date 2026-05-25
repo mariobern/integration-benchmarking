@@ -280,7 +280,7 @@ def test_apply_promotes_coming_soon_regular_only():
     feed = {f["feedId"]: f for f in data["feeds"]}[100]
 
     assert feed["state"] == "STABLE"
-    assert feed["minPublishers"] == 1  # top-level set to 1
+    assert feed["minPublishers"] == 2  # top-level set to 2 on promotion
     assert feed["allowedPublisherIds"] == [24, 35, 42]
     reg = feed["marketSchedules"][0]
     assert reg["allowedPublisherIds"] == [24, 35, 42]

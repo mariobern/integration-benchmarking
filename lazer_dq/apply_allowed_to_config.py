@@ -389,7 +389,7 @@ def apply_summary_to_config(
                 r'"state":\s*"COMING_SOON"', '"state": "STABLE"', block, count=1
             )
             block = set_top_level_allowed(block, sorted(top_union))
-            block = set_top_level_min_publishers(block, 1)
+            block = set_top_level_min_publishers(block, 2)
             stats["promoted"] += 1
             log(f"  PROMOTE: feedId={feed_id} -> STABLE, top={sorted(top_union)}")
         else:  # STABLE — additive only
