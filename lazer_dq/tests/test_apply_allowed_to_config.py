@@ -193,3 +193,14 @@ def test_add_session_inserts_entry_with_benchmark_mapping():
     assert pre["marketSchedule"] == SCHEDULE_TEMPLATES["PRE_MARKET"]
     # REGULAR untouched.
     assert sessions["REGULAR"]["allowedPublisherIds"] == [11]
+
+
+def test_add_session_into_empty_marketschedules():
+    block = '{ "marketSchedules": [] }'
+    out = add_session(block, "REGULAR", [24, 35], None)
+    data = json.loads(out)  # must be valid JSON
+    assert len(data["marketSchedules"]) == 1
+    sess = data["marketSchedules"][0]
+    assert sess["session"] == "REGULAR"
+    assert sess["allowedPublisherIds"] == [24, 35]
+    assert "benchmarkMapping" not in sess  # None mapping omitted

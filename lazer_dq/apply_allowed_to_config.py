@@ -257,8 +257,11 @@ def add_session(block: str, session: str, ids: list[int], benchmark_mapping) -> 
         return block
     closing_bracket = ms_end - 1  # position of the array's ']'
 
-    # Walk back to the last non-whitespace char before ']' (last entry's '}').
+    # Walk back to the last non-whitespace char before ']'. For a non-empty
+    # array that is the previous entry's '}' (prepend a comma); for an empty
+    # array it is the opening '[' (no comma, else invalid JSON).
     p = closing_bracket - 1
     while p >= 0 and block[p] in (" ", "\n", "\t", "\r"):
         p -= 1
-    return block[: p + 1] + ",\n" + entry_text + block[p + 1 :]
+    sep = "\n" if block[p] == "[" else ",\n"
+    return block[: p + 1] + sep + entry_text + block[p + 1 :]
