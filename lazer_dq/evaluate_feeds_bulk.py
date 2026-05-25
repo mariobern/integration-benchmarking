@@ -65,11 +65,14 @@ def run_standalone(
     end_time: str,
     output_path: str,
     target_pub_count: int,
-) -> bool:
-    """Subprocess-call the engine for a single feed-day. True iff returncode == 0.
+) -> str:
+    """Subprocess-call the engine for a single feed-day.
+
+    Returns one of: "ok" (exit 0), "skipped" (exit 2 — no benchmark/aligned data),
+    or "failed" (any other non-zero exit, including invocation errors).
 
     Stdio is inherited from the parent so the engine's progress logs stream live.
-    Any non-zero exit is treated as a soft failure: the caller continues to the
+    Any non-zero exit is treated as a soft outcome: the caller continues to the
     next CSV row.
     """
     argv = [
@@ -98,12 +101,15 @@ def run_standalone(
         result = subprocess.run(argv, check=False)
     except Exception as e:
         print(f"  Error: Engine invocation raised for {feed_id}: {e}")
-        return False
+        return "failed"
     if result.returncode == 0:
         print(f"  Engine execution successful for {feed_id}.")
-        return True
+        return "ok"
+    if result.returncode == 2:
+        print(f"  Skipped {feed_id}: no benchmark/aligned data (exit 2).")
+        return "skipped"
     print(f"  Error: Engine execution failed for {feed_id} (exit {result.returncode}).")
-    return False
+    return "failed"
 
 
 def process_csv(
@@ -113,14 +119,17 @@ def process_csv(
     end_time_override: str | None,
     output_path: str,
     target_pub_count: int,
-) -> tuple[int, int, list[str]]:
-    """Iterate the CSV and run the engine per row. Returns (succeeded, failed, failed_descriptors).
+) -> tuple[int, int, int, list[str], list[str]]:
+    """Iterate the CSV and run the engine per row.
 
-    failed_descriptors is a list like ["1021@2026-05-04", ...] for the end-of-run summary.
+    Returns (succeeded, skipped, failed, skipped_descriptors, failed_descriptors).
+    Descriptor lists look like ["1021@2026-05-04", ...] for the end-of-run summary.
     Per-row failures never abort the batch.
     """
     succeeded = 0
+    skipped = 0
     failed = 0
+    skipped_list: list[str] = []
     failed_list: list[str] = []
 
     print("Starting batch processing of price_ids...")
@@ -151,7 +160,7 @@ def process_csv(
                 else:
                     start_time, end_time = compute_times_from_mode(date, mode)
 
-                ok = run_standalone(
+                outcome = run_standalone(
                     feed_id=feed_id,
                     date=date,
                     mode=mode,
@@ -161,8 +170,11 @@ def process_csv(
                     output_path=output_path,
                     target_pub_count=target_pub_count,
                 )
-                if ok:
+                if outcome == "ok":
                     succeeded += 1
+                elif outcome == "skipped":
+                    skipped += 1
+                    skipped_list.append(f"{feed_id}@{date}")
                 else:
                     failed += 1
                     failed_list.append(f"{feed_id}@{date}")
@@ -171,7 +183,7 @@ def process_csv(
         sys.exit(1)
 
     print("Batch processing complete.")
-    return succeeded, failed, failed_list
+    return succeeded, skipped, failed, skipped_list, failed_list
 
 
 def main():
@@ -221,7 +233,7 @@ Examples:
         print(f"Error: CSV file '{csv_path}' not found.")
         sys.exit(1)
 
-    succeeded, failed, failed_list = process_csv(
+    succeeded, skipped, failed, skipped_list, failed_list = process_csv(
         csv_file=csv_path,
         cluster=args.cluster,
         start_time_override=args.start_time,
@@ -230,8 +242,13 @@ Examples:
         target_pub_count=args.target_pub_count,
     )
 
-    total = succeeded + failed
-    print(f"Processed {total} feeds: {succeeded} succeeded, {failed} failed.")
+    total = succeeded + skipped + failed
+    print(
+        f"Processed {total} feeds: {succeeded} succeeded, "
+        f"{skipped} skipped (no data), {failed} failed."
+    )
+    if skipped_list:
+        print(f"Skipped (no data): {skipped_list}")
     if failed_list:
         print(f"Failed: {failed_list}")
     sys.exit(0 if failed == 0 else 1)
