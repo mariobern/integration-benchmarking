@@ -204,3 +204,175 @@ def test_add_session_into_empty_marketschedules():
     assert sess["session"] == "REGULAR"
     assert sess["allowedPublisherIds"] == [24, 35]
     assert "benchmarkMapping" not in sess  # None mapping omitted
+
+
+from lazer_dq.apply_allowed_to_config import apply_summary_to_config
+
+_BENCH = {"datascope_ric": {"identifiers": [{"identifier": "AAPL.O"}]}}
+
+
+def _config_with(feeds: list[dict]) -> str:
+    """Serialize a minimal config the way after.json is laid out (indent=2)."""
+    return json.dumps({"feeds": feeds}, indent=2)
+
+
+def _feed(feed_id, state, sessions, top=None):
+    """sessions: list of (name, allowed_or_None). REGULAR carries benchmarkMapping."""
+    ms = []
+    for name, allowed in sessions:
+        entry = {
+            "allowedPublisherIds": allowed,
+            "benchmarkMapping": _BENCH,
+            "marketSchedule": "TPL",
+            "minPublishers": 3,
+            "session": name,
+        }
+        ms.append(entry)
+    feed = {
+        "allowedPublisherIds": top if top is not None else [],
+        "feedId": feed_id,
+        "marketSchedules": ms,
+        "minPublishers": 3,
+        "state": state,
+        "symbol": f"S{feed_id}",
+    }
+    return feed
+
+
+def test_apply_promotes_coming_soon_regular_only():
+    raw = _config_with(
+        [_feed(100, "COMING_SOON", [("REGULAR", [1, 2, 3])], top=[1, 2, 3])]
+    )
+    summary = {
+        100: {
+            "aggregate": [24, 35, 42],
+            "sessions": {
+                "REGULAR": [24, 35, 42],
+                "PRE_MARKET": None,
+                "POST_MARKET": None,
+                "OVER_NIGHT": None,
+            },
+        }
+    }
+
+    out, stats = apply_summary_to_config(raw, summary)
+    data = json.loads(out)
+    feed = {f["feedId"]: f for f in data["feeds"]}[100]
+
+    assert feed["state"] == "STABLE"
+    assert feed["minPublishers"] == 1  # top-level set to 1
+    assert feed["allowedPublisherIds"] == [24, 35, 42]
+    reg = feed["marketSchedules"][0]
+    assert reg["allowedPublisherIds"] == [24, 35, 42]
+    assert reg["minPublishers"] == 2  # 3 pubs => REGULAR low-count
+    assert stats["promoted"] == 1
+
+
+def test_apply_adds_missing_session_to_stable_feed():
+    raw = _config_with([_feed(200, "STABLE", [("REGULAR", [11, 12])], top=[11, 12])])
+    summary = {
+        200: {
+            "aggregate": [24, 35],
+            "sessions": {
+                "REGULAR": [11, 12],
+                "PRE_MARKET": [24, 35],
+                "POST_MARKET": None,
+                "OVER_NIGHT": None,
+            },
+        }
+    }
+
+    out, stats = apply_summary_to_config(raw, summary)
+    data = json.loads(out)
+    feed = {f["feedId"]: f for f in data["feeds"]}[200]
+    sess = {s["session"]: s for s in feed["marketSchedules"]}
+
+    assert feed["state"] == "STABLE"  # unchanged
+    assert sess["REGULAR"]["allowedPublisherIds"] == [11, 12]  # live, untouched
+    assert sess["PRE_MARKET"]["allowedPublisherIds"] == [24, 35]  # added
+    assert sess["PRE_MARKET"]["benchmarkMapping"] == _BENCH  # copied from REGULAR
+    assert feed["allowedPublisherIds"] == [11, 12, 24, 35]  # folded union
+    assert feed["minPublishers"] == 3  # top-level untouched on STABLE
+    assert stats["sessions_added"] == 1
+
+
+def test_apply_leaves_existing_stable_session_untouched():
+    raw = _config_with(
+        [_feed(300, "STABLE", [("REGULAR", [11]), ("PRE_MARKET", [99])], top=[11, 99])]
+    )
+    summary = {
+        300: {
+            "aggregate": [24],
+            "sessions": {
+                "REGULAR": [11],
+                "PRE_MARKET": [24],
+                "POST_MARKET": None,
+                "OVER_NIGHT": None,
+            },
+        }
+    }
+
+    out, stats = apply_summary_to_config(raw, summary)
+    data = json.loads(out)
+    feed = {f["feedId"]: f for f in data["feeds"]}[300]
+    sess = {s["session"]: s for s in feed["marketSchedules"]}
+
+    assert sess["PRE_MARKET"]["allowedPublisherIds"] == [99]  # NOT overwritten
+    assert stats["sessions_added"] == 0
+
+
+def test_apply_skips_no_data_feed():
+    raw = _config_with([_feed(400, "COMING_SOON", [("REGULAR", [1])], top=[1])])
+    summary = {
+        400: {
+            "aggregate": None,
+            "sessions": {
+                s: None for s in ["REGULAR", "PRE_MARKET", "POST_MARKET", "OVER_NIGHT"]
+            },
+        }
+    }
+
+    out, stats = apply_summary_to_config(raw, summary)
+    assert out == raw  # nothing changed
+    assert stats["skipped_no_data"] == 1
+
+
+def test_apply_warns_on_missing_feed():
+    raw = _config_with([_feed(500, "COMING_SOON", [("REGULAR", [1])], top=[1])])
+    summary = {
+        999: {
+            "aggregate": [24],
+            "sessions": {
+                "REGULAR": [24],
+                "PRE_MARKET": None,
+                "POST_MARKET": None,
+                "OVER_NIGHT": None,
+            },
+        }
+    }
+
+    out, stats = apply_summary_to_config(raw, summary)
+    assert out == raw
+    assert stats["not_found"] == [999]
+
+
+def test_apply_filters_lazer_and_warns():
+    raw = _config_with([_feed(600, "COMING_SOON", [("REGULAR", [1])], top=[1])])
+    summary = {
+        600: {
+            "aggregate": [1, 9, 24, 35],
+            "sessions": {
+                "REGULAR": [1, 9, 24, 35],
+                "PRE_MARKET": None,
+                "POST_MARKET": None,
+                "OVER_NIGHT": None,
+            },
+        }
+    }
+
+    out, stats = apply_summary_to_config(raw, summary)
+    data = json.loads(out)
+    feed = {f["feedId"]: f for f in data["feeds"]}[600]
+    assert feed["marketSchedules"][0]["allowedPublisherIds"] == [24, 35]
+    assert feed["allowedPublisherIds"] == [24, 35]
+    assert stats["filtered_any"] is True

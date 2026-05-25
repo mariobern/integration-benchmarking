@@ -265,3 +265,117 @@ def add_session(block: str, session: str, ids: list[int], benchmark_mapping) -> 
         p -= 1
     sep = "\n" if block[p] == "[" else ",\n"
     return block[: p + 1] + sep + entry_text + block[p + 1 :]
+
+
+def _regular_benchmark_mapping(feed: dict):
+    """Return the benchmarkMapping dict from the feed's REGULAR session, or None."""
+    for s in feed.get("marketSchedules", []):
+        if s.get("session") == "REGULAR":
+            return s.get("benchmarkMapping")
+    return None
+
+
+def apply_summary_to_config(
+    raw: str, summary: dict[int, dict], log=None
+) -> tuple[str, dict]:
+    """Apply the parsed summary to the raw config text.
+
+    Returns (new_raw, stats). `log` is an optional callable(str) for per-feed
+    lines; defaults to a no-op. Implements the spec decision matrix.
+    """
+    if log is None:
+        log = lambda _msg: None  # noqa: E731
+
+    data = json.loads(raw)
+    feed_index = {f["feedId"]: f for f in data["feeds"]}
+
+    stats = {
+        "promoted": 0,
+        "sessions_added": 0,
+        "skipped_no_data": 0,
+        "skipped_state": 0,
+        "not_found": [],
+        "filtered_any": False,
+    }
+
+    for feed_id, fa in summary.items():
+        if not fa["aggregate"]:
+            stats["skipped_no_data"] += 1
+            log(f"  SKIP (no data): feedId={feed_id}")
+            continue
+
+        feed = feed_index.get(feed_id)
+        if feed is None:
+            stats["not_found"].append(feed_id)
+            log(f"  WARNING (not found): feedId={feed_id}")
+            continue
+
+        state = feed.get("state")
+        if state not in ("COMING_SOON", "STABLE"):
+            stats["skipped_state"] += 1
+            log(f"  SKIP (state={state}): feedId={feed_id}")
+            continue
+
+        bounds = find_feed_block(raw, feed_id)
+        if bounds is None:
+            stats["not_found"].append(feed_id)
+            log(f"  WARNING (block not found): feedId={feed_id}")
+            continue
+
+        start, end = bounds
+        block = raw[start:end]
+        existing_sessions = {s.get("session") for s in feed.get("marketSchedules", [])}
+        bench = _regular_benchmark_mapping(feed)
+
+        if state == "COMING_SOON":
+            block = re.sub(
+                r'"state":\s*"COMING_SOON"', '"state": "STABLE"', block, count=1
+            )
+            top_union: set[int] = set()
+            for session in SESSION_ORDER:
+                raw_ids = fa["sessions"].get(session)
+                if not raw_ids:
+                    continue
+                kept, removed = filter_publishers(raw_ids)
+                if removed:
+                    stats["filtered_any"] = True
+                    log(f"    filtered {removed} from {feed_id}/{session}")
+                if not kept:
+                    continue
+                top_union.update(kept)
+                if session in existing_sessions:
+                    block = overwrite_session(block, session, kept)
+                else:
+                    block = add_session(block, session, kept, bench)
+                    stats["sessions_added"] += 1
+            block = set_top_level_allowed(block, sorted(top_union))
+            block = set_top_level_min_publishers(block, 1)
+            stats["promoted"] += 1
+            log(f"  PROMOTE: feedId={feed_id} -> STABLE, top={sorted(top_union)}")
+        else:  # STABLE — additive only
+            added: set[int] = set()
+            for session in SESSION_ORDER:
+                raw_ids = fa["sessions"].get(session)
+                if not raw_ids:
+                    continue
+                if session in existing_sessions:
+                    log(f"  SKIP (live): feedId={feed_id}/{session}")
+                    continue
+                kept, removed = filter_publishers(raw_ids)
+                if removed:
+                    stats["filtered_any"] = True
+                    log(f"    filtered {removed} from {feed_id}/{session}")
+                if not kept:
+                    continue
+                block = add_session(block, session, kept, bench)
+                added.update(kept)
+                stats["sessions_added"] += 1
+                log(f"  ADD-SESSION: feedId={feed_id}/{session}={kept}")
+            if added:
+                existing_top = feed.get("allowedPublisherIds") or []
+                new_top = sorted(set(existing_top) | added)
+                block = set_top_level_allowed(block, new_top)
+
+        raw = raw[:start] + block + raw[end:]
+
+    return raw, stats
