@@ -116,3 +116,149 @@ def parse_allowed_sheet(path) -> dict[int, dict]:
         else:
             entry["sessions"][session] = ids
     return feeds
+
+
+# marketSchedule templates (America/New_York; session windows; US-equity holidays),
+# used only when ADDING a missing extended-hours session. Sourced from feed 922 (AAPL).
+SCHEDULE_TEMPLATES = {
+    "REGULAR": (
+        "America/New_York;0930-1600,0930-1600,0930-1600,0930-1600,0930-1600,C,C;"
+        "0101/C,0119/C,0216/C,0403/C,0525/C,0619/C,0703/C,0907/C,1126/C,"
+        "1127/0930-1300,1224/0930-1300,1225/C"
+    ),
+    "PRE_MARKET": (
+        "America/New_York;0400-0930,0400-0930,0400-0930,0400-0930,0400-0930,C,C;"
+        "0101/C,0119/C,0216/C,0403/C,0525/C,0619/C,0703/C,0907/C,1126/C,1225/C"
+    ),
+    "POST_MARKET": (
+        "America/New_York;1600-2000,1600-2000,1600-2000,1600-2000,1600-2000,C,C;"
+        "0101/C,0119/C,0216/C,0403/C,0525/C,0619/C,0703/C,0907/C,1126/C,1225/C"
+    ),
+    "OVER_NIGHT": (
+        "America/New_York;0000-0400&2000-2400,0000-0400&2000-2400,"
+        "0000-0400&2000-2400,0000-0400&2000-2400,0000-0400,C,2000-2400;"
+        "0118/C,0119/2000-2400,0215/C,0216/2000-2400,0402/0000-0400,0403/C,"
+        "0524/C,0525/2000-2400,0618/0000-0400,0619/C,0702/0000-0400,0703/C,"
+        "0906/C,0907/2000-2400,1125/0000-0400,1126/2000-2400,1224/0000-0400,"
+        "1225/C,1231/0000-0400,0101/C"
+    ),
+}
+
+
+def _ids_inline(ids: list[int]) -> str:
+    """Render an id list as an inline JSON array: '[ 1, 2, 3 ]' or '[ ]'."""
+    return "[ " + ", ".join(str(i) for i in ids) + " ]" if ids else "[ ]"
+
+
+def set_top_level_allowed(block: str, ids: list[int]) -> str:
+    """Set the feed's top-level allowedPublisherIds.
+
+    The top-level array is the only allowedPublisherIds that precedes
+    marketSchedules, so we restrict the search to the head of the block (before
+    "marketSchedules") to avoid matching a session array. The pattern spans
+    multi-line arrays because [^\\]] also matches newlines. If the feed has no
+    top-level allowedPublisherIds, insert one after the opening '{'.
+    """
+    ms = re.search(r'"marketSchedules"', block)
+    head_end = ms.start() if ms else len(block)
+    head = block[:head_end]
+    pattern = r'"allowedPublisherIds":\s*(\[[^\]]*\]|null)'
+    repl = f'"allowedPublisherIds": {_ids_inline(ids)}'
+    if re.search(pattern, head):
+        new_head = re.sub(pattern, repl, head, count=1)
+        return new_head + block[head_end:]
+    nl = block.index("\n")
+    return block[:nl] + f"\n      {repl}," + block[nl:]
+
+
+def _marketschedules_end(block: str) -> int:
+    """Return the offset just past the marketSchedules array's closing ']', or 0."""
+    ms = re.search(r'"marketSchedules":\s*\[', block)
+    if not ms:
+        return 0
+    pos = ms.end()
+    depth = 1
+    in_str = False
+    while pos < len(block) and depth > 0:
+        c = block[pos]
+        if c == '"' and (pos == 0 or block[pos - 1] != "\\"):
+            in_str = not in_str
+        elif not in_str:
+            if c == "[":
+                depth += 1
+            elif c == "]":
+                depth -= 1
+        pos += 1
+    return pos
+
+
+def set_top_level_min_publishers(block: str, n: int) -> str:
+    """Set the feed's top-level minPublishers.
+
+    after.json lists marketSchedules (with their own minPublishers) BEFORE the
+    top-level minPublishers, so we search only the region after the
+    marketSchedules array closes. Falls back to the first match when the feed
+    has no marketSchedules.
+    """
+    search_from = _marketschedules_end(block)
+    pat = r'"minPublishers":\s*\d+'
+    m = re.search(pat, block[search_from:])
+    if not m:
+        return re.sub(pat, f'"minPublishers": {n}', block, count=1)
+    s = search_from + m.start()
+    e = search_from + m.end()
+    return block[:s] + f'"minPublishers": {n}' + block[e:]
+
+
+def overwrite_session(block: str, session: str, ids: list[int]) -> str:
+    """Within a feed block, set a session's allowedPublisherIds + minPublishers."""
+    bounds = find_session_block(block, session)
+    if bounds is None:
+        return block
+    s, e = bounds
+    sblock = block[s:e]
+    min_pub = get_min_publishers(session, len(ids))
+
+    pub_pat = r'"allowedPublisherIds":\s*(\[[^\]]*\]|null)'
+    if re.search(pub_pat, sblock):
+        sblock = re.sub(
+            pub_pat, f'"allowedPublisherIds": {_ids_inline(ids)}', sblock, count=1
+        )
+    min_pat = r'"minPublishers":\s*\d+'
+    if re.search(min_pat, sblock):
+        sblock = re.sub(min_pat, f'"minPublishers": {min_pub}', sblock, count=1)
+    return block[:s] + sblock + block[e:]
+
+
+def _detect_session_indent(block: str) -> str:
+    """Return the leading whitespace of the first session entry's '{', or 8 spaces."""
+    m = re.search(r"\n(\s*)\{", block[block.find('"marketSchedules"') :])
+    return m.group(1) if m else "        "
+
+
+def add_session(block: str, session: str, ids: list[int], benchmark_mapping) -> str:
+    """Insert a new session entry before the closing ']' of marketSchedules.
+
+    benchmark_mapping is the dict copied from the feed's REGULAR session (or None).
+    """
+    base_indent = _detect_session_indent(block)
+    entry: dict = {"allowedPublisherIds": ids}
+    if benchmark_mapping is not None:
+        entry["benchmarkMapping"] = benchmark_mapping
+    entry["marketSchedule"] = SCHEDULE_TEMPLATES[session]
+    entry["minPublishers"] = get_min_publishers(session, len(ids))
+    entry["session"] = session
+
+    text = json.dumps(entry, indent=2)
+    entry_text = "\n".join(base_indent + ln for ln in text.split("\n"))
+
+    ms_end = _marketschedules_end(block)
+    if ms_end == 0:
+        return block
+    closing_bracket = ms_end - 1  # position of the array's ']'
+
+    # Walk back to the last non-whitespace char before ']' (last entry's '}').
+    p = closing_bracket - 1
+    while p >= 0 and block[p] in (" ", "\n", "\t", "\r"):
+        p -= 1
+    return block[: p + 1] + ",\n" + entry_text + block[p + 1 :]

@@ -100,3 +100,96 @@ def test_get_min_publishers_regular_low_count_rule():
     assert get_min_publishers("REGULAR", 5) == 2
     assert get_min_publishers("REGULAR", 1) == 2
     assert get_min_publishers("REGULAR", 6) == 3
+
+
+from lazer_dq.apply_allowed_to_config import (
+    set_top_level_allowed,
+    set_top_level_min_publishers,
+    overwrite_session,
+    add_session,
+    SCHEDULE_TEMPLATES,
+)
+
+
+def test_set_top_level_allowed_replaces_array_before_marketschedules():
+    block = (
+        '{\n      "allowedPublisherIds": [\n        1,\n        2\n      ],\n'
+        '      "marketSchedules": [ {"allowedPublisherIds": [9], '
+        '"session": "REGULAR"} ]\n}'
+    )
+    out = set_top_level_allowed(block, [24, 35])
+    # Top-level array (before marketSchedules) replaced; session array untouched.
+    assert '"allowedPublisherIds": [ 24, 35 ]' in out
+    assert '"allowedPublisherIds": [9]' in out
+    assert out.index("[ 24, 35 ]") < out.index("[9]")
+
+
+def test_set_top_level_min_publishers_targets_field_after_marketschedules():
+    # Mirrors after.json: a session minPublishers appears BEFORE the top-level one.
+    block = (
+        '{\n      "allowedPublisherIds": [ 1 ],\n'
+        '      "marketSchedules": [ {\n'
+        '          "minPublishers": 3,\n'
+        '          "session": "REGULAR"\n'
+        "        } ],\n"
+        '      "minPublishers": 3,\n'
+        '      "state": "STABLE"\n}'
+    )
+    out = set_top_level_min_publishers(block, 1)
+    data = json.loads(out)
+    assert data["minPublishers"] == 1  # top-level changed
+    assert data["marketSchedules"][0]["minPublishers"] == 3  # session untouched
+
+
+def test_overwrite_session_replaces_ids_and_minpub():
+    block = (
+        '{ "marketSchedules": [ {\n'
+        '          "allowedPublisherIds": [ 1, 2, 3 ],\n'
+        '          "minPublishers": 3,\n'
+        '          "session": "REGULAR"\n'
+        "        } ] }"
+    )
+    out = overwrite_session(block, "REGULAR", [24, 35, 42])
+    assert '"allowedPublisherIds": [ 24, 35, 42 ]' in out
+    assert '"minPublishers": 2' in out  # 3 publishers => REGULAR low-count => 2
+    assert '"session": "REGULAR"' in out
+
+
+def test_overwrite_session_handles_null_array():
+    block = (
+        '{ "marketSchedules": [ {\n'
+        '          "allowedPublisherIds": null,\n'
+        '          "minPublishers": 3,\n'
+        '          "session": "PRE_MARKET"\n'
+        "        } ] }"
+    )
+    out = overwrite_session(block, "PRE_MARKET", [24, 35])
+    assert '"allowedPublisherIds": [ 24, 35 ]' in out
+    assert "null" not in out
+    assert '"minPublishers": 2' in out
+
+
+def test_add_session_inserts_entry_with_benchmark_mapping():
+    block = (
+        '{ "marketSchedules": [\n'
+        "        {\n"
+        '          "allowedPublisherIds": [ 11 ],\n'
+        '          "marketSchedule": "X",\n'
+        '          "minPublishers": 3,\n'
+        '          "session": "REGULAR"\n'
+        "        }\n"
+        "      ]\n}"
+    )
+    bench = {"datascope_ric": {"identifiers": [{"identifier": "AAPL.O"}]}}
+    out = add_session(block, "PRE_MARKET", [24, 35], bench)
+    # Still valid JSON after the insert.
+    data = json.loads(out)
+    sessions = {s["session"]: s for s in data["marketSchedules"]}
+    assert set(sessions) == {"REGULAR", "PRE_MARKET"}
+    pre = sessions["PRE_MARKET"]
+    assert pre["allowedPublisherIds"] == [24, 35]
+    assert pre["minPublishers"] == 2  # PRE_MARKET default
+    assert pre["benchmarkMapping"] == bench
+    assert pre["marketSchedule"] == SCHEDULE_TEMPLATES["PRE_MARKET"]
+    # REGULAR untouched.
+    assert sessions["REGULAR"]["allowedPublisherIds"] == [11]
