@@ -46,6 +46,18 @@ REGULAR_LOW_PUB_MIN = 2
 # filtering (across all sessions). Fewer = insufficient redundancy; left COMING_SOON.
 MIN_PROMOTE_PUBLISHERS = 3
 
+# Asset classes whose marketSchedules entries get per-session allowedPublisherIds
+# + minPublishers written. Every other asset class (hk-equities, etc.) gets only
+# the top-level allowedPublisherIds + minPublishers; its session entries are left
+# alone. us-equities is the only multi-session class, so it is the only one that
+# needs session-level allowlists.
+SESSION_LEVEL_ASSET_CLASSES = {"us-equities"}
+
+# Asset classes recognised by --asset-class (mirrors summarize_feeds). Adding a
+# new asset class here is a one-line change; it gets top-level-only treatment
+# unless also added to SESSION_LEVEL_ASSET_CLASSES.
+KNOWN_ASSET_CLASSES = ["us-equities", "hk-equities"]
+
 
 def filter_publishers(ids: list[int]) -> tuple[list[int], list[int]]:
     """Drop EXCLUDED_PUBLISHERS. Return (kept_sorted_unique, removed_sorted)."""
@@ -314,13 +326,22 @@ def apply_summary_to_config(
     summary: dict[int, dict],
     log=None,
     min_promote_publishers: int = MIN_PROMOTE_PUBLISHERS,
+    write_session_fields: bool = True,
 ) -> tuple[str, dict]:
     """Apply the parsed summary to the raw config text.
 
     Returns (new_raw, stats). `log` is an optional callable(str) for per-feed
     lines; defaults to a no-op. `min_promote_publishers` is the redundancy gate:
     a COMING_SOON feed is promoted only if at least this many publishers survive
-    filtering. Implements the spec decision matrix.
+    filtering.
+
+    `write_session_fields` controls whether per-session allowedPublisherIds +
+    minPublishers are written into marketSchedules entries (True for us-equities,
+    which has distinct per-session allowlists). When False (hk-equities and other
+    single-session classes) only the top-level allowedPublisherIds + minPublishers
+    are set and the marketSchedules entries are left untouched.
+
+    Implements the spec decision matrix.
     """
     if log is None:
         log = lambda _msg: None  # noqa: E731
@@ -401,19 +422,22 @@ def apply_summary_to_config(
             block = re.sub(
                 r'"state":\s*"COMING_SOON"', '"state": "STABLE"', block, count=1
             )
-            for session, kept in session_kept.items():
-                if session in existing_sessions:
-                    block = overwrite_session(block, session, kept)
-                else:
-                    block = add_session(block, session, kept, bench)
-                    stats["sessions_added"] += 1
+            if write_session_fields:
+                for session, kept in session_kept.items():
+                    if session in existing_sessions:
+                        block = overwrite_session(block, session, kept)
+                    else:
+                        block = add_session(block, session, kept, bench)
+                        stats["sessions_added"] += 1
             block = set_top_level_allowed(block, sorted(top_union))
             block = set_top_level_min_publishers(block, 2)
             stats["promoted"] += 1
             log(f"  PROMOTE: feedId={feed_id} -> STABLE, top={sorted(top_union)}")
         else:  # STABLE — additive only
             added: set[int] = set()
-            for session in SESSION_ORDER:
+            # Session adds are a us-equities concept; other asset classes get no
+            # session-level edits, so skip the loop entirely for them.
+            for session in SESSION_ORDER if write_session_fields else []:
                 raw_ids = fa["sessions"].get(session)
                 if not raw_ids:
                     continue
@@ -468,6 +492,17 @@ def main() -> None:
             f"COMING_SOON feed to STABLE (default: {MIN_PROMOTE_PUBLISHERS})."
         ),
     )
+    parser.add_argument(
+        "--asset-class",
+        choices=KNOWN_ASSET_CLASSES,
+        default="us-equities",
+        help=(
+            "Asset class of the workbook (default: us-equities). us-equities "
+            "writes per-session allowedPublisherIds + minPublishers into "
+            "marketSchedules entries; other classes set only the top-level "
+            "allowedPublisherIds + minPublishers and leave sessions untouched."
+        ),
+    )
     args = parser.parse_args()
 
     xlsx_path = Path(args.xlsx)
@@ -488,7 +523,11 @@ def main() -> None:
 
     raw = config_path.read_text()
     new_raw, stats = apply_summary_to_config(
-        raw, summary, log=print, min_promote_publishers=args.min_publishers
+        raw,
+        summary,
+        log=print,
+        min_promote_publishers=args.min_publishers,
+        write_session_fields=args.asset_class in SESSION_LEVEL_ASSET_CLASSES,
     )
 
     changed = stats["promoted"] + stats["sessions_added"]

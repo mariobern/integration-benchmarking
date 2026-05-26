@@ -23,12 +23,13 @@ Run once per workbook (each file is one asset class / one date).
 
 ## Arguments
 
-| Argument           | Description                                                           | Required |
-| ------------------ | --------------------------------------------------------------------- | -------- |
-| `--xlsx`           | dq_summary workbook (reads the `allowed` tab)                         | Yes      |
-| `--config`         | after.json / after_1.json                                             | Yes      |
-| `--dry-run`        | Preview changes without writing                                       | No       |
-| `--min-publishers` | Min surviving publishers to promote a COMING_SOON feed (default: `3`) | No       |
+| Argument           | Description                                                             | Required |
+| ------------------ | ----------------------------------------------------------------------- | -------- |
+| `--xlsx`           | dq_summary workbook (reads the `allowed` tab)                           | Yes      |
+| `--config`         | after.json / after_1.json                                               | Yes      |
+| `--dry-run`        | Preview changes without writing                                         | No       |
+| `--min-publishers` | Min surviving publishers to promote a COMING_SOON feed (default: `3`)   | No       |
+| `--asset-class`    | `us-equities` (default) or `hk-equities` — see session-level note below | No       |
 
 ## Per-(feed, session) rules
 
@@ -42,10 +43,17 @@ Run once per workbook (each file is one asset class / one date).
 | any         | —                      | `(no data)`       | leave untouched                                       |
 
 - Only `COMING_SOON` and `STABLE` feeds are modified.
-- Added sessions copy `benchmarkMapping` from the feed's REGULAR session and
-  use the standard US-equity `marketSchedule` template for the session.
-- `minPublishers`: REGULAR 3 (→2 when ≤5 publishers), PRE/POST 2, OVERNIGHT 1;
-  top-level set to 2 only on COMING_SOON promotion.
+- **Session-level fields are written only for `--asset-class us-equities`.** For
+  us-equities, each `marketSchedules` entry gets its own `allowedPublisherIds` +
+  `minPublishers` (and missing sessions are added). For every other asset class
+  (`hk-equities`, …) only the **top-level** `allowedPublisherIds` + `minPublishers`
+  are set; the single REGULAR `marketSchedules` entry is left exactly as-is (no
+  session-level `allowedPublisherIds`/`minPublishers` added).
+- Added sessions (us-equities only) copy `benchmarkMapping` from the feed's
+  REGULAR session and use the standard US-equity `marketSchedule` template.
+- `minPublishers`: per-session REGULAR 3 (→2 when ≤5 publishers), PRE/POST 2,
+  OVERNIGHT 1 (us-equities only); top-level set to 2 on COMING_SOON promotion
+  (all asset classes).
 - Publishers `{0, 1, 9, 13, 15}` (aggregate sentinel + Lazer) are stripped from
   every list defensively, with a warning.
 - A COMING_SOON feed is promoted **only if at least `--min-publishers` survive

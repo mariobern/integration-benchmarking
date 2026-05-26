@@ -500,6 +500,51 @@ def test_apply_min_promote_publishers_param_lowers_gate():
     assert stats_low["promoted"] == 1
 
 
+def test_apply_write_session_fields_false_sets_top_level_only():
+    # hk-equities shape: a COMING_SOON feed whose REGULAR entry has NO
+    # allowedPublisherIds and NO minPublishers (just benchmarkMapping/schedule).
+    feed = {
+        "allowedPublisherIds": [1, 3, 5],  # COMING_SOON placeholder
+        "feedId": 884,
+        "marketSchedules": [
+            {
+                "benchmarkMapping": _BENCH,
+                "marketSchedule": "Asia/Hong_Kong;0930-1200,C",
+                "session": "REGULAR",
+            }
+        ],
+        "minPublishers": 3,
+        "state": "COMING_SOON",
+        "symbol": "S884",
+    }
+    raw = json.dumps({"feeds": [feed]}, indent=2)
+    summary = {
+        884: {
+            "aggregate": [41, 69],
+            "sessions": {
+                "REGULAR": [41, 69],
+                "PRE_MARKET": None,
+                "POST_MARKET": None,
+                "OVER_NIGHT": None,
+            },
+        }
+    }
+
+    out, stats = apply_summary_to_config(
+        raw, summary, min_promote_publishers=2, write_session_fields=False
+    )
+    f = {x["feedId"]: x for x in json.loads(out)["feeds"]}[884]
+
+    assert f["state"] == "STABLE"
+    assert f["allowedPublisherIds"] == [41, 69]  # top-level set
+    assert f["minPublishers"] == 2  # top-level set
+    reg = f["marketSchedules"][0]
+    # REGULAR entry left exactly as-is — no session-level fields added.
+    assert set(reg.keys()) == {"benchmarkMapping", "marketSchedule", "session"}
+    assert stats["promoted"] == 1
+    assert stats["sessions_added"] == 0
+
+
 import subprocess
 import sys
 
