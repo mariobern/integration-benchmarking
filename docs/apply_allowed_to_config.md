@@ -8,18 +8,26 @@ DQ-vetted publisher lists and additively adds missing sessions to live feeds.
 ## Usage
 
 ```bash
-# Preview (no writes)
+# Preview (no writes) — always dry-run first
 python3 -m lazer_dq.apply_allowed_to_config \
     --xlsx dq_summary_lazer-prod_2026-05-20.xlsx \
-    --config after_1.json --dry-run
+    --config after_1.json --min-publishers 2 --dry-run
 
-# Apply (writes after_1.json, backup at after_1.json.bak)
+# us-equities (default asset class): writes per-session fields, drops
+# publisher-less sessions. Backs up to after_1.json.bak first.
 python3 -m lazer_dq.apply_allowed_to_config \
     --xlsx dq_summary_lazer-prod_2026-05-20.xlsx \
-    --config after_1.json
+    --config after_1.json --min-publishers 2
+
+# hk-equities: top-level allowedPublisherIds + minPublishers only.
+python3 -m lazer_dq.apply_allowed_to_config \
+    --xlsx dq_summary_lazer-prod_2026-05-22.xlsx \
+    --config after_1.json --asset-class hk-equities --min-publishers 2
 ```
 
-Run once per workbook (each file is one asset class / one date).
+Run once per workbook (each file is one asset class / one date). Each real run
+overwrites `after_1.json.bak`, so keep a separate copy of the pristine config if
+you apply several files in sequence.
 
 ## Arguments
 
