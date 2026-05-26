@@ -313,6 +313,42 @@ def add_session(block: str, session: str, ids: list[int], benchmark_mapping) -> 
     return block[: p + 1] + sep + entry_text + block[p + 1 :]
 
 
+def remove_session(block: str, session: str) -> str:
+    """Remove a whole session entry (and one adjacent comma) from marketSchedules.
+
+    Keeps the array valid JSON whether the removed entry is first, middle, last,
+    or only. Returns block unchanged if the session is absent. Used on promotion
+    to drop sessions that have no publishers, so a STABLE feed never carries an
+    unpriceable (publisher-less) market session.
+    """
+    bounds = find_session_block(block, session)
+    if bounds is None:
+        return block
+    s, e = bounds  # s = entry '{', e = one past entry '}'
+
+    # Is there another entry after this one? (a comma after optional whitespace)
+    after = e
+    while after < len(block) and block[after] in " \t\r\n":
+        after += 1
+    has_following = after < len(block) and block[after] == ","
+
+    if has_following:
+        # Drop this entry + its trailing comma + the line it sat on.
+        cut = s
+        while cut > 0 and block[cut - 1] in " \t":
+            cut -= 1
+        if cut > 0 and block[cut - 1] == "\n":
+            cut -= 1
+        return block[:cut] + block[after + 1 :]
+    # Last (or only) entry: drop the preceding comma + this entry.
+    cut = s
+    while cut > 0 and block[cut - 1] in " \t\r\n":
+        cut -= 1
+    if cut > 0 and block[cut - 1] == ",":
+        cut -= 1
+    return block[:cut] + block[e:]
+
+
 def _regular_benchmark_mapping(feed: dict):
     """Return the benchmarkMapping dict from the feed's REGULAR session, or None."""
     for s in feed.get("marketSchedules", []):
@@ -352,6 +388,7 @@ def apply_summary_to_config(
     stats = {
         "promoted": 0,
         "sessions_added": 0,
+        "sessions_removed": 0,
         "skipped_no_data": 0,
         "skipped_too_few_publishers": 0,
         "skipped_stable_no_change": 0,
@@ -423,12 +460,27 @@ def apply_summary_to_config(
                 r'"state":\s*"COMING_SOON"', '"state": "STABLE"', block, count=1
             )
             if write_session_fields:
-                for session, kept in session_kept.items():
-                    if session in existing_sessions:
-                        block = overwrite_session(block, session, kept)
-                    else:
-                        block = add_session(block, session, kept, bench)
-                        stats["sessions_added"] += 1
+                for session in SESSION_ORDER:
+                    if session in session_kept:
+                        # Session has publishers: write it (overwrite or add).
+                        if session in existing_sessions:
+                            block = overwrite_session(
+                                block, session, session_kept[session]
+                            )
+                        else:
+                            block = add_session(
+                                block, session, session_kept[session], bench
+                            )
+                            stats["sessions_added"] += 1
+                    elif session in existing_sessions:
+                        # Session present in the feed but has NO publishers in the
+                        # summary: drop it so the promoted STABLE feed never carries
+                        # an unpriceable (publisher-less) session.
+                        block = remove_session(block, session)
+                        stats["sessions_removed"] += 1
+                        log(
+                            f"  REMOVE-SESSION (no publishers): feedId={feed_id}/{session}"
+                        )
             block = set_top_level_allowed(block, sorted(top_union))
             block = set_top_level_min_publishers(block, 2)
             stats["promoted"] += 1
@@ -540,6 +592,7 @@ def main() -> None:
     print(f"\n{'=' * 50}\nSUMMARY\n{'=' * 50}")
     print(f"  Feeds promoted (COMING_SOON->STABLE): {stats['promoted']}")
     print(f"  Sessions added:                       {stats['sessions_added']}")
+    print(f"  Sessions removed (no publishers):     {stats['sessions_removed']}")
     print(f"  Skipped (no data):                    {stats['skipped_no_data']}")
     print(
         f"  Skipped (<{args.min_publishers} publishers after filter): "

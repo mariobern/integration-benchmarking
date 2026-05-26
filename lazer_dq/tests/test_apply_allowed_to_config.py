@@ -624,3 +624,105 @@ def test_cli_real_run_writes_and_backs_up(tmp_path):
     feed = {f["feedId"]: f for f in data["feeds"]}[100]
     assert feed["state"] == "STABLE"
     assert feed["allowedPublisherIds"] == [24, 35, 42]
+
+
+from lazer_dq.apply_allowed_to_config import remove_session
+
+
+def _ms_block(sessions):
+    """A feed block whose marketSchedules holds one entry per session name."""
+    entries = [
+        "        {\n"
+        '          "allowedPublisherIds": null,\n'
+        '          "minPublishers": 1,\n'
+        f'          "session": "{s}"\n'
+        "        }"
+        for s in sessions
+    ]
+    return '{\n      "marketSchedules": [\n' + ",\n".join(entries) + "\n      ]\n}"
+
+
+def test_remove_session_first():
+    out = remove_session(_ms_block(["REGULAR", "PRE_MARKET", "OVER_NIGHT"]), "REGULAR")
+    assert [s["session"] for s in json.loads(out)["marketSchedules"]] == [
+        "PRE_MARKET",
+        "OVER_NIGHT",
+    ]
+
+
+def test_remove_session_middle():
+    out = remove_session(
+        _ms_block(["REGULAR", "PRE_MARKET", "OVER_NIGHT"]), "PRE_MARKET"
+    )
+    assert [s["session"] for s in json.loads(out)["marketSchedules"]] == [
+        "REGULAR",
+        "OVER_NIGHT",
+    ]
+
+
+def test_remove_session_last():
+    out = remove_session(
+        _ms_block(["REGULAR", "PRE_MARKET", "OVER_NIGHT"]), "OVER_NIGHT"
+    )
+    assert [s["session"] for s in json.loads(out)["marketSchedules"]] == [
+        "REGULAR",
+        "PRE_MARKET",
+    ]
+
+
+def test_remove_session_absent_is_noop():
+    block = _ms_block(["REGULAR"])
+    assert remove_session(block, "PRE_MARKET") == block
+
+
+def test_remove_session_sequential_down_to_one():
+    block = _ms_block(["REGULAR", "PRE_MARKET", "POST_MARKET", "OVER_NIGHT"])
+    for s in ["PRE_MARKET", "POST_MARKET", "OVER_NIGHT"]:
+        block = remove_session(block, s)
+    assert [s["session"] for s in json.loads(block)["marketSchedules"]] == ["REGULAR"]
+
+
+def test_apply_promotion_drops_sessions_without_publishers():
+    # us-equities COMING_SOON feed with all 4 sessions; only REGULAR has publishers
+    # in the summary (the real feed 2300 / 2026-05-20 shape).
+    feed = {
+        "allowedPublisherIds": [1, 2, 3],
+        "feedId": 2300,
+        "marketSchedules": [
+            {
+                "allowedPublisherIds": [1],
+                "benchmarkMapping": _BENCH,
+                "minPublishers": 3,
+                "session": "REGULAR",
+            },
+            {"allowedPublisherIds": None, "minPublishers": 1, "session": "PRE_MARKET"},
+            {"allowedPublisherIds": None, "minPublishers": 1, "session": "POST_MARKET"},
+            {"allowedPublisherIds": None, "minPublishers": 1, "session": "OVER_NIGHT"},
+        ],
+        "minPublishers": 3,
+        "state": "COMING_SOON",
+        "symbol": "S2300",
+    }
+    raw = json.dumps({"feeds": [feed]}, indent=2)
+    summary = {
+        2300: {
+            "aggregate": [19, 41],
+            "sessions": {
+                "REGULAR": [19, 41],
+                "PRE_MARKET": None,
+                "POST_MARKET": None,
+                "OVER_NIGHT": None,
+            },
+        }
+    }
+
+    out, stats = apply_summary_to_config(raw, summary, min_promote_publishers=2)
+    f = {x["feedId"]: x for x in json.loads(out)["feeds"]}[2300]
+
+    assert f["state"] == "STABLE"
+    # PRE/POST/OVERNIGHT dropped; only the priced REGULAR session remains.
+    assert [s["session"] for s in f["marketSchedules"]] == ["REGULAR"]
+    assert f["marketSchedules"][0]["allowedPublisherIds"] == [19, 41]
+    assert f["allowedPublisherIds"] == [19, 41]
+    assert stats["sessions_removed"] == 3
+    assert stats["promoted"] == 1

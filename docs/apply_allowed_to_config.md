@@ -33,16 +33,24 @@ Run once per workbook (each file is one asset class / one date).
 
 ## Per-(feed, session) rules
 
-| Feed state  | Session in feed?       | Summary has list? | Action                                                |
-| ----------- | ---------------------- | ----------------- | ----------------------------------------------------- |
-| COMING_SOON | yes                    | yes               | overwrite `allowedPublisherIds` + `minPublishers`     |
-| COMING_SOON | no                     | yes               | add the session entry                                 |
-| COMING_SOON | (any session has data) | —                 | flip → STABLE; top-level = union, `minPublishers` 2   |
-| STABLE      | yes                    | yes               | leave untouched (live)                                |
-| STABLE      | no                     | yes               | add the session entry; fold publishers into top-level |
-| any         | —                      | `(no data)`       | leave untouched                                       |
+| Feed state  | Session in feed?       | Summary has list? | Action                                                  |
+| ----------- | ---------------------- | ----------------- | ------------------------------------------------------- |
+| COMING_SOON | yes                    | yes               | overwrite `allowedPublisherIds` + `minPublishers`       |
+| COMING_SOON | no                     | yes               | add the session entry                                   |
+| COMING_SOON | yes                    | no                | **drop the session** — see "no publisher-less sessions" |
+| COMING_SOON | (any session has data) | —                 | flip → STABLE; top-level = union, `minPublishers` 2     |
+| STABLE      | yes                    | yes               | leave untouched (live)                                  |
+| STABLE      | no                     | yes               | add the session entry; fold publishers into top-level   |
+| STABLE      | —                      | `(no data)`       | leave untouched                                         |
 
 - Only `COMING_SOON` and `STABLE` feeds are modified.
+- **No publisher-less sessions on promotion (us-equities).** When a COMING_SOON
+  feed is promoted, any `marketSchedules` session that has no publishers in the
+  summary (e.g. PRE/POST/OVERNIGHT showing `(no data)`) is **removed** from the
+  feed — a STABLE feed never carries a session that nobody prices. Only sessions
+  with publishers remain. (If those sessions later get publishers, a subsequent
+  run re-adds them.) STABLE feeds are not touched, so any pre-existing empty
+  session on a live feed is left as-is.
 - **Session-level fields are written only for `--asset-class us-equities`.** For
   us-equities, each `marketSchedules` entry gets its own `allowedPublisherIds` +
   `minPublishers` (and missing sessions are added). For every other asset class
