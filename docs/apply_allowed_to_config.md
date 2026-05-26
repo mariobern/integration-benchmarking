@@ -25,9 +25,28 @@ python3 -m lazer_dq.apply_allowed_to_config \
     --config after_1.json --asset-class hk-equities --min-publishers 2
 ```
 
-Run once per workbook (each file is one asset class / one date). Each real run
-overwrites `after_1.json.bak`, so keep a separate copy of the pristine config if
-you apply several files in sequence.
+Run once per workbook (each file is one asset class / one date).
+
+### Config file vs backups
+
+`--config` is read **and** written in place; before each real run the tool
+snapshots the previous contents to `<config>.bak`. The three files play distinct
+roles:
+
+| File                   | Role                                                                                           |
+| ---------------------- | ---------------------------------------------------------------------------------------------- |
+| `after_1.json`         | The **live config** — always what you pass to `--config`. Read, edited, and written in place.  |
+| `after_1.json.bak`     | **Auto-snapshot** of `after_1.json` taken just before the most recent run. Single-level undo.  |
+| a manual pristine copy | Your **full-reset point** (e.g. `cp after_1.json after_1.json.pristine` before the first run). |
+
+- **Always apply against `after_1.json`.** Running several workbooks in sequence,
+  each with `--config after_1.json`, accumulates correctly — `after_1.json`
+  always carries all applied changes. Never feed `.bak` back in as `--config`
+  (that edits the stale snapshot and writes `<config>.bak.bak`).
+- **Each run overwrites `.bak`**, so after two sequential runs `.bak` only undoes
+  the _last_ run. Roll back the last run with `cp after_1.json.bak after_1.json`;
+  to reset all the way to the original you need the separate pristine copy (or to
+  re-fetch the source config).
 
 ## Arguments
 
