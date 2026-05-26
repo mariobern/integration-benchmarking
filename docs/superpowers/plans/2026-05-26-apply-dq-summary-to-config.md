@@ -14,15 +14,15 @@
 
 ## File Structure
 
-| File | Responsibility |
-|---|---|
-| `lib/json_surgery.py` (create) | Reusable raw-text block finders: `find_feed_block`, `find_session_block`. |
-| `tests/lib/test_json_surgery.py` (create) | Direct unit tests for the extracted helpers. |
-| `update_config_from_summary.py` (modify) | Replace the two private block-finders with imports from `lib.json_surgery`, re-exported under their old private names so existing tests keep passing. |
-| `lazer_dq/apply_allowed_to_config.py` (create) | The new tool: workbook reader, publisher filter, minPublishers policy, session-entry builder, decision-matrix apply, CLI. |
-| `lazer_dq/tests/test_apply_allowed_to_config.py` (create) | Unit + integration tests for the new tool. |
-| `docs/apply_allowed_to_config.md` (create) | User-facing docs. |
-| `CLAUDE.md` (modify) | Add a Scripts-table row and a Key-Gotcha note. |
+| File                                                      | Responsibility                                                                                                                                        |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/json_surgery.py` (create)                            | Reusable raw-text block finders: `find_feed_block`, `find_session_block`.                                                                             |
+| `tests/lib/test_json_surgery.py` (create)                 | Direct unit tests for the extracted helpers.                                                                                                          |
+| `update_config_from_summary.py` (modify)                  | Replace the two private block-finders with imports from `lib.json_surgery`, re-exported under their old private names so existing tests keep passing. |
+| `lazer_dq/apply_allowed_to_config.py` (create)            | The new tool: workbook reader, publisher filter, minPublishers policy, session-entry builder, decision-matrix apply, CLI.                             |
+| `lazer_dq/tests/test_apply_allowed_to_config.py` (create) | Unit + integration tests for the new tool.                                                                                                            |
+| `docs/apply_allowed_to_config.md` (create)                | User-facing docs.                                                                                                                                     |
+| `CLAUDE.md` (modify)                                      | Add a Scripts-table row and a Key-Gotcha note.                                                                                                        |
 
 **Baseline note:** `python3 -m pytest tests/test_update_config_from_summary.py -q` currently shows **37 passed, 4 failed**. The 4 failures (`test_cli_*`) are pre-existing and environment-specific — they hardcode `cwd="/home/mariobern/integration-benchmarking"`, a path that does not exist on this machine. Treat **37 passed** as the green baseline; do not attempt to fix the 4 CLI tests as part of this work.
 
@@ -31,6 +31,7 @@
 ### Task 1: Extract surgical helpers into `lib/json_surgery.py`
 
 **Files:**
+
 - Create: `lib/json_surgery.py`
 - Create: `tests/lib/test_json_surgery.py`
 - Modify: `update_config_from_summary.py` (replace defs at the `_find_feed_block` and `_find_session_block` locations)
@@ -241,6 +242,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task 2: Workbook reader — `parse_allowed_sheet`
 
 **Files:**
+
 - Create: `lazer_dq/apply_allowed_to_config.py`
 - Create: `lazer_dq/tests/test_apply_allowed_to_config.py`
 
@@ -425,6 +427,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task 3: Publisher filter + minPublishers policy
 
 **Files:**
+
 - Modify: `lazer_dq/apply_allowed_to_config.py`
 - Test: `lazer_dq/tests/test_apply_allowed_to_config.py`
 
@@ -517,6 +520,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task 4: Block-edit primitives — set top-level, overwrite session, add session
 
 **Files:**
+
 - Modify: `lazer_dq/apply_allowed_to_config.py`
 - Test: `lazer_dq/tests/test_apply_allowed_to_config.py`
 
@@ -793,6 +797,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task 5: Decision-matrix apply — `apply_summary_to_config`
 
 **Files:**
+
 - Modify: `lazer_dq/apply_allowed_to_config.py`
 - Test: `lazer_dq/tests/test_apply_allowed_to_config.py`
 
@@ -1080,6 +1085,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task 6: CLI — `main`, dry-run, backup, reporting
 
 **Files:**
+
 - Modify: `lazer_dq/apply_allowed_to_config.py`
 - Test: `lazer_dq/tests/test_apply_allowed_to_config.py`
 
@@ -1242,11 +1248,13 @@ This task verifies the tool runs against the actual `dq_summary_lazer-prod_2026-
 - [ ] **Step 1: Dry-run against the real files**
 
 Run:
+
 ```bash
 python3 -m lazer_dq.apply_allowed_to_config \
     --xlsx dq_summary_lazer-prod_2026-05-20.xlsx \
     --config after_1.json --dry-run
 ```
+
 Expected (from the spec's "Expected result" section): SUMMARY shows
 `Feeds promoted ... : 174`, `Sessions added: 0`, `Skipped (no data): 52`,
 `Not found in config: 0`. `after_1.json` is unchanged and no `.bak` is created.
@@ -1254,6 +1262,7 @@ Expected (from the spec's "Expected result" section): SUMMARY shows
 - [ ] **Step 2: Verify a real run produces valid JSON (against a copy)**
 
 Run:
+
 ```bash
 cp after_1.json /tmp/after_smoke.json
 python3 -m lazer_dq.apply_allowed_to_config \
@@ -1266,6 +1275,7 @@ print('feed 997 REGULAR allowed:', \
 [s for s in fids[997]['marketSchedules'] if s['session']=='REGULAR'][0]['allowedPublisherIds']); \
 print('feed 997 top minPub:', fids[997]['minPublishers'])"
 ```
+
 Expected: JSON parses without error; feed 997 state is `STABLE`; REGULAR
 `allowedPublisherIds` is `[24, 35, 42, 45, 80]`; top-level `minPublishers` is `1`.
 
@@ -1284,6 +1294,7 @@ No commit for this task.
 ### Task 8: Documentation
 
 **Files:**
+
 - Create: `docs/apply_allowed_to_config.md`
 - Modify: `CLAUDE.md` (Scripts table + Key Gotchas)
 
@@ -1291,7 +1302,7 @@ No commit for this task.
 
 Create `docs/apply_allowed_to_config.md`:
 
-```markdown
+````markdown
 # Apply Allowed Publishers to Config (apply_allowed_to_config.py)
 
 Applies the **"allowed" sheet** of a `dq_summary_<cluster>_<date>.xlsx`
@@ -1312,27 +1323,28 @@ python3 -m lazer_dq.apply_allowed_to_config \
     --xlsx dq_summary_lazer-prod_2026-05-20.xlsx \
     --config after_1.json
 ```
+````
 
 Run once per workbook (each file is one asset class / one date).
 
 ## Arguments
 
-| Argument    | Description                                  | Required |
-| ----------- | -------------------------------------------- | -------- |
-| `--xlsx`    | dq_summary workbook (reads the `allowed` tab)| Yes      |
-| `--config`  | after.json / after_1.json                    | Yes      |
-| `--dry-run` | Preview changes without writing              | No       |
+| Argument    | Description                                   | Required |
+| ----------- | --------------------------------------------- | -------- |
+| `--xlsx`    | dq_summary workbook (reads the `allowed` tab) | Yes      |
+| `--config`  | after.json / after_1.json                     | Yes      |
+| `--dry-run` | Preview changes without writing               | No       |
 
 ## Per-(feed, session) rules
 
-| Feed state | Session in feed? | Summary has list? | Action |
-|---|---|---|---|
-| COMING_SOON | yes | yes | overwrite `allowedPublisherIds` + `minPublishers` |
-| COMING_SOON | no  | yes | add the session entry |
-| COMING_SOON | (any session has data) | — | flip → STABLE; top-level = union, `minPublishers` 1 |
-| STABLE | yes | yes | leave untouched (live) |
-| STABLE | no  | yes | add the session entry; fold publishers into top-level |
-| any | — | `(no data)` | leave untouched |
+| Feed state  | Session in feed?       | Summary has list? | Action                                                |
+| ----------- | ---------------------- | ----------------- | ----------------------------------------------------- |
+| COMING_SOON | yes                    | yes               | overwrite `allowedPublisherIds` + `minPublishers`     |
+| COMING_SOON | no                     | yes               | add the session entry                                 |
+| COMING_SOON | (any session has data) | —                 | flip → STABLE; top-level = union, `minPublishers` 1   |
+| STABLE      | yes                    | yes               | leave untouched (live)                                |
+| STABLE      | no                     | yes               | add the session entry; fold publishers into top-level |
+| any         | —                      | `(no data)`       | leave untouched                                       |
 
 - Only `COMING_SOON` and `STABLE` feeds are modified.
 - Added sessions copy `benchmarkMapping` from the feed's REGULAR session and
@@ -1350,19 +1362,20 @@ Run once per workbook (each file is one asset class / one date).
 
 ## Compared to update_config_from_summary.py
 
-| Feature        | `update_config_from_summary.py` | `apply_allowed_to_config.py`        |
-| -------------- | ------------------------------- | ----------------------------------- |
-| Input          | `feed_readiness.py` CSV         | dq_summary `.xlsx` "allowed" sheet  |
-| Multi-date     | Intersects across dates         | One vetted date per workbook        |
+| Feature        | `update_config_from_summary.py` | `apply_allowed_to_config.py`               |
+| -------------- | ------------------------------- | ------------------------------------------ |
+| Input          | `feed_readiness.py` CSV         | dq_summary `.xlsx` "allowed" sheet         |
+| Multi-date     | Intersects across dates         | One vetted date per workbook               |
 | STABLE feeds   | Refreshes existing sessions     | Never touches live sessions; adds new only |
-| Added sessions | Omits `benchmarkMapping`        | Copies `benchmarkMapping` from REGULAR |
+| Added sessions | Omits `benchmarkMapping`        | Copies `benchmarkMapping` from REGULAR     |
 
 ## Tests
 
 ```bash
 python3 -m pytest lazer_dq/tests/test_apply_allowed_to_config.py -v
 ```
-```
+
+````
 
 - [ ] **Step 2: Add the Scripts-table row in CLAUDE.md**
 
@@ -1370,14 +1383,14 @@ In `CLAUDE.md`, in the Scripts table (the big table under `## Scripts`), add a r
 
 ```markdown
 | `lazer_dq/apply_allowed_to_config.py`  | Apply dq_summary "allowed" sheet to after.json (promote + add sessions)                                | `python3 -m lazer_dq.apply_allowed_to_config --xlsx dq_summary_X.xlsx --config after_1.json --dry-run` | [docs/apply_allowed_to_config.md](docs/apply_allowed_to_config.md)       |
-```
+````
 
 - [ ] **Step 3: Add a Key Gotchas bullet in CLAUDE.md**
 
 In `CLAUDE.md` under `## Key Gotchas`, add:
 
 ```markdown
-- **`apply_allowed_to_config` vs `update_config_from_summary`** — `lazer_dq/apply_allowed_to_config.py` consumes the dq_summary `.xlsx` "allowed" sheet (from `summarize_feeds.py`); `update_config_from_summary.py` consumes the `feed_readiness.py` CSV. The former only ever changes state on `COMING_SOON` feeds and never overwrites a live (`STABLE`) session — it only *adds* missing sessions to STABLE feeds. Both share `lib/json_surgery.py` for raw-text block surgery.
+- **`apply_allowed_to_config` vs `update_config_from_summary`** — `lazer_dq/apply_allowed_to_config.py` consumes the dq*summary `.xlsx` "allowed" sheet (from `summarize_feeds.py`); `update_config_from_summary.py` consumes the `feed_readiness.py` CSV. The former only ever changes state on `COMING_SOON` feeds and never overwrites a live (`STABLE`) session — it only \_adds* missing sessions to STABLE feeds. Both share `lib/json_surgery.py` for raw-text block surgery.
 ```
 
 - [ ] **Step 4: Run pre-commit on changed files**

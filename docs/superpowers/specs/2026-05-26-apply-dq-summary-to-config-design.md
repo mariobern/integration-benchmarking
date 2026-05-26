@@ -49,31 +49,31 @@ overlap across asset classes, so no cross-file merge is needed. Run the tool onc
 
 ## Decisions (locked during brainstorming)
 
-| # | Decision |
-|---|----------|
-| Scope | Full promote: set `allowedPublisherIds` + `minPublishers`, flip `COMING_SOON→STABLE`, add missing sessions. |
-| Gating | Only touch feeds that have a real publisher list; feeds showing `(no data)` everywhere are skipped. |
-| Top-ups | Included as-is. The "allowed" sheet already folds below-threshold top-ups into the list; we keep whatever is there (even `0 passed + N top-up` sessions). |
-| State changes | `COMING_SOON → STABLE` only. STABLE feeds never change state and never have existing sessions overwritten. |
-| STABLE + missing session | **Approach A (additive):** add the missing session entry; this is safe because that session is not yet live. |
-| Top-level fold | When a session is added to a STABLE feed, its publishers are folded into the feed's top-level `allowedPublisherIds` (union; nothing removed). |
-| minPublishers | Reuse existing defaults, including the "REGULAR with ≤5 publishers ⇒ minPublishers 2" rule. |
-| Input mode | One `--xlsx` per run; read the "allowed" sheet directly (no CSV). |
+| #                        | Decision                                                                                                                                                  |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scope                    | Full promote: set `allowedPublisherIds` + `minPublishers`, flip `COMING_SOON→STABLE`, add missing sessions.                                               |
+| Gating                   | Only touch feeds that have a real publisher list; feeds showing `(no data)` everywhere are skipped.                                                       |
+| Top-ups                  | Included as-is. The "allowed" sheet already folds below-threshold top-ups into the list; we keep whatever is there (even `0 passed + N top-up` sessions). |
+| State changes            | `COMING_SOON → STABLE` only. STABLE feeds never change state and never have existing sessions overwritten.                                                |
+| STABLE + missing session | **Approach A (additive):** add the missing session entry; this is safe because that session is not yet live.                                              |
+| Top-level fold           | When a session is added to a STABLE feed, its publishers are folded into the feed's top-level `allowedPublisherIds` (union; nothing removed).             |
+| minPublishers            | Reuse existing defaults, including the "REGULAR with ≤5 publishers ⇒ minPublishers 2" rule.                                                               |
+| Input mode               | One `--xlsx` per run; read the "allowed" sheet directly (no CSV).                                                                                         |
 
 ## Per-(feed, session) decision matrix
 
-The unit of decision is **(feed, session)**, not the whole feed. "Only act on COMING_SOON"
-governs state changes and overwriting *existing* sessions; *adding* a brand-new session is
+The unit of decision is **(feed, session)**, not the whole feed. "Only act on COMING*SOON"
+governs state changes and overwriting \_existing* sessions; _adding_ a brand-new session is
 always permitted because it is not yet live.
 
-| Feed state in config | Session present in feed? | Summary has a list? | Action |
-|---|---|---|---|
-| `COMING_SOON` | yes | yes | Overwrite session `allowedPublisherIds` + set session `minPublishers`. |
-| `COMING_SOON` | no | yes | Add a new session entry. |
-| `COMING_SOON` | — | (any session has data) | Flip `state` → `STABLE`; set top-level `allowedPublisherIds` = aggregate list; set top-level `minPublishers` = 1. |
-| `STABLE` | yes | yes | **Leave untouched** (session is live). |
-| `STABLE` | no | yes | **Add** new session entry; fold its publishers into top-level `allowedPublisherIds`. Top-level `minPublishers` left as-is. |
-| any | — | `(no data)` / absent | Leave untouched. |
+| Feed state in config | Session present in feed? | Summary has a list?    | Action                                                                                                                     |
+| -------------------- | ------------------------ | ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `COMING_SOON`        | yes                      | yes                    | Overwrite session `allowedPublisherIds` + set session `minPublishers`.                                                     |
+| `COMING_SOON`        | no                       | yes                    | Add a new session entry.                                                                                                   |
+| `COMING_SOON`        | —                        | (any session has data) | Flip `state` → `STABLE`; set top-level `allowedPublisherIds` = aggregate list; set top-level `minPublishers` = 1.          |
+| `STABLE`             | yes                      | yes                    | **Leave untouched** (session is live).                                                                                     |
+| `STABLE`             | no                       | yes                    | **Add** new session entry; fold its publishers into top-level `allowedPublisherIds`. Top-level `minPublishers` left as-is. |
+| any                  | —                        | `(no data)` / absent   | Leave untouched.                                                                                                           |
 
 Feeds whose `(aggregate)` is `(no data)` (all sessions empty) are skipped entirely. Feeds
 present in the summary but absent from the config produce a `WARNING` and are skipped. Feeds
@@ -89,6 +89,7 @@ in states other than `COMING_SOON` or `STABLE` (e.g. `INACTIVE`) are skipped.
 - `sessions: dict[str, list[int] | None]` keyed by `REGULAR`/`PRE_MARKET`/`POST_MARKET`/`OVER_NIGHT`
 
 Parsing rules:
+
 - Open the workbook read-only via `openpyxl`; select the `allowed` sheet by name.
 - Skip the title row and the header row (`Feed ID`, ...).
 - Group consecutive rows by the integer in the `Feed ID` column; blank divider rows and the
@@ -147,6 +148,7 @@ apply logic (the decision matrix) lives only in `lazer_dq/apply_allowed_to_confi
 ### 6. Orchestration / reporting
 
 `main()`:
+
 1. Validate `--xlsx` and `--config` exist.
 2. Parse the allowed sheet.
 3. For each feed, apply the decision matrix against the raw config text.
