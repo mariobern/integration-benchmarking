@@ -187,6 +187,15 @@ def test_overwrite_session_inserts_when_fields_absent():
     assert reg["allowedPublisherIds"] == [24, 35, 42]
     assert reg["minPublishers"] == 2  # 3 pubs => REGULAR low-count
     assert reg["benchmarkMapping"] == {"datascope_ric": {}}  # preserved
+    # Inserted minPublishers sits between marketSchedule and session (canonical
+    # order); allowedPublisherIds leads. Key order is preserved by json.loads.
+    assert list(reg.keys()) == [
+        "allowedPublisherIds",
+        "benchmarkMapping",
+        "marketSchedule",
+        "minPublishers",
+        "session",
+    ]
 
 
 def test_add_session_inserts_entry_with_benchmark_mapping():

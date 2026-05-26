@@ -244,6 +244,20 @@ def _insert_field_after_open_brace(sblock: str, field_text: str) -> str:
     return sblock[: brace + 1] + " " + field_text + sblock[brace + 1 :]
 
 
+def _insert_field_before_session(sblock: str, field_text: str) -> str:
+    """Insert `field_text` (e.g. '"minPublishers": 3,') on its own line just
+    before the entry's "session" key, matching the canonical field order
+    (...marketSchedule, minPublishers, session). Falls back to inserting after
+    the opening '{' if no "session" key is found.
+    """
+    m = re.search(r'\n(\s*)"session"\s*:', sblock)
+    if not m:
+        return _insert_field_after_open_brace(sblock, field_text)
+    indent = m.group(1)
+    pos = m.start() + 1  # just after the newline preceding the "session" line
+    return sblock[:pos] + indent + field_text + "\n" + sblock[pos:]
+
+
 def overwrite_session(block: str, session: str, ids: list[int]) -> str:
     """Within a feed block, set a session's allowedPublisherIds + minPublishers.
 
@@ -271,7 +285,9 @@ def overwrite_session(block: str, session: str, ids: list[int]) -> str:
     if re.search(min_pat, sblock):
         sblock = re.sub(min_pat, min_repl, sblock, count=1)
     else:
-        sblock = _insert_field_after_open_brace(sblock, min_repl + ",")
+        # Place a new minPublishers between marketSchedule and session, matching
+        # the canonical entry order, rather than at the top of the entry.
+        sblock = _insert_field_before_session(sblock, min_repl + ",")
 
     return block[:s] + sblock + block[e:]
 
