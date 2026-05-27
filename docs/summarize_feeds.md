@@ -2,7 +2,7 @@
 
 Generates a single Excel summary workbook from the DQ reports produced by `evaluate_feeds_bulk`. Ranks the top publishers per feed/mode, applies per-mode pass thresholds, and emits a paste-ready `allowedPublisherIds` JSON snippet for config.
 
-- Input: CSV of feeds + `dq_reports/<cluster>/<feed_id>/<mode>/stats.csv` files + `publishers.md`
+- Input: CSV of feeds + `dq_reports/<cluster>/<mode>/<feed_id>/<date>/stats.csv` files + `publishers.md`
 - Output: one `.xlsx` workbook with two sheets — `rankings` and `allowed`
 
 ## When to Use
@@ -27,6 +27,11 @@ python -m lazer_dq.summarize_feeds \
     --reports-dir dq_reports --publishers-md publishers.md \
     --output dq_summary_pre.xlsx
 
+# HK equities (1 mode); see Asset Classes & Modes below
+python -m lazer_dq.summarize_feeds \
+    --csv equity_hk_feed_ids.csv --asset-class hk-equities \
+    --cluster lazer-prod --date 2026-05-19
+
 # Override per-mode thresholds
 python -m lazer_dq.summarize_feeds \
     --csv feeds.csv --cluster lazer-prod --date 2026-05-06 \
@@ -41,26 +46,27 @@ python -m lazer_dq.summarize_feeds \
 
 ## Arguments
 
-| Argument                           | Description                                                                | Default                            |
-| ---------------------------------- | -------------------------------------------------------------------------- | ---------------------------------- |
-| `--csv`                            | CSV file (column 1 = `feed_id`) — **required**                             | —                                  |
-| `--cluster`                        | Cluster name — **required**                                                | —                                  |
-| `--date`                           | Date `YYYY-MM-DD` — **required**                                           | —                                  |
-| `--reports-dir`                    | Base reports directory                                                     | `dq_reports`                       |
-| `--publishers-md`                  | Path to `publishers.md`                                                    | `publishers.md`                    |
-| `--output`                         | Output `.xlsx` path                                                        | `dq_summary_<cluster>_<date>.xlsx` |
-| `--max-rmse-over-spread-regular`   | RMSE/spread ceiling for `us-equities`                                      | `1.0`                              |
-| `--min-hit-rate-regular`           | Hit-rate floor (%) for `us-equities`                                       | `80.0`                             |
-| `--max-rmse-over-spread-pre`       | RMSE/spread ceiling for `us-equities-pre`                                  | `2.0`                              |
-| `--min-hit-rate-pre`               | Hit-rate floor (%) for `us-equities-pre`                                   | `50.0`                             |
-| `--max-rmse-over-spread-post`      | RMSE/spread ceiling for `us-equities-post`                                 | `2.0`                              |
-| `--min-hit-rate-post`              | Hit-rate floor (%) for `us-equities-post`                                  | `50.0`                             |
-| `--max-rmse-over-spread-overnight` | RMSE/spread ceiling for `us-equities-overnight`                            | `3.0`                              |
-| `--min-hit-rate-overnight`         | Hit-rate floor (%) for `us-equities-overnight`                             | `25.0`                             |
-| `--min-n-observations`             | Minimum sample size to consider a publisher                                | `1000`                             |
-| `--top-n`                          | Top-N publishers per feed/mode                                             | `10`                               |
-| `--redundancy-floor`               | Minimum publishers to return per feed/session                              | `5`                                |
-| `--topup-ceiling-mult`             | A top-up's `rmse_over_spread` must be ≤ this × the per-mode pass threshold | `2.0`                              |
+| Argument                           | Description                                                                                    | Default                            |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `--csv`                            | CSV file (column 1 = `feed_id`) — **required**                                                 | —                                  |
+| `--cluster`                        | Cluster name — **required**                                                                    | —                                  |
+| `--date`                           | Date `YYYY-MM-DD` — **required**                                                               | —                                  |
+| `--reports-dir`                    | Base reports directory                                                                         | `dq_reports`                       |
+| `--publishers-md`                  | Path to `publishers.md`                                                                        | `publishers.md`                    |
+| `--output`                         | Output `.xlsx` path                                                                            | `dq_summary_<cluster>_<date>.xlsx` |
+| `--asset-class`                    | Asset class to summarize; sets which modes are read and the layout (see Asset Classes & Modes) | `us-equities`                      |
+| `--max-rmse-over-spread-regular`   | RMSE/spread ceiling for `us-equities`                                                          | `1.0`                              |
+| `--min-hit-rate-regular`           | Hit-rate floor (%) for `us-equities`                                                           | `80.0`                             |
+| `--max-rmse-over-spread-pre`       | RMSE/spread ceiling for `us-equities-pre`                                                      | `2.0`                              |
+| `--min-hit-rate-pre`               | Hit-rate floor (%) for `us-equities-pre`                                                       | `50.0`                             |
+| `--max-rmse-over-spread-post`      | RMSE/spread ceiling for `us-equities-post`                                                     | `2.0`                              |
+| `--min-hit-rate-post`              | Hit-rate floor (%) for `us-equities-post`                                                      | `50.0`                             |
+| `--max-rmse-over-spread-overnight` | RMSE/spread ceiling for `us-equities-overnight`                                                | `3.0`                              |
+| `--min-hit-rate-overnight`         | Hit-rate floor (%) for `us-equities-overnight`                                                 | `25.0`                             |
+| `--min-n-observations`             | Minimum sample size to consider a publisher                                                    | `1000`                             |
+| `--top-n`                          | Top-N publishers per feed/mode                                                                 | `10`                               |
+| `--redundancy-floor`               | Minimum publishers to return per feed/session (set `0` to disable top-ups)                     | `5`                                |
+| `--topup-ceiling-mult`             | A top-up's `rmse_over_spread` must be ≤ this × the per-mode pass threshold                     | `2.0`                              |
 
 ## Inputs
 
@@ -73,7 +79,7 @@ Only column 1 (`feed_id`) is used; other columns are ignored. Malformed rows are
 Read from:
 
 ```
-<reports-dir>/<cluster>/<feed_id>/<mode>/stats.csv
+<reports-dir>/<cluster>/<mode>/<feed_id>/<date>/stats.csv
 ```
 
 Missing files are treated as "no data" for that feed/mode — the feed is still listed but rendered as `(no data)`.
@@ -88,9 +94,11 @@ Markdown table used to derive **excluded publishers**:
 
 Malformed rows are skipped silently.
 
-## Modes
+## Asset Classes & Modes
 
-Each feed is reported across four modes in stable order:
+`--asset-class` selects which modes are read and the workbook layout. Each feed is reported across that asset class's modes in stable order. Adding a new asset class is a one-entry edit to `ASSET_CLASS_CONFIG` in `summarize_feeds.py`.
+
+**`us-equities`** (default) — 4 modes, 24-column rankings layout:
 
 | Mode                    | Session     |
 | ----------------------- | ----------- |
@@ -98,6 +106,17 @@ Each feed is reported across four modes in stable order:
 | `us-equities-pre`       | PRE_MARKET  |
 | `us-equities-post`      | POST_MARKET |
 | `us-equities-overnight` | OVER_NIGHT  |
+
+**`hk-equities`** — 1 mode, 6-column rankings layout:
+
+| Mode          | Session |
+| ------------- | ------- |
+| `hk-equities` | REGULAR |
+
+Notes:
+
+- The CSV's column-3 mode must be one of the selected asset class's modes, or the run exits with a clear error.
+- The per-mode threshold flags (`--max-rmse-over-spread-*`, `--min-hit-rate-*`) apply only to `us-equities`. Other asset classes use the registry defaults — `hk-equities` REGULAR uses `max rmse_over_spread 1.0` and `min hit_rate 80%`.
 
 ## Ranking & Filtering
 
@@ -110,6 +129,7 @@ For each `(feed_id, mode)`:
    - If passers ≥ `--redundancy-floor` → return all passers (the floor is a minimum, never a cap).
    - If passers < `--redundancy-floor` → **top up** with the next-best below-threshold publishers, ranked by `rmse_over_spread`, each of which must clear `--min-n-observations` and have `rmse_over_spread ≤ --topup-ceiling-mult × max-rmse-over-spread-<mode>`. Take only as many as needed to reach the floor.
    - A publisher above the ceiling is never promoted, even if the feed stays below the floor.
+   - **To disable top-ups entirely**, set `--redundancy-floor 0`: with no floor to reach, the `allowed` sheet contains only threshold passers (no below-threshold fillers). To tighten who counts as a passer instead, lower `--max-rmse-over-spread-*` or raise `--min-hit-rate-*`.
    - The `Notes` column shows the mix, e.g. `2 passed + 3 top-up (≤2×)` (highlighted yellow), or `0 passed, all > 2× ceiling` when no publisher is within the ceiling.
 
 The cross-mode **aggregate** is the sorted union of per-mode allowed lists (deduplicated).
