@@ -183,7 +183,7 @@ The five rules that bite most often, with the typical fix:
 | W003 | Schedule deviates from asset-class majority          | Confirm the deviation is intentional, otherwise align with majority. |
 | E013 | STABLE or COMING_SOON futures past every `validTo`   | Flip `state` to `INACTIVE` (the contract has rolled off).            |
 
-For the full set, see [docs/config_linter_examples.md](docs/config_linter_examples.md), which shows the smallest fragment that triggers each rule.
+For the full set, see [config_linter_examples.md](config_linter_examples.md), which shows the smallest fragment that triggers each rule.
 
 ## How To: Investigate Pre-existing Findings
 
@@ -215,7 +215,7 @@ The orchestrator at the bottom of `lib/config_lint.py` is the only place that ne
 
 ## Rule Reference
 
-For each rule's exact trigger condition and a copy-pasteable example fragment, see [docs/config_linter_examples.md](docs/config_linter_examples.md). The summary tables below are duplicates of the reference in [docs/config_linter.md](docs/config_linter.md).
+For each rule's exact trigger condition and a copy-pasteable example fragment, see [config_linter_examples.md](config_linter_examples.md). The summary tables below are duplicates of the reference in [config_linter.md](config_linter.md).
 
 ### Errors
 

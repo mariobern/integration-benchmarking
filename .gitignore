@@ -36,8 +36,16 @@ after.json
 # Local governance-proposal snapshots (before.json / after.json under staging/)
 staging/
 
+# Local config working copies / backups (after_1.json, lazer.json, *.bak)
+after_*.json
+lazer*.json
+*.json.bak
+
 # Local DQ reports output
 dq_reports/
+
+# DQ summary spreadsheet outputs (dq_summary_*.xlsx, dq_hk_*.xlsx, hk_*.xlsx)
+*.xlsx
 
 # IDE
 .idea/

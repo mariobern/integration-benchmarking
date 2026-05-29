@@ -155,6 +155,17 @@ Scripts are thin CLI wrappers that parse arguments and delegate to `lib/`.
 
 `docs/benchmark_results_guide.md` is a standalone guide for publishers explaining how to read benchmark CSV output. Covers pass/fail criteria, core quality metrics, session breakdowns, and advanced statistical tests.
 
+## Documentation Layout
+
+Almost all docs live under `docs/`:
+
+- **Per-script docs**: `docs/<script_name>.md` (linked from the Scripts table above).
+- **Reference guides**: `docs/Config_Linter_Guide.md`, `docs/Exchange_Configuration_Guide.md`.
+- **Planning / scratch notes**: `docs/plans/` (e.g. `PLAN.md`, `conversation_crypto_benchmarking.md`); design specs and implementation plans live under `docs/specs/`, `docs/plans/`, and `docs/superpowers/`.
+- **Work log**: `docs/work-log-2026-Q2.md` summarizes PRs and scripts by quarter.
+
+Files that stay at the repo root: `README.md`, `CLAUDE.md`, `CHANGELOG.md`, and `publishers.md` (the last is read at runtime by `lazer_dq/summarize_feeds.py` via a relative default path, so it must not move).
+
 ## Pre-commit
 
 Always run `pre-commit run --files <changed files>` before committing. Hooks: black (Python), prettier (Markdown/YAML), trailing whitespace, end-of-file fixer.
