@@ -814,3 +814,49 @@ class TestRunLinter:
         rc, output = run_linter(str(target))
         assert rc != 0
         assert "linter" in output.lower() or "not found" in output.lower()
+
+
+# ---------------------------------------------------------------------------
+# resolve_rics_for_feed_ids
+# ---------------------------------------------------------------------------
+from dataclasses import dataclass as _dc
+from edit_config_lib.config_editor import resolve_rics_for_feed_ids
+
+
+@_dc
+class _FakeResult:
+    ric: str
+    display_ticker: str
+    confidence: str = "medium"
+    warnings: tuple = ()
+
+
+class _FakeResolver:
+    def __init__(self, mapping):
+        self._mapping = mapping  # feed_id -> _FakeResult
+
+    def resolve_by_id(self, fid):
+        return self._mapping.get(fid, _FakeResult(ric="", display_ticker=str(fid)))
+
+
+def test_resolve_rics_builds_day_and_overnight():
+    fake = _FakeResolver(
+        {
+            922: _FakeResult(ric="AAPL.O", display_ticker="AAPL"),
+            1059: _FakeResult(ric="CTRA.K", display_ticker="CTRA"),
+        }
+    )
+    out = resolve_rics_for_feed_ids(
+        [922, 1059], symbols_path="unused.json", resolver=fake
+    )
+    assert out[922].day_ric == "AAPL.O"
+    assert out[922].overnight_ric == "AAPL.BLUE"
+    assert out[1059].day_ric == "CTRA.K"
+    assert out[1059].overnight_ric == "CTRA.BLUE"
+
+
+def test_resolve_rics_unresolved_has_empty_day_ric():
+    fake = _FakeResolver({})  # nothing resolves
+    out = resolve_rics_for_feed_ids([990], symbols_path="unused.json", resolver=fake)
+    assert out[990].day_ric == ""
+    assert out[990].overnight_ric == ""

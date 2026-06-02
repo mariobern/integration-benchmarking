@@ -48,6 +48,8 @@ from edit_config_lib.config_ops import (
     BumpMinPublishers,
     SetState,
     SetRicMapping,
+    SetRicFromResolver,
+    ResolvedRic,
 )
 from edit_config_lib.ric_csv import load_ric_csv, build_prefix_index, LoadError
 from edit_config_lib.config_selector import parse_selector_text, read_selector_file
@@ -104,6 +106,53 @@ def _flag_set(args, name: str) -> bool:
     if name in _BOOL_OP_FLAGS:
         return bool(val)
     return val is not None
+
+
+def resolve_rics_for_feed_ids(
+    feed_ids: list[int],
+    symbols_path: str,
+    force_refresh: bool = False,
+    resolver=None,
+) -> dict[int, ResolvedRic]:
+    """Resolve each feed id to its Datascope RICs via generate_ric_mapping.
+
+    day_ric is the resolver RIC (e.g. AAPL.O); overnight_ric is
+    `{ticker_to_ric_base(display_ticker)}.BLUE`. `generate_ric_mapping` lives at
+    the repo root and is imported lazily (with the repo root added to sys.path)
+    so config_editor carries no hard dependency on it until --set-ric is used.
+    Importing the module has no network side effects — the NASDAQ-Trader fetch
+    only happens when RICResolver actually resolves an equity.
+
+    `resolver` is an injection point for tests; production passes None.
+    """
+    import sys
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[3]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    from generate_ric_mapping import RICResolver, ticker_to_ric_base
+
+    if resolver is None:
+        resolver = RICResolver(
+            symbols_path=Path(symbols_path), force_refresh=force_refresh
+        )
+
+    out: dict[int, ResolvedRic] = {}
+    for fid in feed_ids:
+        result = resolver.resolve_by_id(fid)
+        day_ric = result.ric or ""
+        display = result.display_ticker or ""
+        overnight_ric = (
+            f"{ticker_to_ric_base(display)}.BLUE" if day_ric and display else ""
+        )
+        out[fid] = ResolvedRic(
+            day_ric=day_ric,
+            overnight_ric=overnight_ric,
+            confidence=result.confidence or "",
+            warnings=tuple(result.warnings or ()),
+        )
+    return out
 
 
 def build_op_from_args(args) -> list[PlannedOp]:
