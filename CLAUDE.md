@@ -103,7 +103,7 @@ FX and Metals use 24-hour regular session (with maintenance windows). See indivi
 | `update_min_publishers.py`             | Enforce minimum minPublishers based on publisher count                                                 | `python3 update_min_publishers.py --config after.json --dry-run`                                       | [docs/update_min_publishers.md](docs/update_min_publishers.md)           |
 | `volume_profile.py`                    | Volume profile analysis for US equities (per-session)                                                  | `python3 volume_profile.py --tickers AAPL,MSFT --date 2026-03-03`                                      | [docs/volume_profile.md](docs/volume_profile.md)                         |
 | `tools/config-linter/config_linter.py` | Lint after.json for config errors (duplicates, publishers, schedules)                                  | `python3 tools/config-linter/config_linter.py --config after.json`                                     | [docs/config_linter.md](docs/config_linter.md)                           |
-| `tools/edit-config/edit_config.py`     | Surgical editor: add/remove publishers, set minPublishers, set state                                   | `python3 tools/edit-config/edit_config.py --config after.json --add-publisher 80 --feed-id 1000-1050`  | [docs/edit_config.md](docs/edit_config.md)                               |
+| `tools/edit-config/edit_config.py`     | Surgical editor: add/remove publishers, set minPublishers, set state, set RIC identifiers              | `python3 tools/edit-config/edit_config.py --config after.json --add-publisher 80 --feed-id 1000-1050`  | [docs/edit_config.md](docs/edit_config.md)                               |
 
 ### Publisher Performance Portal
 
