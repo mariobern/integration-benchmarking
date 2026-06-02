@@ -22,7 +22,12 @@ from edit_config_lib.config_editor import (  # noqa: E402
     simulate_plan,
     write_with_backup,
 )
-from edit_config_lib.config_ops import Change, SetRicMapping, Warning  # noqa: E402
+from edit_config_lib.config_ops import (  # noqa: E402
+    Change,
+    SetRicMapping,
+    SetRicFromResolver,
+    Warning,
+)
 
 
 def _set_ric_mapping_summary_lines(
@@ -54,6 +59,32 @@ def _set_ric_mapping_summary_lines(
     ]
 
 
+def _set_ric_summary_lines(
+    op: SetRicFromResolver,
+    changes: list[Change],
+    warnings: list[Warning],
+) -> list[str]:
+    """Return extra summary lines for a SetRicFromResolver operation."""
+    overwritten = sum(1 for c in changes if c.location == "datascope_ric_identifier")
+    unresolved = sorted(fid for fid, r in op.rics.items() if not r.day_ric)
+    low_conf = sorted(
+        f"{fid}={r.day_ric}({r.confidence})"
+        for fid, r in op.rics.items()
+        if r.day_ric and r.confidence and r.confidence != "high"
+    )
+    unresolved_detail = (
+        f"  ({', '.join(str(f) for f in unresolved)})" if unresolved else ""
+    )
+    low_conf_detail = f"  ({', '.join(low_conf)})" if low_conf else ""
+    return [
+        "",
+        "RIC resolution summary:",
+        f"  identifiers overwritten: {overwritten}",
+        f"  feeds unresolved:        {len(unresolved)}{unresolved_detail}",
+        f"  low-confidence RICs:     {len(low_conf)}{low_conf_detail}",
+    ]
+
+
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="edit_config.py",
@@ -78,11 +109,30 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fill empty datascope_ric.identifier values from a CSV (use --from-csv).",
     )
+    op_group.add_argument(
+        "--set-ric",
+        action="store_true",
+        help=(
+            "Resolve each targeted feed's RIC via generate_ric_mapping and "
+            "overwrite its datascope_ric identifiers (day=TICKER.<exch>, "
+            "overnight=TICKER.BLUE). Target with --feed-id/--feed-ids-from."
+        ),
+    )
 
     p.add_argument(
         "--from-csv",
         type=str,
         help="CSV path for --set-ric-mapping (LSEG-style: requires Ticker, RIC, Exchange Code columns).",
+    )
+    p.add_argument(
+        "--symbols",
+        type=str,
+        help="Reference file for --set-ric RIC resolution (default: --config).",
+    )
+    p.add_argument(
+        "--force-refresh",
+        action="store_true",
+        help="Bypass the NASDAQ-Trader cache during --set-ric resolution.",
     )
 
     # Targeting
@@ -210,6 +260,11 @@ def main(argv: list[str] | None = None) -> int:
     for planned in plan:
         if isinstance(planned.op, SetRicMapping):
             for line in _set_ric_mapping_summary_lines(
+                planned.op, result.changes, result.warnings
+            ):
+                print(line)
+        elif isinstance(planned.op, SetRicFromResolver):
+            for line in _set_ric_summary_lines(
                 planned.op, result.changes, result.warnings
             ):
                 print(line)

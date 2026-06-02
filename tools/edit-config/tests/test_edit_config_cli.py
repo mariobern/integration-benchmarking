@@ -440,3 +440,82 @@ def test_cli_set_ric_mapping_reports_unmatched_csv_rows(tmp_path):
     assert "1211.HK" in out  # unmatched — no feed in fixture has this symbol
     assert "0700.HK" in out  # filled into feed 884
     assert "885" in out  # skipped feed (already populated)
+
+
+# ---------------------------------------------------------------------------
+# --set-ric (in-process, patched resolver — no network)
+# ---------------------------------------------------------------------------
+import edit_config
+
+from edit_config_lib import config_editor as _ce
+from edit_config_lib.config_ops import ResolvedRic as _ResolvedRic
+
+
+def _write_us_config(path):
+    cfg = {
+        "feeds": [
+            {
+                "feedId": 990,
+                "symbol": "Equity.US.BITS/USD",
+                "state": "STABLE",
+                "metadata": {"name": "BITS", "asset_type": "equity"},
+                "marketSchedules": [
+                    {
+                        "session": "REGULAR",
+                        "benchmarkMapping": {
+                            "datascope_ric": {"identifiers": [{"identifier": "BITS"}]}
+                        },
+                    },
+                    {
+                        "session": "OVER_NIGHT",
+                        "benchmarkMapping": {
+                            "datascope_ric": {
+                                "identifiers": [{"identifier": "BITS.BLUE"}]
+                            }
+                        },
+                    },
+                ],
+            }
+        ]
+    }
+    path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+
+
+def test_cli_set_ric_apply_in_process(tmp_path, monkeypatch):
+    config = tmp_path / "after.json"
+    _write_us_config(config)
+
+    def fake_resolve(feed_ids, symbols_path, force_refresh=False, resolver=None):
+        return {990: _ResolvedRic(day_ric="BITS.O", overnight_ric="BITS.BLUE")}
+
+    monkeypatch.setattr(_ce, "resolve_rics_for_feed_ids", fake_resolve)
+
+    rc = edit_config.main(
+        ["--config", str(config), "--set-ric", "--feed-id", "990", "--apply"]
+    )
+    assert rc == 0
+    data = json.loads(config.read_text())
+    feed = data["feeds"][0]
+    reg = feed["marketSchedules"][0]["benchmarkMapping"]["datascope_ric"][
+        "identifiers"
+    ][0]["identifier"]
+    ovn = feed["marketSchedules"][1]["benchmarkMapping"]["datascope_ric"][
+        "identifiers"
+    ][0]["identifier"]
+    assert reg == "BITS.O"  # bare day RIC rewritten
+    assert ovn == "BITS.BLUE"  # overnight unchanged
+
+
+def test_cli_set_ric_dry_run_does_not_write(tmp_path, monkeypatch):
+    config = tmp_path / "after.json"
+    _write_us_config(config)
+    before = config.read_text()
+
+    def fake_resolve(feed_ids, symbols_path, force_refresh=False, resolver=None):
+        return {990: _ResolvedRic(day_ric="BITS.O", overnight_ric="BITS.BLUE")}
+
+    monkeypatch.setattr(_ce, "resolve_rics_for_feed_ids", fake_resolve)
+
+    rc = edit_config.main(["--config", str(config), "--set-ric", "--feed-id", "990"])
+    assert rc == 0
+    assert config.read_text() == before  # dry-run default, nothing written
