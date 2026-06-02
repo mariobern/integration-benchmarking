@@ -68,6 +68,7 @@ _OP_FLAGS = (
     "bump_min_publishers",
     "set_state",
     "set_ric_mapping",
+    "set_ric",
 )
 
 
@@ -98,7 +99,7 @@ def _parse_signed_int(s: str) -> int:
 
 
 # store_true flags default to False; other op flags default to None.
-_BOOL_OP_FLAGS = frozenset({"set_ric_mapping"})
+_BOOL_OP_FLAGS = frozenset({"set_ric_mapping", "set_ric"})
 
 
 def _flag_set(args, name: str) -> bool:
@@ -188,6 +189,22 @@ def build_op_from_args(args) -> list[PlannedOp]:
             )
         op = SetRicMapping(prefix_to_ric=prefix_to_ric)
         filters = FilterSet()  # matches every feed; deliberately skip validate()
+        return [PlannedOp(op=op, filters=filters)]
+
+    if name == "set_ric":
+        filters = _build_filters_from_args(args)
+        if not filters.feed_ids:
+            raise ValueError(
+                "--set-ric requires --feed-id or --feed-ids-from targeting"
+            )
+        symbols_path = getattr(args, "symbols", None) or args.config
+        force_refresh = getattr(args, "force_refresh", False)
+        rics = resolve_rics_for_feed_ids(
+            sorted(filters.feed_ids),
+            symbols_path=symbols_path,
+            force_refresh=force_refresh,
+        )
+        op = SetRicFromResolver(rics=rics)
         return [PlannedOp(op=op, filters=filters)]
 
     filters = _build_filters_from_args(args)
