@@ -65,13 +65,15 @@ def _set_ric_summary_lines(
     warnings: list[Warning],
 ) -> list[str]:
     """Return extra summary lines for a SetRicFromResolver operation."""
+    # `warnings` is unused — stats are derived from op.rics and changes;
+    # the parameter mirrors _set_ric_mapping_summary_lines for call-site parity.
     overwritten = sum(1 for c in changes if c.location == "datascope_ric_identifier")
     unresolved = sorted(fid for fid, r in op.rics.items() if not r.day_ric)
-    low_conf = sorted(
+    low_conf = [
         f"{fid}={r.day_ric}({r.confidence})"
-        for fid, r in op.rics.items()
+        for fid, r in sorted(op.rics.items())
         if r.day_ric and r.confidence and r.confidence != "high"
-    )
+    ]
     unresolved_detail = (
         f"  ({', '.join(str(f) for f in unresolved)})" if unresolved else ""
     )

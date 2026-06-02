@@ -445,6 +445,8 @@ def test_cli_set_ric_mapping_reports_unmatched_csv_rows(tmp_path):
 # ---------------------------------------------------------------------------
 # --set-ric (in-process, patched resolver — no network)
 # ---------------------------------------------------------------------------
+# conftest puts tools/edit-config on sys.path before collection, so a
+# module-level import is safe here.
 import edit_config
 
 from edit_config_lib import config_editor as _ce
@@ -481,7 +483,7 @@ def _write_us_config(path):
     path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
 
 
-def test_cli_set_ric_apply_in_process(tmp_path, monkeypatch):
+def test_cli_set_ric_apply_in_process(tmp_path, monkeypatch, capsys):
     config = tmp_path / "after.json"
     _write_us_config(config)
 
@@ -493,6 +495,9 @@ def test_cli_set_ric_apply_in_process(tmp_path, monkeypatch):
     rc = edit_config.main(
         ["--config", str(config), "--set-ric", "--feed-id", "990", "--apply"]
     )
+    out = capsys.readouterr().out
+    assert "RIC resolution summary:" in out
+    assert "identifiers overwritten: 1" in out
     assert rc == 0
     data = json.loads(config.read_text())
     feed = data["feeds"][0]
