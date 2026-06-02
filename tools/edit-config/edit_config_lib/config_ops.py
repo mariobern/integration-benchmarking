@@ -560,6 +560,111 @@ class SetRicMapping:
         return changes, warnings
 
 
+@dataclass(frozen=True)
+class ResolvedRic:
+    """A feed's resolved Datascope RICs, consumed by SetRicFromResolver.
+
+    `day_ric` applies to REGULAR/PRE_MARKET/POST_MARKET sessions; `overnight_ric`
+    (the `TICKER.BLUE` form) applies to OVER_NIGHT. An empty `day_ric` means the
+    resolver could not derive a RIC for the feed.
+    """
+
+    day_ric: str
+    overnight_ric: str
+    confidence: str = ""
+    warnings: tuple[str, ...] = ()
+
+
+@dataclass
+class SetRicFromResolver:
+    """Overwrite `datascope_ric` identifier slots from pre-resolved RICs.
+
+    `rics` maps feedId -> ResolvedRic. Per identifier slot the target value is
+    `overnight_ric` when the slot's session is OVER_NIGHT, else `day_ric`. Slots
+    already equal to the target are NOOPs; differing slots (empty, bare, or
+    wrong) are overwritten. Overwriting a non-empty value also emits a Warning so
+    the dry-run diff surfaces churn (e.g. CTRA.N -> CTRA.K). Reuses the
+    `datascope_ric_identifier` Change location, so the text-surgery applier needs
+    no changes.
+
+    Per-feed semantics:
+      - feedId absent from `rics`, or `day_ric` empty -> Warning (unresolved).
+      - feed has no datascope_ric identifier slots -> Warning (cannot insert).
+    """
+
+    rics: dict[int, ResolvedRic]
+
+    def apply(self, feed: dict) -> tuple[list[Change], list[Warning]]:
+        feed_id = feed["feedId"]
+        symbol = feed.get("symbol", "")
+
+        resolved = self.rics.get(feed_id)
+        if resolved is None or not resolved.day_ric:
+            return [], [
+                Warning(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    message=f"feed {feed_id}: no RIC resolved — skipped",
+                )
+            ]
+
+        # (session, identifier-dict) pairs in document order. Order matches
+        # config_text_surgery.find_ric_identifier_spans, so Change.index lines up.
+        slots: list[tuple[str, dict]] = []
+        for schedule in feed.get("marketSchedules", []):
+            session = schedule.get("session", "")
+            bm = schedule.get("benchmarkMapping", {})
+            ds = bm.get("datascope_ric", {})
+            for ident in ds.get("identifiers", []) or []:
+                if isinstance(ident, dict) and "identifier" in ident:
+                    slots.append((session, ident))
+
+        if not slots:
+            return [], [
+                Warning(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    message=(
+                        f"feed {feed_id}: no datascope_ric identifier slots — skipped"
+                    ),
+                )
+            ]
+
+        changes: list[Change] = []
+        warnings: list[Warning] = []
+        for i, (session, slot) in enumerate(slots):
+            target = (
+                resolved.overnight_ric if session == "OVER_NIGHT" else resolved.day_ric
+            )
+            current = slot["identifier"]
+            if current == target:
+                continue
+            changes.append(
+                Change(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    location="datascope_ric_identifier",
+                    field="identifier",
+                    before=current,
+                    after=target,
+                    index=i,
+                )
+            )
+            slot["identifier"] = target
+            if current != "":
+                warnings.append(
+                    Warning(
+                        feed_id=feed_id,
+                        symbol=symbol,
+                        message=(
+                            f"feed {feed_id}: overwriting identifier slot {i} "
+                            f"({current!r} -> {target!r})"
+                        ),
+                    )
+                )
+        return changes, warnings
+
+
 _STATE_WARNINGS = {
     ("STABLE", "COMING_SOON"): "regression: STABLE feed downgraded to COMING_SOON",
     ("STABLE", "INACTIVE"): "deactivation of live STABLE feed",

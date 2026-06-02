@@ -558,3 +558,138 @@ def test_set_ric_mapping_handles_multi_slot_feed():
     assert changes[0].index == 0
     assert changes[0].after == "0002.HK"
     assert len(warnings) == 1
+
+
+# ---------------------------------------------------------------------------
+# SetRicFromResolver
+# ---------------------------------------------------------------------------
+from edit_config_lib.config_ops import ResolvedRic, SetRicFromResolver
+
+
+def _us_feed(feed_id: int, ticker: str, sessions: list[tuple[str, str]]) -> dict:
+    """Build a US-equity feed. `sessions` is [(session_name, identifier_value)]."""
+    return {
+        "feedId": feed_id,
+        "symbol": f"Equity.US.{ticker}/USD",
+        "state": "STABLE",
+        "metadata": {"name": ticker, "asset_type": "equity"},
+        "marketSchedules": [
+            {
+                "session": name,
+                "benchmarkMapping": {
+                    "datascope_ric": {
+                        "identifiers": [
+                            {
+                                "identifier": ident,
+                                "validFrom": "1970-01-01T00:00:00.000000000Z",
+                            }
+                        ]
+                    }
+                },
+            }
+            for (name, ident) in sessions
+        ],
+    }
+
+
+def test_set_ric_rewrites_bare_day_sessions_overnight_noop():
+    feed = _us_feed(
+        990,
+        "BITS",
+        [
+            ("REGULAR", "BITS"),
+            ("PRE_MARKET", "BITS"),
+            ("POST_MARKET", "BITS"),
+            ("OVER_NIGHT", "BITS.BLUE"),
+        ],
+    )
+    op = SetRicFromResolver(
+        rics={990: ResolvedRic(day_ric="BITS.O", overnight_ric="BITS.BLUE")}
+    )
+    changes, warnings = op.apply(feed)
+    assert [c.index for c in changes] == [0, 1, 2]  # 3 day slots, overnight NOOP
+    assert all(c.after == "BITS.O" for c in changes)
+    assert all(c.before == "BITS" for c in changes)
+    assert len(warnings) == 3  # overwriting non-empty -> churn warning each
+    assert all("overwriting identifier slot" in w.message for w in warnings)
+
+
+def test_set_ric_fills_empty_slot_no_warning():
+    feed = _us_feed(1703, "IWDA", [("REGULAR", "")])
+    op = SetRicFromResolver(
+        rics={1703: ResolvedRic(day_ric="IWDA.O", overnight_ric="IWDA.BLUE")}
+    )
+    changes, warnings = op.apply(feed)
+    assert len(changes) == 1
+    assert changes[0].before == ""
+    assert changes[0].after == "IWDA.O"
+    assert changes[0].index == 0
+    assert warnings == []  # filling empty is not churn
+
+
+def test_set_ric_rewrites_wrong_suffix_with_churn_warning():
+    feed = _us_feed(1059, "CTRA", [("REGULAR", "CTRA.N")])
+    op = SetRicFromResolver(
+        rics={1059: ResolvedRic(day_ric="CTRA.K", overnight_ric="CTRA.BLUE")}
+    )
+    changes, warnings = op.apply(feed)
+    assert len(changes) == 1
+    assert changes[0].before == "CTRA.N"
+    assert changes[0].after == "CTRA.K"
+    assert len(warnings) == 1
+    assert "CTRA.N" in warnings[0].message and "CTRA.K" in warnings[0].message
+
+
+def test_set_ric_all_correct_is_noop():
+    feed = _us_feed(922, "AAPL", [("REGULAR", "AAPL.O"), ("OVER_NIGHT", "AAPL.BLUE")])
+    op = SetRicFromResolver(
+        rics={922: ResolvedRic(day_ric="AAPL.O", overnight_ric="AAPL.BLUE")}
+    )
+    changes, warnings = op.apply(feed)
+    assert changes == []
+    assert warnings == []
+
+
+def test_set_ric_overnight_slot_rewritten_when_wrong():
+    feed = _us_feed(990, "BITS", [("OVER_NIGHT", "WRONG")])
+    op = SetRicFromResolver(
+        rics={990: ResolvedRic(day_ric="BITS.O", overnight_ric="BITS.BLUE")}
+    )
+    changes, warnings = op.apply(feed)
+    assert len(changes) == 1
+    assert changes[0].after == "BITS.BLUE"
+
+
+def test_set_ric_no_identifier_slots_warns():
+    feed = {
+        "feedId": 999,
+        "symbol": "Equity.US.FOO/USD",
+        "state": "STABLE",
+        "marketSchedules": [{"session": "REGULAR", "benchmarkMapping": {}}],
+    }
+    op = SetRicFromResolver(
+        rics={999: ResolvedRic(day_ric="FOO.O", overnight_ric="FOO.BLUE")}
+    )
+    changes, warnings = op.apply(feed)
+    assert changes == []
+    assert len(warnings) == 1
+    assert "no datascope_ric identifier slots" in warnings[0].message
+
+
+def test_set_ric_unresolved_feed_warns():
+    feed = _us_feed(990, "BITS", [("REGULAR", "BITS")])
+    # empty day_ric == resolver could not resolve
+    op = SetRicFromResolver(rics={990: ResolvedRic(day_ric="", overnight_ric="")})
+    changes, warnings = op.apply(feed)
+    assert changes == []
+    assert len(warnings) == 1
+    assert "no RIC resolved" in warnings[0].message
+
+
+def test_set_ric_feed_absent_from_map_warns():
+    feed = _us_feed(990, "BITS", [("REGULAR", "BITS")])
+    op = SetRicFromResolver(rics={})  # 990 not present
+    changes, warnings = op.apply(feed)
+    assert changes == []
+    assert len(warnings) == 1
+    assert "no RIC resolved" in warnings[0].message
