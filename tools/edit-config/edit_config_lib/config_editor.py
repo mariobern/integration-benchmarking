@@ -167,7 +167,7 @@ def build_op_from_args(args) -> list[PlannedOp]:
         raise ValueError(
             "no operation specified (use one of --add-publisher, "
             "--remove-publisher, --set-min-publishers, "
-            "--bump-min-publishers, --set-state, --set-ric-mapping)"
+            "--bump-min-publishers, --set-state, --set-ric-mapping, --set-ric)"
         )
     if len(selected) > 1:
         raise ValueError(f"exactly one operation flag allowed; got {selected}")
@@ -192,20 +192,23 @@ def build_op_from_args(args) -> list[PlannedOp]:
         return [PlannedOp(op=op, filters=filters)]
 
     if name == "set_ric":
-        filters = _build_filters_from_args(args)
-        if not filters.feed_ids:
+        feed_ids: set[int] = set()
+        if args.feed_id:
+            feed_ids |= parse_selector_text(args.feed_id)
+        if args.feed_ids_from:
+            feed_ids |= read_selector_file(args.feed_ids_from)
+        if not feed_ids:
             raise ValueError(
                 "--set-ric requires --feed-id or --feed-ids-from targeting"
             )
-        symbols_path = getattr(args, "symbols", None) or args.config
-        force_refresh = getattr(args, "force_refresh", False)
+        symbols_path = args.symbols or args.config
         rics = resolve_rics_for_feed_ids(
-            sorted(filters.feed_ids),
+            sorted(feed_ids),
             symbols_path=symbols_path,
-            force_refresh=force_refresh,
+            force_refresh=args.force_refresh,
         )
         op = SetRicFromResolver(rics=rics)
-        return [PlannedOp(op=op, filters=filters)]
+        return [PlannedOp(op=op, filters=FilterSet(feed_ids=feed_ids))]
 
     filters = _build_filters_from_args(args)
 

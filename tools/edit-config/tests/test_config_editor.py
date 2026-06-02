@@ -909,6 +909,7 @@ def test_build_set_ric_resolves_targeted_ids(monkeypatch):
     def fake_resolve(feed_ids, symbols_path, force_refresh=False, resolver=None):
         captured["feed_ids"] = feed_ids
         captured["symbols_path"] = symbols_path
+        captured["force_refresh"] = force_refresh
         from edit_config_lib.config_ops import ResolvedRic
 
         return {
@@ -923,3 +924,4 @@ def test_build_set_ric_resolves_targeted_ids(monkeypatch):
     assert plan[0].filters.feed_ids == {990, 1059}
     assert captured["feed_ids"] == [990, 1059]  # sorted
     assert captured["symbols_path"] == "my_after.json"  # defaults to --config
+    assert captured["force_refresh"] is False
