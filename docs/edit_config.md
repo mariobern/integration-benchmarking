@@ -91,7 +91,10 @@ overwrites the `datascope_ric.identifier` slots in every existing session on tha
   OVER_NIGHT sessions are never inserted.**
 
 **Targeting** — requires `--feed-id` or `--feed-ids-from`. Symbol-pattern and
-asset-class-only targeting are not accepted (resolution is by feed ID).
+asset-class-only targeting are not accepted (resolution is by feed ID). Intended
+for US-equity feeds: other asset classes either resolve no RIC (reported as
+unresolved) or get a day-session RIC with an empty `OVER_NIGHT` value, so review
+the dry-run before targeting non-US-equity feeds.
 
 **Resolution summary footer** — after processing, a footer shows the number of
 identifiers overwritten, feeds unresolved, and low-confidence RIC counts.
