@@ -93,10 +93,10 @@ overwrites the `datascope_ric.identifier` slots in every existing session on tha
 **Targeting** — requires `--feed-id` or `--feed-ids-from`. Symbol-pattern and
 asset-class-only targeting are not accepted (resolution is by feed ID).
 
-**Resolution summary footer** — after processing, a footer shows total feeds
-processed, feeds unresolved, and low-confidence RIC counts. Low-confidence RICs
-are still written, but surfaced here so you can decide whether to review before
-`--apply`.
+**Resolution summary footer** — after processing, a footer shows the number of
+identifiers overwritten, feeds unresolved, and low-confidence RIC counts.
+Low-confidence RICs are still written, but surfaced here so you can decide
+whether to review before `--apply`.
 
 **Extra flags**
 
