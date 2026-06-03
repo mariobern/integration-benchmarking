@@ -536,17 +536,25 @@ def _build_per_feed_data(
     floor,
     ceiling_mult,
     modes,
+    manual_exclude=None,
 ):
-    """Returns (per_feed_data, skipped_feeds, topup_rows, zero_passer_rows, modes_with_data_count).
+    """Returns (per_feed_data, skipped_feeds, topup_rows, zero_passer_rows,
+    modes_with_data_count, manual_excluded_cells).
 
     `modes` is the ordered list of dq_reports subdirectory names to read for each feed
     (drawn from ASSET_CLASS_CONFIG[<asset_class>]["modes"]).
+
+    `manual_exclude` is an optional set of integer publisher_ids that are hidden from
+    the 'allowed' sheet (filtered path) only.  The 'rankings' path (rank_top_n) is
+    left untouched so those publishers remain visible for review.
     """
+    manual_exclude = manual_exclude or set()
     per_feed_data: dict = {}
     skipped: list[int] = []
     topup_rows = 0
     zero_passer_rows = 0
     modes_with_data = 0
+    manual_excluded_cells = 0
 
     for feed_id in feed_ids:
         mode_data: dict = {}
@@ -570,8 +578,20 @@ def _build_per_feed_data(
                 mode_data[mode] = None  # all rows excluded
                 continue
             ranked = rank_top_n(kept, n=top_n, excluded=set())  # already excluded
+            # Manual exclusion applies to the allowed sheet only: strip the IDs
+            # from the filter input but leave `ranked` untouched.
+            filter_input = [
+                r for r in kept if int(r["publisher_id"]) not in manual_exclude
+            ]
+            if len(filter_input) != len(kept):
+                manual_excluded_cells += 1
             selected, n_passed, n_topup = apply_filter(
-                kept, max_ros_map[mode], min_hit_map[mode], min_obs, floor, ceiling_mult
+                filter_input,
+                max_ros_map[mode],
+                min_hit_map[mode],
+                min_obs,
+                floor,
+                ceiling_mult,
             )
             mode_data[mode] = {
                 "ranked": ranked,
@@ -588,7 +608,14 @@ def _build_per_feed_data(
         if not any_data:
             skipped.append(feed_id)
         per_feed_data[feed_id] = mode_data
-    return per_feed_data, skipped, topup_rows, zero_passer_rows, modes_with_data
+    return (
+        per_feed_data,
+        skipped,
+        topup_rows,
+        zero_passer_rows,
+        modes_with_data,
+        manual_excluded_cells,
+    )
 
 
 def main():

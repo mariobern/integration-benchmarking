@@ -746,6 +746,7 @@ def test_build_per_feed_data_honors_modes_parameter(tmp_path):
         topup_rows,
         zero_passer_rows,
         modes_with_data,
+        manual_excluded_cells,
     ) = _build_per_feed_data(
         feed_ids=[884],
         reports_dir=reports,
@@ -771,6 +772,7 @@ def test_build_per_feed_data_honors_modes_parameter(tmp_path):
     assert zero_passer_rows == 0
     # Crucially: no us-equities key at all.
     assert "us-equities" not in per_feed[884]
+    assert manual_excluded_cells == 0
 
 
 # ---------- write_rankings_sheet parametric layout ----------
@@ -1176,3 +1178,164 @@ def test_main_hk_equities_topup_path_end_to_end(tmp_path, monkeypatch, capsys):
     assert "5, 7, 9, 11, 13" in json_cell
     assert "15" not in json_cell  # over the 2x ceiling, never promoted
     assert allowed.cell(row=4, column=4).value == "1 passed + 4 top-up (≤2×)"
+
+
+# ---------- _build_per_feed_data with manual_exclude ----------
+
+
+def test_build_per_feed_data_manual_exclude_keeps_pub_in_ranked_not_filtered(tmp_path):
+    """80 stays visible in 'ranked' (rankings) but is removed from 'filtered' (allowed)."""
+    reports = tmp_path / "dq_reports"
+    _write_stats_csv(
+        reports,
+        "lazer-prod",
+        "hk-equities",
+        884,
+        "2026-05-19",
+        body_rows=[
+            "80,5000,0.001,0.2,90.0\n",  # best r/s — would top the allowed list
+            "5,5000,0.001,0.5,90.0\n",
+            "7,5000,0.001,0.6,90.0\n",
+        ],
+        header="publisher_id,n_observations,rmse,rmse_over_spread,hit_rate_0.1pct\n",
+    )
+    (
+        per_feed,
+        skipped,
+        topup_rows,
+        zero_passer_rows,
+        modes_with_data,
+        manual_excluded_cells,
+    ) = _build_per_feed_data(
+        feed_ids=[884],
+        reports_dir=reports,
+        cluster="lazer-prod",
+        date="2026-05-19",
+        excluded={0},
+        top_n=10,
+        max_ros_map={"hk-equities": 1.0},
+        min_hit_map={"hk-equities": 80.0},
+        min_obs=1000,
+        floor=5,
+        ceiling_mult=2.0,
+        modes=["hk-equities"],
+        manual_exclude={80},
+    )
+    md = per_feed[884]["hk-equities"]
+    ranked_ids = {r["publisher_id"] for r in md["ranked"]}
+    filtered_ids = {r["publisher_id"] for r in md["filtered"]}
+    assert "80" in ranked_ids  # still visible in rankings
+    assert "80" not in filtered_ids  # removed from allowed
+    assert filtered_ids == {"5", "7"}
+    assert manual_excluded_cells == 1
+
+
+def test_build_per_feed_data_manual_exclude_below_floor_backfills_next_best(tmp_path):
+    """Removing 80 drops passers below the floor → next-best near-miss is topped up."""
+    reports = tmp_path / "dq_reports"
+    _write_stats_csv(
+        reports,
+        "lazer-prod",
+        "hk-equities",
+        884,
+        "2026-05-19",
+        body_rows=[
+            "80,5000,0.001,0.2,90.0\n",  # passer, but manually excluded
+            "5,5000,0.001,0.5,90.0\n",  # passer
+            "7,5000,0.002,1.3,90.0\n",  # near-miss (1.0 < r/s <= 2.0)
+            "9,5000,0.002,1.7,90.0\n",  # near-miss → backfill substitute
+        ],
+        header="publisher_id,n_observations,rmse,rmse_over_spread,hit_rate_0.1pct\n",
+    )
+    (per_feed, _s, _t, _z, _m, cells) = _build_per_feed_data(
+        feed_ids=[884],
+        reports_dir=reports,
+        cluster="lazer-prod",
+        date="2026-05-19",
+        excluded={0},
+        top_n=10,
+        max_ros_map={"hk-equities": 1.0},
+        min_hit_map={"hk-equities": 80.0},
+        min_obs=1000,
+        floor=3,
+        ceiling_mult=2.0,
+        modes=["hk-equities"],
+        manual_exclude={80},
+    )
+    md = per_feed[884]["hk-equities"]
+    filtered_ids = {r["publisher_id"] for r in md["filtered"]}
+    # 80 gone; passer 5 plus the two near-miss top-ups (7, 9) reach floor of 3.
+    assert "80" not in filtered_ids
+    assert filtered_ids == {"5", "7", "9"}
+    assert md["n_topup"] == 2
+    assert cells == 1
+
+
+def test_build_per_feed_data_manual_exclude_above_floor_just_shrinks(tmp_path):
+    """Plenty of passers above the floor → removing 80 just drops it, no substitute added."""
+    reports = tmp_path / "dq_reports"
+    _write_stats_csv(
+        reports,
+        "lazer-prod",
+        "hk-equities",
+        884,
+        "2026-05-19",
+        body_rows=[
+            "80,5000,0.001,0.2,90.0\n",  # passer, excluded
+            "5,5000,0.001,0.3,90.0\n",
+            "7,5000,0.001,0.4,90.0\n",
+            "9,5000,0.001,0.5,90.0\n",
+        ],
+        header="publisher_id,n_observations,rmse,rmse_over_spread,hit_rate_0.1pct\n",
+    )
+    (per_feed, _s, _t, _z, _m, cells) = _build_per_feed_data(
+        feed_ids=[884],
+        reports_dir=reports,
+        cluster="lazer-prod",
+        date="2026-05-19",
+        excluded={0},
+        top_n=10,
+        max_ros_map={"hk-equities": 1.0},
+        min_hit_map={"hk-equities": 80.0},
+        min_obs=1000,
+        floor=2,  # 3 remaining passers comfortably exceed the floor
+        ceiling_mult=2.0,
+        modes=["hk-equities"],
+        manual_exclude={80},
+    )
+    md = per_feed[884]["hk-equities"]
+    filtered_ids = {r["publisher_id"] for r in md["filtered"]}
+    assert filtered_ids == {"5", "7", "9"}  # 80 dropped, no extra pulled in
+    assert md["n_topup"] == 0
+    assert cells == 1
+
+
+def test_build_per_feed_data_manual_exclude_default_is_noop(tmp_path):
+    """No manual_exclude arg → 80 stays in both ranked and filtered; counter is 0."""
+    reports = tmp_path / "dq_reports"
+    _write_stats_csv(
+        reports,
+        "lazer-prod",
+        "hk-equities",
+        884,
+        "2026-05-19",
+        body_rows=["80,5000,0.001,0.2,90.0\n", "5,5000,0.001,0.5,90.0\n"],
+        header="publisher_id,n_observations,rmse,rmse_over_spread,hit_rate_0.1pct\n",
+    )
+    (per_feed, _s, _t, _z, _m, cells) = _build_per_feed_data(
+        feed_ids=[884],
+        reports_dir=reports,
+        cluster="lazer-prod",
+        date="2026-05-19",
+        excluded={0},
+        top_n=10,
+        max_ros_map={"hk-equities": 1.0},
+        min_hit_map={"hk-equities": 80.0},
+        min_obs=1000,
+        floor=5,
+        ceiling_mult=2.0,
+        modes=["hk-equities"],
+    )
+    md = per_feed[884]["hk-equities"]
+    assert "80" in {r["publisher_id"] for r in md["filtered"]}
+    assert cells == 0
