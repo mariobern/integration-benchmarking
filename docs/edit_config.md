@@ -70,6 +70,59 @@ python3 tools/config-linter/config_linter.py --config after.json
 - `0` — success (warnings allowed)
 - `1` — validation or runtime error (no write happens)
 
+### `--set-ric` — resolve and overwrite `datascope_ric` identifiers
+
+Resolves each targeted feed's RIC via `generate_ric_mapping`'s `RICResolver` and
+overwrites the `datascope_ric.identifier` slots in every existing session on that feed.
+
+**RIC pattern (US equities)**
+
+| Session slot                     | Written value                                                                                                         |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| REGULAR, PRE_MARKET, POST_MARKET | Day RIC: `TICKER.O` (NASDAQ), `TICKER.K` (IEX / 4+ char consolidated), bare `TICKER` (short consolidated, e.g. `XLF`) |
+| OVER_NIGHT                       | `TICKER.BLUE`                                                                                                         |
+
+**Per-slot behaviour**
+
+- Slot already equals resolved value → NOOP (no diff entry).
+- Slot differs (empty, bare ticker, or wrong exchange suffix) → overwritten. If the
+  old value was non-empty a churn warning is printed so you can review it in the dry-run.
+- **Only existing session slots are updated — missing PRE_MARKET / POST_MARKET /
+  OVER_NIGHT sessions are never inserted.**
+
+**Targeting** — requires `--feed-id` or `--feed-ids-from`. Symbol-pattern and
+asset-class-only targeting are not accepted (resolution is by feed ID). Intended
+for US-equity feeds: other asset classes either resolve no RIC (reported as
+unresolved) or get a day-session RIC with an empty `OVER_NIGHT` value, so review
+the dry-run before targeting non-US-equity feeds.
+
+**Resolution summary footer** — after processing, a footer shows the number of
+identifiers overwritten, feeds unresolved, and low-confidence RIC counts.
+Low-confidence RICs are still written, but surfaced here so you can decide
+whether to review before `--apply`.
+
+**Extra flags**
+
+| Flag              | Default         | Effect                                            |
+| ----------------- | --------------- | ------------------------------------------------- |
+| `--symbols PATH`  | `--config` file | Override the resolver's reference symbols file    |
+| `--force-refresh` | off             | Bypass NASDAQ-Trader cache (forces a live lookup) |
+
+```bash
+# dry-run (default)
+python3 tools/edit-config/edit_config.py --config after.json \
+    --set-ric --feed-ids-from feed_ids.txt
+
+# write
+python3 tools/edit-config/edit_config.py --config after.json \
+    --set-ric --feed-ids-from feed_ids.txt --apply
+```
+
+**Contrast with `--set-ric-mapping`** — `--set-ric-mapping` is HK-only, matches
+feeds by symbol prefix from a CSV, writes one RIC to every slot, and only fills
+_empty_ slots. `--set-ric` resolves RICs automatically by feed ID, differentiates
+day vs overnight slots, and overwrites non-empty values that differ.
+
 ### `--set-ric-mapping` — fill empty `datascope_ric` identifiers
 
 Backfills `marketSchedules[].benchmarkMapping.datascope_ric.identifiers[].identifier`

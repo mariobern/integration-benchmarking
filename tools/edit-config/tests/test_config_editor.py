@@ -814,3 +814,114 @@ class TestRunLinter:
         rc, output = run_linter(str(target))
         assert rc != 0
         assert "linter" in output.lower() or "not found" in output.lower()
+
+
+# ---------------------------------------------------------------------------
+# resolve_rics_for_feed_ids
+# ---------------------------------------------------------------------------
+from dataclasses import dataclass as _dc
+from edit_config_lib.config_editor import resolve_rics_for_feed_ids
+
+
+@_dc
+class _FakeResult:
+    ric: str
+    display_ticker: str
+    confidence: str = "medium"
+    warnings: tuple = ()
+
+
+class _FakeResolver:
+    def __init__(self, mapping):
+        self._mapping = mapping  # feed_id -> _FakeResult
+
+    def resolve_by_id(self, fid):
+        return self._mapping.get(fid, _FakeResult(ric="", display_ticker=str(fid)))
+
+
+def test_resolve_rics_builds_day_and_overnight():
+    fake = _FakeResolver(
+        {
+            922: _FakeResult(ric="AAPL.O", display_ticker="AAPL"),
+            1059: _FakeResult(ric="CTRA.K", display_ticker="CTRA"),
+        }
+    )
+    out = resolve_rics_for_feed_ids(
+        [922, 1059], symbols_path="unused.json", resolver=fake
+    )
+    assert out[922].day_ric == "AAPL.O"
+    assert out[922].overnight_ric == "AAPL.BLUE"
+    assert out[1059].day_ric == "CTRA.K"
+    assert out[1059].overnight_ric == "CTRA.BLUE"
+
+
+def test_resolve_rics_unresolved_has_empty_day_ric():
+    fake = _FakeResolver({})  # nothing resolves
+    out = resolve_rics_for_feed_ids([990], symbols_path="unused.json", resolver=fake)
+    assert out[990].day_ric == ""
+    assert out[990].overnight_ric == ""
+
+
+# ---------------------------------------------------------------------------
+# build_op_from_args: --set-ric
+# ---------------------------------------------------------------------------
+import argparse as _argparse
+from edit_config_lib import config_editor as _ce
+from edit_config_lib.config_editor import build_op_from_args
+from edit_config_lib.config_ops import SetRicFromResolver as _SetRicFromResolver
+
+
+def _ric_args(**overrides):
+    base = dict(
+        config="after.json",
+        add_publisher=None,
+        remove_publisher=None,
+        set_min_publishers=None,
+        bump_min_publishers=None,
+        set_state=None,
+        from_spec=None,
+        set_ric_mapping=False,
+        set_ric=False,
+        from_csv=None,
+        feed_id=None,
+        feed_ids_from=None,
+        symbol_pattern=None,
+        asset_class=None,
+        state=None,
+        session=None,
+        symbols=None,
+        force_refresh=False,
+    )
+    base.update(overrides)
+    return _argparse.Namespace(**base)
+
+
+def test_build_set_ric_requires_feed_id(monkeypatch):
+    monkeypatch.setattr(_ce, "resolve_rics_for_feed_ids", lambda *a, **k: {})
+    args = _ric_args(set_ric=True, symbol_pattern="Equity.US.*")
+    with pytest.raises(ValueError, match="requires --feed-id"):
+        build_op_from_args(args)
+
+
+def test_build_set_ric_resolves_targeted_ids(monkeypatch):
+    captured = {}
+
+    def fake_resolve(feed_ids, symbols_path, force_refresh=False, resolver=None):
+        captured["feed_ids"] = feed_ids
+        captured["symbols_path"] = symbols_path
+        captured["force_refresh"] = force_refresh
+        from edit_config_lib.config_ops import ResolvedRic
+
+        return {
+            fid: ResolvedRic(day_ric="X.O", overnight_ric="X.BLUE") for fid in feed_ids
+        }
+
+    monkeypatch.setattr(_ce, "resolve_rics_for_feed_ids", fake_resolve)
+    args = _ric_args(set_ric=True, feed_id="990,1059", config="my_after.json")
+    plan = build_op_from_args(args)
+    assert len(plan) == 1
+    assert isinstance(plan[0].op, _SetRicFromResolver)
+    assert plan[0].filters.feed_ids == {990, 1059}
+    assert captured["feed_ids"] == [990, 1059]  # sorted
+    assert captured["symbols_path"] == "my_after.json"  # defaults to --config
+    assert captured["force_refresh"] is False
