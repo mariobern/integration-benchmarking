@@ -110,12 +110,14 @@ excluded publisher visibly tops `rankings` yet silently vanishes from
    `Manually excluded from allowed: [80] → applied to 23 feed/session cells`
    ("applied to N cells" = count of `(feed, mode)` candidate sets from which at
    least one manually-excluded publisher was actually removed).
-2. **`allowed` sheet subtitle note**, written only when the flag is used, e.g.
-   a cell under the title reading `Manually excluded from allowed: 80`.
-   The `write_allowed_sheet` signature gains an optional
-   `manual_exclude` argument (default empty) so existing callers/tests are
-   unaffected; when non-empty it writes the note and shifts the existing
-   header/data rows down by one.
+2. **`allowed` sheet note in the title row**, written only when the flag is
+   used: a cell at row 1, column 3 reading `Manually excluded from allowed:
+80`. The `write_allowed_sheet` signature gains an optional `manual_exclude`
+   argument (default empty) so existing callers/tests are unaffected. The note
+   is placed in the otherwise-empty title row (row 1) rather than as a new
+   subtitle row, so **no header/data rows shift** — the `allowed` sheet layout
+   (headers at row 2, data from row 3) is byte-identical whether or not the
+   flag is used.
 
 > Note: this subtitle is a small, deliberate deviation from a strict
 > "allowed-sheet-only, no annotation" reading — kept because it is nearly free
