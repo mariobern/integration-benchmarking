@@ -405,11 +405,14 @@ def write_allowed_sheet(
     modes: list,
     sessions: dict,
     ceiling_mult: float = DEFAULT_TOPUP_CEILING_MULT,
+    manual_exclude: set | None = None,
 ) -> None:
     """Populate the 'allowed' worksheet.
 
     Layout (4 cols, NO merges):
       A1: title (cell A1 only, bold size 14)
+      C1: optional "Manually excluded from allowed: ..." note (bold), present
+          only when manual_exclude is non-empty
       A2: column headers — Feed ID | Session | allowedPublisherIds | Notes (bold + light gray)
       A3+: per-feed groups:
            row: <feed_id> | (aggregate)  | sorted-union JSON or "(no data)" |
@@ -434,6 +437,15 @@ def write_allowed_sheet(
     ws.cell(
         row=1, column=1, value=f"Allowed Publishers — {cluster} — {date}"
     ).font = bold_xl
+
+    # Optional note in the otherwise-empty title row (no row shift): records
+    # which publishers were held out of the allowed lists for this run.
+    manual_exclude = manual_exclude or set()
+    if manual_exclude:
+        note = "Manually excluded from allowed: " + ", ".join(
+            str(p) for p in sorted(manual_exclude)
+        )
+        ws.cell(row=1, column=3, value=note).font = bold
 
     # Row 2: column headers.
     headers = ["Feed ID", "Session", "allowedPublisherIds", "Notes"]
@@ -536,17 +548,25 @@ def _build_per_feed_data(
     floor,
     ceiling_mult,
     modes,
+    manual_exclude=None,
 ):
-    """Returns (per_feed_data, skipped_feeds, topup_rows, zero_passer_rows, modes_with_data_count).
+    """Returns (per_feed_data, skipped_feeds, topup_rows, zero_passer_rows,
+    modes_with_data_count, manual_excluded_cells).
 
     `modes` is the ordered list of dq_reports subdirectory names to read for each feed
     (drawn from ASSET_CLASS_CONFIG[<asset_class>]["modes"]).
+
+    `manual_exclude` is an optional set of integer publisher_ids that are hidden from
+    the 'allowed' sheet (filtered path) only.  The 'rankings' path (rank_top_n) is
+    left untouched so those publishers remain visible for review.
     """
+    manual_exclude = manual_exclude or set()
     per_feed_data: dict = {}
     skipped: list[int] = []
     topup_rows = 0
     zero_passer_rows = 0
     modes_with_data = 0
+    manual_excluded_cells = 0
 
     for feed_id in feed_ids:
         mode_data: dict = {}
@@ -570,8 +590,22 @@ def _build_per_feed_data(
                 mode_data[mode] = None  # all rows excluded
                 continue
             ranked = rank_top_n(kept, n=top_n, excluded=set())  # already excluded
+            # Manual exclusion applies to the allowed sheet only: strip the IDs
+            # from the filter input but leave `ranked` untouched.
+            # int() is safe: every row in `kept` already passed an int()
+            # parse in the kept-building loop above.
+            filter_input = [
+                r for r in kept if int(r["publisher_id"]) not in manual_exclude
+            ]
+            if len(filter_input) != len(kept):
+                manual_excluded_cells += 1
             selected, n_passed, n_topup = apply_filter(
-                kept, max_ros_map[mode], min_hit_map[mode], min_obs, floor, ceiling_mult
+                filter_input,
+                max_ros_map[mode],
+                min_hit_map[mode],
+                min_obs,
+                floor,
+                ceiling_mult,
             )
             mode_data[mode] = {
                 "ranked": ranked,
@@ -588,7 +622,14 @@ def _build_per_feed_data(
         if not any_data:
             skipped.append(feed_id)
         per_feed_data[feed_id] = mode_data
-    return per_feed_data, skipped, topup_rows, zero_passer_rows, modes_with_data
+    return (
+        per_feed_data,
+        skipped,
+        topup_rows,
+        zero_passer_rows,
+        modes_with_data,
+        manual_excluded_cells,
+    )
 
 
 def main():
@@ -700,6 +741,16 @@ Examples:
         help="A top-up's rmse_over_spread must be <= this multiple of the "
         "per-mode pass threshold (default: 2.0).",
     )
+    parser.add_argument(
+        "--exclude-publisher",
+        nargs="+",
+        type=int,
+        default=None,
+        metavar="PUB_ID",
+        help="Publisher ID(s) to hold out of the 'allowed' sheet for this run "
+        "only. They remain visible in 'rankings'. The redundancy floor "
+        "auto-backfills the next-best publisher where needed.",
+    )
     args = parser.parse_args()
 
     csv_path = Path(args.csv)
@@ -750,12 +801,15 @@ Examples:
         max_ros_map = dict(asset_cfg["default_max_ros"])
         min_hit_map = dict(asset_cfg["default_min_hit"])
 
+    manual_exclude = set(args.exclude_publisher or [])
+
     (
         per_feed_data,
         skipped,
         topup_rows,
         zero_passer_rows,
         modes_with_data,
+        manual_excluded_cells,
     ) = _build_per_feed_data(
         feed_ids,
         reports_dir,
@@ -769,6 +823,7 @@ Examples:
         args.redundancy_floor,
         args.topup_ceiling_mult,
         modes=modes,
+        manual_exclude=manual_exclude,
     )
 
     feeds_with_data = len(feed_ids) - len(skipped)
@@ -793,6 +848,7 @@ Examples:
         modes=modes,
         sessions=sessions,
         ceiling_mult=args.topup_ceiling_mult,
+        manual_exclude=manual_exclude,
     )
 
     out_path = (
@@ -815,6 +871,11 @@ Examples:
     print(f"Excluded publishers: 0 + {test_count} .Test (sample: {sample_excluded})")
     print(f"Rows using top-ups: {topup_rows} cells")
     print(f"Rows with 0 passers: {zero_passer_rows} cells")
+    if manual_exclude:
+        print(
+            f"Manually excluded from allowed: {sorted(manual_exclude)} → "
+            f"applied to {manual_excluded_cells} feed/session cells"
+        )
     sys.exit(0)
 
 

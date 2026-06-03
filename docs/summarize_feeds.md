@@ -42,31 +42,37 @@ python -m lazer_dq.summarize_feeds \
 python -m lazer_dq.summarize_feeds \
     --csv feeds.csv --cluster lazer-prod --date 2026-05-06 \
     --top-n 15 --redundancy-floor 5 --topup-ceiling-mult 2.0 --min-n-observations 500
+
+# Temporarily hold a jittery publisher out of the allowed lists (kept visible in rankings)
+python -m lazer_dq.summarize_feeds \
+    --csv feeds.csv --cluster lazer-prod --date 2026-05-06 \
+    --exclude-publisher 80
 ```
 
 ## Arguments
 
-| Argument                           | Description                                                                                    | Default                            |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------- |
-| `--csv`                            | CSV file (column 1 = `feed_id`) — **required**                                                 | —                                  |
-| `--cluster`                        | Cluster name — **required**                                                                    | —                                  |
-| `--date`                           | Date `YYYY-MM-DD` — **required**                                                               | —                                  |
-| `--reports-dir`                    | Base reports directory                                                                         | `dq_reports`                       |
-| `--publishers-md`                  | Path to `publishers.md`                                                                        | `publishers.md`                    |
-| `--output`                         | Output `.xlsx` path                                                                            | `dq_summary_<cluster>_<date>.xlsx` |
-| `--asset-class`                    | Asset class to summarize; sets which modes are read and the layout (see Asset Classes & Modes) | `us-equities`                      |
-| `--max-rmse-over-spread-regular`   | RMSE/spread ceiling for `us-equities`                                                          | `1.0`                              |
-| `--min-hit-rate-regular`           | Hit-rate floor (%) for `us-equities`                                                           | `80.0`                             |
-| `--max-rmse-over-spread-pre`       | RMSE/spread ceiling for `us-equities-pre`                                                      | `2.0`                              |
-| `--min-hit-rate-pre`               | Hit-rate floor (%) for `us-equities-pre`                                                       | `50.0`                             |
-| `--max-rmse-over-spread-post`      | RMSE/spread ceiling for `us-equities-post`                                                     | `2.0`                              |
-| `--min-hit-rate-post`              | Hit-rate floor (%) for `us-equities-post`                                                      | `50.0`                             |
-| `--max-rmse-over-spread-overnight` | RMSE/spread ceiling for `us-equities-overnight`                                                | `3.0`                              |
-| `--min-hit-rate-overnight`         | Hit-rate floor (%) for `us-equities-overnight`                                                 | `25.0`                             |
-| `--min-n-observations`             | Minimum sample size to consider a publisher                                                    | `1000`                             |
-| `--top-n`                          | Top-N publishers per feed/mode                                                                 | `10`                               |
-| `--redundancy-floor`               | Minimum publishers to return per feed/session (set `0` to disable top-ups)                     | `5`                                |
-| `--topup-ceiling-mult`             | A top-up's `rmse_over_spread` must be ≤ this × the per-mode pass threshold                     | `2.0`                              |
+| Argument                           | Description                                                                                                             | Default                            |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `--csv`                            | CSV file (column 1 = `feed_id`) — **required**                                                                          | —                                  |
+| `--cluster`                        | Cluster name — **required**                                                                                             | —                                  |
+| `--date`                           | Date `YYYY-MM-DD` — **required**                                                                                        | —                                  |
+| `--reports-dir`                    | Base reports directory                                                                                                  | `dq_reports`                       |
+| `--publishers-md`                  | Path to `publishers.md`                                                                                                 | `publishers.md`                    |
+| `--output`                         | Output `.xlsx` path                                                                                                     | `dq_summary_<cluster>_<date>.xlsx` |
+| `--asset-class`                    | Asset class to summarize; sets which modes are read and the layout (see Asset Classes & Modes)                          | `us-equities`                      |
+| `--max-rmse-over-spread-regular`   | RMSE/spread ceiling for `us-equities`                                                                                   | `1.0`                              |
+| `--min-hit-rate-regular`           | Hit-rate floor (%) for `us-equities`                                                                                    | `80.0`                             |
+| `--max-rmse-over-spread-pre`       | RMSE/spread ceiling for `us-equities-pre`                                                                               | `2.0`                              |
+| `--min-hit-rate-pre`               | Hit-rate floor (%) for `us-equities-pre`                                                                                | `50.0`                             |
+| `--max-rmse-over-spread-post`      | RMSE/spread ceiling for `us-equities-post`                                                                              | `2.0`                              |
+| `--min-hit-rate-post`              | Hit-rate floor (%) for `us-equities-post`                                                                               | `50.0`                             |
+| `--max-rmse-over-spread-overnight` | RMSE/spread ceiling for `us-equities-overnight`                                                                         | `3.0`                              |
+| `--min-hit-rate-overnight`         | Hit-rate floor (%) for `us-equities-overnight`                                                                          | `25.0`                             |
+| `--min-n-observations`             | Minimum sample size to consider a publisher                                                                             | `1000`                             |
+| `--top-n`                          | Top-N publishers per feed/mode                                                                                          | `10`                               |
+| `--redundancy-floor`               | Minimum publishers to return per feed/session (set `0` to disable top-ups)                                              | `5`                                |
+| `--topup-ceiling-mult`             | A top-up's `rmse_over_spread` must be ≤ this × the per-mode pass threshold                                              | `2.0`                              |
+| `--exclude-publisher`              | Publisher ID(s) to hold out of the `allowed` sheet only (still shown in `rankings`); floor auto-backfills the next-best | none (off)                         |
 
 ## Inputs
 
@@ -133,6 +139,20 @@ For each `(feed_id, mode)`:
    - The `Notes` column shows the mix, e.g. `2 passed + 3 top-up (≤2×)` (highlighted yellow), or `0 passed, all > 2× ceiling` when no publisher is within the ceiling.
 
 The cross-mode **aggregate** is the sorted union of per-mode allowed lists (deduplicated).
+
+### Per-run publisher exclusion (`--exclude-publisher`)
+
+`--exclude-publisher 80 [55 ...]` holds the given publisher IDs out of the
+`allowed` sheet for this run only. The excluded publishers **remain visible in
+the `rankings` sheet** (so their metrics can still be inspected), but they are
+dropped before the threshold/floor filter that builds the `allowed` lists.
+Because removal can push a feed/session below `--redundancy-floor`, the
+existing top-up logic automatically backfills the next-best eligible publisher
+("auto next-best" substitution) — feeds already above the floor simply lose the
+excluded publisher with no replacement. When the flag is used, the `allowed`
+sheet title row notes which publishers were excluded, and the run summary
+prints how many feed/session cells were affected. This is a temporary,
+per-run override; it does not touch `publishers.md`.
 
 ## Output Workbook
 
