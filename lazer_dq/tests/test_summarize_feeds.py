@@ -1378,6 +1378,79 @@ def test_write_allowed_sheet_writes_manual_exclude_note_in_title_row(tmp_path):
     assert ws.cell(row=3, column=2).value == "(aggregate)"
 
 
+def test_main_exclude_publisher_end_to_end(tmp_path, monkeypatch, capsys):
+    """--exclude-publisher 80: 80 visible in rankings, absent from allowed, stdout reports it."""
+    reports = tmp_path / "dq_reports"
+    _write_stats_csv(
+        reports,
+        "lazer-prod",
+        "hk-equities",
+        884,
+        "2026-05-19",
+        body_rows=[
+            "80,5000,0.001,0.2,90.0\n",  # best r/s — would lead allowed if not excluded
+            "5,5000,0.001,0.5,90.0\n",
+            "7,5000,0.001,0.6,90.0\n",
+        ],
+        header="publisher_id,n_observations,rmse,rmse_over_spread,hit_rate_0.1pct\n",
+    )
+    csv = tmp_path / "hk.csv"
+    csv.write_text("884,2026-05-19,hk-equities\n")
+    md = tmp_path / "publishers.md"
+    md.write_text("| ID | Name | Active |\n| 0 | Zero.Test | Yes |\n")
+    out = tmp_path / "out.xlsx"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "summarize_feeds",
+            "--csv",
+            str(csv),
+            "--cluster",
+            "lazer-prod",
+            "--date",
+            "2026-05-19",
+            "--reports-dir",
+            str(reports),
+            "--publishers-md",
+            str(md),
+            "--asset-class",
+            "hk-equities",
+            "--output",
+            str(out),
+            "--exclude-publisher",
+            "80",
+        ],
+    )
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 0
+
+    captured = capsys.readouterr().out
+    assert "Manually excluded from allowed: [80]" in captured
+    assert "1 feed/session cells" in captured
+
+    wb = load_workbook(out, data_only=True)
+
+    # rankings: 80 still present as a publisher_id.
+    rank = wb["rankings"]
+    rankings_pub_ids = set()
+    for r in range(1, 30):
+        for c in range(1, 7):
+            v = rank.cell(r, c).value
+            if isinstance(v, int):
+                rankings_pub_ids.add(v)
+    assert 80 in rankings_pub_ids
+
+    # allowed: the REGULAR JSON (row 4, col 3) excludes 80, includes the substitutes.
+    allowed = wb["allowed"]
+    assert allowed.cell(row=1, column=3).value == "Manually excluded from allowed: 80"
+    json_cell = allowed.cell(row=4, column=3).value
+    assert "80" not in json_cell
+    assert "5, 7" in json_cell
+
+
 def test_write_allowed_sheet_no_note_when_manual_exclude_empty(tmp_path):
     from openpyxl import Workbook
 
