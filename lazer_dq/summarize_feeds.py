@@ -405,6 +405,7 @@ def write_allowed_sheet(
     modes: list,
     sessions: dict,
     ceiling_mult: float = DEFAULT_TOPUP_CEILING_MULT,
+    manual_exclude=None,
 ) -> None:
     """Populate the 'allowed' worksheet.
 
@@ -434,6 +435,15 @@ def write_allowed_sheet(
     ws.cell(
         row=1, column=1, value=f"Allowed Publishers — {cluster} — {date}"
     ).font = bold_xl
+
+    # Optional note in the otherwise-empty title row (no row shift): records
+    # which publishers were held out of the allowed lists for this run.
+    manual_exclude = manual_exclude or set()
+    if manual_exclude:
+        note = "Manually excluded from allowed: " + ", ".join(
+            str(p) for p in sorted(manual_exclude)
+        )
+        ws.cell(row=1, column=3, value=note).font = bold
 
     # Row 2: column headers.
     headers = ["Feed ID", "Session", "allowedPublisherIds", "Notes"]

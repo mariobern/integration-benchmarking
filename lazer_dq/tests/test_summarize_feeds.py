@@ -1339,3 +1339,70 @@ def test_build_per_feed_data_manual_exclude_default_is_noop(tmp_path):
     md = per_feed[884]["hk-equities"]
     assert "80" in {r["publisher_id"] for r in md["filtered"]}
     assert cells == 0
+
+
+# ---------- write_allowed_sheet manual_exclude note ----------
+
+
+def test_write_allowed_sheet_writes_manual_exclude_note_in_title_row(tmp_path):
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    per_feed = {
+        884: {
+            "hk-equities": {
+                "ranked": [_ranked_row(5)],
+                "filtered": [_ranked_row(5), _ranked_row(7)],
+                "n_passed": 2,
+                "n_topup": 0,
+            }
+        }
+    }
+    write_allowed_sheet(
+        ws,
+        per_feed,
+        skipped_feeds=[],
+        date="2026-05-19",
+        cluster="lazer-prod",
+        modes=["hk-equities"],
+        sessions={"hk-equities": "REGULAR"},
+        ceiling_mult=2.0,
+        manual_exclude={80, 55},
+    )
+    # Note lives in the title row (row 1), column 3 — no row shift.
+    assert ws.cell(row=1, column=3).value == "Manually excluded from allowed: 55, 80"
+    # Layout below the title is unchanged: headers at row 2, data from row 3.
+    assert ws.cell(row=2, column=1).value == "Feed ID"
+    assert ws.cell(row=3, column=1).value == 884
+    assert ws.cell(row=3, column=2).value == "(aggregate)"
+
+
+def test_write_allowed_sheet_no_note_when_manual_exclude_empty(tmp_path):
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    per_feed = {
+        884: {
+            "hk-equities": {
+                "ranked": [_ranked_row(5)],
+                "filtered": [_ranked_row(5)],
+                "n_passed": 1,
+                "n_topup": 0,
+            }
+        }
+    }
+    write_allowed_sheet(
+        ws,
+        per_feed,
+        skipped_feeds=[],
+        date="2026-05-19",
+        cluster="lazer-prod",
+        modes=["hk-equities"],
+        sessions={"hk-equities": "REGULAR"},
+        ceiling_mult=2.0,
+    )
+    assert ws.cell(row=1, column=3).value is None  # no note
+    assert ws.cell(row=2, column=1).value == "Feed ID"
+    assert ws.cell(row=3, column=1).value == 884
