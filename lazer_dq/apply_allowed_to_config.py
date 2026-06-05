@@ -56,6 +56,25 @@ MIN_PROMOTE_PUBLISHERS = 3
 US_EQUITY_SYMBOL_PREFIX = "Equity.US."
 
 
+def check_new_format(data: dict) -> None:
+    """Reject old-format configs that still carry feed-level allowedPublisherIds.
+
+    The new config format (lazer_update.json era) keeps publisher lists only
+    inside marketSchedules session entries; running this tool against an
+    old-format file would leave stale feed-level rosters inconsistent with the
+    session edits.
+    """
+    offenders = [
+        f["feedId"] for f in data.get("feeds", []) if "allowedPublisherIds" in f
+    ]
+    if offenders:
+        raise ValueError(
+            f"config contains feed-level allowedPublisherIds (old format) on "
+            f"{len(offenders)} feed(s), e.g. {offenders[:5]}. This tool now "
+            f"supports only the session-level format (lazer_update.json era)."
+        )
+
+
 def filter_publishers(ids: list[int]) -> tuple[list[int], list[int]]:
     """Drop EXCLUDED_PUBLISHERS. Return (kept_sorted_unique, removed_sorted)."""
     id_set = set(ids)
@@ -391,6 +410,7 @@ def apply_summary_to_config(
         log = lambda _msg: None  # noqa: E731
 
     data = json.loads(raw)
+    check_new_format(data)
     feed_index = {f["feedId"]: f for f in data["feeds"]}
 
     stats = {
@@ -566,12 +586,16 @@ def main() -> None:
         print("\n=== DRY RUN (no files will be modified) ===\n")
 
     raw = config_path.read_text()
-    new_raw, stats = apply_summary_to_config(
-        raw,
-        summary,
-        log=print,
-        min_promote_publishers=args.min_publishers,
-    )
+    try:
+        new_raw, stats = apply_summary_to_config(
+            raw,
+            summary,
+            log=print,
+            min_promote_publishers=args.min_publishers,
+        )
+    except ValueError as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
 
     changed = stats["promoted"] + stats["sessions_added"]
     if not args.dry_run and changed > 0:

@@ -601,6 +601,25 @@ def test_apply_us_promotion_writes_session_min():
     assert reg["minPublishers"] == 2  # 3 pubs => REGULAR low-count rule
 
 
+def test_apply_rejects_old_format_config():
+    feed = _feed(900, "COMING_SOON", [("REGULAR", [1, 2, 3])])
+    feed["allowedPublisherIds"] = [1, 2, 3]  # old-format marker
+    raw = _config_with([feed])
+    summary = {
+        900: {
+            "aggregate": [24, 35, 42],
+            "sessions": {
+                "REGULAR": [24, 35, 42],
+                "PRE_MARKET": None,
+                "POST_MARKET": None,
+                "OVER_NIGHT": None,
+            },
+        }
+    }
+    with pytest.raises(ValueError, match="old format"):
+        apply_summary_to_config(raw, summary)
+
+
 import subprocess
 import sys
 
@@ -677,6 +696,32 @@ def test_cli_real_run_writes_and_backs_up(tmp_path):
     assert feed["state"] == "STABLE"
     reg = next(s for s in feed["marketSchedules"] if s["session"] == "REGULAR")
     assert reg["allowedPublisherIds"] == [24, 35, 42]
+
+
+def test_cli_old_format_config_exits_1(tmp_path):
+    xlsx = _real_workbook(tmp_path)
+    feed = _feed(100, "COMING_SOON", [("REGULAR", [1, 2, 3])])
+    feed["allowedPublisherIds"] = [1, 2, 3]
+    cfg = tmp_path / "old_format.json"
+    cfg.write_text(_config_with([feed]))
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "lazer_dq.apply_allowed_to_config",
+            "--xlsx",
+            str(xlsx),
+            "--config",
+            str(cfg),
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(Path(__file__).resolve().parents[2]),
+    )
+    assert result.returncode == 1
+    assert "old format" in (result.stdout + result.stderr)
 
 
 from lazer_dq.apply_allowed_to_config import remove_session
