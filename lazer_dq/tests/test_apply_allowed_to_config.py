@@ -103,7 +103,6 @@ def test_get_min_publishers_regular_low_count_rule():
 
 
 from lazer_dq.apply_allowed_to_config import (
-    set_top_level_allowed,
     set_top_level_min_publishers,
     overwrite_session,
     add_session,
@@ -111,24 +110,10 @@ from lazer_dq.apply_allowed_to_config import (
 )
 
 
-def test_set_top_level_allowed_replaces_array_before_marketschedules():
-    block = (
-        '{\n      "allowedPublisherIds": [\n        1,\n        2\n      ],\n'
-        '      "marketSchedules": [ {"allowedPublisherIds": [9], '
-        '"session": "REGULAR"} ]\n}'
-    )
-    out = set_top_level_allowed(block, [24, 35])
-    # Top-level array (before marketSchedules) replaced; session array untouched.
-    assert '"allowedPublisherIds": [ 24, 35 ]' in out
-    assert '"allowedPublisherIds": [9]' in out
-    assert out.index("[ 24, 35 ]") < out.index("[9]")
-
-
 def test_set_top_level_min_publishers_targets_field_after_marketschedules():
     # Mirrors after.json: a session minPublishers appears BEFORE the top-level one.
     block = (
-        '{\n      "allowedPublisherIds": [ 1 ],\n'
-        '      "marketSchedules": [ {\n'
+        '{\n      "marketSchedules": [ {\n'
         '          "minPublishers": 3,\n'
         '          "session": "REGULAR"\n'
         "        } ],\n"
@@ -284,33 +269,36 @@ def _config_with(feeds: list[dict]) -> str:
     return json.dumps({"feeds": feeds}, indent=2)
 
 
-def _feed(feed_id, state, sessions, top=None):
-    """sessions: list of (name, allowed_or_None). REGULAR carries benchmarkMapping."""
+def _feed(feed_id, state, sessions, symbol=None, session_min=True):
+    """New-format feed: publishers live ONLY in session entries.
+
+    sessions: list of (name, allowed_or_None); None omits the key (the real
+    COMING_SOON shape). session_min=True adds a session minPublishers
+    (the Equity.US.* shape); the default symbol is a US-equity symbol so
+    session-min expectations hold unless a test overrides it.
+    """
     ms = []
     for name, allowed in sessions:
-        entry = {
-            "allowedPublisherIds": allowed,
-            "benchmarkMapping": _BENCH,
-            "marketSchedule": "TPL",
-            "minPublishers": 3,
-            "session": name,
-        }
+        entry = {}
+        if allowed is not None:
+            entry["allowedPublisherIds"] = allowed
+        entry["benchmarkMapping"] = _BENCH
+        entry["marketSchedule"] = "TPL"
+        if session_min:
+            entry["minPublishers"] = 3
+        entry["session"] = name
         ms.append(entry)
-    feed = {
-        "allowedPublisherIds": top if top is not None else [],
+    return {
         "feedId": feed_id,
         "marketSchedules": ms,
         "minPublishers": 3,
         "state": state,
-        "symbol": f"S{feed_id}",
+        "symbol": symbol or f"Equity.US.S{feed_id}/USD",
     }
-    return feed
 
 
 def test_apply_promotes_coming_soon_regular_only():
-    raw = _config_with(
-        [_feed(100, "COMING_SOON", [("REGULAR", [1, 2, 3])], top=[1, 2, 3])]
-    )
+    raw = _config_with([_feed(100, "COMING_SOON", [("REGULAR", None)])])
     summary = {
         100: {
             "aggregate": [24, 35, 42],
@@ -329,7 +317,7 @@ def test_apply_promotes_coming_soon_regular_only():
 
     assert feed["state"] == "STABLE"
     assert feed["minPublishers"] == 2  # top-level set to 2 on promotion
-    assert feed["allowedPublisherIds"] == [24, 35, 42]
+    assert "allowedPublisherIds" not in feed
     reg = feed["marketSchedules"][0]
     assert reg["allowedPublisherIds"] == [24, 35, 42]
     assert reg["minPublishers"] == 2  # 3 pubs => REGULAR low-count
@@ -337,7 +325,7 @@ def test_apply_promotes_coming_soon_regular_only():
 
 
 def test_apply_adds_missing_session_to_stable_feed():
-    raw = _config_with([_feed(200, "STABLE", [("REGULAR", [11, 12])], top=[11, 12])])
+    raw = _config_with([_feed(200, "STABLE", [("REGULAR", [11, 12])])])
     summary = {
         200: {
             "aggregate": [24, 35],
@@ -359,7 +347,7 @@ def test_apply_adds_missing_session_to_stable_feed():
     assert sess["REGULAR"]["allowedPublisherIds"] == [11, 12]  # live, untouched
     assert sess["PRE_MARKET"]["allowedPublisherIds"] == [24, 35]  # added
     assert sess["PRE_MARKET"]["benchmarkMapping"] == _BENCH  # copied from REGULAR
-    assert feed["allowedPublisherIds"] == [11, 12, 24, 35]  # folded union
+    assert "allowedPublisherIds" not in feed  # no feed-level roster created
     assert feed["minPublishers"] == 3  # top-level untouched on STABLE
     assert stats["sessions_added"] == 1
     assert stats["skipped_stable_no_change"] == 0  # a session WAS added
@@ -367,7 +355,7 @@ def test_apply_adds_missing_session_to_stable_feed():
 
 def test_apply_leaves_existing_stable_session_untouched():
     raw = _config_with(
-        [_feed(300, "STABLE", [("REGULAR", [11]), ("PRE_MARKET", [99])], top=[11, 99])]
+        [_feed(300, "STABLE", [("REGULAR", [11]), ("PRE_MARKET", [99])])]
     )
     summary = {
         300: {
@@ -393,7 +381,7 @@ def test_apply_leaves_existing_stable_session_untouched():
 
 
 def test_apply_skips_no_data_feed():
-    raw = _config_with([_feed(400, "COMING_SOON", [("REGULAR", [1])], top=[1])])
+    raw = _config_with([_feed(400, "COMING_SOON", [("REGULAR", None)])])
     summary = {
         400: {
             "aggregate": None,
@@ -409,7 +397,7 @@ def test_apply_skips_no_data_feed():
 
 
 def test_apply_warns_on_missing_feed():
-    raw = _config_with([_feed(500, "COMING_SOON", [("REGULAR", [1])], top=[1])])
+    raw = _config_with([_feed(500, "COMING_SOON", [("REGULAR", None)])])
     summary = {
         999: {
             "aggregate": [24],
@@ -428,7 +416,7 @@ def test_apply_warns_on_missing_feed():
 
 
 def test_apply_filters_lazer_and_warns():
-    raw = _config_with([_feed(600, "COMING_SOON", [("REGULAR", [1])], top=[1])])
+    raw = _config_with([_feed(600, "COMING_SOON", [("REGULAR", None)])])
     summary = {
         600: {
             "aggregate": [1, 9, 24, 35, 42],
@@ -445,12 +433,12 @@ def test_apply_filters_lazer_and_warns():
     data = json.loads(out)
     feed = {f["feedId"]: f for f in data["feeds"]}[600]
     assert feed["marketSchedules"][0]["allowedPublisherIds"] == [24, 35, 42]
-    assert feed["allowedPublisherIds"] == [24, 35, 42]
+    assert "allowedPublisherIds" not in feed
     assert stats["filtered_any"] is True
 
 
 def test_apply_does_not_promote_when_all_publishers_filtered():
-    raw = _config_with([_feed(700, "COMING_SOON", [("REGULAR", [1])], top=[1])])
+    raw = _config_with([_feed(700, "COMING_SOON", [("REGULAR", None)])])
     summary = {
         700: {
             "aggregate": [1, 9, 13],
@@ -475,7 +463,7 @@ def test_apply_does_not_promote_when_all_publishers_filtered():
 
 def test_apply_does_not_promote_fewer_than_three_publishers():
     # 2 publishers survive filtering -> below the redundancy gate -> not promoted.
-    raw = _config_with([_feed(800, "COMING_SOON", [("REGULAR", [1])], top=[1])])
+    raw = _config_with([_feed(800, "COMING_SOON", [("REGULAR", None)])])
     summary = {
         800: {
             "aggregate": [24, 35],
@@ -499,7 +487,7 @@ def test_apply_does_not_promote_fewer_than_three_publishers():
 
 def test_apply_promotes_with_exactly_three_publishers():
     # Exactly 3 survivors clears the gate.
-    raw = _config_with([_feed(810, "COMING_SOON", [("REGULAR", [1])], top=[1])])
+    raw = _config_with([_feed(810, "COMING_SOON", [("REGULAR", None)])])
     summary = {
         810: {
             "aggregate": [24, 35, 42],
@@ -515,14 +503,14 @@ def test_apply_promotes_with_exactly_three_publishers():
     out, stats = apply_summary_to_config(raw, summary)
     feed = {f["feedId"]: f for f in json.loads(out)["feeds"]}[810]
     assert feed["state"] == "STABLE"
-    assert feed["allowedPublisherIds"] == [24, 35, 42]
+    assert feed["marketSchedules"][0]["allowedPublisherIds"] == [24, 35, 42]
     assert stats["promoted"] == 1
 
 
 def test_apply_min_promote_publishers_param_lowers_gate():
     # A 2-publisher feed is skipped at the default gate (3) but promotes when
     # the caller lowers min_promote_publishers to 2.
-    raw = _config_with([_feed(820, "COMING_SOON", [("REGULAR", [1])], top=[1])])
+    raw = _config_with([_feed(820, "COMING_SOON", [("REGULAR", None)])])
     summary = {
         820: {
             "aggregate": [24, 35],
@@ -544,15 +532,15 @@ def test_apply_min_promote_publishers_param_lowers_gate():
     out_low, stats_low = apply_summary_to_config(raw, summary, min_promote_publishers=2)
     feed = {f["feedId"]: f for f in json.loads(out_low)["feeds"]}[820]
     assert feed["state"] == "STABLE"
-    assert feed["allowedPublisherIds"] == [24, 35]
+    assert feed["marketSchedules"][0]["allowedPublisherIds"] == [24, 35]
     assert stats_low["promoted"] == 1
 
 
-def test_apply_write_session_fields_false_sets_top_level_only():
-    # hk-equities shape: a COMING_SOON feed whose REGULAR entry has NO
-    # allowedPublisherIds and NO minPublishers (just benchmarkMapping/schedule).
+def test_apply_hk_promotion_writes_session_ids_feed_level_min_only():
+    # hk-equities shape: COMING_SOON, REGULAR entry without allowedPublisherIds
+    # or minPublishers; the symbol is NOT Equity.US.*, so session-level
+    # minPublishers must never be written.
     feed = {
-        "allowedPublisherIds": [1, 3, 5],  # COMING_SOON placeholder
         "feedId": 884,
         "marketSchedules": [
             {
@@ -563,7 +551,7 @@ def test_apply_write_session_fields_false_sets_top_level_only():
         ],
         "minPublishers": 3,
         "state": "COMING_SOON",
-        "symbol": "S884",
+        "symbol": "Equity.HK.0700-HK/HKD",
     }
     raw = json.dumps({"feeds": [feed]}, indent=2)
     summary = {
@@ -578,19 +566,39 @@ def test_apply_write_session_fields_false_sets_top_level_only():
         }
     }
 
-    out, stats = apply_summary_to_config(
-        raw, summary, min_promote_publishers=2, write_session_fields=False
-    )
+    out, stats = apply_summary_to_config(raw, summary, min_promote_publishers=2)
     f = {x["feedId"]: x for x in json.loads(out)["feeds"]}[884]
 
     assert f["state"] == "STABLE"
-    assert f["allowedPublisherIds"] == [41, 69]  # top-level set
-    assert f["minPublishers"] == 2  # top-level set
+    assert f["minPublishers"] == 2  # feed-level minPublishers set on promotion
     reg = f["marketSchedules"][0]
-    # REGULAR entry left exactly as-is — no session-level fields added.
-    assert set(reg.keys()) == {"benchmarkMapping", "marketSchedule", "session"}
+    assert reg["allowedPublisherIds"] == [41, 69]  # session list written
+    assert "minPublishers" not in reg  # session min NEVER written for non-US
+    assert "allowedPublisherIds" not in f  # no feed-level roster created
     assert stats["promoted"] == 1
-    assert stats["sessions_added"] == 0
+
+
+def test_apply_us_promotion_writes_session_min():
+    # Equity.US.* counterpart: session minPublishers IS written.
+    raw = _config_with(
+        [_feed(110, "COMING_SOON", [("REGULAR", None)], session_min=False)]
+    )
+    summary = {
+        110: {
+            "aggregate": [24, 35, 42],
+            "sessions": {
+                "REGULAR": [24, 35, 42],
+                "PRE_MARKET": None,
+                "POST_MARKET": None,
+                "OVER_NIGHT": None,
+            },
+        }
+    }
+    out, _stats = apply_summary_to_config(raw, summary)
+    f = {x["feedId"]: x for x in json.loads(out)["feeds"]}[110]
+    reg = f["marketSchedules"][0]
+    assert reg["allowedPublisherIds"] == [24, 35, 42]
+    assert reg["minPublishers"] == 2  # 3 pubs => REGULAR low-count rule
 
 
 import subprocess
@@ -614,11 +622,7 @@ def _real_workbook(tmp_path):
 
 def _real_config(tmp_path):
     cfg = tmp_path / "after_test.json"
-    cfg.write_text(
-        _config_with(
-            [_feed(100, "COMING_SOON", [("REGULAR", [1, 2, 3])], top=[1, 2, 3])]
-        )
-    )
+    cfg.write_text(_config_with([_feed(100, "COMING_SOON", [("REGULAR", None)])]))
     return cfg
 
 
@@ -671,7 +675,8 @@ def test_cli_real_run_writes_and_backs_up(tmp_path):
     data = json.loads(cfg.read_text())
     feed = {f["feedId"]: f for f in data["feeds"]}[100]
     assert feed["state"] == "STABLE"
-    assert feed["allowedPublisherIds"] == [24, 35, 42]
+    reg = next(s for s in feed["marketSchedules"] if s["session"] == "REGULAR")
+    assert reg["allowedPublisherIds"] == [24, 35, 42]
 
 
 from lazer_dq.apply_allowed_to_config import remove_session
@@ -734,7 +739,6 @@ def test_apply_promotion_drops_sessions_without_publishers():
     # us-equities COMING_SOON feed with all 4 sessions; only REGULAR has publishers
     # in the summary (the real feed 2300 / 2026-05-20 shape).
     feed = {
-        "allowedPublisherIds": [1, 2, 3],
         "feedId": 2300,
         "marketSchedules": [
             {
@@ -743,13 +747,13 @@ def test_apply_promotion_drops_sessions_without_publishers():
                 "minPublishers": 3,
                 "session": "REGULAR",
             },
-            {"allowedPublisherIds": None, "minPublishers": 1, "session": "PRE_MARKET"},
-            {"allowedPublisherIds": None, "minPublishers": 1, "session": "POST_MARKET"},
-            {"allowedPublisherIds": None, "minPublishers": 1, "session": "OVER_NIGHT"},
+            {"minPublishers": 1, "session": "PRE_MARKET"},
+            {"minPublishers": 1, "session": "POST_MARKET"},
+            {"minPublishers": 1, "session": "OVER_NIGHT"},
         ],
         "minPublishers": 3,
         "state": "COMING_SOON",
-        "symbol": "S2300",
+        "symbol": "Equity.US.S2300/USD",
     }
     raw = json.dumps({"feeds": [feed]}, indent=2)
     summary = {
@@ -771,6 +775,6 @@ def test_apply_promotion_drops_sessions_without_publishers():
     # PRE/POST/OVERNIGHT dropped; only the priced REGULAR session remains.
     assert [s["session"] for s in f["marketSchedules"]] == ["REGULAR"]
     assert f["marketSchedules"][0]["allowedPublisherIds"] == [19, 41]
-    assert f["allowedPublisherIds"] == [19, 41]
+    assert "allowedPublisherIds" not in f
     assert stats["sessions_removed"] == 3
     assert stats["promoted"] == 1
