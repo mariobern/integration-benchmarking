@@ -1,6 +1,25 @@
 # edit_config.py
 
-Surgical editor for `after.json`. Adds/removes publishers, sets/bumps `minPublishers`, sets `state` — for one feed, a list, a range, or a filtered set.
+Surgical editor for session-only configs (`lazer_update.json` era). Adds/removes
+publishers, sets/bumps `minPublishers`, sets `state` — for one feed, a list, a
+range, or a filtered set.
+
+## Config format (new format only)
+
+The editor targets the session-level config format (`lazer_update.json` era)
+and refuses to run against configs that still carry feed-level
+`allowedPublisherIds` (old format).
+
+- Publisher ops edit session lists only. Default scope is the REGULAR
+  session; `--session ALL` covers every session entry on the feed;
+  `--session NONE` is an error for publisher ops.
+- If a targeted session entry has no `allowedPublisherIds` key (common on
+  COMING_SOON feeds), `--add-publisher` inserts it. The dry-run diff shows
+  inserts as `(absent) -> [ ... ]`.
+- minPublishers ops still edit the feed-level value. Session-level
+  minPublishers is us-equities-only: non-US feeds take feed-level only
+  (default and `--session ALL` degrade to feed-level; an explicit
+  `--session REGULAR` etc. on a non-US feed is an error).
 
 ## Installation
 
@@ -41,13 +60,25 @@ python3 tools/edit-config/edit_config.py --config after.json [OPERATION] [TARGET
 
 `--session {REGULAR,PRE_MARKET,POST_MARKET,OVER_NIGHT,ALL,NONE}`
 
-Default (no `--session`): top-level + REGULAR for equity feeds with per-session rosters; top-level only for feeds without per-session rosters (crypto, fx, commodity, metals, rates, single-session equities, etc.).
+**Publisher ops** (`--add-publisher`, `--remove-publisher`):
 
-- `NONE` = top-level only.
-- `ALL` = top-level + every per-session roster. Symmetric for add and remove. Errors if the feed has no per-session rosters.
-- Explicit `REGULAR`/`PRE_MARKET`/`POST_MARKET`/`OVER_NIGHT` = that session roster only (no top-level). Errors if the named session has no roster on this feed — on non-per-session feeds, drop `--session` entirely and use the default scope to edit top-level.
+| `--session` value                                       | Meaning                                               |
+| ------------------------------------------------------- | ----------------------------------------------------- |
+| _(omitted)_                                             | REGULAR session entry only                            |
+| `REGULAR` / `PRE_MARKET` / `POST_MARKET` / `OVER_NIGHT` | that session entry; error if the feed doesn't have it |
+| `ALL`                                                   | every session entry present on the feed               |
+| `NONE`                                                  | error — no feed-level roster exists in the new format |
 
-`remove_publisher` default differs: removes from EVERYWHERE in this feed (top-level + every per-session roster present).
+**min-publishers ops** (`--set-min-publishers`, `--bump-min-publishers`).
+Session-level `minPublishers` is a us-equities-only concept, so session targets
+apply only to feeds whose symbol starts with `Equity.US.`:
+
+| `--session` value                                       | US-equity feed (`Equity.US.*`)                       | All other feeds                          |
+| ------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------- |
+| _(omitted)_                                             | feed-level + REGULAR session entry                   | feed-level only                          |
+| `REGULAR` / `PRE_MARKET` / `POST_MARKET` / `OVER_NIGHT` | that session entry only; error if the feed lacks it  | error — session minPublishers is US-only |
+| `ALL`                                                   | feed-level + every session entry present on the feed | feed-level only                          |
+| `NONE`                                                  | feed-level only                                      | feed-level only                          |
 
 ### Execution
 
