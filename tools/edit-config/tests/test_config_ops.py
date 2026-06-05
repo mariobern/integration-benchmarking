@@ -331,6 +331,19 @@ class TestSetMinPublishers:
         changes, _ = op.apply(feed)
         assert changes == []
 
+    def test_default_us_skips_regular_without_publisher_list(self, feeds):
+        # A US-equity feed whose REGULAR session has no publisher list gets
+        # only the feed-level write — a publisher-less session has nothing to
+        # satisfy a floor against. (Deliberate scope decision.)
+        feed = feed_by_id(feeds, 922)
+        del get_session(feed, "REGULAR")["allowedPublisherIds"]
+        op = SetMinPublishers(value=2)  # value differs from current top-level (1)
+        changes, _ = op.apply(feed)
+        assert [c.location for c in changes] == ["top_level"]
+        assert "minPublishers" not in get_session(feed, "REGULAR") or (
+            get_session(feed, "REGULAR")["minPublishers"] == 3
+        )  # session min untouched
+
 
 from edit_config_lib.config_ops import BumpMinPublishers
 
@@ -380,6 +393,17 @@ class TestBumpMinPublishers:
         op = BumpMinPublishers(delta=+1, session="REGULAR")
         with pytest.raises(OpError, match="us-equities-only"):
             op.apply(feed)
+
+    def test_bump_inserts_missing_session_min_on_us_feed(self, feeds):
+        # Feed 1023 (Equity.US.*) has a REGULAR list but no session min:
+        # an explicit-session bump inserts it (before=None marks the insert).
+        feed = feed_by_id(feeds, 1023)
+        op = BumpMinPublishers(delta=+1, session="REGULAR")
+        changes, _ = op.apply(feed)
+        assert get_session(feed, "REGULAR")["minPublishers"] == 1  # max(1, 0+1)
+        assert len(changes) == 1
+        assert changes[0].before is None
+        assert changes[0].after == 1
 
 
 from edit_config_lib.config_ops import SetState
