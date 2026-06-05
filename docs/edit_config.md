@@ -31,20 +31,20 @@ pip install -r requirements.txt
 ## Usage
 
 ```bash
-python3 tools/edit-config/edit_config.py --config after.json [OPERATION] [TARGETING] [SCOPE] [EXECUTION]
+python3 tools/edit-config/edit_config.py --config lazer_update.json [OPERATION] [TARGETING] [SCOPE] [EXECUTION]
 ```
 
 ### Operations (exactly one per CLI invocation)
 
-| Flag                                        | Effect                                                |
-| ------------------------------------------- | ----------------------------------------------------- |
-| `--add-publisher INT`                       | Add publisher to `allowedPublisherIds`                |
-| `--remove-publisher INT`                    | Remove publisher from `allowedPublisherIds`           |
-| `--set-min-publishers INT`                  | Set `minPublishers` to a value                        |
-| `--bump-min-publishers ±INT`                | Adjust `minPublishers` by signed delta (clamped at 1) |
-| `--set-state STABLE\|COMING_SOON\|INACTIVE` | Change feed state                                     |
-| `--set-ric-mapping --from-csv PATH`         | Fill empty `datascope_ric.identifier` values          |
-| `--from-spec PATH`                          | Apply a batched YAML spec (multiple ops)              |
+| Flag                                        | Effect                                                   |
+| ------------------------------------------- | -------------------------------------------------------- |
+| `--add-publisher INT`                       | Add publisher to session `allowedPublisherIds` list      |
+| `--remove-publisher INT`                    | Remove publisher from session `allowedPublisherIds` list |
+| `--set-min-publishers INT`                  | Set `minPublishers` to a value                           |
+| `--bump-min-publishers ±INT`                | Adjust `minPublishers` by signed delta (clamped at 1)    |
+| `--set-state STABLE\|COMING_SOON\|INACTIVE` | Change feed state                                        |
+| `--set-ric-mapping --from-csv PATH`         | Fill empty `datascope_ric.identifier` values             |
+| `--from-spec PATH`                          | Apply a batched YAML spec (multiple ops)                 |
 
 ### Targeting (≥1 required when not using `--from-spec`)
 
@@ -141,11 +141,11 @@ whether to review before `--apply`.
 
 ```bash
 # dry-run (default)
-python3 tools/edit-config/edit_config.py --config after.json \
+python3 tools/edit-config/edit_config.py --config lazer_update.json \
     --set-ric --feed-ids-from feed_ids.txt
 
 # write
-python3 tools/edit-config/edit_config.py --config after.json \
+python3 tools/edit-config/edit_config.py --config lazer_update.json \
     --set-ric --feed-ids-from feed_ids.txt --apply
 ```
 
@@ -162,7 +162,7 @@ identifier strings and the RICs are delivered separately.
 
 ```bash
 python3 tools/edit-config/edit_config.py \
-    --config after.json \
+    --config lazer_update.json \
     --set-ric-mapping \
     --from-csv hk-syms.csv
 ```
