@@ -44,15 +44,22 @@ top-level targets.
    written into the feed's REGULAR session entry. The hk/us split
    (`--asset-class`, `write_session_fields`) is deleted; the allowed sheet's
    session rows drive everything (hk workbooks already emit `REGULAR` rows).
-6. **minPublishers stays two-level.** Feed-level `minPublishers` still
-   exists in the new format and both tools keep writing it: apply_allowed
-   keeps setting it to 2 on promotion, and the edit_config min-publishers
-   ops keep their old scope semantics (default = feed-level + REGULAR,
-   `NONE` = feed-level only, `ALL` = feed-level + every session). Only
-   `allowedPublisherIds` moves session-only. Because the feed-level roster
-   is gone, the feed-level `minPublishers` is validated against the union
-   of all session `allowedPublisherIds`.
-7. **Out of scope:** `update_config_from_summary.py`,
+6. **minPublishers stays two-level — but session-level is
+   us-equities-only.** Feed-level `minPublishers` still exists on every
+   feed and both tools keep writing it (apply_allowed keeps setting it to 2
+   on promotion). Session-level `minPublishers` exists **only on
+   `Equity.US.*` feeds** in the new format (2,214 session entries carry it;
+   zero on `Equity.HK.*` and every other asset class), and the tools
+   preserve that invariant: only US-equity feeds ever get session-level
+   `minPublishers` written or inserted; all other feeds take `minPublishers`
+   at the feed level only. Because the feed-level roster is gone, the
+   feed-level `minPublishers` is validated against the union of all session
+   `allowedPublisherIds`.
+7. **US-equity detection by symbol.** A feed is session-min-capable iff its
+   symbol starts with `Equity.US.` — one constant per tool, no CLI flag
+   (apply_allowed's `--asset-class` stays deleted; edit_config handles
+   mixed-asset selections per feed).
+8. **Out of scope:** `update_config_from_summary.py`,
    `update_min_publishers.py`, `config_linter.py`, `update_lazer_symbols.py`
    and any other config-touching tool. They are updated later if/when run
    against new-format files.
@@ -96,7 +103,7 @@ not import from each other today).
   ≥ `--min-publishers` or the feed stays COMING_SOON.
 - `overwrite_session` / `add_session` / `remove_session` text-surgery
   mechanics, and per-session `minPublishers` defaults via
-  `get_min_publishers()`.
+  `get_min_publishers()` (US-equity feeds only — see below).
 - `set_top_level_min_publishers()` and the top-level `minPublishers: 2`
   write on promotion (feed-level minPublishers still exists in the new
   format).
@@ -111,6 +118,13 @@ not import from each other today).
   now simply means "no sessions added".
 - All asset classes flow through the same per-session loop; for hk-equities
   the sheet contains only REGULAR rows, so only REGULAR is written.
+- **Session-level minPublishers only for US equities:** `overwrite_session`
+  and `add_session` gain a `write_min: bool` parameter, set per feed from
+  `symbol.startswith("Equity.US.")`. With `write_min=False` only the
+  session's `allowedPublisherIds` is written — the entry never gains a
+  `minPublishers` key. An hk-equities promotion therefore writes the
+  REGULAR publisher list plus the feed-level `minPublishers: 2`, nothing
+  session-level.
 
 ### 3. `edit_config.py` — ops lose the top level
 
@@ -124,15 +138,16 @@ not import from each other today).
 | `NONE`                                                  | `OpError` — no feed-level roster exists anymore           |
 
 **Scope semantics — min-publishers ops** (SetMinPublishers,
-BumpMinPublishers; unchanged from today since feed-level `minPublishers`
-still exists):
+BumpMinPublishers). Session-level `minPublishers` is a us-equities-only
+concept, so session targets apply only to feeds whose symbol starts with
+`Equity.US.`:
 
-| `--session` value                                       | Meaning                                                 |
-| ------------------------------------------------------- | ------------------------------------------------------- |
-| _(omitted)_                                             | feed-level + REGULAR session entry                      |
-| `REGULAR` / `PRE_MARKET` / `POST_MARKET` / `OVER_NIGHT` | that session entry only; `OpError` if the feed lacks it |
-| `ALL`                                                   | feed-level + every session entry present on the feed    |
-| `NONE`                                                  | feed-level only                                         |
+| `--session` value                                       | US-equity feed (`Equity.US.*`)                          | All other feeds                              |
+| ------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------- |
+| _(omitted)_                                             | feed-level + REGULAR session entry                      | feed-level only                              |
+| `REGULAR` / `PRE_MARKET` / `POST_MARKET` / `OVER_NIGHT` | that session entry only; `OpError` if the feed lacks it | `OpError` — session minPublishers is US-only |
+| `ALL`                                                   | feed-level + every session entry present on the feed    | feed-level only                              |
+| `NONE`                                                  | feed-level only                                         | feed-level only                              |
 
 `NONE` therefore stays in the CLI choices and the YAML spec schema, but is
 valid only for the min-publishers ops.
@@ -148,14 +163,17 @@ valid only for the min-publishers ops.
   warning compares against the session's `minPublishers` when present, else
   falls back to the feed-level `minPublishers` (read-only).
 - `SetMinPublishers` / `BumpMinPublishers`: keep the feed-level target per
-  the scope table above. A missing session `minPublishers` key is inserted
-  (placed on its own line just before the `"session"` key, matching
-  canonical field order). Validation: a session value is checked against
-  that session's `allowedPublisherIds` length (absent key counts as 0
-  publishers, so setting a positive value there is an unsatisfiable error);
-  the feed-level value is checked against the **union of all session
-  `allowedPublisherIds`** (the old basis — the feed-level roster — no
-  longer exists). Headroom warnings use the same counts.
+  the scope table above; session targets are resolved only on US-equity
+  feeds (`symbol.startswith("Equity.US.")`, one module constant). A missing
+  session `minPublishers` key on a US-equity feed is inserted (placed on
+  its own line just before the `"session"` key, matching canonical field
+  order); non-US feeds never gain one. Validation: a session value is
+  checked against that session's `allowedPublisherIds` length (absent key
+  counts as 0 publishers, so setting a positive value there is an
+  unsatisfiable error); the feed-level value is checked against the
+  **union of all session `allowedPublisherIds`** (the old basis — the
+  feed-level roster — no longer exists). Headroom warnings use the same
+  counts.
 - `SetState`, `--set-ric-mapping`, `--set-ric`: untouched. The `top_level`
   Change location survives for `state` and feed-level `minPublishers`.
 
@@ -182,7 +200,11 @@ valid only for the min-publishers ops.
   feed-level minPublishers validated against the session-list union;
   promotion still writes top-level `minPublishers: 2`; hk-equities flowing
   through the session path; remove-publisher NOOP on a session without the
-  key.
+  key. US-only session-min invariant: hk-equities promotion writes no
+  session `minPublishers`; min-op default scope on a non-US feed touches
+  feed-level only; explicit `--session REGULAR` min op on a non-US feed is
+  an `OpError`; `--session ALL` min op on a non-US feed touches feed-level
+  only.
 - Sanity runs against real data: `apply_allowed_to_config --dry-run` on a
   copy of `lazer_update.json` with a real dq_summary workbook;
   `edit_config --add-publisher … --dry-run` likewise; `json.loads`
