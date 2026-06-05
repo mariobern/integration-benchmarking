@@ -21,6 +21,20 @@ def _hunk_header(change: Change) -> str:
 
 def _value_lines(change: Change) -> tuple[str, str]:
     """Return (before_line, after_line) formatted as JSON-ish text."""
+    if change.before is None and change.field in (
+        "allowedPublisherIds",
+        "minPublishers",
+    ):
+        # Insert: the field did not exist in the session entry before.
+        b = "      (absent)"
+        if change.field == "allowedPublisherIds":
+            a = (
+                f'      "allowedPublisherIds": '
+                f"{_format_publisher_list(change.after)},"
+            )
+        else:
+            a = f'      "minPublishers": {change.after},'
+        return b, a
     if change.field == "allowedPublisherIds":
         b = f'      "allowedPublisherIds": {_format_publisher_list(change.before)},'
         a = f'      "allowedPublisherIds": {_format_publisher_list(change.after)},'
