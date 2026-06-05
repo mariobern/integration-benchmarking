@@ -235,6 +235,45 @@ def test_add_session_into_empty_marketschedules():
     assert "benchmarkMapping" not in sess  # None mapping omitted
 
 
+def test_overwrite_session_write_min_false_never_touches_min():
+    # Non-US feeds take minPublishers at the feed level only; write_min=False
+    # must neither insert nor update a session-level minPublishers.
+    block = (
+        '{ "marketSchedules": [ {\n'
+        '          "allowedPublisherIds": [ 1, 2, 3 ],\n'
+        '          "session": "REGULAR"\n'
+        "        } ] }"
+    )
+    out = overwrite_session(block, "REGULAR", [24, 35, 42], write_min=False)
+    reg = json.loads(out)["marketSchedules"][0]
+    assert reg["allowedPublisherIds"] == [24, 35, 42]
+    assert "minPublishers" not in reg
+
+
+def test_overwrite_session_write_min_false_inserts_ids_only():
+    # hk-equities COMING_SOON shape: REGULAR entry with neither field.
+    block = (
+        '{ "marketSchedules": [\n'
+        "        {\n"
+        '          "marketSchedule": "X",\n'
+        '          "session": "REGULAR"\n'
+        "        }\n"
+        "      ] }"
+    )
+    out = overwrite_session(block, "REGULAR", [41, 69], write_min=False)
+    reg = json.loads(out)["marketSchedules"][0]
+    assert reg["allowedPublisherIds"] == [41, 69]
+    assert "minPublishers" not in reg
+
+
+def test_add_session_write_min_false_omits_min():
+    block = '{ "marketSchedules": [] }'
+    out = add_session(block, "REGULAR", [24, 35], None, write_min=False)
+    sess = json.loads(out)["marketSchedules"][0]
+    assert sess["allowedPublisherIds"] == [24, 35]
+    assert "minPublishers" not in sess
+
+
 from lazer_dq.apply_allowed_to_config import apply_summary_to_config
 
 _BENCH = {"datascope_ric": {"identifiers": [{"identifier": "AAPL.O"}]}}

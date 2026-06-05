@@ -258,20 +258,26 @@ def _insert_field_before_session(sblock: str, field_text: str) -> str:
     return sblock[:pos] + indent + field_text + "\n" + sblock[pos:]
 
 
-def overwrite_session(block: str, session: str, ids: list[int]) -> str:
-    """Within a feed block, set a session's allowedPublisherIds + minPublishers.
+def overwrite_session(
+    block: str, session: str, ids: list[int], write_min: bool = True
+) -> str:
+    """Within a feed block, set a session's allowedPublisherIds (and, when
+    write_min is True, its minPublishers).
 
     Replaces each field in place when present; inserts it after the session's
-    opening '{' when absent. Many COMING_SOON session entries in after.json ship
-    without an allowedPublisherIds (and sometimes minPublishers) key, so the
-    insert path is the common case on real configs.
+    opening '{' when absent. Many COMING_SOON session entries ship without an
+    allowedPublisherIds (and sometimes minPublishers) key, so the insert path
+    is the common case on real configs.
+
+    Session-level minPublishers is a us-equities-only concept in the new
+    config format; callers pass write_min=False for every other asset class
+    so the entry never gains (or changes) a minPublishers key.
     """
     bounds = find_session_block(block, session)
     if bounds is None:
         return block
     s, e = bounds
     sblock = block[s:e]
-    min_pub = get_min_publishers(session, len(ids))
 
     pub_pat = r'"allowedPublisherIds":\s*(\[[^\]]*\]|null)'
     pub_repl = f'"allowedPublisherIds": {_ids_inline(ids)}'
@@ -280,14 +286,16 @@ def overwrite_session(block: str, session: str, ids: list[int]) -> str:
     else:
         sblock = _insert_field_after_open_brace(sblock, pub_repl + ",")
 
-    min_pat = r'"minPublishers":\s*\d+'
-    min_repl = f'"minPublishers": {min_pub}'
-    if re.search(min_pat, sblock):
-        sblock = re.sub(min_pat, min_repl, sblock, count=1)
-    else:
-        # Place a new minPublishers between marketSchedule and session, matching
-        # the canonical entry order, rather than at the top of the entry.
-        sblock = _insert_field_before_session(sblock, min_repl + ",")
+    if write_min:
+        min_pub = get_min_publishers(session, len(ids))
+        min_pat = r'"minPublishers":\s*\d+'
+        min_repl = f'"minPublishers": {min_pub}'
+        if re.search(min_pat, sblock):
+            sblock = re.sub(min_pat, min_repl, sblock, count=1)
+        else:
+            # Place a new minPublishers between marketSchedule and session,
+            # matching the canonical entry order.
+            sblock = _insert_field_before_session(sblock, min_repl + ",")
 
     return block[:s] + sblock + block[e:]
 
@@ -298,17 +306,26 @@ def _detect_session_indent(block: str) -> str:
     return m.group(1) if m else "        "
 
 
-def add_session(block: str, session: str, ids: list[int], benchmark_mapping) -> str:
+def add_session(
+    block: str,
+    session: str,
+    ids: list[int],
+    benchmark_mapping,
+    write_min: bool = True,
+) -> str:
     """Insert a new session entry before the closing ']' of marketSchedules.
 
-    benchmark_mapping is the dict copied from the feed's REGULAR session (or None).
+    benchmark_mapping is the dict copied from the feed's REGULAR session (or
+    None). write_min=False (non-US-equity feeds) omits the session-level
+    minPublishers key entirely.
     """
     base_indent = _detect_session_indent(block)
     entry: dict = {"allowedPublisherIds": ids}
     if benchmark_mapping is not None:
         entry["benchmarkMapping"] = benchmark_mapping
     entry["marketSchedule"] = SCHEDULE_TEMPLATES[session]
-    entry["minPublishers"] = get_min_publishers(session, len(ids))
+    if write_min:
+        entry["minPublishers"] = get_min_publishers(session, len(ids))
     entry["session"] = session
 
     text = json.dumps(entry, indent=2)
