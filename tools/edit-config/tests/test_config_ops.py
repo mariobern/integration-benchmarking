@@ -8,7 +8,6 @@ from edit_config_lib.config_ops import (
     Change,
     Warning,
     OpError,
-    has_session_publishers,
     get_session,
     SESSION_NAMES,
 )
@@ -60,16 +59,6 @@ class TestSessionHelpers:
             "OVER_NIGHT",
         }
 
-    def test_has_session_publishers_true_for_equity_4_session(self, feeds):
-        assert has_session_publishers(feed_by_id(feeds, 922)) is True
-
-    def test_has_session_publishers_false_for_crypto(self, feeds):
-        assert has_session_publishers(feed_by_id(feeds, 1)) is False
-
-    def test_has_session_publishers_false_for_single_session_equity(self, feeds):
-        # SMLC has only REGULAR with no per-session allowedPublisherIds
-        assert has_session_publishers(feed_by_id(feeds, 1023)) is False
-
     def test_get_session_returns_dict(self, feeds):
         sess = get_session(feed_by_id(feeds, 922), "PRE_MARKET")
         assert sess is not None
@@ -80,184 +69,135 @@ class TestSessionHelpers:
 
 
 class TestAddPublisher:
-    def test_default_on_non_equity_adds_top_level(self, feeds):
-        feed = feed_by_id(feeds, 1)  # crypto, no per-session lists
+    def test_default_targets_regular_only(self, feeds):
+        feed = feed_by_id(feeds, 1)  # crypto: publishers in REGULAR entry
         op = AddPublisher(publisher_id=80)
         changes, warns = op.apply(feed)
-        assert feed["allowedPublisherIds"] == [1, 3, 7, 11, 80]
+        regular = get_session(feed, "REGULAR")
+        assert regular["allowedPublisherIds"] == [1, 3, 7, 11, 80]
         assert len(changes) == 1
-        assert changes[0].location == "top_level"
+        assert changes[0].location == "REGULAR"
         assert changes[0].field == "allowedPublisherIds"
         assert changes[0].before == [1, 3, 7, 11]
         assert changes[0].after == [1, 3, 7, 11, 80]
         assert warns == []
 
-    def test_default_on_equity_adds_top_level_and_regular(self, feeds):
+    def test_default_on_us_equity_touches_regular_not_extended(self, feeds):
         feed = feed_by_id(feeds, 922)
         op = AddPublisher(publisher_id=80)
-        changes, warns = op.apply(feed)
-        assert 80 in feed["allowedPublisherIds"]
-        regular = get_session(feed, "REGULAR")
-        assert 80 in regular["allowedPublisherIds"]
-        # PRE_MARKET should NOT be touched
-        pre = get_session(feed, "PRE_MARKET")
-        assert 80 not in pre["allowedPublisherIds"]
-        locs = sorted(c.location for c in changes)
-        assert locs == ["REGULAR", "top_level"]
+        changes, _ = op.apply(feed)
+        assert 80 in get_session(feed, "REGULAR")["allowedPublisherIds"]
+        assert 80 not in get_session(feed, "PRE_MARKET")["allowedPublisherIds"]
+        assert [c.location for c in changes] == ["REGULAR"]
 
     def test_explicit_pre_market_session(self, feeds):
         feed = feed_by_id(feeds, 922)
         op = AddPublisher(publisher_id=80, session="PRE_MARKET")
-        changes, warns = op.apply(feed)
-        assert 80 in feed["allowedPublisherIds"]
+        changes, _ = op.apply(feed)
         assert 80 in get_session(feed, "PRE_MARKET")["allowedPublisherIds"]
-        # REGULAR not touched
-        regular = get_session(feed, "REGULAR")
-        assert 80 not in regular["allowedPublisherIds"]
+        assert 80 not in get_session(feed, "REGULAR")["allowedPublisherIds"]
+        assert [c.location for c in changes] == ["PRE_MARKET"]
 
-    def test_session_all(self, feeds):
+    def test_session_all_touches_every_session(self, feeds):
         feed = feed_by_id(feeds, 922)
         op = AddPublisher(publisher_id=80, session="ALL")
         changes, _ = op.apply(feed)
         for sname in SESSION_NAMES:
-            sess = get_session(feed, sname)
-            assert 80 in sess["allowedPublisherIds"]
-        assert 80 in feed["allowedPublisherIds"]
-        assert len(changes) == 5  # 4 sessions + top_level
+            assert 80 in get_session(feed, sname)["allowedPublisherIds"]
+        assert len(changes) == 4  # sessions only — no top_level anymore
 
-    def test_session_none_only_top_level(self, feeds):
+    def test_session_all_on_single_session_feed(self, feeds):
+        feed = feed_by_id(feeds, 1)  # crypto: REGULAR only
+        op = AddPublisher(publisher_id=80, session="ALL")
+        changes, _ = op.apply(feed)
+        assert len(changes) == 1
+        assert changes[0].location == "REGULAR"
+
+    def test_session_none_raises(self, feeds):
         feed = feed_by_id(feeds, 922)
         op = AddPublisher(publisher_id=80, session="NONE")
-        changes, _ = op.apply(feed)
-        assert 80 in feed["allowedPublisherIds"]
-        for sname in SESSION_NAMES:
-            sess = get_session(feed, sname)
-            assert 80 not in sess["allowedPublisherIds"]
-        assert len(changes) == 1
-        assert changes[0].location == "top_level"
+        with pytest.raises(OpError, match="NONE is invalid for publisher ops"):
+            op.apply(feed)
 
-    def test_explicit_session_on_non_equity_raises(self, feeds):
-        feed = feed_by_id(feeds, 1)  # crypto, no PRE_MARKET
+    def test_explicit_session_missing_on_feed_raises(self, feeds):
+        feed = feed_by_id(feeds, 1)  # crypto, no PRE_MARKET entry
         op = AddPublisher(publisher_id=80, session="PRE_MARKET")
-        with pytest.raises(OpError, match="session.*does not exist"):
+        with pytest.raises(OpError, match="does not exist"):
             op.apply(feed)
 
-    def test_session_all_on_non_equity_raises(self, feeds):
-        feed = feed_by_id(feeds, 1)
-        op = AddPublisher(publisher_id=80, session="ALL")
-        with pytest.raises(OpError, match="no per-session"):
-            op.apply(feed)
-
-    def test_session_regular_on_non_equity_raises(self, feeds):
-        # Non-US-equity feeds have no per-session REGULAR roster (only top-level).
-        # --session REGULAR must error so users don't think they targeted something
-        # specific when only the top-level list exists.
-        feed = feed_by_id(feeds, 1)
-        op = AddPublisher(publisher_id=80, session="REGULAR")
-        with pytest.raises(OpError, match="session.*does not exist"):
-            op.apply(feed)
+    def test_inserts_list_when_session_lacks_key(self, feeds):
+        # Feed 5000's REGULAR entry has NO allowedPublisherIds (COMING_SOON
+        # shape) — the op must create it, flagged as an insert (before=None).
+        feed = feed_by_id(feeds, 5000)
+        op = AddPublisher(publisher_id=80)
+        changes, warns = op.apply(feed)
+        assert get_session(feed, "REGULAR")["allowedPublisherIds"] == [80]
+        assert len(changes) == 1
+        assert changes[0].before is None
+        assert changes[0].after == [80]
+        assert warns == []
 
     def test_noop_when_already_present(self, feeds):
         feed = feed_by_id(feeds, 1)
-        op = AddPublisher(publisher_id=3)  # 3 already in [1, 3, 7, 11]
+        op = AddPublisher(publisher_id=3)  # 3 already in REGULAR [1, 3, 7, 11]
         changes, _ = op.apply(feed)
         assert changes == []
 
     def test_lists_deduped_and_sorted(self, feeds):
         feed = feed_by_id(feeds, 1)
-        feed["allowedPublisherIds"] = [11, 1, 7, 3]  # not sorted
+        get_session(feed, "REGULAR")["allowedPublisherIds"] = [11, 1, 7, 3]
         op = AddPublisher(publisher_id=5)
         op.apply(feed)
-        assert feed["allowedPublisherIds"] == [1, 3, 5, 7, 11]
-
-    def test_empty_list_initial(self, feeds):
-        feed = feed_by_id(feeds, 5000)  # COMING_SOON, empty list
-        op = AddPublisher(publisher_id=80)
-        changes, _ = op.apply(feed)
-        assert feed["allowedPublisherIds"] == [80]
-        assert len(changes) == 1
-
-    def test_missing_top_level_field_warns_and_skips(self, feeds):
-        # Some feeds (e.g. inactive crypto) lack a top-level allowedPublisherIds.
-        # AddPublisher must NOT invent the field — text-surgery cannot insert
-        # it later. Instead, emit a Warning and produce no Change.
-        feed = feed_by_id(feeds, 1)  # crypto, no per-session lists
-        del feed["allowedPublisherIds"]
-        op = AddPublisher(publisher_id=80)
-        changes, warns = op.apply(feed)
-        assert changes == []
-        assert "allowedPublisherIds" not in feed  # not invented
-        assert len(warns) == 1
-        assert "no top-level allowedPublisherIds" in warns[0].message
-
-    def test_missing_top_level_field_with_session_all(self, feeds):
-        # session=ALL on an equity-style feed: top-level missing -> warn for
-        # top_level only; session targets still get their changes.
-        feed = feed_by_id(feeds, 922)
-        del feed["allowedPublisherIds"]
-        op = AddPublisher(publisher_id=80, session="ALL")
-        changes, warns = op.apply(feed)
-        assert "allowedPublisherIds" not in feed
-        assert any("top-level" in w.message for w in warns)
-        # All four sessions should still be edited.
-        assert sorted(c.location for c in changes) == sorted(SESSION_NAMES)
+        assert get_session(feed, "REGULAR")["allowedPublisherIds"] == [1, 3, 5, 7, 11]
 
 
 from edit_config_lib.config_ops import RemovePublisher
 
 
 class TestRemovePublisher:
-    def test_default_removes_everywhere_on_equity(self, feeds):
+    def test_default_removes_from_regular_only(self, feeds):
         feed = feed_by_id(feeds, 922)
-        # publisher 22 is in top-level + REGULAR + PRE_MARKET + POST_MARKET
+        # publisher 22 is in REGULAR + PRE_MARKET + POST_MARKET
         op = RemovePublisher(publisher_id=22)
         changes, _ = op.apply(feed)
-        assert 22 not in feed["allowedPublisherIds"]
+        assert 22 not in get_session(feed, "REGULAR")["allowedPublisherIds"]
+        assert 22 in get_session(feed, "PRE_MARKET")["allowedPublisherIds"]
+        assert 22 in get_session(feed, "POST_MARKET")["allowedPublisherIds"]
+        assert [c.location for c in changes] == ["REGULAR"]
+
+    def test_session_all_removes_everywhere(self, feeds):
+        feed = feed_by_id(feeds, 922)
+        op = RemovePublisher(publisher_id=22, session="ALL")
+        changes, _ = op.apply(feed)
         for name in SESSION_NAMES:
             sess = get_session(feed, name)
-            if sess and "allowedPublisherIds" in sess:
-                assert 22 not in sess["allowedPublisherIds"]
-        # 4 changes: top_level + REGULAR + PRE_MARKET + POST_MARKET
-        # (OVER_NIGHT didn't have 22)
-        assert len(changes) == 4
-
-    def test_default_on_non_equity_removes_top_level(self, feeds):
-        feed = feed_by_id(feeds, 1)
-        op = RemovePublisher(publisher_id=3)
-        changes, _ = op.apply(feed)
-        assert 3 not in feed["allowedPublisherIds"]
-        assert len(changes) == 1
+            assert 22 not in (sess.get("allowedPublisherIds") or [])
+        # REGULAR + PRE_MARKET + POST_MARKET had 22; OVER_NIGHT did not.
+        assert sorted(c.location for c in changes) == [
+            "POST_MARKET",
+            "PRE_MARKET",
+            "REGULAR",
+        ]
 
     def test_explicit_session_removes_only_that_session(self, feeds):
         feed = feed_by_id(feeds, 922)
         op = RemovePublisher(publisher_id=22, session="PRE_MARKET")
         changes, _ = op.apply(feed)
-        assert 22 in feed["allowedPublisherIds"]  # top-level untouched
         assert 22 not in get_session(feed, "PRE_MARKET")["allowedPublisherIds"]
         assert 22 in get_session(feed, "REGULAR")["allowedPublisherIds"]
-        assert len(changes) == 1
-        assert changes[0].location == "PRE_MARKET"
+        assert [c.location for c in changes] == ["PRE_MARKET"]
 
-    def test_session_all_removes_everywhere(self, feeds):
-        # session=ALL mirrors AddPublisher: removes from top-level AND every
-        # per-session list.
-        feed = feed_by_id(feeds, 922)
-        op = RemovePublisher(publisher_id=22, session="ALL")
-        changes, _ = op.apply(feed)
-        assert 22 not in feed["allowedPublisherIds"]
-        for name in SESSION_NAMES:
-            sess = get_session(feed, name)
-            if sess and "allowedPublisherIds" in sess:
-                assert 22 not in sess["allowedPublisherIds"]
-        assert any(c.location == "top_level" for c in changes)
-
-    def test_session_none_warns_about_consistency(self, feeds):
+    def test_session_none_raises(self, feeds):
         feed = feed_by_id(feeds, 922)
         op = RemovePublisher(publisher_id=22, session="NONE")
-        changes, warns = op.apply(feed)
-        assert 22 not in feed["allowedPublisherIds"]
-        # 22 still in REGULAR session -> consistency warning
-        assert any("still in session" in w.message for w in warns)
+        with pytest.raises(OpError, match="NONE is invalid for publisher ops"):
+            op.apply(feed)
+
+    def test_explicit_session_missing_on_feed_raises(self, feeds):
+        feed = feed_by_id(feeds, 1)
+        op = RemovePublisher(publisher_id=1, session="PRE_MARKET")
+        with pytest.raises(OpError, match="does not exist"):
+            op.apply(feed)
 
     def test_noop_when_absent(self, feeds):
         feed = feed_by_id(feeds, 1)
@@ -265,86 +205,124 @@ class TestRemovePublisher:
         changes, _ = op.apply(feed)
         assert changes == []
 
-    def test_session_regular_on_non_equity_raises(self, feeds):
-        # Non-US-equity feeds have no per-session REGULAR roster (only top-level).
-        # --session REGULAR must error rather than silently editing top-level.
-        feed = feed_by_id(feeds, 1)
-        target = feed["allowedPublisherIds"][0]
-        op = RemovePublisher(publisher_id=target, session="REGULAR")
-        with pytest.raises(OpError, match="session.*does not exist"):
-            op.apply(feed)
+    def test_noop_when_session_lacks_key(self, feeds):
+        # Feed 5000's REGULAR entry has no allowedPublisherIds at all.
+        feed = feed_by_id(feeds, 5000)
+        op = RemovePublisher(publisher_id=1)
+        changes, warns = op.apply(feed)
+        assert changes == []
+        assert warns == []
 
-    def test_warns_when_at_or_below_min_publishers(self, feeds):
+    def test_warns_when_at_or_below_session_min(self, feeds):
         feed = feed_by_id(feeds, 922)
-        # OVER_NIGHT has [32, 41, 42] with minPublishers=2.
+        # OVER_NIGHT has [32, 41, 42] with session minPublishers=2.
         # Remove 32 -> [41, 42] with min=2 -> at-floor warning.
         op = RemovePublisher(publisher_id=32, session="OVER_NIGHT")
-        changes, warns = op.apply(feed)
+        _, warns = op.apply(feed)
         assert any(
             "OVER_NIGHT" in w.message and "headroom" in w.message.lower() for w in warns
         )
 
-    def test_warns_for_top_level_at_floor(self, feeds):
+    def test_headroom_falls_back_to_feed_level_min(self, feeds):
+        # Feed 6000: REGULAR [19, 22] with NO session minPublishers;
+        # feed-level minPublishers=1. Remove 19 -> [22] vs min=1 -> warning.
         feed = feed_by_id(feeds, 6000)
-        # top-level [19, 22], minPublishers=1. Remove 19 -> [22], min=1 -> warn
         op = RemovePublisher(publisher_id=19)
-        changes, warns = op.apply(feed)
-        assert any(
-            "top_level" in w.message or "headroom" in w.message.lower() for w in warns
-        )
+        _, warns = op.apply(feed)
+        assert any("headroom" in w.message.lower() for w in warns)
 
 
 from edit_config_lib.config_ops import SetMinPublishers
 
 
 class TestSetMinPublishers:
-    def test_default_on_non_equity_writes_top_level(self, feeds):
-        feed = feed_by_id(feeds, 1)
+    def test_default_non_us_writes_feed_level_only(self, feeds):
+        feed = feed_by_id(feeds, 1)  # Crypto.BTC/USD
         op = SetMinPublishers(value=2)
         changes, _ = op.apply(feed)
         assert feed["minPublishers"] == 2
-        assert len(changes) == 1
-        assert changes[0].location == "top_level"
-        assert changes[0].field == "minPublishers"
-        assert changes[0].after == 2
+        assert "minPublishers" not in get_session(feed, "REGULAR")
+        assert [c.location for c in changes] == ["top_level"]
 
-    def test_default_on_equity_writes_top_and_regular(self, feeds):
+    def test_default_us_writes_feed_level_and_regular(self, feeds):
         feed = feed_by_id(feeds, 922)
         op = SetMinPublishers(value=4)
         changes, _ = op.apply(feed)
         assert feed["minPublishers"] == 4
         assert get_session(feed, "REGULAR")["minPublishers"] == 4
         assert get_session(feed, "PRE_MARKET")["minPublishers"] == 2  # untouched
-        locs = sorted(c.location for c in changes)
-        assert locs == ["REGULAR", "top_level"]
+        assert sorted(c.location for c in changes) == ["REGULAR", "top_level"]
 
-    def test_explicit_session(self, feeds):
+    def test_default_us_inserts_missing_regular_min(self, feeds):
+        # Feed 1023 is Equity.US.* with a REGULAR list but NO session min.
+        feed = feed_by_id(feeds, 1023)
+        op = SetMinPublishers(value=3)
+        changes, _ = op.apply(feed)
+        assert get_session(feed, "REGULAR")["minPublishers"] == 3
+        regular_change = next(c for c in changes if c.location == "REGULAR")
+        assert regular_change.before is None  # insert
+
+    def test_explicit_session_on_us_feed(self, feeds):
         feed = feed_by_id(feeds, 922)
         op = SetMinPublishers(value=3, session="PRE_MARKET")
         changes, _ = op.apply(feed)
         assert get_session(feed, "PRE_MARKET")["minPublishers"] == 3
         assert feed["minPublishers"] == 1  # untouched
-        assert len(changes) == 1
-        assert changes[0].location == "PRE_MARKET"
+        assert [c.location for c in changes] == ["PRE_MARKET"]
 
-    def test_hard_error_when_value_exceeds_count(self, feeds):
+    def test_explicit_session_on_non_us_feed_raises(self, feeds):
+        feed = feed_by_id(feeds, 1)  # crypto
+        op = SetMinPublishers(value=2, session="REGULAR")
+        with pytest.raises(OpError, match="us-equities-only"):
+            op.apply(feed)
+
+    def test_session_all_on_non_us_feed_is_feed_level_only(self, feeds):
+        feed = feed_by_id(feeds, 100)  # fx
+        op = SetMinPublishers(value=2, session="ALL")
+        changes, _ = op.apply(feed)
+        assert feed["minPublishers"] == 2
+        assert "minPublishers" not in get_session(feed, "REGULAR")
+        assert [c.location for c in changes] == ["top_level"]
+
+    def test_session_none_feed_level_only(self, feeds):
         feed = feed_by_id(feeds, 922)
-        # OVER_NIGHT has 3 publishers, set min=5 -> unsatisfiable
+        op = SetMinPublishers(value=4, session="NONE")
+        changes, _ = op.apply(feed)
+        assert feed["minPublishers"] == 4
+        assert get_session(feed, "REGULAR")["minPublishers"] == 3  # untouched
+        assert [c.location for c in changes] == ["top_level"]
+
+    def test_feed_level_validated_against_session_union(self, feeds):
+        # Feed 1's union is [1, 3, 7, 11] (4 publishers): value 5 must error.
+        feed = feed_by_id(feeds, 1)
+        op = SetMinPublishers(value=5)
+        with pytest.raises(OpError, match="exceed"):
+            op.apply(feed)
+
+    def test_unsatisfiable_on_feed_without_any_publishers(self, feeds):
+        # Feed 5000 has no publisher lists at all -> union is empty.
+        feed = feed_by_id(feeds, 5000)
+        op = SetMinPublishers(value=2)
+        with pytest.raises(OpError, match="exceed"):
+            op.apply(feed)
+
+    def test_session_value_validated_against_session_count(self, feeds):
+        feed = feed_by_id(feeds, 922)
+        # OVER_NIGHT has 3 publishers: min=5 is unsatisfiable.
         op = SetMinPublishers(value=5, session="OVER_NIGHT")
         with pytest.raises(OpError, match="exceed"):
             op.apply(feed)
 
     def test_warning_at_floor(self, feeds):
         feed = feed_by_id(feeds, 922)
-        # OVER_NIGHT has 3 publishers, set min=3 -> at-floor warning
         op = SetMinPublishers(value=3, session="OVER_NIGHT")
-        changes, warns = op.apply(feed)
+        _, warns = op.apply(feed)
         assert any("headroom" in w.message.lower() for w in warns)
 
     def test_warning_when_one_on_stable(self, feeds):
         feed = feed_by_id(feeds, 1)
         op = SetMinPublishers(value=1)
-        changes, warns = op.apply(feed)
+        _, warns = op.apply(feed)
         assert any("STABLE" in w.message and "1" in w.message for w in warns)
 
     def test_noop_when_unchanged(self, feeds):
@@ -353,29 +331,33 @@ class TestSetMinPublishers:
         changes, _ = op.apply(feed)
         assert changes == []
 
-    def test_session_none_only_top_level(self, feeds):
+    def test_default_us_skips_regular_without_publisher_list(self, feeds):
+        # A US-equity feed whose REGULAR session has no publisher list gets
+        # only the feed-level write — a publisher-less session has nothing to
+        # satisfy a floor against. (Deliberate scope decision.)
         feed = feed_by_id(feeds, 922)
-        op = SetMinPublishers(value=4, session="NONE")
+        del get_session(feed, "REGULAR")["allowedPublisherIds"]
+        op = SetMinPublishers(value=2)  # value differs from current top-level (1)
         changes, _ = op.apply(feed)
-        assert feed["minPublishers"] == 4
-        assert get_session(feed, "REGULAR")["minPublishers"] == 3  # untouched
-        assert len(changes) == 1
-        assert changes[0].location == "top_level"
+        assert [c.location for c in changes] == ["top_level"]
+        assert "minPublishers" not in get_session(feed, "REGULAR") or (
+            get_session(feed, "REGULAR")["minPublishers"] == 3
+        )  # session min untouched
 
 
 from edit_config_lib.config_ops import BumpMinPublishers
 
 
 class TestBumpMinPublishers:
-    def test_bump_up(self, feeds):
-        feed = feed_by_id(feeds, 1)  # min=3
+    def test_bump_up_feed_level(self, feeds):
+        feed = feed_by_id(feeds, 1)  # min=3, union has 4 publishers
         op = BumpMinPublishers(delta=+1)
         changes, _ = op.apply(feed)
         assert feed["minPublishers"] == 4
         assert changes[0].before == 3 and changes[0].after == 4
 
     def test_bump_down(self, feeds):
-        feed = feed_by_id(feeds, 1)  # min=3
+        feed = feed_by_id(feeds, 1)
         op = BumpMinPublishers(delta=-1)
         changes, _ = op.apply(feed)
         assert feed["minPublishers"] == 2
@@ -393,12 +375,35 @@ class TestBumpMinPublishers:
         changes, _ = op.apply(feed)
         assert changes == []
 
-    def test_hard_error_when_exceeding_count(self, feeds):
+    def test_hard_error_when_exceeding_session_count(self, feeds):
         feed = feed_by_id(feeds, 922)
         # OVER_NIGHT min=2, count=3. Bump +2 -> 4 -> exceeds.
         op = BumpMinPublishers(delta=+2, session="OVER_NIGHT")
         with pytest.raises(OpError, match="exceed"):
             op.apply(feed)
+
+    def test_hard_error_against_union_at_feed_level(self, feeds):
+        feed = feed_by_id(feeds, 1)  # min=3, union of 4
+        op = BumpMinPublishers(delta=+2)  # -> 5 > 4
+        with pytest.raises(OpError, match="exceed"):
+            op.apply(feed)
+
+    def test_explicit_session_on_non_us_feed_raises(self, feeds):
+        feed = feed_by_id(feeds, 100)  # fx
+        op = BumpMinPublishers(delta=+1, session="REGULAR")
+        with pytest.raises(OpError, match="us-equities-only"):
+            op.apply(feed)
+
+    def test_bump_inserts_missing_session_min_on_us_feed(self, feeds):
+        # Feed 1023 (Equity.US.*) has a REGULAR list but no session min:
+        # an explicit-session bump inserts it (before=None marks the insert).
+        feed = feed_by_id(feeds, 1023)
+        op = BumpMinPublishers(delta=+1, session="REGULAR")
+        changes, _ = op.apply(feed)
+        assert get_session(feed, "REGULAR")["minPublishers"] == 1  # max(1, 0+1)
+        assert len(changes) == 1
+        assert changes[0].before is None
+        assert changes[0].after == 1
 
 
 from edit_config_lib.config_ops import SetState

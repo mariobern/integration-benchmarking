@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-05
+
+### Changed
+
+- `lazer_dq/apply_allowed_to_config.py` and `tools/edit-config/edit_config.py` now target the new session-only config format (`lazer_update.json` era): publisher lists are written only into `marketSchedules` session entries (no feed-level `allowedPublisherIds`), session-level `minPublishers` is written only for `Equity.US.*` feeds, and both tools refuse to run against old-format configs. `apply_allowed_to_config` loses its `--asset-class` flag (hk-equities flows through the same session path); `edit_config` publisher ops default to the REGULAR session (`--session NONE` is now valid only for min-publishers ops) and insert missing `allowedPublisherIds`/`minPublishers` keys.
+
 ## 2026-02-25
 
 ### Added

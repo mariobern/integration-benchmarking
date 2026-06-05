@@ -260,3 +260,59 @@ def test_find_ric_identifier_spans_no_datascope_ric():
 def test_find_ric_identifier_spans_no_marketSchedules():
     block = '{"feedId": 1}'
     assert find_ric_identifier_spans(block) == []
+
+
+import json
+
+from edit_config_lib.config_text_surgery import (
+    insert_field_after_open_brace,
+    insert_field_before_session,
+    find_marketschedules_end,
+)
+
+
+class TestInsertHelpers:
+    SESSION_BLOCK = (
+        "{\n"
+        '          "marketSchedule": "X",\n'
+        '          "session": "REGULAR"\n'
+        "        }"
+    )
+
+    def test_insert_after_open_brace_leads_the_entry(self):
+        out = insert_field_after_open_brace(
+            self.SESSION_BLOCK, '"allowedPublisherIds": [ 80 ],'
+        )
+        data = json.loads(out)
+        assert data["allowedPublisherIds"] == [80]
+        assert list(data.keys())[0] == "allowedPublisherIds"
+
+    def test_insert_after_open_brace_matches_indent(self):
+        out = insert_field_after_open_brace(
+            self.SESSION_BLOCK, '"allowedPublisherIds": [ 80 ],'
+        )
+        assert '\n          "allowedPublisherIds": [ 80 ],\n' in out
+
+    def test_insert_before_session_canonical_position(self):
+        out = insert_field_before_session(self.SESSION_BLOCK, '"minPublishers": 3,')
+        data = json.loads(out)
+        assert list(data.keys()) == ["marketSchedule", "minPublishers", "session"]
+
+    def test_insert_before_session_falls_back_without_session_key(self):
+        block = '{\n  "foo": 1\n}'
+        out = insert_field_before_session(block, '"minPublishers": 3,')
+        assert json.loads(out)["minPublishers"] == 3
+
+
+class TestFindMarketschedulesEnd:
+    def test_end_points_past_closing_bracket(self):
+        block = (
+            '{ "marketSchedules": [ { "minPublishers": 2, "session": "REGULAR" } ],'
+            ' "minPublishers": 3 }'
+        )
+        end = find_marketschedules_end(block)
+        assert block[end - 1] == "]"
+        assert '"minPublishers": 3' in block[end:]
+
+    def test_absent_array_returns_zero(self):
+        assert find_marketschedules_end('{ "foo": 1 }') == 0

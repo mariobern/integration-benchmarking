@@ -1,9 +1,14 @@
 # edit_config recipes
 
+> All recipes assume a session-only config (`lazer_update.json` era). The tool
+> rejects old-format files that still carry feed-level `allowedPublisherIds`
+> (e.g. `after.json`). Publisher ops target the REGULAR session by default —
+> pass `--session ALL` to touch every session entry on a feed.
+
 ## Add a publisher to a contiguous range
 
 ```bash
-python3 tools/edit-config/edit_config.py --config after.json \
+python3 tools/edit-config/edit_config.py --config lazer_update.json \
     --add-publisher 80 --feed-id 1000-1050
 ```
 
@@ -18,28 +23,28 @@ cat > /tmp/feeds.txt <<'EOF'
 275, 299
 3530
 EOF
-python3 tools/edit-config/edit_config.py --config after.json \
+python3 tools/edit-config/edit_config.py --config lazer_update.json \
     --add-publisher 80 --feed-ids-from /tmp/feeds.txt
 ```
 
-## Remove a retired publisher entirely (all sessions + top-level)
+## Remove a retired publisher entirely (all sessions)
 
 ```bash
-python3 tools/edit-config/edit_config.py --config after.json \
-    --remove-publisher 22 --asset-class equity
+python3 tools/edit-config/edit_config.py --config lazer_update.json \
+    --remove-publisher 22 --asset-class equity --session ALL
 ```
 
 ## Add a publisher to PRE_MARKET only on a single equity
 
 ```bash
-python3 tools/edit-config/edit_config.py --config after.json \
+python3 tools/edit-config/edit_config.py --config lazer_update.json \
     --add-publisher 80 --feed-id 922 --session PRE_MARKET
 ```
 
 ## Raise minPublishers across all STABLE us-equities REGULAR by 1
 
 ```bash
-python3 tools/edit-config/edit_config.py --config after.json \
+python3 tools/edit-config/edit_config.py --config lazer_update.json \
     --bump-min-publishers +1 --asset-class equity --state STABLE \
     --session REGULAR
 ```
@@ -47,14 +52,14 @@ python3 tools/edit-config/edit_config.py --config after.json \
 ## Promote a list of feeds to STABLE
 
 ```bash
-python3 tools/edit-config/edit_config.py --config after.json \
+python3 tools/edit-config/edit_config.py --config lazer_update.json \
     --set-state STABLE --feed-id 500,501,502
 ```
 
 ## Deactivate a deprecated feed
 
 ```bash
-python3 tools/edit-config/edit_config.py --config after.json \
+python3 tools/edit-config/edit_config.py --config lazer_update.json \
     --set-state INACTIVE --feed-id 6000
 ```
 
@@ -77,9 +82,9 @@ operations:
 ```
 
 ```bash
-python3 tools/edit-config/edit_config.py --config after.json \
+python3 tools/edit-config/edit_config.py --config lazer_update.json \
     --from-spec edits-2026-05-05.yaml
 # review diff, then:
-python3 tools/edit-config/edit_config.py --config after.json \
+python3 tools/edit-config/edit_config.py --config lazer_update.json \
     --from-spec edits-2026-05-05.yaml --apply
 ```

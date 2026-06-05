@@ -1,6 +1,7 @@
 """Orchestrator: parse spec, resolve targets, simulate, apply."""
 
 import fnmatch
+import re
 from dataclasses import dataclass
 
 
@@ -445,8 +446,10 @@ from edit_config_lib.config_text_surgery import (
     find_publisher_array_span,
     find_int_field_span,
     find_string_field_span,
-    find_matching_close,
     find_ric_identifier_spans,
+    find_marketschedules_end,
+    insert_field_after_open_brace,
+    insert_field_before_session,
 )
 
 
@@ -456,89 +459,85 @@ def _format_publisher_list(ids: list[int]) -> str:
     return "[ " + ", ".join(str(i) for i in ids) + " ]"
 
 
-def _apply_changes_to_feed_block(block: str, changes: list[Change]) -> str:
-    """Apply all changes for a single feed to its raw text block.
+def _set_session_publishers(sblock: str, ids: list[int]) -> str:
+    """Set (or insert) a session entry's allowedPublisherIds list."""
+    span = find_publisher_array_span(sblock)
+    if span is not None:
+        return sblock[: span[0]] + _format_publisher_list(ids) + sblock[span[1] :]
+    null_m = re.search(r'"allowedPublisherIds":\s*null', sblock)
+    if null_m is not None:
+        repl = f'"allowedPublisherIds": {_format_publisher_list(ids)}'
+        return sblock[: null_m.start()] + repl + sblock[null_m.end() :]
+    field = f'"allowedPublisherIds": {_format_publisher_list(ids)},'
+    return insert_field_after_open_brace(sblock, field)
 
-    Strategy: collect (start, end, replacement) tuples relative to the
-    feed block, sort by descending start offset, splice them in order
-    so prior splices don't shift later offsets.
-    """
-    edits: list[tuple[int, int, str]] = []
 
-    # Compute marketSchedules array span up-front (used to scope top-level int
-    # field lookups so we don't accidentally hit a session's minPublishers).
-    ms_match = None
-    ms_idx = block.find('"marketSchedules":')
-    if ms_idx >= 0:
-        ms_open = block.find("[", ms_idx)
-        if ms_open >= 0:
-            ms_close = find_matching_close(block, ms_open)
-            if ms_close is not None:
-                ms_match = (ms_open, ms_close + 1)
+def _set_session_min_publishers(sblock: str, value: int) -> str:
+    """Set (or insert, in canonical position) a session entry's minPublishers."""
+    span = find_int_field_span(sblock, "minPublishers")
+    if span is not None:
+        return sblock[: span[0]] + str(value) + sblock[span[1] :]
+    return insert_field_before_session(sblock, f'"minPublishers": {value},')
 
-    # Pre-compute ric identifier spans once if any change targets them.
-    ric_spans: list[tuple[int, int, str]] | None = None
-    if any(c.location == "datascope_ric_identifier" for c in changes):
+
+def _apply_one_change(block: str, change: Change) -> str:
+    """Apply a single Change to a feed's raw text block."""
+    if change.location == "datascope_ric_identifier":
         ric_spans = find_ric_identifier_spans(block)
+        if change.index is None:
+            raise RuntimeError("datascope_ric_identifier change missing index")
+        if change.index >= len(ric_spans):
+            raise RuntimeError(
+                f"identifier slot index {change.index} out of range "
+                f"({len(ric_spans)} slots)"
+            )
+        start, end, _current = ric_spans[change.index]
+        return block[:start] + f'"{change.after}"' + block[end:]
 
+    if change.location == "top_level":
+        if change.field == "state":
+            span = find_string_field_span(block, "state")
+            if span is None:
+                raise RuntimeError("state field not found in feed block")
+            return block[: span[0]] + f'"{change.after}"' + block[span[1] :]
+        if change.field == "minPublishers":
+            # The feed-level minPublishers sits AFTER the marketSchedules
+            # array, so scope the lookup to the tail to avoid matching a
+            # session's value.
+            tail_start = find_marketschedules_end(block)
+            m = re.search(r'"minPublishers":\s*(-?\d+)', block[tail_start:])
+            if m is None:
+                raise RuntimeError("feed-level minPublishers not found")
+            s, e = tail_start + m.start(1), tail_start + m.end(1)
+            return block[:s] + str(change.after) + block[e:]
+        raise RuntimeError(
+            f"unsupported top-level field {change.field!r} — the new config "
+            f"format keeps publisher lists only in session entries"
+        )
+
+    # Session-scoped change.
+    sb = find_session_block(block, change.location)
+    if sb is None:
+        raise RuntimeError(f"session block {change.location!r} not found in feed block")
+    sblock = block[sb[0] : sb[1]]
+    if change.field == "allowedPublisherIds":
+        new_sblock = _set_session_publishers(sblock, change.after)
+    elif change.field == "minPublishers":
+        new_sblock = _set_session_min_publishers(sblock, change.after)
+    else:
+        raise RuntimeError(f"unsupported session field {change.field!r}")
+    return block[: sb[0]] + new_sblock + block[sb[1] :]
+
+
+def _apply_changes_to_feed_block(block: str, changes: list[Change]) -> str:
+    """Apply all changes for a single feed, one at a time.
+
+    Each change re-locates its span in the CURRENT block text, so a prior
+    splice — including whole-line inserts that shift everything after them —
+    can never invalidate a later change's offsets.
+    """
     for change in changes:
-        if change.location == "datascope_ric_identifier":
-            assert ric_spans is not None
-            if change.index is None:
-                raise RuntimeError("datascope_ric_identifier change missing index")
-            if change.index >= len(ric_spans):
-                raise RuntimeError(
-                    f"identifier slot index {change.index} out of range "
-                    f"({len(ric_spans)} slots)"
-                )
-            start_rel, end_rel, _current = ric_spans[change.index]
-            replacement = f'"{change.after}"'
-            edits.append((start_rel, end_rel, replacement))
-            continue
-
-        if change.location == "top_level":
-            scope_block, scope_offset = block, 0
-            # For top-level int fields, scope the lookup to the tail after marketSchedules.
-            if change.field == "minPublishers" and ms_match is not None:
-                tail_start = ms_match[1]
-                scope_block = block[tail_start:]
-                scope_offset = tail_start
-        else:
-            sb = find_session_block(block, change.location)
-            if sb is None:
-                raise RuntimeError(
-                    f"session block {change.location!r} not found in feed block"
-                )
-            scope_block = block[sb[0] : sb[1]]
-            scope_offset = sb[0]
-
-        if change.field == "allowedPublisherIds":
-            span = find_publisher_array_span(scope_block)
-            if span is None:
-                raise RuntimeError(
-                    f"allowedPublisherIds not found in {change.location}"
-                )
-            replacement = _format_publisher_list(change.after)
-        elif change.field == "minPublishers":
-            span = find_int_field_span(scope_block, "minPublishers")
-            if span is None:
-                raise RuntimeError(f"minPublishers not found in {change.location}")
-            replacement = str(change.after)
-        elif change.field == "state":
-            span = find_string_field_span(scope_block, "state")
-            if span is None:
-                raise RuntimeError(f"state field not found in {change.location}")
-            replacement = f'"{change.after}"'
-        else:
-            raise RuntimeError(f"unsupported field {change.field!r}")
-
-        abs_start = scope_offset + span[0]
-        abs_end = scope_offset + span[1]
-        edits.append((abs_start, abs_end, replacement))
-
-    # Apply in reverse offset order so earlier spans aren't disturbed.
-    for start, end, replacement in sorted(edits, key=lambda e: -e[0]):
-        block = block[:start] + replacement + block[end:]
+        block = _apply_one_change(block, change)
     return block
 
 

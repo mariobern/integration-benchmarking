@@ -110,3 +110,31 @@ class TestRenderDiff:
     def test_empty_changes(self):
         out = render_diff([])
         assert out.strip() == "(no changes)"
+
+
+def test_insert_renders_absent_before_line_for_publishers():
+    c = Change(
+        feed_id=5000,
+        symbol="Crypto.NEW/USD",
+        location="REGULAR",
+        field="allowedPublisherIds",
+        before=None,
+        after=[80],
+    )
+    out = render_diff([c])
+    assert "-      (absent)" in out
+    assert '+      "allowedPublisherIds": [ 80 ],' in out
+
+
+def test_insert_renders_absent_before_line_for_min_publishers():
+    c = Change(
+        feed_id=5000,
+        symbol="Crypto.NEW/USD",
+        location="REGULAR",
+        field="minPublishers",
+        before=None,
+        after=2,
+    )
+    out = render_diff([c])
+    assert "-      (absent)" in out
+    assert '+      "minPublishers": 2,' in out

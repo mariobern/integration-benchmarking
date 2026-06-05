@@ -21,6 +21,11 @@ def run_cli(args: list[str], cwd: Path | None = None) -> subprocess.CompletedPro
     )
 
 
+def _regular_ids(feed: dict) -> list[int]:
+    reg = next(s for s in feed["marketSchedules"] if s["session"] == "REGULAR")
+    return reg.get("allowedPublisherIds", [])
+
+
 @pytest.fixture
 def config_copy(tmp_path):
     dst = tmp_path / "after.json"
@@ -45,7 +50,7 @@ class TestCli:
         assert "[DRY RUN]" in result.stdout
         data = json.loads(config_copy.read_text())
         f = next(x for x in data["feeds"] if x["feedId"] == 1)
-        assert 80 not in f["allowedPublisherIds"]
+        assert 80 not in _regular_ids(f)
 
     def test_apply_writes_changes(self, config_copy):
         result = run_cli(
@@ -62,7 +67,7 @@ class TestCli:
         assert result.returncode == 0, result.stderr
         data = json.loads(config_copy.read_text())
         f = next(x for x in data["feeds"] if x["feedId"] == 1)
-        assert 80 in f["allowedPublisherIds"]
+        assert 80 in _regular_ids(f)
 
     def test_apply_writes_backup(self, config_copy):
         run_cli(
@@ -146,7 +151,7 @@ class TestCli:
         assert result.returncode == 0, result.stderr
         data = json.loads(config_copy.read_text())
         f = next(x for x in data["feeds"] if x["feedId"] == 1)
-        assert 80 in f["allowedPublisherIds"]
+        assert 80 in _regular_ids(f)
 
     def test_feed_ids_from_file(self, config_copy, tmp_path):
         ids_file = tmp_path / "ids.txt"
@@ -166,8 +171,8 @@ class TestCli:
         data = json.loads(config_copy.read_text())
         f1 = next(x for x in data["feeds"] if x["feedId"] == 1)
         f100 = next(x for x in data["feeds"] if x["feedId"] == 100)
-        assert 80 in f1["allowedPublisherIds"]
-        assert 80 in f100["allowedPublisherIds"]
+        assert 80 in _regular_ids(f1)
+        assert 80 in _regular_ids(f100)
 
     def test_diff_always_prints_on_dry_run(self, config_copy):
         result = run_cli(
@@ -181,6 +186,27 @@ class TestCli:
             ]
         )
         assert "@@ feedId 1" in result.stdout
+
+    def test_old_format_config_rejected(self, tmp_path):
+        old = {
+            "feeds": [
+                {
+                    "feedId": 1,
+                    "symbol": "Crypto.BTC/USD",
+                    "state": "STABLE",
+                    "allowedPublisherIds": [1, 3],
+                    "minPublishers": 1,
+                    "marketSchedules": [{"session": "REGULAR"}],
+                }
+            ]
+        }
+        cfg = tmp_path / "after.json"
+        cfg.write_text(json.dumps(old, indent=2), encoding="utf-8")
+        result = run_cli(
+            ["--config", str(cfg), "--add-publisher", "80", "--feed-id", "1"]
+        )
+        assert result.returncode == 1
+        assert "old format" in result.stderr
 
 
 class TestCliInProcess:
@@ -334,6 +360,27 @@ class TestCliInProcess:
         out = capsys.readouterr().out
         assert rc == 0
         assert "@@ feedId 1" in out
+
+    def test_old_format_config_rejected_in_process(self, tmp_path, capsys):
+        old = {
+            "feeds": [
+                {
+                    "feedId": 1,
+                    "symbol": "Crypto.BTC/USD",
+                    "state": "STABLE",
+                    "allowedPublisherIds": [1, 3],
+                    "minPublishers": 1,
+                    "marketSchedules": [{"session": "REGULAR"}],
+                }
+            ]
+        }
+        cfg = tmp_path / "after.json"
+        cfg.write_text(json.dumps(old, indent=2), encoding="utf-8")
+        m = self._import_main()
+        rc = m.main(["--config", str(cfg), "--add-publisher", "80", "--feed-id", "1"])
+        err = capsys.readouterr().err
+        assert rc == 1
+        assert "old format" in err
 
 
 FIXTURES = Path(__file__).parent / "fixtures"

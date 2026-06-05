@@ -3,9 +3,14 @@
 
 Reads the 'allowed' sheet of a dq_summary_<cluster>_<date>.xlsx (produced by
 lazer_dq/summarize_feeds.py) and edits a Lazer config (after.json / after_1.json)
-in place: per-(feed, session) it promotes COMING_SOON feeds to STABLE on their
-DQ-vetted publisher lists, and additively adds missing sessions to already-live
-(STABLE) feeds without disturbing their live sessions.
+in place: it promotes COMING_SOON feeds to STABLE and additively adds missing
+sessions to already-live (STABLE) feeds without disturbing their live sessions.
+
+This tool targets the new (session-only) config format: publisher lists are
+written ONLY into marketSchedules session entries — there is no feed-level
+allowedPublisherIds in the new format. Session-level minPublishers is written
+only for Equity.US.* feeds; every other asset class takes minPublishers at the
+feed level only.
 
 Run:
     python3 -m lazer_dq.apply_allowed_to_config \
@@ -46,17 +51,28 @@ REGULAR_LOW_PUB_MIN = 2
 # filtering (across all sessions). Fewer = insufficient redundancy; left COMING_SOON.
 MIN_PROMOTE_PUBLISHERS = 3
 
-# Asset classes whose marketSchedules entries get per-session allowedPublisherIds
-# + minPublishers written. Every other asset class (hk-equities, etc.) gets only
-# the top-level allowedPublisherIds + minPublishers; its session entries are left
-# alone. us-equities is the only multi-session class, so it is the only one that
-# needs session-level allowlists.
-SESSION_LEVEL_ASSET_CLASSES = {"us-equities"}
+# Session-level minPublishers is a us-equities-only concept in the new config
+# format; every other asset class takes minPublishers at the feed level only.
+US_EQUITY_SYMBOL_PREFIX = "Equity.US."
 
-# Asset classes recognised by --asset-class (mirrors summarize_feeds). Adding a
-# new asset class here is a one-line change; it gets top-level-only treatment
-# unless also added to SESSION_LEVEL_ASSET_CLASSES.
-KNOWN_ASSET_CLASSES = ["us-equities", "hk-equities"]
+
+def check_new_format(data: dict) -> None:
+    """Reject old-format configs that still carry feed-level allowedPublisherIds.
+
+    The new config format (lazer_update.json era) keeps publisher lists only
+    inside marketSchedules session entries; running this tool against an
+    old-format file would leave stale feed-level rosters inconsistent with the
+    session edits.
+    """
+    offenders = [
+        f["feedId"] for f in data.get("feeds", []) if "allowedPublisherIds" in f
+    ]
+    if offenders:
+        raise ValueError(
+            f"config contains feed-level allowedPublisherIds (old format) on "
+            f"{len(offenders)} feed(s), e.g. {offenders[:5]}. This tool now "
+            f"supports only the session-level format (lazer_update.json era)."
+        )
 
 
 def filter_publishers(ids: list[int]) -> tuple[list[int], list[int]]:
@@ -166,27 +182,6 @@ def _ids_inline(ids: list[int]) -> str:
     return "[ " + ", ".join(str(i) for i in ids) + " ]" if ids else "[ ]"
 
 
-def set_top_level_allowed(block: str, ids: list[int]) -> str:
-    """Set the feed's top-level allowedPublisherIds.
-
-    The top-level array is the only allowedPublisherIds that precedes
-    marketSchedules, so we restrict the search to the head of the block (before
-    "marketSchedules") to avoid matching a session array. The pattern spans
-    multi-line arrays because [^\\]] also matches newlines. If the feed has no
-    top-level allowedPublisherIds, insert one after the opening '{'.
-    """
-    ms = re.search(r'"marketSchedules"', block)
-    head_end = ms.start() if ms else len(block)
-    head = block[:head_end]
-    pattern = r'"allowedPublisherIds":\s*(\[[^\]]*\]|null)'
-    repl = f'"allowedPublisherIds": {_ids_inline(ids)}'
-    if re.search(pattern, head):
-        new_head = re.sub(pattern, repl, head, count=1)
-        return new_head + block[head_end:]
-    nl = block.index("\n")
-    return block[:nl] + f"\n      {repl}," + block[nl:]
-
-
 def _marketschedules_end(block: str) -> int:
     """Return the offset just past the marketSchedules array's closing ']', or 0."""
     ms = re.search(r'"marketSchedules":\s*\[', block)
@@ -258,20 +253,26 @@ def _insert_field_before_session(sblock: str, field_text: str) -> str:
     return sblock[:pos] + indent + field_text + "\n" + sblock[pos:]
 
 
-def overwrite_session(block: str, session: str, ids: list[int]) -> str:
-    """Within a feed block, set a session's allowedPublisherIds + minPublishers.
+def overwrite_session(
+    block: str, session: str, ids: list[int], write_min: bool = True
+) -> str:
+    """Within a feed block, set a session's allowedPublisherIds (and, when
+    write_min is True, its minPublishers).
 
     Replaces each field in place when present; inserts it after the session's
-    opening '{' when absent. Many COMING_SOON session entries in after.json ship
-    without an allowedPublisherIds (and sometimes minPublishers) key, so the
-    insert path is the common case on real configs.
+    opening '{' when absent. Many COMING_SOON session entries ship without an
+    allowedPublisherIds (and sometimes minPublishers) key, so the insert path
+    is the common case on real configs.
+
+    Session-level minPublishers is a us-equities-only concept in the new
+    config format; callers pass write_min=False for every other asset class
+    so the entry never gains (or changes) a minPublishers key.
     """
     bounds = find_session_block(block, session)
     if bounds is None:
         return block
     s, e = bounds
     sblock = block[s:e]
-    min_pub = get_min_publishers(session, len(ids))
 
     pub_pat = r'"allowedPublisherIds":\s*(\[[^\]]*\]|null)'
     pub_repl = f'"allowedPublisherIds": {_ids_inline(ids)}'
@@ -280,14 +281,16 @@ def overwrite_session(block: str, session: str, ids: list[int]) -> str:
     else:
         sblock = _insert_field_after_open_brace(sblock, pub_repl + ",")
 
-    min_pat = r'"minPublishers":\s*\d+'
-    min_repl = f'"minPublishers": {min_pub}'
-    if re.search(min_pat, sblock):
-        sblock = re.sub(min_pat, min_repl, sblock, count=1)
-    else:
-        # Place a new minPublishers between marketSchedule and session, matching
-        # the canonical entry order, rather than at the top of the entry.
-        sblock = _insert_field_before_session(sblock, min_repl + ",")
+    if write_min:
+        min_pub = get_min_publishers(session, len(ids))
+        min_pat = r'"minPublishers":\s*\d+'
+        min_repl = f'"minPublishers": {min_pub}'
+        if re.search(min_pat, sblock):
+            sblock = re.sub(min_pat, min_repl, sblock, count=1)
+        else:
+            # Place a new minPublishers between marketSchedule and session,
+            # matching the canonical entry order.
+            sblock = _insert_field_before_session(sblock, min_repl + ",")
 
     return block[:s] + sblock + block[e:]
 
@@ -298,17 +301,26 @@ def _detect_session_indent(block: str) -> str:
     return m.group(1) if m else "        "
 
 
-def add_session(block: str, session: str, ids: list[int], benchmark_mapping) -> str:
+def add_session(
+    block: str,
+    session: str,
+    ids: list[int],
+    benchmark_mapping,
+    write_min: bool = True,
+) -> str:
     """Insert a new session entry before the closing ']' of marketSchedules.
 
-    benchmark_mapping is the dict copied from the feed's REGULAR session (or None).
+    benchmark_mapping is the dict copied from the feed's REGULAR session (or
+    None). write_min=False (non-US-equity feeds) omits the session-level
+    minPublishers key entirely.
     """
     base_indent = _detect_session_indent(block)
     entry: dict = {"allowedPublisherIds": ids}
     if benchmark_mapping is not None:
         entry["benchmarkMapping"] = benchmark_mapping
     entry["marketSchedule"] = SCHEDULE_TEMPLATES[session]
-    entry["minPublishers"] = get_min_publishers(session, len(ids))
+    if write_min:
+        entry["minPublishers"] = get_min_publishers(session, len(ids))
     entry["session"] = session
 
     text = json.dumps(entry, indent=2)
@@ -378,7 +390,6 @@ def apply_summary_to_config(
     summary: dict[int, dict],
     log=None,
     min_promote_publishers: int = MIN_PROMOTE_PUBLISHERS,
-    write_session_fields: bool = True,
 ) -> tuple[str, dict]:
     """Apply the parsed summary to the raw config text.
 
@@ -387,11 +398,11 @@ def apply_summary_to_config(
     a COMING_SOON feed is promoted only if at least this many publishers survive
     filtering.
 
-    `write_session_fields` controls whether per-session allowedPublisherIds +
-    minPublishers are written into marketSchedules entries (True for us-equities,
-    which has distinct per-session allowlists). When False (hk-equities and other
-    single-session classes) only the top-level allowedPublisherIds + minPublishers
-    are set and the marketSchedules entries are left untouched.
+    Publisher lists are written ONLY into marketSchedules session entries —
+    the new config format has no feed-level allowedPublisherIds. Session-level
+    minPublishers is written only for Equity.US.* feeds; every other asset
+    class takes minPublishers at the feed level only. The feed-level
+    minPublishers is still set to 2 on promotion.
 
     Implements the spec decision matrix.
     """
@@ -399,6 +410,7 @@ def apply_summary_to_config(
         log = lambda _msg: None  # noqa: E731
 
     data = json.loads(raw)
+    check_new_format(data)
     feed_index = {f["feedId"]: f for f in data["feeds"]}
 
     stats = {
@@ -441,6 +453,7 @@ def apply_summary_to_config(
         block = raw[start:end]
         existing_sessions = {s.get("session") for s in feed.get("marketSchedules", [])}
         bench = _regular_benchmark_mapping(feed)
+        write_min = feed.get("symbol", "").startswith(US_EQUITY_SYMBOL_PREFIX)
 
         if state == "COMING_SOON":
             # First pass: compute filtered per-session lists + union. No edits yet,
@@ -475,37 +488,35 @@ def apply_summary_to_config(
             block = re.sub(
                 r'"state":\s*"COMING_SOON"', '"state": "STABLE"', block, count=1
             )
-            if write_session_fields:
-                for session in SESSION_ORDER:
-                    if session in session_kept:
-                        # Session has publishers: write it (overwrite or add).
-                        if session in existing_sessions:
-                            block = overwrite_session(
-                                block, session, session_kept[session]
-                            )
-                        else:
-                            block = add_session(
-                                block, session, session_kept[session], bench
-                            )
-                            stats["sessions_added"] += 1
-                    elif session in existing_sessions:
-                        # Session present in the feed but has NO publishers in the
-                        # summary: drop it so the promoted STABLE feed never carries
-                        # an unpriceable (publisher-less) session.
-                        block = remove_session(block, session)
-                        stats["sessions_removed"] += 1
-                        log(
-                            f"  REMOVE-SESSION (no publishers): feedId={feed_id}/{session}"
+            for session in SESSION_ORDER:
+                if session in session_kept:
+                    # Session has publishers: write it (overwrite or add).
+                    if session in existing_sessions:
+                        block = overwrite_session(
+                            block, session, session_kept[session], write_min=write_min
                         )
-            block = set_top_level_allowed(block, sorted(top_union))
+                    else:
+                        block = add_session(
+                            block,
+                            session,
+                            session_kept[session],
+                            bench,
+                            write_min=write_min,
+                        )
+                        stats["sessions_added"] += 1
+                elif session in existing_sessions:
+                    # Session present in the feed but has NO publishers in the
+                    # summary: drop it so the promoted STABLE feed never carries
+                    # an unpriceable (publisher-less) market session.
+                    block = remove_session(block, session)
+                    stats["sessions_removed"] += 1
+                    log(f"  REMOVE-SESSION (no publishers): feedId={feed_id}/{session}")
             block = set_top_level_min_publishers(block, 2)
             stats["promoted"] += 1
-            log(f"  PROMOTE: feedId={feed_id} -> STABLE, top={sorted(top_union)}")
+            log(f"  PROMOTE: feedId={feed_id} -> STABLE, union={sorted(top_union)}")
         else:  # STABLE — additive only
-            added: set[int] = set()
-            # Session adds are a us-equities concept; other asset classes get no
-            # session-level edits, so skip the loop entirely for them.
-            for session in SESSION_ORDER if write_session_fields else []:
+            added_any = False
+            for session in SESSION_ORDER:
                 raw_ids = fa["sessions"].get(session)
                 if not raw_ids:
                     continue
@@ -518,15 +529,11 @@ def apply_summary_to_config(
                     log(f"    filtered {removed} from {feed_id}/{session}")
                 if not kept:
                     continue
-                block = add_session(block, session, kept, bench)
-                added.update(kept)
+                block = add_session(block, session, kept, bench, write_min=write_min)
+                added_any = True
                 stats["sessions_added"] += 1
                 log(f"  ADD-SESSION: feedId={feed_id}/{session}={kept}")
-            if added:
-                existing_top = feed.get("allowedPublisherIds") or []
-                new_top = sorted(set(existing_top) | added)
-                block = set_top_level_allowed(block, new_top)
-            else:
+            if not added_any:
                 # STABLE feed whose only data was for sessions already live:
                 # nothing to add, nothing changed. Counted so the summary
                 # reconciles to the input feed count.
@@ -560,17 +567,6 @@ def main() -> None:
             f"COMING_SOON feed to STABLE (default: {MIN_PROMOTE_PUBLISHERS})."
         ),
     )
-    parser.add_argument(
-        "--asset-class",
-        choices=KNOWN_ASSET_CLASSES,
-        default="us-equities",
-        help=(
-            "Asset class of the workbook (default: us-equities). us-equities "
-            "writes per-session allowedPublisherIds + minPublishers into "
-            "marketSchedules entries; other classes set only the top-level "
-            "allowedPublisherIds + minPublishers and leave sessions untouched."
-        ),
-    )
     args = parser.parse_args()
 
     xlsx_path = Path(args.xlsx)
@@ -590,13 +586,16 @@ def main() -> None:
         print("\n=== DRY RUN (no files will be modified) ===\n")
 
     raw = config_path.read_text()
-    new_raw, stats = apply_summary_to_config(
-        raw,
-        summary,
-        log=print,
-        min_promote_publishers=args.min_publishers,
-        write_session_fields=args.asset_class in SESSION_LEVEL_ASSET_CLASSES,
-    )
+    try:
+        new_raw, stats = apply_summary_to_config(
+            raw,
+            summary,
+            log=print,
+            min_promote_publishers=args.min_publishers,
+        )
+    except ValueError as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
 
     changed = stats["promoted"] + stats["sessions_added"]
     if not args.dry_run and changed > 0:

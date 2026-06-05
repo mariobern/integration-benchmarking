@@ -1,9 +1,27 @@
 # Apply Allowed Publishers to Config (apply_allowed_to_config.py)
 
 Applies the **"allowed" sheet** of a `dq_summary_<cluster>_<date>.xlsx`
-(produced by `lazer_dq/summarize_feeds.py`) directly into `after.json` /
-`after_1.json`. It promotes `COMING_SOON` feeds to `STABLE` on their
-DQ-vetted publisher lists and additively adds missing sessions to live feeds.
+(produced by `lazer_dq/summarize_feeds.py`) directly into a session-only
+config (`lazer_update.json` era). It promotes `COMING_SOON` feeds to `STABLE`
+on their DQ-vetted publisher lists and additively adds missing sessions to live
+feeds.
+
+## Config format (new format only)
+
+This tool targets the session-level config format (`lazer_update.json` era):
+publisher lists live ONLY inside `marketSchedules` session entries — there is
+no feed-level `allowedPublisherIds`. The tool refuses to run against
+old-format files (clear error at startup).
+
+- Promotion writes per-session `allowedPublisherIds` and sets the feed-level
+  `minPublishers` to 2.
+- Session-level `minPublishers` is written only for `Equity.US.*` feeds
+  (us-equities is the only asset class that carries it). hk-equities and all
+  other classes get the session publisher list plus the feed-level
+  `minPublishers` — their session entries never gain a `minPublishers` key.
+- There is no `--asset-class` flag anymore: the workbook's session rows drive
+  which sessions are written (hk workbooks emit only REGULAR rows), and
+  US-equity detection is automatic by symbol prefix.
 
 ## Usage
 
@@ -13,16 +31,11 @@ python3 -m lazer_dq.apply_allowed_to_config \
     --xlsx dq_summary_lazer-prod_2026-05-20.xlsx \
     --config after_1.json --min-publishers 2 --dry-run
 
-# us-equities (default asset class): writes per-session fields, drops
-# publisher-less sessions. Backs up to after_1.json.bak first.
+# Write per-session fields, drop publisher-less sessions.
+# Backs up to after_1.json.bak first.
 python3 -m lazer_dq.apply_allowed_to_config \
     --xlsx dq_summary_lazer-prod_2026-05-20.xlsx \
     --config after_1.json --min-publishers 2
-
-# hk-equities: top-level allowedPublisherIds + minPublishers only.
-python3 -m lazer_dq.apply_allowed_to_config \
-    --xlsx dq_summary_lazer-prod_2026-05-22.xlsx \
-    --config after_1.json --asset-class hk-equities --min-publishers 2
 ```
 
 Run once per workbook (each file is one asset class / one date).
@@ -50,52 +63,51 @@ roles:
 
 ## Arguments
 
-| Argument           | Description                                                             | Required |
-| ------------------ | ----------------------------------------------------------------------- | -------- |
-| `--xlsx`           | dq_summary workbook (reads the `allowed` tab)                           | Yes      |
-| `--config`         | after.json / after_1.json                                               | Yes      |
-| `--dry-run`        | Preview changes without writing                                         | No       |
-| `--min-publishers` | Min surviving publishers to promote a COMING_SOON feed (default: `3`)   | No       |
-| `--asset-class`    | `us-equities` (default) or `hk-equities` — see session-level note below | No       |
+| Argument           | Description                                                           | Required |
+| ------------------ | --------------------------------------------------------------------- | -------- |
+| `--xlsx`           | dq_summary workbook (reads the `allowed` tab)                         | Yes      |
+| `--config`         | session-only config (e.g. `after_1.json` / `lazer_update.json`)       | Yes      |
+| `--dry-run`        | Preview changes without writing                                       | No       |
+| `--min-publishers` | Min surviving publishers to promote a COMING_SOON feed (default: `3`) | No       |
 
 ## Per-(feed, session) rules
 
-| Feed state  | Session in feed?       | Summary has list? | Action                                                  |
-| ----------- | ---------------------- | ----------------- | ------------------------------------------------------- |
-| COMING_SOON | yes                    | yes               | overwrite `allowedPublisherIds` + `minPublishers`       |
-| COMING_SOON | no                     | yes               | add the session entry                                   |
-| COMING_SOON | yes                    | no                | **drop the session** — see "no publisher-less sessions" |
-| COMING_SOON | (any session has data) | —                 | flip → STABLE; top-level = union, `minPublishers` 2     |
-| STABLE      | yes                    | yes               | leave untouched (live)                                  |
-| STABLE      | no                     | yes               | add the session entry; fold publishers into top-level   |
-| STABLE      | —                      | `(no data)`       | leave untouched                                         |
+| Feed state  | Session in feed?       | Summary has list? | Action                                                            |
+| ----------- | ---------------------- | ----------------- | ----------------------------------------------------------------- |
+| COMING_SOON | yes                    | yes               | overwrite session `allowedPublisherIds` (+ `minPublishers` on US) |
+| COMING_SOON | no                     | yes               | add the session entry                                             |
+| COMING_SOON | yes                    | no                | **drop the session** — see "no publisher-less sessions"           |
+| COMING_SOON | (any session has data) | —                 | flip → STABLE; feed-level `minPublishers: 2`                      |
+| STABLE      | yes                    | yes               | leave untouched (live)                                            |
+| STABLE      | no                     | yes               | add the session entry                                             |
+| STABLE      | —                      | `(no data)`       | leave untouched                                                   |
 
 - Only `COMING_SOON` and `STABLE` feeds are modified.
-- **No publisher-less sessions on promotion (us-equities).** When a COMING_SOON
-  feed is promoted, any `marketSchedules` session that has no publishers in the
-  summary (e.g. PRE/POST/OVERNIGHT showing `(no data)`) is **removed** from the
-  feed — a STABLE feed never carries a session that nobody prices. Only sessions
-  with publishers remain. (If those sessions later get publishers, a subsequent
-  run re-adds them.) STABLE feeds are not touched, so any pre-existing empty
-  session on a live feed is left as-is.
-- **Session-level fields are written only for `--asset-class us-equities`.** For
-  us-equities, each `marketSchedules` entry gets its own `allowedPublisherIds` +
-  `minPublishers` (and missing sessions are added). For every other asset class
-  (`hk-equities`, …) only the **top-level** `allowedPublisherIds` + `minPublishers`
-  are set; the single REGULAR `marketSchedules` entry is left exactly as-is (no
-  session-level `allowedPublisherIds`/`minPublishers` added).
-- Added sessions (us-equities only) copy `benchmarkMapping` from the feed's
+- **No publisher-less sessions on promotion.** When a COMING_SOON feed is
+  promoted, any `marketSchedules` session that has no publishers in the summary
+  (e.g. PRE/POST/OVERNIGHT showing `(no data)`) is **removed** from the feed —
+  a STABLE feed never carries a session that nobody prices. Only sessions with
+  publishers remain. (If those sessions later get publishers, a subsequent run
+  re-adds them.) STABLE feeds are not touched, so any pre-existing empty session
+  on a live feed is left as-is.
+- **Session-level `minPublishers` only for `Equity.US.*` feeds.** For US-equity
+  feeds, each `marketSchedules` entry gets its own `allowedPublisherIds` +
+  `minPublishers` (missing sessions are added). For all other asset classes
+  (hk-equities, fx, metals, …) only the session's `allowedPublisherIds` is
+  written — session entries never gain a `minPublishers` key. US-equity detection
+  is automatic by symbol prefix (`Equity.US.`).
+- Added sessions (US-equity feeds only) copy `benchmarkMapping` from the feed's
   REGULAR session and use the standard US-equity `marketSchedule` template.
 - `minPublishers`: per-session REGULAR 3 (→2 when ≤5 publishers), PRE/POST 2,
-  OVERNIGHT 1 (us-equities only); top-level set to 2 on COMING_SOON promotion
-  (all asset classes).
+  OVERNIGHT 1 (US-equity feeds only); feed-level set to 2 on COMING_SOON
+  promotion (all asset classes).
 - Publishers `{0, 1, 9, 13, 15}` (aggregate sentinel + Lazer) are stripped from
   every list defensively, with a warning.
 - A COMING_SOON feed is promoted **only if at least `--min-publishers` survive
   filtering** (across all sessions; default 3). Feeds below the threshold have
   insufficient redundancy and are left `COMING_SOON`, reported as
   "Skipped (<N publishers after filter)" — never promoted to STABLE. (At the
-  default of 3 this also guarantees the top-level `minPublishers: 2` is
+  default of 3 this also guarantees the feed-level `minPublishers: 2` is
   satisfiable. Lower it, e.g. `--min-publishers 2`, for asset classes with
   fewer publishers such as hk-equities.)
 

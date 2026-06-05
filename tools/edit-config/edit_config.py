@@ -189,6 +189,16 @@ def main(argv: list[str] | None = None) -> int:
     raw = config_path.read_text(encoding="utf-8")
     data = json.loads(raw)
     feeds = data["feeds"]
+    old_format = [f["feedId"] for f in feeds if "allowedPublisherIds" in f]
+    if old_format:
+        print(
+            f"ERROR: config contains feed-level allowedPublisherIds (old "
+            f"format) on {len(old_format)} feed(s), e.g. {old_format[:5]}.\n"
+            f"This tool now supports only the session-level format "
+            f"(lazer_update.json era).",
+            file=sys.stderr,
+        )
+        return 1
     print(f"Reading {config_path} ({len(feeds)} feeds)...")
 
     # Build plan

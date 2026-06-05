@@ -101,6 +101,9 @@ set `minPublishers`, set feed state, or fill RIC mappings across a feed range.
 
 - Key ops: `--add-publisher` / `--remove-publisher`, `--set-min-publishers`,
   `--set-state`, `--set-ric-mapping --from-csv <lseg.csv>`, `--feed-id 1000-1050`.
+- _Since PR #40 (Jun 2026):_ targets the session-only config format
+  (`lazer_update.json` era) — publisher ops edit session lists (REGULAR by
+  default), and old-format files like `after.json` are rejected at startup.
 
 **`tools/session-editor/session_editor.py`** — [docs/session_editor.md](session_editor.md)
 Adds or removes market sessions (REGULAR / PRE_MARKET / POST_MARKET /
@@ -168,6 +171,10 @@ feeds without disturbing their live sessions. Shares `lib/json_surgery.py` with
 the other config tools.
 
 - Key flags: `--xlsx dq_summary_*.xlsx`, `--config after_1.json`, `--dry-run`.
+- _Since PR #40 (Jun 2026):_ targets the session-only config format
+  (`lazer_update.json` era) — publisher lists are written only into session
+  entries, session-level `minPublishers` only for `Equity.US.*` feeds, the
+  `--asset-class` flag is gone, and old-format configs are rejected.
 
 > **Pipeline-vs-CSV note:** `apply_allowed_to_config` consumes the
 > `summarize_feeds` `.xlsx` (DQ pipeline). The older `update_config_from_summary.py`

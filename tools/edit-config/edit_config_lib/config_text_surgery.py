@@ -202,3 +202,51 @@ def find_ric_identifier_spans(block: str) -> list[tuple[int, int, str]]:
             out.append((abs_start, abs_end, value))
     out.sort(key=lambda t: t[0])
     return out
+
+
+def insert_field_after_open_brace(block: str, field_text: str) -> str:
+    """Insert `field_text` (e.g. '"allowedPublisherIds": [ 80 ],') as a new
+    line right after the block's opening '{', indented to match the block's
+    existing fields.
+
+    `field_text` must carry its own trailing comma; a session entry always has
+    at least the "session" field after the insertion point, so the comma is
+    always valid.
+    """
+    brace = block.index("{")
+    m = re.search(r'\n(\s*)"', block)
+    if m:
+        indent = m.group(1)
+        nl = block.index("\n", brace)
+        return block[: nl + 1] + indent + field_text + "\n" + block[nl + 1 :]
+    # single-line fallback: '{ <field> ...'
+    return block[: brace + 1] + " " + field_text + block[brace + 1 :]
+
+
+def insert_field_before_session(block: str, field_text: str) -> str:
+    """Insert `field_text` (e.g. '"minPublishers": 3,') on its own line just
+    before the block's "session" key — the canonical position for
+    minPublishers (...marketSchedule, minPublishers, session). Falls back to
+    insert_field_after_open_brace when no "session" key exists.
+    """
+    m = re.search(r'\n(\s*)"session"\s*:', block)
+    if m is None:
+        return insert_field_after_open_brace(block, field_text)
+    indent = m.group(1)
+    pos = m.start() + 1  # just after the newline preceding the "session" line
+    return block[:pos] + indent + field_text + "\n" + block[pos:]
+
+
+def find_marketschedules_end(block: str) -> int:
+    """Return the offset just past the marketSchedules array's closing ']',
+    or 0 when the block has no marketSchedules array. Used to scope feed-level
+    minPublishers lookups to the tail of a feed block (the feed-level value
+    sits AFTER marketSchedules in the canonical layout)."""
+    idx = block.find('"marketSchedules":')
+    if idx < 0:
+        return 0
+    open_idx = block.find("[", idx)
+    if open_idx < 0:
+        return 0
+    close = find_matching_close(block, open_idx)
+    return 0 if close is None else close + 1

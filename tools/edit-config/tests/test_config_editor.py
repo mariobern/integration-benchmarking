@@ -474,21 +474,6 @@ class TestApplyChanges:
     def setup_method(self):
         self.raw = FIXTURE_PATH.read_text(encoding="utf-8")
 
-    def test_publisher_top_level_change(self):
-        change = Change(
-            feed_id=1,
-            symbol="Crypto.BTC/USD",
-            location="top_level",
-            field="allowedPublisherIds",
-            before=[1, 3, 7, 11],
-            after=[1, 3, 7, 11, 80],
-        )
-        new_raw = apply_changes(self.raw, [change])
-        # Locate the feed 1 block in the result
-        new_data = json.loads(new_raw)
-        f = next(x for x in new_data["feeds"] if x["feedId"] == 1)
-        assert f["allowedPublisherIds"] == [1, 3, 7, 11, 80]
-
     def test_publisher_session_change(self):
         change = Change(
             feed_id=922,
@@ -552,12 +537,10 @@ class TestApplyChanges:
             Change(
                 feed_id=922,
                 symbol="X",
-                location="top_level",
+                location="REGULAR",
                 field="allowedPublisherIds",
                 before=[
-                    11,
                     12,
-                    13,
                     14,
                     19,
                     20,
@@ -565,7 +548,6 @@ class TestApplyChanges:
                     22,
                     26,
                     29,
-                    32,
                     35,
                     41,
                     42,
@@ -573,19 +555,14 @@ class TestApplyChanges:
                     48,
                     54,
                     55,
-                    57,
                     59,
                     64,
                     65,
                     69,
                     71,
-                    72,
-                    73,
                 ],
                 after=[
-                    11,
                     12,
-                    13,
                     14,
                     19,
                     20,
@@ -593,7 +570,6 @@ class TestApplyChanges:
                     22,
                     26,
                     29,
-                    32,
                     35,
                     41,
                     42,
@@ -601,14 +577,11 @@ class TestApplyChanges:
                     48,
                     54,
                     55,
-                    57,
                     59,
                     64,
                     65,
                     69,
                     71,
-                    72,
-                    73,
                     80,
                 ],
             ),
@@ -624,8 +597,8 @@ class TestApplyChanges:
         new_raw = apply_changes(self.raw, changes)
         new_data = json.loads(new_raw)
         f = next(x for x in new_data["feeds"] if x["feedId"] == 922)
-        assert 80 in f["allowedPublisherIds"]
         regular = next(s for s in f["marketSchedules"] if s["session"] == "REGULAR")
+        assert 80 in regular["allowedPublisherIds"]
         assert regular["minPublishers"] == 4
 
     def test_multiple_changes_different_feeds(self):
@@ -656,6 +629,121 @@ class TestApplyChanges:
 
     def test_empty_changes_is_identity(self):
         assert apply_changes(self.raw, []) == self.raw
+
+
+class TestApplyChangesInserts:
+    """Insert-when-absent: the new config format ships session entries without
+    allowedPublisherIds / minPublishers keys; the applier must create them."""
+
+    RAW = """{
+  "feeds": [
+    {
+      "feedId": 5000,
+      "symbol": "Crypto.NEW/USD",
+      "marketSchedules": [
+        {
+          "marketSchedule": "America/New_York;O,O,O,O,O,O,O;",
+          "session": "REGULAR"
+        }
+      ],
+      "minPublishers": 3,
+      "state": "COMING_SOON"
+    }
+  ]
+}"""
+
+    def test_inserts_session_publisher_list(self):
+        change = Change(
+            feed_id=5000,
+            symbol="Crypto.NEW/USD",
+            location="REGULAR",
+            field="allowedPublisherIds",
+            before=None,
+            after=[80],
+        )
+        out = apply_changes(self.RAW, [change])
+        reg = json.loads(out)["feeds"][0]["marketSchedules"][0]
+        assert reg["allowedPublisherIds"] == [80]
+        assert reg["session"] == "REGULAR"  # entry still intact
+
+    def test_inserts_session_min_publishers_before_session_key(self):
+        change = Change(
+            feed_id=5000,
+            symbol="Crypto.NEW/USD",
+            location="REGULAR",
+            field="minPublishers",
+            before=None,
+            after=2,
+        )
+        out = apply_changes(self.RAW, [change])
+        reg = json.loads(out)["feeds"][0]["marketSchedules"][0]
+        assert reg["minPublishers"] == 2
+        keys = list(reg.keys())
+        assert keys.index("minPublishers") == keys.index("session") - 1
+
+    def test_two_inserts_into_same_session_entry(self):
+        # e.g. a YAML spec with add_publisher + set_min_publishers in one run.
+        changes = [
+            Change(
+                feed_id=5000,
+                symbol="Crypto.NEW/USD",
+                location="REGULAR",
+                field="allowedPublisherIds",
+                before=None,
+                after=[80, 81],
+            ),
+            Change(
+                feed_id=5000,
+                symbol="Crypto.NEW/USD",
+                location="REGULAR",
+                field="minPublishers",
+                before=None,
+                after=2,
+            ),
+        ]
+        out = apply_changes(self.RAW, changes)
+        reg = json.loads(out)["feeds"][0]["marketSchedules"][0]
+        assert reg["allowedPublisherIds"] == [80, 81]
+        assert reg["minPublishers"] == 2
+
+    def test_replaces_null_session_publishers(self):
+        raw = self.RAW.replace(
+            '"marketSchedule": "America/New_York;O,O,O,O,O,O,O;",',
+            '"allowedPublisherIds": null,\n          '
+            '"marketSchedule": "America/New_York;O,O,O,O,O,O,O;",',
+        )
+        change = Change(
+            feed_id=5000,
+            symbol="Crypto.NEW/USD",
+            location="REGULAR",
+            field="allowedPublisherIds",
+            before=None,
+            after=[1, 2],
+        )
+        out = apply_changes(raw, [change])
+        reg = json.loads(out)["feeds"][0]["marketSchedules"][0]
+        assert reg["allowedPublisherIds"] == [1, 2]
+        assert "null" not in out
+
+    def test_feed_level_min_publishers_still_works_after_sessions(self):
+        # Feed-level minPublishers sits AFTER marketSchedules; the lookup must
+        # not match the session's value.
+        raw = self.RAW.replace(
+            '"session": "REGULAR"',
+            '"minPublishers": 1,\n          "session": "REGULAR"',
+        )
+        change = Change(
+            feed_id=5000,
+            symbol="Crypto.NEW/USD",
+            location="top_level",
+            field="minPublishers",
+            before=3,
+            after=2,
+        )
+        out = apply_changes(raw, [change])
+        feed = json.loads(out)["feeds"][0]
+        assert feed["minPublishers"] == 2
+        assert feed["marketSchedules"][0]["minPublishers"] == 1  # untouched
 
 
 import shutil
