@@ -14,6 +14,10 @@ from typing import Any
 
 SESSION_NAMES: tuple[str, ...] = ("REGULAR", "PRE_MARKET", "POST_MARKET", "OVER_NIGHT")
 
+# Session-level minPublishers is a us-equities-only concept in the new config
+# format; every other asset class takes minPublishers at the feed level only.
+US_EQUITY_SYMBOL_PREFIX = "Equity.US."
+
 
 @dataclass(frozen=True)
 class Change:
@@ -39,17 +43,47 @@ class OpError(Exception):
     """Raised by ops on validation errors that should block apply."""
 
 
-def has_session_publishers(feed: dict) -> bool:
-    """True if any marketSchedule entry has an `allowedPublisherIds` field."""
-    return any("allowedPublisherIds" in s for s in feed.get("marketSchedules", []))
-
-
 def get_session(feed: dict, session_name: str) -> dict | None:
     """Return the session entry with the given name, or None."""
     for s in feed.get("marketSchedules", []):
         if s.get("session") == session_name:
             return s
     return None
+
+
+def is_us_equity(feed: dict) -> bool:
+    """True for feeds that may carry session-level minPublishers."""
+    return feed.get("symbol", "").startswith(US_EQUITY_SYMBOL_PREFIX)
+
+
+def _session_publisher_union(feed: dict) -> list[int]:
+    """Union of every session's allowedPublisherIds — the effective feed
+    roster, now that no feed-level allowedPublisherIds exists."""
+    ids: set[int] = set()
+    for s in feed.get("marketSchedules", []):
+        ids.update(s.get("allowedPublisherIds") or [])
+    return sorted(ids)
+
+
+def _resolve_publisher_sessions(feed: dict, session: str | None) -> list[str]:
+    """Session names a publisher op targets.
+
+    Publisher lists live ONLY in marketSchedules entries in the new config
+    format; there is no feed-level roster, so session=NONE is invalid here.
+    """
+    feed_id = feed["feedId"]
+    if session is None:
+        return ["REGULAR"]
+    if session == "ALL":
+        return [s["session"] for s in feed.get("marketSchedules", [])]
+    if session == "NONE":
+        raise OpError(
+            f"feed {feed_id}: session=NONE is invalid for publisher ops — "
+            f"the new config format has no feed-level allowedPublisherIds"
+        )
+    if session in SESSION_NAMES:
+        return [session]
+    raise OpError(f"unknown session value: {session!r}")
 
 
 def _add_publisher_to_list(
@@ -71,69 +105,37 @@ def _add_publisher_to_list(
 @dataclass
 class AddPublisher:
     publisher_id: int
-    session: str | None = (
-        None  # None|REGULAR|PRE_MARKET|POST_MARKET|OVER_NIGHT|ALL|NONE
-    )
+    session: str | None = None  # None|REGULAR|PRE_MARKET|POST_MARKET|OVER_NIGHT|ALL
 
     def apply(self, feed: dict) -> tuple[list[Change], list[Warning]]:
         changes: list[Change] = []
-        warnings: list[Warning] = []
         feed_id = feed["feedId"]
         symbol = feed.get("symbol", "")
 
-        # Determine which lists to touch. We only target fields that already exist
-        # in the parsed dict — text-surgery cannot insert missing fields. A missing
-        # top-level allowedPublisherIds emits a Warning and skips that target.
-        targets: list[tuple[str, list[int]]] = []  # (location, list ref)
-
-        def _want_top_level() -> None:
-            if "allowedPublisherIds" in feed:
-                targets.append(("top_level", feed["allowedPublisherIds"]))
-            else:
-                warnings.append(
-                    Warning(
+        for name in _resolve_publisher_sessions(feed, self.session):
+            sess = get_session(feed, name)
+            if sess is None:
+                raise OpError(
+                    f"feed {feed_id}: session {name!r} does not exist on this feed"
+                )
+            if "allowedPublisherIds" not in sess or sess["allowedPublisherIds"] is None:
+                # Missing (or null) list: create it. before=None marks
+                # "field absent — insert" for the diff and the text applier.
+                sess["allowedPublisherIds"] = [self.publisher_id]
+                changes.append(
+                    Change(
                         feed_id=feed_id,
                         symbol=symbol,
-                        message=(
-                            f"feed {feed_id}: no top-level allowedPublisherIds — "
-                            f"skipped (cannot insert new field via text surgery)"
-                        ),
+                        location=name,
+                        field="allowedPublisherIds",
+                        before=None,
+                        after=[self.publisher_id],
                     )
                 )
-
-        if self.session is None:
-            # Default scope
-            _want_top_level()
-            if has_session_publishers(feed):
-                regular = get_session(feed, "REGULAR")
-                if regular is not None and "allowedPublisherIds" in regular:
-                    targets.append(("REGULAR", regular["allowedPublisherIds"]))
-        elif self.session == "NONE":
-            _want_top_level()
-        elif self.session == "ALL":
-            if not has_session_publishers(feed):
-                raise OpError(
-                    f"feed {feed_id}: session=ALL requires per-session publisher lists; "
-                    f"feed has no per-session lists"
-                )
-            _want_top_level()
-            for name in SESSION_NAMES:
-                sess = get_session(feed, name)
-                if sess is not None and "allowedPublisherIds" in sess:
-                    targets.append((name, sess["allowedPublisherIds"]))
-        elif self.session in SESSION_NAMES:
-            sess = get_session(feed, self.session)
-            if sess is None or "allowedPublisherIds" not in sess:
-                raise OpError(
-                    f"feed {feed_id}: session {self.session!r} does not exist on this feed"
-                )
-            _want_top_level()
-            targets.append((self.session, sess["allowedPublisherIds"]))
-        else:
-            raise OpError(f"unknown session value: {self.session!r}")
-
-        for location, ref in targets:
-            result = _add_publisher_to_list(ref, self.publisher_id)
+                continue
+            result = _add_publisher_to_list(
+                sess["allowedPublisherIds"], self.publisher_id
+            )
             if result is None:
                 continue
             before, after = result
@@ -141,14 +143,14 @@ class AddPublisher:
                 Change(
                     feed_id=feed_id,
                     symbol=symbol,
-                    location=location,
+                    location=name,
                     field="allowedPublisherIds",
                     before=before,
                     after=after,
                 )
             )
 
-        return changes, warnings
+        return changes, []
 
 
 def _remove_from_list(
@@ -196,65 +198,22 @@ class RemovePublisher:
         feed_id = feed["feedId"]
         symbol = feed.get("symbol", "")
 
-        # location, list ref, min_publishers
-        targets: list[tuple[str, list[int], int | None]] = []
+        names = _resolve_publisher_sessions(feed, self.session)
+        explicit = self.session in SESSION_NAMES
+        feed_min = feed.get("minPublishers")
 
-        if self.session is None:
-            # Default: remove from everywhere (top-level + every session list).
-            targets.append(
-                (
-                    "top_level",
-                    feed.get("allowedPublisherIds", []),
-                    feed.get("minPublishers"),
-                )
-            )
-            for name in SESSION_NAMES:
-                sess = get_session(feed, name)
-                if sess and "allowedPublisherIds" in sess:
-                    targets.append(
-                        (name, sess["allowedPublisherIds"], sess.get("minPublishers"))
+        for name in names:
+            sess = get_session(feed, name)
+            if sess is None:
+                if explicit:
+                    raise OpError(
+                        f"feed {feed_id}: session {name!r} does not exist "
+                        f"on this feed"
                     )
-        elif self.session == "NONE":
-            targets.append(
-                (
-                    "top_level",
-                    feed.get("allowedPublisherIds", []),
-                    feed.get("minPublishers"),
-                )
-            )
-        elif self.session == "ALL":
-            # Mirror AddPublisher: "ALL" means top-level + every per-session list.
-            if "allowedPublisherIds" in feed:
-                targets.append(
-                    (
-                        "top_level",
-                        feed["allowedPublisherIds"],
-                        feed.get("minPublishers"),
-                    )
-                )
-            for name in SESSION_NAMES:
-                sess = get_session(feed, name)
-                if sess and "allowedPublisherIds" in sess:
-                    targets.append(
-                        (name, sess["allowedPublisherIds"], sess.get("minPublishers"))
-                    )
-        elif self.session in SESSION_NAMES:
-            sess = get_session(feed, self.session)
-            if sess is None or "allowedPublisherIds" not in sess:
-                raise OpError(
-                    f"feed {feed_id}: session {self.session!r} does not exist on this feed"
-                )
-            targets.append(
-                (
-                    self.session,
-                    sess["allowedPublisherIds"],
-                    sess.get("minPublishers"),
-                )
-            )
-        else:
-            raise OpError(f"unknown session value: {self.session!r}")
-
-        for location, ref, min_pub in targets:
+                continue
+            ref = sess.get("allowedPublisherIds")
+            if not ref:
+                continue  # nothing to remove from a missing/empty list
             result = _remove_from_list(ref, self.publisher_id)
             if result is None:
                 continue
@@ -263,32 +222,19 @@ class RemovePublisher:
                 Change(
                     feed_id=feed_id,
                     symbol=symbol,
-                    location=location,
+                    location=name,
                     field="allowedPublisherIds",
                     before=before,
                     after=after,
                 )
             )
-            warn = _check_at_floor(feed_id, symbol, location, after, min_pub)
+            # Headroom check: session minPublishers when present, else the
+            # feed-level value (still enforced in the new format).
+            warn = _check_at_floor(
+                feed_id, symbol, name, after, sess.get("minPublishers", feed_min)
+            )
             if warn is not None:
                 warnings.append(warn)
-
-        # session=NONE: warn if publisher still in any session list
-        if self.session == "NONE":
-            for name in SESSION_NAMES:
-                sess = get_session(feed, name)
-                if sess and self.publisher_id in sess.get("allowedPublisherIds", []):
-                    warnings.append(
-                        Warning(
-                            feed_id=feed_id,
-                            symbol=symbol,
-                            message=(
-                                f"feed {feed_id}: publisher {self.publisher_id} "
-                                f"still in session {name} but not in top-level roster"
-                            ),
-                        )
-                    )
-                    break
 
         return changes, warnings
 
@@ -297,33 +243,42 @@ def _resolve_min_pub_targets(
     feed: dict,
     session: str | None,
 ) -> list[tuple[str, dict, str]]:
-    """Return list of (location, container, key) tuples.
+    """Return list of (location, container, key) tuples for minPublishers ops.
 
-    `container` is the dict that holds the field; `key` is "minPublishers".
-    Used by SetMinPublishers and BumpMinPublishers.
+    Feed-level minPublishers exists on every feed and stays editable.
+    Session-level minPublishers is a us-equities-only concept: non-US feeds
+    never get session targets, and explicitly asking for one is an error.
+    Session targets are limited to entries that already have a publisher list
+    (a publisher-less session has nothing to satisfy a floor against).
     """
     feed_id = feed["feedId"]
+    us = is_us_equity(feed)
     targets: list[tuple[str, dict, str]] = []
 
     if session is None:
         targets.append(("top_level", feed, "minPublishers"))
-        if has_session_publishers(feed):
+        if us:
             regular = get_session(feed, "REGULAR")
-            if regular is not None:
+            if regular is not None and regular.get("allowedPublisherIds"):
                 targets.append(("REGULAR", regular, "minPublishers"))
     elif session == "NONE":
         targets.append(("top_level", feed, "minPublishers"))
     elif session == "ALL":
-        if not has_session_publishers(feed):
-            raise OpError(f"feed {feed_id}: session=ALL requires per-session lists")
         targets.append(("top_level", feed, "minPublishers"))
-        for name in SESSION_NAMES:
-            sess = get_session(feed, name)
-            if sess and "allowedPublisherIds" in sess:
-                targets.append((name, sess, "minPublishers"))
+        if us:
+            for s in feed.get("marketSchedules", []):
+                if s.get("allowedPublisherIds"):
+                    targets.append((s["session"], s, "minPublishers"))
     elif session in SESSION_NAMES:
+        if not us:
+            raise OpError(
+                f"feed {feed_id} ({feed.get('symbol', '')}): session-level "
+                f"minPublishers is a us-equities-only concept; this feed "
+                f"takes minPublishers at the feed level (omit --session or "
+                f"use --session NONE)"
+            )
         sess = get_session(feed, session)
-        if sess is None or "allowedPublisherIds" not in sess:
+        if sess is None:
             raise OpError(
                 f"feed {feed_id}: session {session!r} does not exist on this feed"
             )
@@ -336,9 +291,11 @@ def _resolve_min_pub_targets(
 
 def _list_for_target(feed: dict, location: str) -> list[int]:
     if location == "top_level":
-        return feed.get("allowedPublisherIds", [])
+        # No feed-level roster exists in the new format; validate against the
+        # union of all session lists.
+        return _session_publisher_union(feed)
     sess = get_session(feed, location)
-    return sess.get("allowedPublisherIds", []) if sess else []
+    return (sess.get("allowedPublisherIds") or []) if sess else []
 
 
 @dataclass
@@ -427,8 +384,8 @@ class BumpMinPublishers:
         # doesn't leave earlier targets partially mutated.
         for location, container, key in targets:
             allowed = _list_for_target(feed, location)
-            old = container.get(key, 0)
-            new = max(1, old + self.delta)
+            old = container.get(key)
+            new = max(1, (old or 0) + self.delta)
             if new > len(allowed):
                 raise OpError(
                     f"feed {feed_id} {location}: bumped minPublishers={new} "
@@ -437,8 +394,8 @@ class BumpMinPublishers:
 
         for location, container, key in targets:
             allowed = _list_for_target(feed, location)
-            old = container.get(key, 0)
-            new = max(1, old + self.delta)
+            old = container.get(key)
+            new = max(1, (old or 0) + self.delta)
             if new == old:
                 continue
             container[key] = new

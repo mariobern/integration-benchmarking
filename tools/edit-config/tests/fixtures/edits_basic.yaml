@@ -26,4 +26,3 @@ operations:
   - op: add_publisher
     publisher_id: 90
     feed_id: [1, "100-101", 5000]
-    session: NONE
