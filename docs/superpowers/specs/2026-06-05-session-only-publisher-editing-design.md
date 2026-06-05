@@ -33,11 +33,10 @@ top-level targets.
 2. **Format guard.** Both tools refuse to run (clear error) if any feed in
    the config has a feed-level `allowedPublisherIds` key, preventing
    accidental half-edits of legacy files.
-3. **Default scope = REGULAR.** `--add-publisher`, `--remove-publisher`,
-   `--set-min-publishers`, and `--bump-min-publishers` without `--session`
-   target only the REGULAR session entry (always present in the new format).
-   This includes remove: pulling a publisher from all sessions requires
-   `--session ALL`.
+3. **Default scope = REGULAR for publisher ops.** `--add-publisher` and
+   `--remove-publisher` without `--session` target only the REGULAR session
+   entry (always present in the new format). This includes remove: pulling a
+   publisher from all sessions requires `--session ALL`.
 4. **Insert missing keys.** Ops targeting a session entry that lacks the
    field (`allowedPublisherIds` or `minPublishers`) insert it rather than
    warn/error.
@@ -45,9 +44,14 @@ top-level targets.
    written into the feed's REGULAR session entry. The hk/us split
    (`--asset-class`, `write_session_fields`) is deleted; the allowed sheet's
    session rows drive everything (hk workbooks already emit `REGULAR` rows).
-6. **minPublishers writes are session-only too.** Neither tool writes the
-   feed-level `minPublishers` anymore (apply_allowed previously set it to 2
-   on promotion). It may still be _read_ (see headroom warning below).
+6. **minPublishers stays two-level.** Feed-level `minPublishers` still
+   exists in the new format and both tools keep writing it: apply_allowed
+   keeps setting it to 2 on promotion, and the edit_config min-publishers
+   ops keep their old scope semantics (default = feed-level + REGULAR,
+   `NONE` = feed-level only, `ALL` = feed-level + every session). Only
+   `allowedPublisherIds` moves session-only. Because the feed-level roster
+   is gone, the feed-level `minPublishers` is validated against the union
+   of all session `allowedPublisherIds`.
 7. **Out of scope:** `update_config_from_summary.py`,
    `update_min_publishers.py`, `config_linter.py`, `update_lazer_symbols.py`
    and any other config-touching tool. They are updated later if/when run
@@ -78,7 +82,7 @@ not import from each other today).
 
 **Deleted:**
 
-- `set_top_level_allowed()`, `set_top_level_min_publishers()`
+- `set_top_level_allowed()`
 - `SESSION_LEVEL_ASSET_CLASSES`, `KNOWN_ASSET_CLASSES`
 - the `--asset-class` CLI flag
 - the `write_session_fields` parameter of `apply_summary_to_config()`
@@ -93,13 +97,15 @@ not import from each other today).
 - `overwrite_session` / `add_session` / `remove_session` text-surgery
   mechanics, and per-session `minPublishers` defaults via
   `get_min_publishers()`.
+- `set_top_level_min_publishers()` and the top-level `minPublishers: 2`
+  write on promotion (feed-level minPublishers still exists in the new
+  format).
 
 **Changed flows:**
 
 - **COMING_SOON promotion:** state → STABLE plus per-session
-  overwrite/add/remove, exactly as today, minus the two top-level writes
-  (roster union and `minPublishers: 2`). The feed's existing top-level
-  `minPublishers` is left untouched.
+  overwrite/add/remove, exactly as today, minus the top-level roster-union
+  write. The top-level `minPublishers: 2` write is kept.
 - **STABLE additive:** adds missing sessions only; the "union new publishers
   into the top-level roster" step is deleted. `skipped_stable_no_change`
   now simply means "no sessions added".
@@ -108,15 +114,28 @@ not import from each other today).
 
 ### 3. `edit_config.py` — ops lose the top level
 
-**Scope semantics** (applies to AddPublisher, RemovePublisher,
-SetMinPublishers, BumpMinPublishers):
+**Scope semantics — publisher ops** (AddPublisher, RemovePublisher):
 
 | `--session` value                                       | Meaning                                                   |
 | ------------------------------------------------------- | --------------------------------------------------------- |
 | _(omitted)_                                             | REGULAR session entry only                                |
 | `REGULAR` / `PRE_MARKET` / `POST_MARKET` / `OVER_NIGHT` | that session entry; `OpError` if the feed doesn't have it |
 | `ALL`                                                   | every session entry present on the feed                   |
-| `NONE`                                                  | **removed** from CLI choices and the YAML spec schema     |
+| `NONE`                                                  | `OpError` — no feed-level roster exists anymore           |
+
+**Scope semantics — min-publishers ops** (SetMinPublishers,
+BumpMinPublishers; unchanged from today since feed-level `minPublishers`
+still exists):
+
+| `--session` value                                       | Meaning                                                 |
+| ------------------------------------------------------- | ------------------------------------------------------- |
+| _(omitted)_                                             | feed-level + REGULAR session entry                      |
+| `REGULAR` / `PRE_MARKET` / `POST_MARKET` / `OVER_NIGHT` | that session entry only; `OpError` if the feed lacks it |
+| `ALL`                                                   | feed-level + every session entry present on the feed    |
+| `NONE`                                                  | feed-level only                                         |
+
+`NONE` therefore stays in the CLI choices and the YAML spec schema, but is
+valid only for the min-publishers ops.
 
 **Per-op behavior:**
 
@@ -128,14 +147,17 @@ SetMinPublishers, BumpMinPublishers):
   NOOP. The old `session=NONE` drift warning is deleted. The "no headroom"
   warning compares against the session's `minPublishers` when present, else
   falls back to the feed-level `minPublishers` (read-only).
-- `SetMinPublishers` / `BumpMinPublishers`: session entries only. A missing
-  session `minPublishers` key is inserted (placed on its own line just
-  before the `"session"` key, matching canonical field order). Validation
-  counts the session's `allowedPublisherIds` length; an absent key counts
-  as 0 publishers, so setting a positive value there is an unsatisfiable
-  error.
-- `SetState`, `--set-ric-mapping`, `--set-ric`: untouched. `state` is still
-  a feed-level field; the `top_level` Change location survives only for it.
+- `SetMinPublishers` / `BumpMinPublishers`: keep the feed-level target per
+  the scope table above. A missing session `minPublishers` key is inserted
+  (placed on its own line just before the `"session"` key, matching
+  canonical field order). Validation: a session value is checked against
+  that session's `allowedPublisherIds` length (absent key counts as 0
+  publishers, so setting a positive value there is an unsatisfiable error);
+  the feed-level value is checked against the **union of all session
+  `allowedPublisherIds`** (the old basis — the feed-level roster — no
+  longer exists). Headroom warnings use the same counts.
+- `SetState`, `--set-ric-mapping`, `--set-ric`: untouched. The `top_level`
+  Change location survives for `state` and feed-level `minPublishers`.
 
 **Text surgery** (`config_text_surgery.py` + `config_editor.py` applier):
 
@@ -144,8 +166,9 @@ SetMinPublishers, BumpMinPublishers):
   `_insert_field_after_open_brace` (for `allowedPublisherIds`) and
   `_insert_field_before_session` (for `minPublishers`), duplicated rather
   than cross-imported between the two tool packages.
-- The `top_level` branch keeps only the `state` field path; the
-  marketSchedules-tail scoping for top-level `minPublishers` is deleted.
+- The `top_level` branch keeps the `state` and `minPublishers` field paths,
+  including the marketSchedules-tail scoping that stops a feed-level
+  `minPublishers` lookup from matching a session's value.
 - `config_diff.py` renders inserts as `(absent) → [ … ]`.
 
 ### 4. Testing
@@ -155,8 +178,11 @@ SetMinPublishers, BumpMinPublishers):
   `allowedPublisherIds`); rewrite assertions that expect top-level writes.
 - New cases: format-guard rejection (both tools); insert-missing-key for
   publishers and minPublishers; REGULAR default scope; ALL scope;
-  hk-equities flowing through the session path; remove-publisher NOOP on a
-  session without the key.
+  `--session NONE` rejected for publisher ops but working for min ops;
+  feed-level minPublishers validated against the session-list union;
+  promotion still writes top-level `minPublishers: 2`; hk-equities flowing
+  through the session path; remove-publisher NOOP on a session without the
+  key.
 - Sanity runs against real data: `apply_allowed_to_config --dry-run` on a
   copy of `lazer_update.json` with a real dq_summary workbook;
   `edit_config --add-publisher … --dry-run` likewise; `json.loads`
