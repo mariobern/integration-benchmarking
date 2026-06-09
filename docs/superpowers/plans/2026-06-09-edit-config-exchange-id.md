@@ -17,7 +17,7 @@
 - An **exchange** entry: `{"exchangeId": 1, "name": "...", "assetClass": "EXCHANGE_ASSET_CLASS_EQUITY", "sessions": [{"session": "REGULAR", "marketSchedule": "America/New_York;..."}, ...]}`.
 - A **feed** may carry a top-level `"exchangeId": N`. When it does, its session entries (`marketSchedules[]`) carry **no** `marketSchedule` string — the schedule is inherited from the exchange. When it does not, each session entry carries its own `marketSchedule` string.
 - The editor never mutates parsed JSON and re-serializes; it splices the **raw text** to preserve formatting. `Change` records (feed_id, symbol, location, field, before, after, index) describe edits; `config_editor.apply_changes` applies them to raw text via `config_text_surgery` helpers.
-- **Change conventions:** `before is None` (and `after` set) = *insert a field that was absent*. This plan adds the mirror: `after is None` (and `before` set) = *delete the field*.
+- **Change conventions:** `before is None` (and `after` set) = _insert a field that was absent_. This plan adds the mirror: `after is None` (and `before` set) = _delete the field_.
 
 Run the full existing suite once before starting to confirm a green baseline:
 
@@ -25,6 +25,7 @@ Run the full existing suite once before starting to confirm a green baseline:
 cd /Users/mariobernardi/Documents/GitHub/integration-benchmarking
 python3 -m pytest tools/edit-config/tests/ -q
 ```
+
 Expected: all pass.
 
 ---
@@ -45,6 +46,7 @@ Expected: all pass.
 ## Task 1: `delete_scalar_field` text primitive
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config_lib/config_text_surgery.py`
 - Test: `tools/edit-config/tests/test_config_text_surgery.py`
 
@@ -135,6 +137,7 @@ git commit -m "feat(edit-config): add delete_scalar_field text primitive"
 ## Task 2: Exchange data helpers + test fixture
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config_lib/config_ops.py`
 - Create: `tools/edit-config/tests/fixtures/after_with_exchanges.json`
 - Test: `tools/edit-config/tests/test_config_ops.py`
@@ -151,10 +154,22 @@ Create `tools/edit-config/tests/fixtures/after_with_exchanges.json` with this ex
       "exchangeId": 1,
       "name": "NASDAQ Test Consolidated",
       "sessions": [
-        { "session": "REGULAR", "marketSchedule": "America/New_York;0930-1600;R" },
-        { "session": "PRE_MARKET", "marketSchedule": "America/New_York;0400-0930;P" },
-        { "session": "POST_MARKET", "marketSchedule": "America/New_York;1600-2000;A" },
-        { "session": "OVER_NIGHT", "marketSchedule": "America/New_York;2000-0400;O" }
+        {
+          "session": "REGULAR",
+          "marketSchedule": "America/New_York;0930-1600;R"
+        },
+        {
+          "session": "PRE_MARKET",
+          "marketSchedule": "America/New_York;0400-0930;P"
+        },
+        {
+          "session": "POST_MARKET",
+          "marketSchedule": "America/New_York;1600-2000;A"
+        },
+        {
+          "session": "OVER_NIGHT",
+          "marketSchedule": "America/New_York;2000-0400;O"
+        }
       ]
     },
     {
@@ -408,6 +423,7 @@ git commit -m "feat(edit-config): exchange data helpers + exchanges fixture"
 ## Task 3: `AddExchangeId` operation
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config_lib/config_ops.py`
 - Test: `tools/edit-config/tests/test_config_ops.py`
 
@@ -603,6 +619,7 @@ git commit -m "feat(edit-config): AddExchangeId op with schedule stripping"
 ## Task 4: `RemoveExchangeId` operation
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config_lib/config_ops.py`
 - Test: `tools/edit-config/tests/test_config_ops.py`
 
@@ -777,6 +794,7 @@ git commit -m "feat(edit-config): RemoveExchangeId op with schedule restore"
 ## Task 5: Applier support in `config_editor.py`
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config_lib/config_editor.py`
 - Test: `tools/edit-config/tests/test_config_editor.py`
 
@@ -921,6 +939,7 @@ git commit -m "feat(edit-config): apply exchangeId + marketSchedule field change
 ## Task 6: Diff rendering for exchangeId / marketSchedule
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config_lib/config_diff.py`
 - Test: `tools/edit-config/tests/test_config_diff.py`
 
@@ -1011,6 +1030,7 @@ git commit -m "feat(edit-config): render exchangeId/marketSchedule diff hunks"
 ## Task 7: CLI wiring + `build_op_from_args`
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config.py`
 - Modify: `tools/edit-config/edit_config_lib/config_editor.py`
 - Test: `tools/edit-config/tests/test_edit_config_cli.py`
@@ -1212,6 +1232,7 @@ git commit -m "feat(edit-config): --add-exchange-id / --remove-exchange-id CLI"
 ## Task 8: YAML spec support
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config_lib/config_editor.py`
 - Test: `tools/edit-config/tests/test_config_editor.py`
 
@@ -1349,6 +1370,7 @@ git commit -m "feat(edit-config): YAML spec support for exchange ops"
 ## Task 9: End-to-end round-trip test
 
 **Files:**
+
 - Test: `tools/edit-config/tests/test_edit_config_cli.py`
 
 Proves add-then-remove restores the per-session schedules and that the anomaly
@@ -1402,6 +1424,7 @@ git commit -m "test(edit-config): exchange add/remove round-trip + anomaly clean
 ## Task 10: Documentation
 
 **Files:**
+
 - Modify: `docs/edit_config.md`
 - Modify: `CLAUDE.md`
 
@@ -1411,8 +1434,8 @@ In `docs/edit_config.md`, add two rows to the Operations table (after the
 `--set-state` row):
 
 ```markdown
-| `--add-exchange-id N`                       | Assign exchange `N` and strip inherited `marketSchedule` strings |
-| `--remove-exchange-id`                      | Remove `exchangeId` and restore `marketSchedule` strings from the exchange |
+| `--add-exchange-id N` | Assign exchange `N` and strip inherited `marketSchedule` strings |
+| `--remove-exchange-id` | Remove `exchangeId` and restore `marketSchedule` strings from the exchange |
 ```
 
 - [ ] **Step 2: Add an "Exchange inheritance" section to `docs/edit_config.md`**
@@ -1456,7 +1479,7 @@ In `CLAUDE.md`, update the `edit_config.py` row in the Scripts table — extend 
 description to mention exchange ids. Change the existing cell:
 
 ```markdown
-| `tools/edit-config/edit_config.py`     | Surgical editor: add/remove publishers, set minPublishers, set state, set RIC identifiers, add/remove exchangeId (schedule inheritance) | `python3 tools/edit-config/edit_config.py --config after.json --add-publisher 80 --feed-id 1000-1050`  | [docs/edit_config.md](docs/edit_config.md)                               |
+| `tools/edit-config/edit_config.py` | Surgical editor: add/remove publishers, set minPublishers, set state, set RIC identifiers, add/remove exchangeId (schedule inheritance) | `python3 tools/edit-config/edit_config.py --config after.json --add-publisher 80 --feed-id 1000-1050` | [docs/edit_config.md](docs/edit_config.md) |
 ```
 
 Then update the "New config format (session-only publishers)" gotcha bullet at
@@ -1497,6 +1520,7 @@ pre-commit run --files \
   tools/edit-config/edit_config_lib/config_text_surgery.py \
   tools/edit-config/edit_config_lib/config_diff.py
 ```
+
 Expected: black/whitespace hooks pass (re-stage and re-commit if black reformats).
 
 - [ ] **Smoke-test against the real config (dry run, no write)**
@@ -1505,6 +1529,7 @@ Expected: black/whitespace hooks pass (re-stage and re-commit if black reformats
 python3 tools/edit-config/edit_config.py --config lazer_new.json \
   --add-exchange-id 1 --feed-id 956
 ```
+
 Expected: exit 0; dry-run diff shows `"exchangeId": 1` inserted and the four
 `marketSchedule` strings removed; ends with `[DRY RUN] No changes written.`
 
@@ -1512,6 +1537,7 @@ Expected: exit 0; dry-run diff shows `"exchangeId": 1` inserted and the four
 python3 tools/edit-config/edit_config.py --config lazer_new.json \
   --remove-exchange-id --feed-id 922
 ```
+
 Expected: exit 0; dry-run diff shows `exchangeId` removed and four
 `marketSchedule` strings restored from exchange 1.
 
@@ -1519,6 +1545,7 @@ Expected: exit 0; dry-run diff shows `exchangeId` removed and four
 python3 tools/edit-config/edit_config.py --config lazer_new.json \
   --add-exchange-id 99 --feed-id 956
 ```
+
 Expected: exit 1; `ERROR: --add-exchange-id 99: exchange not defined in exchanges[]`.
 
 ---
@@ -1539,4 +1566,7 @@ Expected: exit 1; `ERROR: --add-exchange-id 99: exchange not defined in exchange
 - **Old-format guard:** `main()` already rejects configs with feed-level
   `allowedPublisherIds`. The exchange ops run only on new-format configs; no
   extra guard needed.
+
+```
+
 ```

@@ -52,9 +52,9 @@ targeting (`--feed-id`, `--feed-ids-from`, `--symbol-pattern`, `--asset-class`,
 `--state`) and execution (`--dry-run` default / `--apply`, `--no-backup`,
 `--show-full-diff`) apply unchanged.
 
-| Flag | Effect |
-| --- | --- |
-| `--add-exchange-id N` | Assign exchange `N` to each targeted feed and **strip** every session's `marketSchedule` string (now inherited). Reassigns + warns if a different id is already present. |
+| Flag                   | Effect                                                                                                                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--add-exchange-id N`  | Assign exchange `N` to each targeted feed and **strip** every session's `marketSchedule` string (now inherited). Reassigns + warns if a different id is already present.                          |
 | `--remove-exchange-id` | Remove each targeted feed's `exchangeId` and **restore** every session's `marketSchedule` string by copying from that exchange's definition. Takes no value — operates on whatever id is present. |
 
 `--remove-exchange-id` is a `store_true` flag (no value).
@@ -83,6 +83,7 @@ ExchangeInfo:
 ```
 
 `AddExchangeId`:
+
 - Fields: `exchange_id: int`, `exchange: ExchangeInfo` (pre-resolved at build
   time — the id is fixed for the invocation).
 - `apply(feed)`:
@@ -97,29 +98,30 @@ ExchangeInfo:
      absent, else replace (`before=current, after=exchange_id`). NOOP when equal.
   5. Emit one `Change` per session that still carries a `marketSchedule` string:
      `location=SESSION_NAME, field="marketSchedule", before=<string>,
-     after=None` (delete). Sessions already stripped produce no change.
+after=None` (delete). Sessions already stripped produce no change.
   6. If id is already correct **and** no strings remain → 0 changes (clean NOOP).
 
 `RemoveExchangeId`:
+
 - Fields: `exchanges_by_id: dict[int, ExchangeInfo]` (the whole map — different
   feeds in a batch may reference different exchanges).
 - `apply(feed)`:
   1. `current = feed.get("exchangeId")`. If `None` → `Warning` (`feed X has no
-     exchangeId`), 0 changes.
+exchangeId`), 0 changes.
   2. Look up `exchange = exchanges_by_id.get(current)`. If absent → `OpError`
      (can't restore schedules from an unknown exchange).
   3. **Session coverage** — every feed session must be in `exchange.sessions`;
      otherwise `OpError` (nothing to restore for that session).
   4. Emit a `Change` to delete the `exchangeId` field (`location="top_level",
-     field="exchangeId", before=current, after=None`).
+field="exchangeId", before=current, after=None`).
   5. For each feed session lacking a `marketSchedule` string, emit a `Change` to
      insert it (`location=SESSION_NAME, field="marketSchedule", before=None,
-     after=<string from exchange.sessions[session]>`). A session that already has
+after=<string from exchange.sessions[session]>`). A session that already has
      a string (anomaly) is left untouched (NOOP).
 
-**Change convention:** `after = None` (with `before != None`) means *delete the
-field*. This mirrors the existing `before = None` (with `after != None`) = *insert
-the field*. Both non-None = replace.
+**Change convention:** `after = None` (with `before != None`) means _delete the
+field_. This mirrors the existing `before = None` (with `after != None`) = _insert
+the field_. Both non-None = replace.
 
 ### `config_text_surgery.py` — new primitives
 
@@ -170,17 +172,20 @@ with the publisher/minPublishers ops and is documented, not special-cased.
 ## Validation summary
 
 **Hard errors (block apply):**
+
 - `--add-exchange-id N` where `N` not in `exchanges[]` (raised at build time).
 - Feed has a session the exchange doesn't define (add: nothing to inherit;
   remove: nothing to restore).
 - `--remove-exchange-id` where the feed's current id isn't in `exchanges[]`.
 
 **Warnings (allow apply):**
+
 - Asset-class mismatch (exchange `assetClass` vs feed `metadata.asset_type`).
 - Reassignment (`exchangeId` already set to a different value).
 - `--remove-exchange-id` on a feed with no `exchangeId` (NOOP).
 
 **NOOP (0 changes):**
+
 - Add with the same id and all strings already stripped.
 - Per session: already-stripped (add) or already-present (remove) schedule
   string.
