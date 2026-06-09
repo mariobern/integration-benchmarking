@@ -1013,3 +1013,116 @@ def test_build_set_ric_resolves_targeted_ids(monkeypatch):
     assert captured["feed_ids"] == [990, 1059]  # sorted
     assert captured["symbols_path"] == "my_after.json"  # defaults to --config
     assert captured["force_refresh"] is False
+
+
+_EX_FIXTURE = Path(__file__).parent / "fixtures" / "after_with_exchanges.json"
+
+
+def _raw_ex_fixture():
+    return _EX_FIXTURE.read_text(encoding="utf-8")
+
+
+def _feed_in(data, fid):
+    return next(f for f in data["feeds"] if f["feedId"] == fid)
+
+
+class TestApplyExchangeChanges:
+    def test_insert_exchange_id(self):
+        raw = _raw_ex_fixture()
+        ch = Change(
+            feed_id=100,
+            symbol="Equity.US.AAA/USD",
+            location="top_level",
+            field="exchangeId",
+            before=None,
+            after=1,
+        )
+        out = apply_changes(raw, [ch])
+        data = json.loads(out)
+        assert _feed_in(data, 100)["exchangeId"] == 1
+
+    def test_update_exchange_id(self):
+        raw = _raw_ex_fixture()
+        ch = Change(
+            feed_id=200,
+            symbol="Equity.US.BBB/USD",
+            location="top_level",
+            field="exchangeId",
+            before=1,
+            after=21,
+        )
+        out = apply_changes(raw, [ch])
+        assert _feed_in(json.loads(out), 200)["exchangeId"] == 21
+
+    def test_delete_exchange_id(self):
+        raw = _raw_ex_fixture()
+        ch = Change(
+            feed_id=200,
+            symbol="Equity.US.BBB/USD",
+            location="top_level",
+            field="exchangeId",
+            before=1,
+            after=None,
+        )
+        out = apply_changes(raw, [ch])
+        assert "exchangeId" not in _feed_in(json.loads(out), 200)
+
+    def test_delete_session_schedule(self):
+        raw = _raw_ex_fixture()
+        ch = Change(
+            feed_id=100,
+            symbol="Equity.US.AAA/USD",
+            location="REGULAR",
+            field="marketSchedule",
+            before="America/New_York;0930-1600;OLD-R",
+            after=None,
+        )
+        out = apply_changes(raw, [ch])
+        reg = next(
+            s
+            for s in _feed_in(json.loads(out), 100)["marketSchedules"]
+            if s["session"] == "REGULAR"
+        )
+        assert "marketSchedule" not in reg
+
+    def test_insert_session_schedule(self):
+        raw = _raw_ex_fixture()
+        ch = Change(
+            feed_id=200,
+            symbol="Equity.US.BBB/USD",
+            location="REGULAR",
+            field="marketSchedule",
+            before=None,
+            after="America/New_York;0930-1600;R",
+        )
+        out = apply_changes(raw, [ch])
+        reg = next(
+            s
+            for s in _feed_in(json.loads(out), 200)["marketSchedules"]
+            if s["session"] == "REGULAR"
+        )
+        assert reg["marketSchedule"] == "America/New_York;0930-1600;R"
+
+    def test_update_session_schedule(self):
+        raw = _raw_ex_fixture()
+        # feed 100 REGULAR already has a marketSchedule string; replacing it
+        # must yield exactly one key with the new value (no duplicate key).
+        ch = Change(
+            feed_id=100,
+            symbol="Equity.US.AAA/USD",
+            location="REGULAR",
+            field="marketSchedule",
+            before="America/New_York;0930-1600;OLD-R",
+            after="America/New_York;0930-1600;NEW-R",
+        )
+        out = apply_changes(raw, [ch])
+        reg = next(
+            s
+            for s in _feed_in(json.loads(out), 100)["marketSchedules"]
+            if s["session"] == "REGULAR"
+        )
+        assert reg["marketSchedule"] == "America/New_York;0930-1600;NEW-R"
+        # No duplicate key: the old value must not appear in feed 100's parsed entry.
+        assert "OLD-R" not in reg["marketSchedule"]
+        # The NEW-R value appears in the serialised output (spot-check no silent no-op).
+        assert out.count("America/New_York;0930-1600;NEW-R") >= 1

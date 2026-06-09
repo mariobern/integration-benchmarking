@@ -1,6 +1,7 @@
 """Orchestrator: parse spec, resolve targets, simulate, apply."""
 
 import fnmatch
+import json
 import re
 from dataclasses import dataclass
 
@@ -450,6 +451,7 @@ from edit_config_lib.config_text_surgery import (
     find_marketschedules_end,
     insert_field_after_open_brace,
     insert_field_before_session,
+    delete_scalar_field,
 )
 
 
@@ -510,6 +512,17 @@ def _apply_one_change(block: str, change: Change) -> str:
                 raise RuntimeError("feed-level minPublishers not found")
             s, e = tail_start + m.start(1), tail_start + m.end(1)
             return block[:s] + str(change.after) + block[e:]
+        if change.field == "exchangeId":
+            if change.after is None:
+                return delete_scalar_field(block, "exchangeId")
+            if change.before is None:
+                return insert_field_after_open_brace(
+                    block, f'"exchangeId": {change.after},'
+                )
+            span = find_int_field_span(block, "exchangeId")
+            if span is None:
+                raise RuntimeError("exchangeId field not found in feed block")
+            return block[: span[0]] + str(change.after) + block[span[1] :]
         raise RuntimeError(
             f"unsupported top-level field {change.field!r} — the new config "
             f"format keeps publisher lists only in session entries"
@@ -524,6 +537,22 @@ def _apply_one_change(block: str, change: Change) -> str:
         new_sblock = _set_session_publishers(sblock, change.after)
     elif change.field == "minPublishers":
         new_sblock = _set_session_min_publishers(sblock, change.after)
+    elif change.field == "marketSchedule":
+        if change.after is None:
+            new_sblock = delete_scalar_field(sblock, "marketSchedule")
+        else:
+            # Replace an existing value in place; otherwise insert before
+            # "session". Keeps the applier correct for insert AND update,
+            # mirroring the exchangeId branch.
+            span = find_string_field_span(sblock, "marketSchedule")
+            if span is not None:
+                new_sblock = (
+                    sblock[: span[0]] + json.dumps(change.after) + sblock[span[1] :]
+                )
+            else:
+                new_sblock = insert_field_before_session(
+                    sblock, f'"marketSchedule": {json.dumps(change.after)},'
+                )
     else:
         raise RuntimeError(f"unsupported session field {change.field!r}")
     return block[: sb[0]] + new_sblock + block[sb[1] :]
