@@ -655,3 +655,56 @@ class TestExchangeCli:
         # nothing written
         feed = _feed(json.loads(ex_config_copy.read_text()), 400)
         assert "exchangeId" not in feed
+
+    def test_add_then_remove_round_trips_schedules(self, ex_config_copy):
+        # Add exchange 1 to feed 100 (strips its 4 OLD-* strings).
+        r1 = run_cli(
+            [
+                "--config",
+                str(ex_config_copy),
+                "--add-exchange-id",
+                "1",
+                "--feed-id",
+                "100",
+                "--apply",
+            ]
+        )
+        assert r1.returncode == 0, r1.stderr
+        # Remove it again (restores strings from exchange 1's definition).
+        r2 = run_cli(
+            [
+                "--config",
+                str(ex_config_copy),
+                "--remove-exchange-id",
+                "--feed-id",
+                "100",
+                "--apply",
+            ]
+        )
+        assert r2.returncode == 0, r2.stderr
+        feed = _feed(json.loads(ex_config_copy.read_text()), 100)
+        assert "exchangeId" not in feed
+        by_session = {
+            s["session"]: s.get("marketSchedule") for s in feed["marketSchedules"]
+        }
+        # Restored values come from exchange 1, not the original OLD-* strings.
+        assert by_session["REGULAR"] == "America/New_York;0930-1600;R"
+        assert by_session["OVER_NIGHT"] == "America/New_York;2000-0400;O"
+
+    def test_add_cleans_up_anomaly_feed(self, ex_config_copy):
+        # Feed 300 already has exchangeId 1 AND two stale strings.
+        r = run_cli(
+            [
+                "--config",
+                str(ex_config_copy),
+                "--add-exchange-id",
+                "1",
+                "--feed-id",
+                "300",
+                "--apply",
+            ]
+        )
+        assert r.returncode == 0, r.stderr
+        feed = _feed(json.loads(ex_config_copy.read_text()), 300)
+        assert feed["exchangeId"] == 1
+        assert all("marketSchedule" not in s for s in feed["marketSchedules"])
