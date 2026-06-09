@@ -826,3 +826,70 @@ class TestAddExchangeId:
         changes, warns = op.apply(feed)
         assert feed["exchangeId"] == 1
         assert any("does not match exchange" in w.message for w in warns)
+
+
+from edit_config_lib.config_ops import RemoveExchangeId
+
+
+class TestRemoveExchangeId:
+    def test_removes_id_and_restores_all_schedules(self, ex_feeds, exchanges_by_id):
+        feed = feed_by_id(ex_feeds, 200)  # exchangeId 1, no strings, 4 sessions
+        op = RemoveExchangeId(exchanges_by_id=exchanges_by_id)
+        changes, warns = op.apply(feed)
+        id_changes = [c for c in changes if c.field == "exchangeId"]
+        sched_changes = [c for c in changes if c.field == "marketSchedule"]
+        assert len(id_changes) == 1 and id_changes[0].after is None
+        assert len(sched_changes) == 4
+        # Restored strings come from the exchange definition.
+        reg = get_session(feed, "REGULAR")
+        assert reg["marketSchedule"] == "America/New_York;0930-1600;R"
+        assert "exchangeId" not in feed
+        assert warns == []
+
+    def test_no_exchange_id_warns_noop(self, ex_feeds, exchanges_by_id):
+        feed = feed_by_id(ex_feeds, 100)  # no exchangeId
+        op = RemoveExchangeId(exchanges_by_id=exchanges_by_id)
+        changes, warns = op.apply(feed)
+        assert changes == []
+        assert any("no exchangeId to remove" in w.message for w in warns)
+
+    def test_unknown_current_id_is_error(self, exchanges_by_id):
+        feed = {
+            "exchangeId": 7,  # not in {1, 21}
+            "feedId": 888,
+            "symbol": "Equity.US.ZZZ/USD",
+            "metadata": {"asset_type": "equity"},
+            "marketSchedules": [{"allowedPublisherIds": [1], "session": "REGULAR"}],
+        }
+        op = RemoveExchangeId(exchanges_by_id=exchanges_by_id)
+        with pytest.raises(OpError, match="not defined in exchanges"):
+            op.apply(feed)
+
+    def test_session_not_covered_is_error(self, exchanges_by_id):
+        feed = {
+            "exchangeId": 21,  # HK: REGULAR only
+            "feedId": 889,
+            "symbol": "Equity.HK.Y/HKD",
+            "metadata": {"asset_type": "equity"},
+            "marketSchedules": [
+                {"allowedPublisherIds": [1], "session": "REGULAR"},
+                {"allowedPublisherIds": [1], "session": "OVER_NIGHT"},
+            ],
+        }
+        op = RemoveExchangeId(exchanges_by_id=exchanges_by_id)
+        with pytest.raises(OpError, match="cannot restore"):
+            op.apply(feed)
+
+    def test_existing_schedule_string_left_untouched(self, ex_feeds, exchanges_by_id):
+        feed = feed_by_id(
+            ex_feeds, 300
+        )  # exchangeId 1, REGULAR+OVER_NIGHT both have stale strings
+        op = RemoveExchangeId(exchanges_by_id=exchanges_by_id)
+        changes, warns = op.apply(feed)
+        # id removed; both sessions already had strings -> no marketSchedule changes.
+        assert [c for c in changes if c.field == "exchangeId"] == [changes[0]]
+        assert [c for c in changes if c.field == "marketSchedule"] == []
+        assert (
+            get_session(feed, "REGULAR")["marketSchedule"]
+            == "America/New_York;0930-1600;STALE-R"
+        )

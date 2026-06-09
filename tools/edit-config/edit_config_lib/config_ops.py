@@ -767,6 +767,83 @@ class AddExchangeId:
         return changes, warnings
 
 
+@dataclass
+class RemoveExchangeId:
+    """Remove a feed's `exchangeId` and restore each session's
+    `marketSchedule` string from that exchange's definition.
+
+    `exchanges_by_id` is the whole map because different feeds in a batch may
+    reference different exchanges; the schedule to restore comes from the
+    feed's current id.
+    """
+
+    exchanges_by_id: dict[int, ExchangeInfo]
+
+    def apply(self, feed: dict) -> tuple[list[Change], list[Warning]]:
+        feed_id = feed["feedId"]
+        symbol = feed.get("symbol", "")
+        warnings: list[Warning] = []
+
+        current = feed.get("exchangeId")
+        if current is None:
+            warnings.append(
+                Warning(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    message=f"feed {feed_id}: no exchangeId to remove",
+                )
+            )
+            return [], warnings
+
+        exchange = self.exchanges_by_id.get(current)
+        if exchange is None:
+            raise OpError(
+                f"feed {feed_id}: current exchangeId {current} is not defined "
+                f"in exchanges[] — cannot restore schedules"
+            )
+
+        schedules = feed.get("marketSchedules", [])
+        uncovered = [
+            s.get("session")
+            for s in schedules
+            if s.get("session") not in exchange.sessions
+        ]
+        if uncovered:
+            raise OpError(
+                f"feed {feed_id}: exchange {current} ({exchange.name!r}) does "
+                f"not define session(s) {uncovered} — cannot restore a schedule"
+            )
+
+        changes: list[Change] = [
+            Change(
+                feed_id=feed_id,
+                symbol=symbol,
+                location="top_level",
+                field="exchangeId",
+                before=current,
+                after=None,
+            )
+        ]
+        del feed["exchangeId"]
+
+        for s in schedules:
+            if "marketSchedule" not in s:
+                sched = exchange.sessions[s["session"]]
+                changes.append(
+                    Change(
+                        feed_id=feed_id,
+                        symbol=symbol,
+                        location=s["session"],
+                        field="marketSchedule",
+                        before=None,
+                        after=sched,
+                    )
+                )
+                s["marketSchedule"] = sched
+
+        return changes, warnings
+
+
 _STATE_WARNINGS = {
     ("STABLE", "COMING_SOON"): "regression: STABLE feed downgraded to COMING_SOON",
     ("STABLE", "INACTIVE"): "deactivation of live STABLE feed",
