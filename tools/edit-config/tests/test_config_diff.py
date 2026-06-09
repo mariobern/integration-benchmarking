@@ -138,3 +138,61 @@ def test_insert_renders_absent_before_line_for_min_publishers():
     out = render_diff([c])
     assert "-      (absent)" in out
     assert '+      "minPublishers": 2,' in out
+
+
+from edit_config_lib.config_ops import Change as _C
+from edit_config_lib.config_diff import render_diff as _render
+
+
+class TestExchangeDiff:
+    def test_insert_exchange_id(self):
+        c = _C(
+            feed_id=100,
+            symbol="Equity.US.AAA/USD",
+            location="top_level",
+            field="exchangeId",
+            before=None,
+            after=1,
+        )
+        out = _render([c])
+        assert "(absent)" in out
+        assert '+      "exchangeId": 1,' in out
+
+    def test_delete_exchange_id(self):
+        c = _C(
+            feed_id=200,
+            symbol="Equity.US.BBB/USD",
+            location="top_level",
+            field="exchangeId",
+            before=1,
+            after=None,
+        )
+        out = _render([c])
+        assert '-      "exchangeId": 1,' in out
+        assert "(removed)" in out
+
+    def test_delete_market_schedule(self):
+        c = _C(
+            feed_id=100,
+            symbol="Equity.US.AAA/USD",
+            location="REGULAR",
+            field="marketSchedule",
+            before="America/New_York;0930-1600;R",
+            after=None,
+        )
+        out = _render([c])
+        assert '-      "marketSchedule": "America/New_York;0930-1600;R",' in out
+        assert "(removed)" in out
+
+    def test_insert_market_schedule(self):
+        c = _C(
+            feed_id=200,
+            symbol="Equity.US.BBB/USD",
+            location="REGULAR",
+            field="marketSchedule",
+            before=None,
+            after="America/New_York;0930-1600;R",
+        )
+        out = _render([c])
+        assert "(absent)" in out
+        assert '+      "marketSchedule": "America/New_York;0930-1600;R",' in out
