@@ -571,3 +571,87 @@ def test_cli_set_ric_dry_run_does_not_write(tmp_path, monkeypatch):
     rc = edit_config.main(["--config", str(config), "--set-ric", "--feed-id", "990"])
     assert rc == 0
     assert config.read_text() == before  # dry-run default, nothing written
+
+
+EX_FIXTURE = Path(__file__).parent / "fixtures" / "after_with_exchanges.json"
+
+
+@pytest.fixture
+def ex_config_copy(tmp_path):
+    dst = tmp_path / "after_with_exchanges.json"
+    shutil.copy(EX_FIXTURE, dst)
+    return dst
+
+
+def _feed(data, fid):
+    return next(f for f in data["feeds"] if f["feedId"] == fid)
+
+
+class TestExchangeCli:
+    def test_add_exchange_id_apply(self, ex_config_copy):
+        r = run_cli(
+            [
+                "--config",
+                str(ex_config_copy),
+                "--add-exchange-id",
+                "1",
+                "--feed-id",
+                "100",
+                "--apply",
+            ]
+        )
+        assert r.returncode == 0, r.stderr
+        data = json.loads(ex_config_copy.read_text())
+        feed = _feed(data, 100)
+        assert feed["exchangeId"] == 1
+        assert all("marketSchedule" not in s for s in feed["marketSchedules"])
+
+    def test_remove_exchange_id_apply(self, ex_config_copy):
+        r = run_cli(
+            [
+                "--config",
+                str(ex_config_copy),
+                "--remove-exchange-id",
+                "--feed-id",
+                "200",
+                "--apply",
+            ]
+        )
+        assert r.returncode == 0, r.stderr
+        feed = _feed(json.loads(ex_config_copy.read_text()), 200)
+        assert "exchangeId" not in feed
+        reg = next(s for s in feed["marketSchedules"] if s["session"] == "REGULAR")
+        assert reg["marketSchedule"] == "America/New_York;0930-1600;R"
+
+    def test_unknown_exchange_id_errors(self, ex_config_copy):
+        r = run_cli(
+            [
+                "--config",
+                str(ex_config_copy),
+                "--add-exchange-id",
+                "99",
+                "--feed-id",
+                "100",
+            ]
+        )
+        assert r.returncode == 1
+        assert "not defined in exchanges" in (r.stdout + r.stderr)
+
+    def test_session_not_covered_blocks_apply(self, ex_config_copy):
+        # feed 400 has OVER_NIGHT; exchange 21 (HK) lacks it.
+        r = run_cli(
+            [
+                "--config",
+                str(ex_config_copy),
+                "--add-exchange-id",
+                "21",
+                "--feed-id",
+                "400",
+                "--apply",
+            ]
+        )
+        assert r.returncode == 1
+        assert "does not define session" in (r.stdout + r.stderr)
+        # nothing written
+        feed = _feed(json.loads(ex_config_copy.read_text()), 400)
+        assert "exchangeId" not in feed

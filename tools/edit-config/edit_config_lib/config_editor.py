@@ -52,6 +52,9 @@ from edit_config_lib.config_ops import (
     SetRicMapping,
     SetRicFromResolver,
     ResolvedRic,
+    AddExchangeId,
+    RemoveExchangeId,
+    ExchangeInfo,
 )
 from edit_config_lib.ric_csv import load_ric_csv, build_prefix_index, LoadError
 from edit_config_lib.config_selector import parse_selector_text, read_selector_file
@@ -71,6 +74,8 @@ _OP_FLAGS = (
     "set_state",
     "set_ric_mapping",
     "set_ric",
+    "add_exchange_id",
+    "remove_exchange_id",
 )
 
 
@@ -101,7 +106,7 @@ def _parse_signed_int(s: str) -> int:
 
 
 # store_true flags default to False; other op flags default to None.
-_BOOL_OP_FLAGS = frozenset({"set_ric_mapping", "set_ric"})
+_BOOL_OP_FLAGS = frozenset({"set_ric_mapping", "set_ric", "remove_exchange_id"})
 
 
 def _flag_set(args, name: str) -> bool:
@@ -158,18 +163,22 @@ def resolve_rics_for_feed_ids(
     return out
 
 
-def build_op_from_args(args) -> list[PlannedOp]:
+def build_op_from_args(
+    args, exchanges_by_id: dict[int, ExchangeInfo] | None = None
+) -> list[PlannedOp]:
     """Build a single-element PlannedOp list from argparse Namespace.
 
     Raises ValueError on missing/multiple operation flags, missing
     targeting, etc.
     """
+    exchanges_by_id = exchanges_by_id or {}
     selected = [name for name in _OP_FLAGS if _flag_set(args, name)]
     if not selected:
         raise ValueError(
             "no operation specified (use one of --add-publisher, "
             "--remove-publisher, --set-min-publishers, "
-            "--bump-min-publishers, --set-state, --set-ric-mapping, --set-ric)"
+            "--bump-min-publishers, --set-state, --set-ric-mapping, --set-ric, "
+            "--add-exchange-id, --remove-exchange-id)"
         )
     if len(selected) > 1:
         raise ValueError(f"exactly one operation flag allowed; got {selected}")
@@ -225,6 +234,16 @@ def build_op_from_args(args) -> list[PlannedOp]:
         op = BumpMinPublishers(delta=delta, session=args.session)
     elif name == "set_state":
         op = SetState(value=args.set_state)
+    elif name == "add_exchange_id":
+        exchange = exchanges_by_id.get(args.add_exchange_id)
+        if exchange is None:
+            raise ValueError(
+                f"--add-exchange-id {args.add_exchange_id}: exchange not "
+                f"defined in exchanges[] (known ids: {sorted(exchanges_by_id)})"
+            )
+        op = AddExchangeId(exchange_id=args.add_exchange_id, exchange=exchange)
+    elif name == "remove_exchange_id":
+        op = RemoveExchangeId(exchanges_by_id=exchanges_by_id)
     else:
         raise AssertionError(f"unhandled op {name}")
 
@@ -343,8 +362,11 @@ def _build_op_from_yaml_entry(entry: dict):
     raise AssertionError(f"unhandled op {op_name}")
 
 
-def parse_yaml_spec(path: str) -> list[PlannedOp]:
+def parse_yaml_spec(path: str, exchanges_by_id: dict | None = None) -> list[PlannedOp]:
     """Load a YAML spec file and produce a list of PlannedOp."""
+    # Wired here for the exchange-id YAML ops added in the next step; the
+    # add_exchange_id / remove_exchange_id YAML branches consume it.
+    exchanges_by_id = exchanges_by_id or {}
     with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     if not isinstance(data, dict):
