@@ -698,3 +698,59 @@ def test_set_ric_feed_absent_from_map_warns():
     assert changes == []
     assert len(warnings) == 1
     assert "no RIC resolved" in warnings[0].message
+
+
+from edit_config_lib.config_ops import (
+    ExchangeInfo,
+    build_exchanges_by_id,
+    asset_class_matches,
+)
+
+EX_FIXTURE_PATH = Path(__file__).parent / "fixtures" / "after_with_exchanges.json"
+
+
+@pytest.fixture
+def ex_config():
+    return json.loads(EX_FIXTURE_PATH.read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def exchanges_by_id(ex_config):
+    return build_exchanges_by_id(ex_config["exchanges"])
+
+
+@pytest.fixture
+def ex_feeds(ex_config):
+    return ex_config["feeds"]
+
+
+class TestExchangeHelpers:
+    def test_build_maps_by_id(self, exchanges_by_id):
+        assert set(exchanges_by_id) == {1, 21}
+        ex1 = exchanges_by_id[1]
+        assert isinstance(ex1, ExchangeInfo)
+        assert ex1.name == "NASDAQ Test Consolidated"
+        assert ex1.asset_class == "EXCHANGE_ASSET_CLASS_EQUITY"
+        assert set(ex1.sessions) == {
+            "REGULAR",
+            "PRE_MARKET",
+            "POST_MARKET",
+            "OVER_NIGHT",
+        }
+        assert ex1.sessions["REGULAR"] == "America/New_York;0930-1600;R"
+
+    def test_build_hk_single_session(self, exchanges_by_id):
+        assert set(exchanges_by_id[21].sessions) == {"REGULAR"}
+
+    def test_empty_list_yields_empty_map(self):
+        assert build_exchanges_by_id([]) == {}
+
+    def test_asset_class_matches_equity(self):
+        assert asset_class_matches("EXCHANGE_ASSET_CLASS_EQUITY", "equity") is True
+
+    def test_asset_class_mismatch(self):
+        assert asset_class_matches("EXCHANGE_ASSET_CLASS_EQUITY", "crypto") is False
+
+    def test_asset_class_blank_does_not_flag(self):
+        assert asset_class_matches("", "equity") is True
+        assert asset_class_matches("EXCHANGE_ASSET_CLASS_EQUITY", "") is True

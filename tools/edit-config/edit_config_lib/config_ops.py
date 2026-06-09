@@ -20,6 +20,59 @@ US_EQUITY_SYMBOL_PREFIX = "Equity.US."
 
 
 @dataclass(frozen=True)
+class ExchangeInfo:
+    """A resolved entry from the config's top-level `exchanges[]` array.
+
+    `sessions` maps a session name (REGULAR/PRE_MARKET/...) to its
+    `marketSchedule` string — the calendar a feed inherits when it carries
+    this exchange's id.
+    """
+
+    exchange_id: int
+    name: str
+    asset_class: str
+    sessions: dict[str, str]
+
+
+def build_exchanges_by_id(exchanges: list[dict]) -> dict[int, ExchangeInfo]:
+    """Index the raw `exchanges[]` list by exchangeId. The array is sparse
+    (some ids are not yet defined); only present ids appear in the map."""
+    out: dict[int, ExchangeInfo] = {}
+    for ex in exchanges:
+        eid = ex.get("exchangeId")
+        if eid is None:
+            continue
+        sessions: dict[str, str] = {}
+        for s in ex.get("sessions", []):
+            name = s.get("session")
+            sched = s.get("marketSchedule")
+            if name is not None and sched is not None:
+                sessions[name] = sched
+        out[eid] = ExchangeInfo(
+            exchange_id=eid,
+            name=ex.get("name", ""),
+            asset_class=ex.get("assetClass", ""),
+            sessions=sessions,
+        )
+    return out
+
+
+def asset_class_matches(exchange_asset_class: str, feed_asset_type: str) -> bool:
+    """True if the exchange's assetClass plausibly matches the feed's
+    asset_type. Blanks on either side are treated as a match (nothing to
+    compare -> don't warn). Comparison strips the `EXCHANGE_ASSET_CLASS_`
+    prefix and lowercases, so `EXCHANGE_ASSET_CLASS_EQUITY` matches `equity`.
+    """
+    if not exchange_asset_class or not feed_asset_type:
+        return True
+    prefix = "EXCHANGE_ASSET_CLASS_"
+    token = exchange_asset_class
+    if token.startswith(prefix):
+        token = token[len(prefix) :]
+    return token.lower() == feed_asset_type.lower()
+
+
+@dataclass(frozen=True)
 class Change:
     """One atomic edit to a feed."""
 
