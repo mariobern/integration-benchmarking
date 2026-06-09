@@ -754,3 +754,75 @@ class TestExchangeHelpers:
     def test_asset_class_blank_does_not_flag(self):
         assert asset_class_matches("", "equity") is True
         assert asset_class_matches("EXCHANGE_ASSET_CLASS_EQUITY", "") is True
+
+
+from edit_config_lib.config_ops import AddExchangeId
+
+
+def _sessions_with_schedule(feed):
+    return [s["session"] for s in feed["marketSchedules"] if "marketSchedule" in s]
+
+
+class TestAddExchangeId:
+    def test_add_inserts_id_and_strips_all_schedule_strings(
+        self, ex_feeds, exchanges_by_id
+    ):
+        feed = feed_by_id(ex_feeds, 100)  # no exchangeId, strings on all 4 sessions
+        op = AddExchangeId(exchange_id=1, exchange=exchanges_by_id[1])
+        changes, warns = op.apply(feed)
+        # exchangeId inserted (before=None) + 4 schedule deletions.
+        id_changes = [c for c in changes if c.field == "exchangeId"]
+        sched_changes = [c for c in changes if c.field == "marketSchedule"]
+        assert len(id_changes) == 1
+        assert id_changes[0].before is None and id_changes[0].after == 1
+        assert len(sched_changes) == 4
+        assert all(c.after is None for c in sched_changes)
+        assert feed["exchangeId"] == 1
+        assert _sessions_with_schedule(feed) == []
+        assert warns == []
+
+    def test_same_id_with_stale_strings_strips_them_no_id_change(
+        self, ex_feeds, exchanges_by_id
+    ):
+        feed = feed_by_id(ex_feeds, 300)  # exchangeId 1 already + 2 stale strings
+        op = AddExchangeId(exchange_id=1, exchange=exchanges_by_id[1])
+        changes, warns = op.apply(feed)
+        assert [c for c in changes if c.field == "exchangeId"] == []
+        assert len(changes) == 2  # both stale strings removed
+        assert _sessions_with_schedule(feed) == []
+        assert warns == []
+
+    def test_same_id_already_inherited_is_noop(self, ex_feeds, exchanges_by_id):
+        feed = feed_by_id(ex_feeds, 200)  # exchangeId 1, no strings
+        op = AddExchangeId(exchange_id=1, exchange=exchanges_by_id[1])
+        changes, warns = op.apply(feed)
+        assert changes == []
+        assert warns == []
+
+    def test_reassignment_warns(self, exchanges_by_id):
+        # A single-REGULAR feed already on exchange 1, reassigned to 21.
+        # (Exchange 21 only defines REGULAR, so coverage holds.)
+        feed = {
+            "exchangeId": 1,
+            "feedId": 999,
+            "symbol": "Equity.HK.X/HKD",
+            "metadata": {"asset_type": "equity"},
+            "marketSchedules": [{"allowedPublisherIds": [1], "session": "REGULAR"}],
+        }
+        op = AddExchangeId(exchange_id=21, exchange=exchanges_by_id[21])
+        changes, warns = op.apply(feed)
+        assert feed["exchangeId"] == 21
+        assert any("reassigning exchangeId 1 -> 21" in w.message for w in warns)
+
+    def test_session_not_covered_is_error(self, ex_feeds, exchanges_by_id):
+        feed = feed_by_id(ex_feeds, 400)  # has OVER_NIGHT; exchange 21 lacks it
+        op = AddExchangeId(exchange_id=21, exchange=exchanges_by_id[21])
+        with pytest.raises(OpError, match="does not define session"):
+            op.apply(feed)
+
+    def test_asset_class_mismatch_warns_but_applies(self, ex_feeds, exchanges_by_id):
+        feed = feed_by_id(ex_feeds, 500)  # crypto feed, REGULAR only
+        op = AddExchangeId(exchange_id=1, exchange=exchanges_by_id[1])
+        changes, warns = op.apply(feed)
+        assert feed["exchangeId"] == 1
+        assert any("does not match exchange" in w.message for w in warns)

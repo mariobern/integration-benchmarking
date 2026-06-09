@@ -675,6 +675,98 @@ class SetRicFromResolver:
         return changes, warnings
 
 
+@dataclass
+class AddExchangeId:
+    """Assign `exchange_id` to a feed and strip each session's now-redundant
+    `marketSchedule` string (the feed inherits the exchange's calendar).
+
+    `exchange` is the pre-resolved ExchangeInfo for `exchange_id`, captured at
+    construction time (the id is fixed per invocation).
+    """
+
+    exchange_id: int
+    exchange: ExchangeInfo
+
+    def apply(self, feed: dict) -> tuple[list[Change], list[Warning]]:
+        feed_id = feed["feedId"]
+        symbol = feed.get("symbol", "")
+        changes: list[Change] = []
+        warnings: list[Warning] = []
+        schedules = feed.get("marketSchedules", [])
+
+        # 1. Session coverage (hard error): every feed session must exist on
+        #    the exchange, else stripping its string leaves nothing to inherit.
+        uncovered = [
+            s.get("session")
+            for s in schedules
+            if s.get("session") not in self.exchange.sessions
+        ]
+        if uncovered:
+            raise OpError(
+                f"feed {feed_id}: exchange {self.exchange_id} "
+                f"({self.exchange.name!r}) does not define session(s) "
+                f"{uncovered} that this feed has — cannot inherit a schedule"
+            )
+
+        # 2. Asset-class check (warning only).
+        feed_asset = feed.get("metadata", {}).get("asset_type", "")
+        if not asset_class_matches(self.exchange.asset_class, feed_asset):
+            warnings.append(
+                Warning(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    message=(
+                        f"feed {feed_id}: asset_type {feed_asset!r} does not "
+                        f"match exchange {self.exchange_id} assetClass "
+                        f"{self.exchange.asset_class!r}"
+                    ),
+                )
+            )
+
+        # 3. exchangeId field change (+ reassignment warning).
+        current = feed.get("exchangeId")
+        if current != self.exchange_id:
+            if current is not None:
+                warnings.append(
+                    Warning(
+                        feed_id=feed_id,
+                        symbol=symbol,
+                        message=(
+                            f"feed {feed_id}: reassigning exchangeId "
+                            f"{current} -> {self.exchange_id}"
+                        ),
+                    )
+                )
+            changes.append(
+                Change(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    location="top_level",
+                    field="exchangeId",
+                    before=current,
+                    after=self.exchange_id,
+                )
+            )
+            feed["exchangeId"] = self.exchange_id
+
+        # 4. Strip per-session marketSchedule strings (inheritance).
+        for s in schedules:
+            if "marketSchedule" in s:
+                changes.append(
+                    Change(
+                        feed_id=feed_id,
+                        symbol=symbol,
+                        location=s["session"],
+                        field="marketSchedule",
+                        before=s["marketSchedule"],
+                        after=None,
+                    )
+                )
+                del s["marketSchedule"]
+
+        return changes, warnings
+
+
 _STATE_WARNINGS = {
     ("STABLE", "COMING_SOON"): "regression: STABLE feed downgraded to COMING_SOON",
     ("STABLE", "INACTIVE"): "deactivation of live STABLE feed",
