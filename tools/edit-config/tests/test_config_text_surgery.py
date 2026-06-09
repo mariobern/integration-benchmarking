@@ -316,3 +316,36 @@ class TestFindMarketschedulesEnd:
 
     def test_absent_array_returns_zero(self):
         assert find_marketschedules_end('{ "foo": 1 }') == 0
+
+
+from edit_config_lib.config_text_surgery import delete_scalar_field
+
+
+class TestDeleteScalarField:
+    def test_deletes_int_field_and_trailing_comma(self):
+        block = '{\n  "exchangeId": 1,\n  "feedId": 922\n}'
+        out = delete_scalar_field(block, "exchangeId")
+        assert out == '{\n  "feedId": 922\n}'
+
+    def test_deletes_string_field(self):
+        block = (
+            '{\n  "marketSchedule": "America/New_York;0930-1600",\n'
+            '  "session": "REGULAR"\n}'
+        )
+        out = delete_scalar_field(block, "marketSchedule")
+        assert out == '{\n  "session": "REGULAR"\n}'
+
+    def test_string_value_with_escaped_quote(self):
+        block = '{\n  "k": "a\\"b",\n  "session": "REGULAR"\n}'
+        out = delete_scalar_field(block, "k")
+        assert out == '{\n  "session": "REGULAR"\n}'
+
+    def test_absent_key_returns_unchanged(self):
+        block = '{\n  "session": "REGULAR"\n}'
+        assert delete_scalar_field(block, "exchangeId") == block
+
+    def test_only_named_key_removed(self):
+        block = '{\n  "exchangeId": 1,\n  "expiryTime": "5s",\n  "feedId": 5\n}'
+        out = delete_scalar_field(block, "exchangeId")
+        assert '"expiryTime"' in out and '"feedId"' in out
+        assert '"exchangeId"' not in out

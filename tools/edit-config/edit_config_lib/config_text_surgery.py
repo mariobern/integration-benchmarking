@@ -250,3 +250,25 @@ def find_marketschedules_end(block: str) -> int:
         return 0
     close = find_matching_close(block, open_idx)
     return 0 if close is None else close + 1
+
+
+def delete_scalar_field(block: str, key: str) -> str:
+    """Delete the entire physical line of a top-level int or quoted-string
+    field `"key": <value>,` from `block`, including its trailing comma.
+
+    Matches from the newline that precedes the field's indentation through the
+    trailing comma, so the field's whole line is removed and surrounding
+    formatting stays intact. Assumes the field is NOT the last field in its
+    object (so it carries a trailing comma) — true for the feed-level
+    `exchangeId` (always followed by more feed fields) and a session's
+    `marketSchedule` (always followed by `"session"`). Returns `block`
+    unchanged when `key` is absent.
+    """
+    pattern = re.compile(
+        rf'\n[ \t]*"{re.escape(key)}"\s*:\s*'
+        rf'(?:"[^"\\]*(?:\\.[^"\\]*)*"|-?\d+)[ \t]*,'
+    )
+    m = pattern.search(block)
+    if m is None:
+        return block
+    return block[: m.start()] + block[m.end() :]
