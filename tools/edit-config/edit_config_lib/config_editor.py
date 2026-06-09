@@ -260,6 +260,8 @@ _OP_REQUIRED_FIELDS = {
     "bump_min_publishers": {"delta"},
     "set_state": {"value"},
     "set_ric_mapping": {"from_csv"},
+    "add_exchange_id": {"exchange_id"},
+    "remove_exchange_id": set(),
 }
 
 _TARGETING_KEYS = {
@@ -327,7 +329,7 @@ def _validate_keys(entry: dict, op_name: str) -> None:
         raise ValueError(f"unknown key(s) in op {op_name!r}: {sorted(extras)}")
 
 
-def _build_op_from_yaml_entry(entry: dict):
+def _build_op_from_yaml_entry(entry: dict, exchanges_by_id: dict):
     op_name = entry["op"]
     if op_name not in _OP_REQUIRED_FIELDS:
         raise ValueError(f"unknown op {op_name!r}")
@@ -359,13 +361,24 @@ def _build_op_from_yaml_entry(entry: dict):
                 f"set_ric_mapping from_csv {entry['from_csv']!r}: no rows produced a known feed prefix"
             )
         return SetRicMapping(prefix_to_ric=prefix_to_ric)
+    if op_name == "add_exchange_id":
+        eid = entry["exchange_id"]
+        exchange = exchanges_by_id.get(eid)
+        if exchange is None:
+            raise ValueError(
+                f"add_exchange_id: exchange {eid} not defined in exchanges[] "
+                f"(known ids: {sorted(exchanges_by_id)})"
+            )
+        return AddExchangeId(exchange_id=eid, exchange=exchange)
+    if op_name == "remove_exchange_id":
+        return RemoveExchangeId(exchanges_by_id=exchanges_by_id)
     raise AssertionError(f"unhandled op {op_name}")
 
 
 def parse_yaml_spec(path: str, exchanges_by_id: dict | None = None) -> list[PlannedOp]:
     """Load a YAML spec file and produce a list of PlannedOp."""
-    # Wired here for the exchange-id YAML ops added in the next step; the
-    # add_exchange_id / remove_exchange_id YAML branches consume it.
+    # Forwarded to _build_op_from_yaml_entry for the add_exchange_id /
+    # remove_exchange_id branches; harmless ({}) for all other ops.
     exchanges_by_id = exchanges_by_id or {}
     with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
@@ -383,7 +396,7 @@ def parse_yaml_spec(path: str, exchanges_by_id: dict | None = None) -> list[Plan
             raise ValueError(f"operation #{i + 1}: must be a mapping")
         if "op" not in entry:
             raise ValueError(f"operation #{i + 1}: missing 'op' field")
-        op = _build_op_from_yaml_entry(entry)
+        op = _build_op_from_yaml_entry(entry, exchanges_by_id)
         if entry["op"] == "set_ric_mapping":
             filters = FilterSet()  # CSV is the selector
         else:

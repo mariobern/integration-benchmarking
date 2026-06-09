@@ -1126,3 +1126,56 @@ class TestApplyExchangeChanges:
         assert "OLD-R" not in reg["marketSchedule"]
         # The NEW-R value appears in the serialised output (spot-check no silent no-op).
         assert out.count("America/New_York;0930-1600;NEW-R") >= 1
+
+
+from edit_config_lib.config_ops import (
+    build_exchanges_by_id as _build_ex,
+    AddExchangeId as _AddEx,
+    RemoveExchangeId as _RemEx,
+)
+
+
+def _ex_map():
+    data = json.loads(_EX_FIXTURE.read_text(encoding="utf-8"))
+    return _build_ex(data["exchanges"])
+
+
+class TestYamlExchangeOps:
+    def test_add_exchange_id_from_yaml(self, tmp_path):
+        spec = tmp_path / "spec.yaml"
+        spec.write_text(
+            "version: 1\n"
+            "operations:\n"
+            "  - op: add_exchange_id\n"
+            "    exchange_id: 1\n"
+            "    feed_id: 100\n"
+        )
+        plan = parse_yaml_spec(str(spec), _ex_map())
+        assert len(plan) == 1
+        assert isinstance(plan[0].op, _AddEx)
+        assert plan[0].op.exchange_id == 1
+        assert plan[0].filters.feed_ids == {100}
+
+    def test_remove_exchange_id_from_yaml(self, tmp_path):
+        spec = tmp_path / "spec.yaml"
+        spec.write_text(
+            "version: 1\n"
+            "operations:\n"
+            "  - op: remove_exchange_id\n"
+            "    feed_id: 200\n"
+        )
+        plan = parse_yaml_spec(str(spec), _ex_map())
+        assert isinstance(plan[0].op, _RemEx)
+        assert plan[0].filters.feed_ids == {200}
+
+    def test_unknown_exchange_id_from_yaml_raises(self, tmp_path):
+        spec = tmp_path / "spec.yaml"
+        spec.write_text(
+            "version: 1\n"
+            "operations:\n"
+            "  - op: add_exchange_id\n"
+            "    exchange_id: 99\n"
+            "    feed_id: 100\n"
+        )
+        with pytest.raises(ValueError, match="not defined in exchanges"):
+            parse_yaml_spec(str(spec), _ex_map())
