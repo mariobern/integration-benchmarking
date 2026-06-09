@@ -36,15 +36,17 @@ python3 tools/edit-config/edit_config.py --config lazer_update.json [OPERATION] 
 
 ### Operations (exactly one per CLI invocation)
 
-| Flag                                        | Effect                                                   |
-| ------------------------------------------- | -------------------------------------------------------- |
-| `--add-publisher INT`                       | Add publisher to session `allowedPublisherIds` list      |
-| `--remove-publisher INT`                    | Remove publisher from session `allowedPublisherIds` list |
-| `--set-min-publishers INT`                  | Set `minPublishers` to a value                           |
-| `--bump-min-publishers ±INT`                | Adjust `minPublishers` by signed delta (clamped at 1)    |
-| `--set-state STABLE\|COMING_SOON\|INACTIVE` | Change feed state                                        |
-| `--set-ric-mapping --from-csv PATH`         | Fill empty `datascope_ric.identifier` values             |
-| `--from-spec PATH`                          | Apply a batched YAML spec (multiple ops)                 |
+| Flag                                        | Effect                                                                     |
+| ------------------------------------------- | -------------------------------------------------------------------------- |
+| `--add-publisher INT`                       | Add publisher to session `allowedPublisherIds` list                        |
+| `--remove-publisher INT`                    | Remove publisher from session `allowedPublisherIds` list                   |
+| `--set-min-publishers INT`                  | Set `minPublishers` to a value                                             |
+| `--bump-min-publishers ±INT`                | Adjust `minPublishers` by signed delta (clamped at 1)                      |
+| `--set-state STABLE\|COMING_SOON\|INACTIVE` | Change feed state                                                          |
+| `--add-exchange-id N`                       | Assign exchange `N` and strip inherited `marketSchedule` strings           |
+| `--remove-exchange-id`                      | Remove `exchangeId` and restore `marketSchedule` strings from the exchange |
+| `--set-ric-mapping --from-csv PATH`         | Fill empty `datascope_ric.identifier` values                               |
+| `--from-spec PATH`                          | Apply a batched YAML spec (multiple ops)                                   |
 
 ### Targeting (≥1 required when not using `--from-spec`)
 
@@ -227,3 +229,31 @@ Plain text, UTF-8. Tokens are `N` (single ID) or `A-B` (inclusive range). Tokens
 # inline pasted from a slack message
 100-200, 205, 208, 3530
 ```
+
+## Exchange inheritance
+
+A feed may carry a top-level `exchangeId` that points into the config's
+top-level `exchanges[]` array. When it does, the feed **inherits** that
+exchange's trading calendar: its session entries omit their own
+`marketSchedule` string.
+
+- `--add-exchange-id N` sets the feed's `exchangeId` to `N` and removes the
+  now-redundant `marketSchedule` string from every session entry. If the feed
+  already has a different `exchangeId`, the op reassigns it and warns.
+- `--remove-exchange-id` clears the `exchangeId` and restores each session's
+  `marketSchedule` string by copying it from the exchange definition.
+
+Validation:
+
+- Adding an `exchangeId` not present in `exchanges[]` is an error. The array is
+  sparse; ids the team has not yet defined simply error until they are added.
+- If the feed has a session the exchange does not define (e.g. an `OVER_NIGHT`
+  session against an exchange that only defines `REGULAR`), both add and remove
+  error — there would be no schedule to inherit or restore for that session.
+- An exchange whose `assetClass` does not match the feed's `metadata.asset_type`
+  produces a warning, not an error.
+
+These ops target whole feeds (use `--feed-id`, `--symbol-pattern`, etc.). Like
+the other edit ops, they skip `INACTIVE` feeds — reactivate with `--set-state`
+first. They are also available in YAML specs as `add_exchange_id`
+(`exchange_id:` required) and `remove_exchange_id`.
