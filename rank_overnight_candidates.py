@@ -79,6 +79,7 @@ def main() -> None:
         "--meta",
         type=Path,
         default=Path("overnight_candidates_meta.csv"),
+        help="Candidate metadata CSV from extract_overnight_candidates.py",
     )
     parser.add_argument(
         "--output",
@@ -97,8 +98,8 @@ def main() -> None:
     ranked = join_and_rank(volume, meta)
     ranked.to_csv(args.output, index=False)
 
-    net_new = int((~resolved["overnight_configured"]).sum())
-    configured = len(resolved) - net_new
+    net_new = int((~ranked["overnight_configured"].astype(bool)).sum())
+    configured = len(ranked) - net_new
     print(
         f"Ranked {len(ranked)} candidates "
         f"({net_new} net-new, {configured} already-configured) -> {args.output}",

@@ -86,3 +86,10 @@ class TestJoinAndRank:
         assert list(ranked.columns) == OUTPUT_COLUMNS
         assert ranked.iloc[0]["feedId"] == 2
         assert ranked.iloc[0]["overnight_configured"] is True
+
+    def test_net_new_count_from_ranked(self):
+        # AAA: overnight_configured=False (net-new), BBB: overnight_configured=True (configured)
+        # Both have volume rows, so both appear in ranked. Net-new count must be 1.
+        ranked = join_and_rank(_volume(), _meta())
+        net_new = int((~ranked["overnight_configured"].astype(bool)).sum())
+        assert net_new == 1  # only AAA is net-new
