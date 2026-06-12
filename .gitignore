@@ -18,6 +18,9 @@ env/
 quick_benchmark_results.csv
 backups/pre-perf-optimization
 
+# Overnight candidate pipeline outputs (CSVs already covered by *.csv above)
+overnight_candidates_tickers.txt
+
 # Benchmark availability - track summary but ignore daily instrument lists
 !benchmark_availability/SUMMARY.md
 !benchmark_availability/history.csv
