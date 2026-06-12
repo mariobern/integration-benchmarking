@@ -27,8 +27,12 @@ def has_overnight_session(feed: dict) -> bool:
 
 
 def extract_ticker(symbol: str) -> str:
-    """'Equity.US.AAPL/USD' -> 'AAPL' (handles dotted tickers like BRK.B)."""
-    return symbol[len(US_EQUITY_PREFIX) :].split("/")[0]
+    """'Equity.US.AAPL/USD' -> 'AAPL' (handles dotted tickers like BRK.B).
+
+    Uppercased to match volume_profile.py, which uppercases ticker-file input;
+    keeping the case aligned guarantees the downstream join key matches.
+    """
+    return symbol[len(US_EQUITY_PREFIX) :].split("/")[0].upper()
 
 
 def is_candidate(feed: dict) -> bool:

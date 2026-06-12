@@ -42,6 +42,9 @@ class TestExtractTicker:
     def test_dotted(self):
         assert extract_ticker("Equity.US.BRK.B/USD") == "BRK.B"
 
+    def test_uppercased_to_match_volume_profile(self):
+        assert extract_ticker("Equity.US.brkb/USD") == "BRKB"
+
 
 class TestIsCandidate:
     def test_stable_no_overnight_included(self):
