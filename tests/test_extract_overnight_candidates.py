@@ -45,6 +45,9 @@ class TestExtractTicker:
     def test_uppercased_to_match_volume_profile(self):
         assert extract_ticker("Equity.US.brkb/USD") == "BRKB"
 
+    def test_hk_prefix_and_hkd_quote(self):
+        assert extract_ticker("Equity.HK.0002/HKD", "Equity.HK.") == "0002"
+
 
 class TestIsCandidate:
     def test_stable_no_overnight_included(self):
@@ -69,6 +72,14 @@ class TestIsCandidate:
     def test_non_us_equity_excluded(self):
         assert is_candidate(_feed("Crypto.BTC/USD", "STABLE", ["REGULAR"])) is False
 
+    def test_hk_prefix_includes_hk_feed(self):
+        feed = _feed("Equity.HK.0002/HKD", "STABLE", ["REGULAR"])
+        assert is_candidate(feed, "Equity.HK.") is True
+
+    def test_hk_prefix_excludes_us_feed(self):
+        feed = _feed("Equity.US.A/USD", "STABLE", ["REGULAR"])
+        assert is_candidate(feed, "Equity.HK.") is False
+
 
 class TestBuildCandidates:
     def test_rows_and_flag(self):
@@ -88,6 +99,15 @@ class TestBuildCandidates:
         assert by_ticker["A"]["overnight_configured"] is False
         assert by_ticker["NEW"]["overnight_configured"] is True
         assert by_ticker["NEW"]["state"] == "COMING_SOON"
+
+    def test_prefix_selects_only_that_namespace(self):
+        feeds = [
+            _feed("Equity.US.A/USD", "STABLE", ["REGULAR"]),
+            _feed("Equity.HK.0002/HKD", "STABLE", ["REGULAR"]),
+            _feed("Equity.HK.0005/HKD", "COMING_SOON", ["REGULAR"]),
+        ]
+        rows = build_candidates(feeds, "Equity.HK.")
+        assert [r["ticker"] for r in rows] == ["0002", "0005"]
 
 
 class TestWriters:
