@@ -698,3 +698,119 @@ def test_set_ric_feed_absent_from_map_warns():
     assert changes == []
     assert len(warnings) == 1
     assert "no RIC resolved" in warnings[0].message
+
+
+# ---------------------------------------------------------------------------
+# ClearRic
+# ---------------------------------------------------------------------------
+from edit_config_lib.config_ops import ClearRic
+
+
+def _ric_feed(feed_id, symbol, sessions, state="STABLE"):
+    """Build a feed with datascope_ric slots. `sessions` is [(session, ident)]."""
+    return {
+        "feedId": feed_id,
+        "symbol": symbol,
+        "state": state,
+        "marketSchedules": [
+            {
+                "session": name,
+                "benchmarkMapping": {
+                    "datascope_ric": {
+                        "identifiers": [
+                            {
+                                "identifier": ident,
+                                "validFrom": "1970-01-01T00:00:00.000000000Z",
+                            }
+                        ]
+                    }
+                },
+            }
+            for (name, ident) in sessions
+        ],
+    }
+
+
+def test_clear_ric_clears_populated_slot():
+    feed = _ric_feed(885, "Equity.HK.0883-HK/HKD", [("REGULAR", "STALE.HK")])
+    op = ClearRic()
+    changes, warnings = op.apply(feed)
+    assert len(changes) == 1
+    c = changes[0]
+    assert c.feed_id == 885
+    assert c.location == "datascope_ric_identifier"
+    assert c.field == "identifier"
+    assert c.before == "STALE.HK"
+    assert c.after == ""
+    assert c.index == 0
+    # working copy updated in place
+    ident = feed["marketSchedules"][0]["benchmarkMapping"]["datascope_ric"][
+        "identifiers"
+    ][0]["identifier"]
+    assert ident == ""
+    # one churn warning naming the wiped value
+    assert any("STALE.HK" in w.message and "clearing" in w.message for w in warnings)
+
+
+def test_clear_ric_already_empty_is_noop():
+    feed = _ric_feed(884, "Equity.HK.0700-HK/HKD", [("REGULAR", "")])
+    op = ClearRic()
+    changes, warnings = op.apply(feed)
+    assert changes == []
+    assert warnings == []
+
+
+def test_clear_ric_mixed_slots_only_clears_populated():
+    feed = {
+        "feedId": 990,
+        "symbol": "Equity.US.BITS/USD",
+        "state": "STABLE",
+        "marketSchedules": [
+            {
+                "session": "REGULAR",
+                "benchmarkMapping": {
+                    "datascope_ric": {
+                        "identifiers": [
+                            {"identifier": "BITS.O"},
+                            {"identifier": ""},
+                        ]
+                    }
+                },
+            }
+        ],
+    }
+    op = ClearRic()
+    changes, _ = op.apply(feed)
+    assert [c.index for c in changes] == [0]
+    assert changes[0].before == "BITS.O"
+    assert changes[0].after == ""
+
+
+def test_clear_ric_stable_feed_extra_warning():
+    feed = _ric_feed(990, "Equity.US.BITS/USD", [("REGULAR", "BITS.O")], state="STABLE")
+    op = ClearRic()
+    _, warnings = op.apply(feed)
+    assert any("STABLE feed" in w.message for w in warnings)
+
+
+def test_clear_ric_non_stable_no_extra_warning():
+    feed = _ric_feed(
+        884, "Equity.HK.0700-HK/HKD", [("REGULAR", "0700.HK")], state="COMING_SOON"
+    )
+    op = ClearRic()
+    _, warnings = op.apply(feed)
+    assert not any("STABLE feed" in w.message for w in warnings)
+
+
+def test_clear_ric_no_slots_warns():
+    feed = {
+        "feedId": 1000,
+        "symbol": "Crypto.BTC/USD",
+        "state": "STABLE",
+        "marketSchedules": [{"session": "REGULAR", "benchmarkMapping": {}}],
+    }
+    op = ClearRic()
+    changes, warnings = op.apply(feed)
+    assert changes == []
+    assert len(warnings) == 1
+    assert "nothing to clear" in warnings[0].message

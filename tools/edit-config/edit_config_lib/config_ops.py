@@ -622,6 +622,94 @@ class SetRicFromResolver:
         return changes, warnings
 
 
+@dataclass
+class ClearRic:
+    """Clear every datascope_ric identifier slot on a feed back to "".
+
+    The structural inverse of SetRicMapping: it keeps the datascope_ric /
+    identifiers[] scaffold intact and only empties the value strings. Reuses the
+    `datascope_ric_identifier` Change location (after=""), so the text-surgery
+    applier needs no changes.
+
+    Per-slot semantics:
+      - identifier == ""  -> NOOP (no Change).
+      - identifier != ""  -> Change(after="") + Warning naming the wiped value.
+
+    Per-feed semantics:
+      - no datascope_ric identifier slots -> Warning ("nothing to clear").
+      - state == STABLE with >=1 non-empty slot -> extra Warning (live benchmark).
+    """
+
+    def apply(self, feed: dict) -> tuple[list[Change], list[Warning]]:
+        feed_id = feed["feedId"]
+        symbol = feed.get("symbol", "")
+
+        # Walk slots in document order — matches SetRicFromResolver and
+        # config_text_surgery.find_ric_identifier_spans, so Change.index lines up.
+        slots: list[dict] = []
+        for schedule in feed.get("marketSchedules", []):
+            bm = schedule.get("benchmarkMapping", {})
+            ds = bm.get("datascope_ric", {})
+            for ident in ds.get("identifiers", []) or []:
+                if isinstance(ident, dict) and "identifier" in ident:
+                    slots.append(ident)
+
+        if not slots:
+            return [], [
+                Warning(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    message=(
+                        f"feed {feed_id}: no datascope_ric identifier slots — "
+                        f"nothing to clear"
+                    ),
+                )
+            ]
+
+        changes: list[Change] = []
+        warnings: list[Warning] = []
+        for i, slot in enumerate(slots):
+            current = slot["identifier"]
+            if current == "":
+                continue
+            changes.append(
+                Change(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    location="datascope_ric_identifier",
+                    field="identifier",
+                    before=current,
+                    after="",
+                    index=i,
+                )
+            )
+            slot["identifier"] = ""
+            warnings.append(
+                Warning(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    message=(
+                        f"feed {feed_id}: clearing identifier slot {i} "
+                        f'({current!r} -> "")'
+                    ),
+                )
+            )
+
+        if changes and feed.get("state") == "STABLE":
+            warnings.append(
+                Warning(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    message=(
+                        f"feed {feed_id}: clearing RIC on STABLE feed — "
+                        f"breaks live benchmark"
+                    ),
+                )
+            )
+
+        return changes, warnings
+
+
 _STATE_WARNINGS = {
     ("STABLE", "COMING_SOON"): "regression: STABLE feed downgraded to COMING_SOON",
     ("STABLE", "INACTIVE"): "deactivation of live STABLE feed",
