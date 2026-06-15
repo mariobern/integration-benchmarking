@@ -814,3 +814,16 @@ def test_clear_ric_no_slots_warns():
     assert changes == []
     assert len(warnings) == 1
     assert "nothing to clear" in warnings[0].message
+
+
+def test_clear_ric_multi_session_indices_are_sequential():
+    feed = _ric_feed(
+        885,
+        "Equity.HK.0883-HK/HKD",
+        [("REGULAR", "0883.HK"), ("OVER_NIGHT", "0883.BLUE")],
+        state="COMING_SOON",
+    )
+    op = ClearRic()
+    changes, _ = op.apply(feed)
+    assert len(changes) == 2
+    assert [c.index for c in changes] == [0, 1]

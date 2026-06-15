@@ -626,7 +626,7 @@ class SetRicFromResolver:
 class ClearRic:
     """Clear every datascope_ric identifier slot on a feed back to "".
 
-    The structural inverse of SetRicMapping: it keeps the datascope_ric /
+    Reverses what SetRicMapping / SetRicFromResolver wrote: it keeps the datascope_ric /
     identifiers[] scaffold intact and only empties the value strings. Reuses the
     `datascope_ric_identifier` Change location (after=""), so the text-surgery
     applier needs no changes.
