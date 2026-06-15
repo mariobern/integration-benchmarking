@@ -89,7 +89,7 @@ def _set_ric_summary_lines(
 
 
 def _remove_ric_summary_lines(
-    op: "ClearRic",
+    op: ClearRic,
     changes: list[Change],
     warnings: list[Warning],
 ) -> list[str]:
@@ -100,6 +100,8 @@ def _remove_ric_summary_lines(
     """
     cleared = sum(1 for c in changes if c.location == "datascope_ric_identifier")
     no_slots = sum(1 for w in warnings if "nothing to clear" in w.message)
+    # Plan-wide warnings; with --from-spec mixing ClearRic and min-publisher
+    # ops, this could include unrelated "STABLE feed" warnings. Acceptable (YAGNI).
     stable = sum(1 for w in warnings if "STABLE feed" in w.message)
     return [
         "",

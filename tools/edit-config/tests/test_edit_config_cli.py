@@ -626,3 +626,36 @@ def test_cli_remove_ric_no_slots_warns(tmp_path):
     assert result.returncode == 0, result.stderr
     out = result.stdout + result.stderr
     assert "nothing to clear" in out
+
+
+def test_cli_remove_ric_stable_feed_footer_counts(tmp_path):
+    # A STABLE feed with a populated RIC -> the footer's STABLE counter is 1
+    # and a STABLE-feed warning is emitted (dry-run).
+    config = tmp_path / "after.json"
+    cfg = {
+        "feeds": [
+            {
+                "feedId": 777,
+                "symbol": "Equity.US.FOO/USD",
+                "state": "STABLE",
+                "metadata": {"asset_type": "equity"},
+                "marketSchedules": [
+                    {
+                        "session": "REGULAR",
+                        "benchmarkMapping": {
+                            "datascope_ric": {"identifiers": [{"identifier": "FOO.O"}]}
+                        },
+                    }
+                ],
+                "minPublishers": 1,
+            }
+        ]
+    }
+    config.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+    result = _run_cli_ric(
+        ["--config", str(config), "--remove-ric", "--feed-id", "777"]
+    )
+    assert result.returncode == 0, result.stderr
+    out = result.stdout + result.stderr
+    assert "STABLE feeds affected:  1" in out
+    assert "STABLE feed" in out  # the per-feed warning fired
