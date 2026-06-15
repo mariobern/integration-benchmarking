@@ -571,3 +571,58 @@ def test_cli_set_ric_dry_run_does_not_write(tmp_path, monkeypatch):
     rc = edit_config.main(["--config", str(config), "--set-ric", "--feed-id", "990"])
     assert rc == 0
     assert config.read_text() == before  # dry-run default, nothing written
+
+
+# ---------------------------------------------------------------------------
+# --remove-ric (uses the hk_sample.json fixture: 885 = STALE.HK populated,
+# 884/886 = empty, 1000 = no datascope_ric slots)
+# ---------------------------------------------------------------------------
+def test_cli_remove_ric_dry_run_does_not_write(tmp_path):
+    config = tmp_path / "after.json"
+    shutil.copy(FIXTURES / "hk_sample.json", config)
+    before = config.read_text()
+    result = _run_cli_ric(["--config", str(config), "--remove-ric", "--feed-id", "885"])
+    assert result.returncode == 0, result.stderr
+    out = result.stdout + result.stderr
+    assert "[DRY RUN]" in out
+    assert "RIC removal summary" in out
+    assert "STALE.HK" in out  # the value being wiped is shown
+    assert config.read_text() == before  # nothing written
+
+
+def test_cli_remove_ric_apply_clears_value(tmp_path):
+    config = tmp_path / "after.json"
+    shutil.copy(FIXTURES / "hk_sample.json", config)
+    result = _run_cli_ric(
+        ["--config", str(config), "--remove-ric", "--feed-id", "885", "--apply"]
+    )
+    assert result.returncode == 0, result.stderr
+    data = json.loads(config.read_text())
+    feeds_by_id = {f["feedId"]: f for f in data["feeds"]}
+    cleared = feeds_by_id[885]["marketSchedules"][0]["benchmarkMapping"][
+        "datascope_ric"
+    ]["identifiers"][0]["identifier"]
+    assert cleared == ""
+
+
+def test_cli_remove_ric_already_empty_no_changes(tmp_path):
+    config = tmp_path / "after.json"
+    shutil.copy(FIXTURES / "hk_sample.json", config)
+    # Feed 884 already has an empty identifier -> nothing to clear.
+    result = _run_cli_ric(
+        ["--config", str(config), "--remove-ric", "--feed-id", "884", "--apply"]
+    )
+    assert result.returncode == 0, result.stderr
+    assert "No changes to write." in (result.stdout + result.stderr)
+
+
+def test_cli_remove_ric_no_slots_warns(tmp_path):
+    config = tmp_path / "after.json"
+    shutil.copy(FIXTURES / "hk_sample.json", config)
+    # Feed 1000 (Crypto.BTC) has empty marketSchedules -> no slots warning.
+    result = _run_cli_ric(
+        ["--config", str(config), "--remove-ric", "--feed-id", "1000"]
+    )
+    assert result.returncode == 0, result.stderr
+    out = result.stdout + result.stderr
+    assert "nothing to clear" in out

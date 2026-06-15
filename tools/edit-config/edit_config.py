@@ -26,6 +26,7 @@ from edit_config_lib.config_ops import (  # noqa: E402
     Change,
     SetRicMapping,
     SetRicFromResolver,
+    ClearRic,
     Warning,
 )
 
@@ -87,6 +88,28 @@ def _set_ric_summary_lines(
     ]
 
 
+def _remove_ric_summary_lines(
+    op: "ClearRic",
+    changes: list[Change],
+    warnings: list[Warning],
+) -> list[str]:
+    """Return extra summary lines for a ClearRic operation.
+
+    `op` is accepted for call-site parity with the other summary helpers; the
+    stats are derived from `changes` and `warnings`.
+    """
+    cleared = sum(1 for c in changes if c.location == "datascope_ric_identifier")
+    no_slots = sum(1 for w in warnings if "nothing to clear" in w.message)
+    stable = sum(1 for w in warnings if "STABLE feed" in w.message)
+    return [
+        "",
+        "RIC removal summary:",
+        f"  identifiers cleared:    {cleared}",
+        f"  feeds with no slots:    {no_slots}",
+        f"  STABLE feeds affected:  {stable}",
+    ]
+
+
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="edit_config.py",
@@ -118,6 +141,14 @@ def _build_parser() -> argparse.ArgumentParser:
             "Resolve each targeted feed's RIC via generate_ric_mapping and "
             "overwrite its datascope_ric identifiers (day=TICKER.<exch>, "
             "overnight=TICKER.BLUE). Target with --feed-id/--feed-ids-from."
+        ),
+    )
+    op_group.add_argument(
+        "--remove-ric",
+        action="store_true",
+        help=(
+            'Clear all datascope_ric identifier values to "" on targeted feeds '
+            "(inverse of --set-ric-mapping). Target with the usual filters."
         ),
     )
 
@@ -277,6 +308,11 @@ def main(argv: list[str] | None = None) -> int:
                 print(line)
         elif isinstance(planned.op, SetRicFromResolver):
             for line in _set_ric_summary_lines(
+                planned.op, result.changes, result.warnings
+            ):
+                print(line)
+        elif isinstance(planned.op, ClearRic):
+            for line in _remove_ric_summary_lines(
                 planned.op, result.changes, result.warnings
             ):
                 print(line)
