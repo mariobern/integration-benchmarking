@@ -51,6 +51,7 @@ from edit_config_lib.config_ops import (
     SetRicMapping,
     SetRicFromResolver,
     ResolvedRic,
+    ClearRic,
 )
 from edit_config_lib.ric_csv import load_ric_csv, build_prefix_index, LoadError
 from edit_config_lib.config_selector import parse_selector_text, read_selector_file
@@ -70,6 +71,7 @@ _OP_FLAGS = (
     "set_state",
     "set_ric_mapping",
     "set_ric",
+    "remove_ric",
 )
 
 
@@ -100,7 +102,7 @@ def _parse_signed_int(s: str) -> int:
 
 
 # store_true flags default to False; other op flags default to None.
-_BOOL_OP_FLAGS = frozenset({"set_ric_mapping", "set_ric"})
+_BOOL_OP_FLAGS = frozenset({"set_ric_mapping", "set_ric", "remove_ric"})
 
 
 def _flag_set(args, name: str) -> bool:
@@ -224,6 +226,8 @@ def build_op_from_args(args) -> list[PlannedOp]:
         op = BumpMinPublishers(delta=delta, session=args.session)
     elif name == "set_state":
         op = SetState(value=args.set_state)
+    elif name == "remove_ric":
+        op = ClearRic()
     else:
         raise AssertionError(f"unhandled op {name}")
 
