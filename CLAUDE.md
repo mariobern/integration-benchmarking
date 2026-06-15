@@ -105,7 +105,7 @@ FX and Metals use 24-hour regular session (with maintenance windows). See indivi
 | `extract_overnight_candidates.py`      | Extract equity overnight candidates from a Lazer config (`--symbol-prefix`, default `Equity.US.`)      | `python3 extract_overnight_candidates.py --config lazer_test.json --symbol-prefix Equity.HK.`          | -                                                                        |
 | `rank_overnight_candidates.py`         | Rank overnight candidates by volume profile (joins volume_profile.py output) for BlueOcean             | `python3 rank_overnight_candidates.py --volume-csv output_csv/volume_profile_2026-06-11.csv`           | -                                                                        |
 | `tools/config-linter/config_linter.py` | Lint after.json for config errors (duplicates, publishers, schedules)                                  | `python3 tools/config-linter/config_linter.py --config after.json`                                     | [docs/config_linter.md](docs/config_linter.md)                           |
-| `tools/edit-config/edit_config.py`     | Surgical editor: add/remove publishers, set minPublishers, set state, set RIC identifiers              | `python3 tools/edit-config/edit_config.py --config after.json --add-publisher 80 --feed-id 1000-1050`  | [docs/edit_config.md](docs/edit_config.md)                               |
+| `tools/edit-config/edit_config.py`     | Surgical editor: add/remove publishers, set minPublishers, set state, set/clear RIC identifiers        | `python3 tools/edit-config/edit_config.py --config after.json --add-publisher 80 --feed-id 1000-1050`  | [docs/edit_config.md](docs/edit_config.md)                               |
 
 ### Publisher Performance Portal
 
