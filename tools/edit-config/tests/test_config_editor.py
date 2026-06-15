@@ -1041,3 +1041,28 @@ def test_build_remove_ric_requires_targeting():
     args = make_args(remove_ric=True)
     with pytest.raises(ValueError, match="at least one"):
         build_op_from_args(args)
+
+
+def test_yaml_remove_ric_parses(tmp_path):
+    spec = tmp_path / "spec.yaml"
+    spec.write_text(
+        "version: 1\n"
+        "operations:\n"
+        "  - op: remove_ric\n"
+        '    feed_id: "884,885"\n',
+        encoding="utf-8",
+    )
+    ops = parse_yaml_spec(str(spec))
+    assert len(ops) == 1
+    assert isinstance(ops[0].op, _ClearRic)
+    assert ops[0].filters.feed_ids == {884, 885}
+
+
+def test_yaml_remove_ric_requires_targeting(tmp_path):
+    spec = tmp_path / "spec.yaml"
+    spec.write_text(
+        "operations:\n  - op: remove_ric\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="at least one"):
+        parse_yaml_spec(str(spec))

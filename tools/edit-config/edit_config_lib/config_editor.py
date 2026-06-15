@@ -245,6 +245,7 @@ _OP_REQUIRED_FIELDS = {
     "bump_min_publishers": {"delta"},
     "set_state": {"value"},
     "set_ric_mapping": {"from_csv"},
+    "remove_ric": set(),
 }
 
 _TARGETING_KEYS = {
@@ -344,6 +345,8 @@ def _build_op_from_yaml_entry(entry: dict):
                 f"set_ric_mapping from_csv {entry['from_csv']!r}: no rows produced a known feed prefix"
             )
         return SetRicMapping(prefix_to_ric=prefix_to_ric)
+    if op_name == "remove_ric":
+        return ClearRic()
     raise AssertionError(f"unhandled op {op_name}")
 
 
