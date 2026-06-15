@@ -170,7 +170,8 @@ def build_op_from_args(args) -> list[PlannedOp]:
         raise ValueError(
             "no operation specified (use one of --add-publisher, "
             "--remove-publisher, --set-min-publishers, "
-            "--bump-min-publishers, --set-state, --set-ric-mapping, --set-ric)"
+            "--bump-min-publishers, --set-state, --set-ric-mapping, --set-ric, "
+            "--remove-ric)"
         )
     if len(selected) > 1:
         raise ValueError(f"exactly one operation flag allowed; got {selected}")
