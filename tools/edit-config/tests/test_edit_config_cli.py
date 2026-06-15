@@ -652,9 +652,7 @@ def test_cli_remove_ric_stable_feed_footer_counts(tmp_path):
         ]
     }
     config.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
-    result = _run_cli_ric(
-        ["--config", str(config), "--remove-ric", "--feed-id", "777"]
-    )
+    result = _run_cli_ric(["--config", str(config), "--remove-ric", "--feed-id", "777"])
     assert result.returncode == 0, result.stderr
     out = result.stdout + result.stderr
     assert "STABLE feeds affected:  1" in out
