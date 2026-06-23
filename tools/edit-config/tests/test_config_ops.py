@@ -698,3 +698,198 @@ def test_set_ric_feed_absent_from_map_warns():
     assert changes == []
     assert len(warnings) == 1
     assert "no RIC resolved" in warnings[0].message
+
+
+from edit_config_lib.config_ops import (
+    ExchangeInfo,
+    build_exchanges_by_id,
+    asset_class_matches,
+)
+
+EX_FIXTURE_PATH = Path(__file__).parent / "fixtures" / "after_with_exchanges.json"
+
+
+@pytest.fixture
+def ex_config():
+    return json.loads(EX_FIXTURE_PATH.read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def exchanges_by_id(ex_config):
+    return build_exchanges_by_id(ex_config["exchanges"])
+
+
+@pytest.fixture
+def ex_feeds(ex_config):
+    return ex_config["feeds"]
+
+
+class TestExchangeHelpers:
+    def test_build_maps_by_id(self, exchanges_by_id):
+        assert set(exchanges_by_id) == {1, 21}
+        ex1 = exchanges_by_id[1]
+        assert isinstance(ex1, ExchangeInfo)
+        assert ex1.name == "NASDAQ Test Consolidated"
+        assert ex1.asset_class == "EXCHANGE_ASSET_CLASS_EQUITY"
+        assert set(ex1.sessions) == {
+            "REGULAR",
+            "PRE_MARKET",
+            "POST_MARKET",
+            "OVER_NIGHT",
+        }
+        assert ex1.sessions["REGULAR"] == "America/New_York;0930-1600;R"
+
+    def test_build_hk_single_session(self, exchanges_by_id):
+        assert set(exchanges_by_id[21].sessions) == {"REGULAR"}
+
+    def test_empty_list_yields_empty_map(self):
+        assert build_exchanges_by_id([]) == {}
+
+    def test_asset_class_matches_equity(self):
+        assert asset_class_matches("EXCHANGE_ASSET_CLASS_EQUITY", "equity") is True
+
+    def test_asset_class_mismatch(self):
+        assert asset_class_matches("EXCHANGE_ASSET_CLASS_EQUITY", "crypto") is False
+
+    def test_asset_class_blank_does_not_flag(self):
+        assert asset_class_matches("", "equity") is True
+        assert asset_class_matches("EXCHANGE_ASSET_CLASS_EQUITY", "") is True
+
+
+from edit_config_lib.config_ops import AddExchangeId
+
+
+def _sessions_with_schedule(feed):
+    return [s["session"] for s in feed["marketSchedules"] if "marketSchedule" in s]
+
+
+class TestAddExchangeId:
+    def test_add_inserts_id_and_strips_all_schedule_strings(
+        self, ex_feeds, exchanges_by_id
+    ):
+        feed = feed_by_id(ex_feeds, 100)  # no exchangeId, strings on all 4 sessions
+        op = AddExchangeId(exchange_id=1, exchange=exchanges_by_id[1])
+        changes, warns = op.apply(feed)
+        # exchangeId inserted (before=None) + 4 schedule deletions.
+        id_changes = [c for c in changes if c.field == "exchangeId"]
+        sched_changes = [c for c in changes if c.field == "marketSchedule"]
+        assert len(id_changes) == 1
+        assert id_changes[0].before is None and id_changes[0].after == 1
+        assert len(sched_changes) == 4
+        assert all(c.after is None for c in sched_changes)
+        assert feed["exchangeId"] == 1
+        assert _sessions_with_schedule(feed) == []
+        assert warns == []
+
+    def test_same_id_with_stale_strings_strips_them_no_id_change(
+        self, ex_feeds, exchanges_by_id
+    ):
+        feed = feed_by_id(ex_feeds, 300)  # exchangeId 1 already + 2 stale strings
+        op = AddExchangeId(exchange_id=1, exchange=exchanges_by_id[1])
+        changes, warns = op.apply(feed)
+        assert [c for c in changes if c.field == "exchangeId"] == []
+        assert len(changes) == 2  # both stale strings removed
+        assert _sessions_with_schedule(feed) == []
+        assert warns == []
+
+    def test_same_id_already_inherited_is_noop(self, ex_feeds, exchanges_by_id):
+        feed = feed_by_id(ex_feeds, 200)  # exchangeId 1, no strings
+        op = AddExchangeId(exchange_id=1, exchange=exchanges_by_id[1])
+        changes, warns = op.apply(feed)
+        assert changes == []
+        assert warns == []
+
+    def test_reassignment_warns(self, exchanges_by_id):
+        # A single-REGULAR feed already on exchange 1, reassigned to 21.
+        # (Exchange 21 only defines REGULAR, so coverage holds.)
+        feed = {
+            "exchangeId": 1,
+            "feedId": 999,
+            "symbol": "Equity.HK.X/HKD",
+            "metadata": {"asset_type": "equity"},
+            "marketSchedules": [{"allowedPublisherIds": [1], "session": "REGULAR"}],
+        }
+        op = AddExchangeId(exchange_id=21, exchange=exchanges_by_id[21])
+        changes, warns = op.apply(feed)
+        assert feed["exchangeId"] == 21
+        assert any("reassigning exchangeId 1 -> 21" in w.message for w in warns)
+
+    def test_session_not_covered_is_error(self, ex_feeds, exchanges_by_id):
+        feed = feed_by_id(ex_feeds, 400)  # has OVER_NIGHT; exchange 21 lacks it
+        op = AddExchangeId(exchange_id=21, exchange=exchanges_by_id[21])
+        with pytest.raises(OpError, match="does not define session"):
+            op.apply(feed)
+
+    def test_asset_class_mismatch_warns_but_applies(self, ex_feeds, exchanges_by_id):
+        feed = feed_by_id(ex_feeds, 500)  # crypto feed, REGULAR only
+        op = AddExchangeId(exchange_id=1, exchange=exchanges_by_id[1])
+        changes, warns = op.apply(feed)
+        assert feed["exchangeId"] == 1
+        assert any("does not match exchange" in w.message for w in warns)
+
+
+from edit_config_lib.config_ops import RemoveExchangeId
+
+
+class TestRemoveExchangeId:
+    def test_removes_id_and_restores_all_schedules(self, ex_feeds, exchanges_by_id):
+        feed = feed_by_id(ex_feeds, 200)  # exchangeId 1, no strings, 4 sessions
+        op = RemoveExchangeId(exchanges_by_id=exchanges_by_id)
+        changes, warns = op.apply(feed)
+        id_changes = [c for c in changes if c.field == "exchangeId"]
+        sched_changes = [c for c in changes if c.field == "marketSchedule"]
+        assert len(id_changes) == 1 and id_changes[0].after is None
+        assert len(sched_changes) == 4
+        # Restored strings come from the exchange definition.
+        reg = get_session(feed, "REGULAR")
+        assert reg["marketSchedule"] == "America/New_York;0930-1600;R"
+        assert "exchangeId" not in feed
+        assert warns == []
+
+    def test_no_exchange_id_warns_noop(self, ex_feeds, exchanges_by_id):
+        feed = feed_by_id(ex_feeds, 100)  # no exchangeId
+        op = RemoveExchangeId(exchanges_by_id=exchanges_by_id)
+        changes, warns = op.apply(feed)
+        assert changes == []
+        assert any("no exchangeId to remove" in w.message for w in warns)
+
+    def test_unknown_current_id_is_error(self, exchanges_by_id):
+        feed = {
+            "exchangeId": 7,  # not in {1, 21}
+            "feedId": 888,
+            "symbol": "Equity.US.ZZZ/USD",
+            "metadata": {"asset_type": "equity"},
+            "marketSchedules": [{"allowedPublisherIds": [1], "session": "REGULAR"}],
+        }
+        op = RemoveExchangeId(exchanges_by_id=exchanges_by_id)
+        with pytest.raises(OpError, match="not defined in exchanges"):
+            op.apply(feed)
+
+    def test_session_not_covered_is_error(self, exchanges_by_id):
+        feed = {
+            "exchangeId": 21,  # HK: REGULAR only
+            "feedId": 889,
+            "symbol": "Equity.HK.Y/HKD",
+            "metadata": {"asset_type": "equity"},
+            "marketSchedules": [
+                {"allowedPublisherIds": [1], "session": "REGULAR"},
+                {"allowedPublisherIds": [1], "session": "OVER_NIGHT"},
+            ],
+        }
+        op = RemoveExchangeId(exchanges_by_id=exchanges_by_id)
+        with pytest.raises(OpError, match="cannot restore"):
+            op.apply(feed)
+
+    def test_existing_schedule_string_left_untouched(self, ex_feeds, exchanges_by_id):
+        feed = feed_by_id(
+            ex_feeds, 300
+        )  # exchangeId 1, REGULAR+OVER_NIGHT both have stale strings
+        op = RemoveExchangeId(exchanges_by_id=exchanges_by_id)
+        changes, warns = op.apply(feed)
+        # id removed; both sessions already had strings -> no marketSchedule changes.
+        assert [c for c in changes if c.field == "exchangeId"] == [changes[0]]
+        assert [c for c in changes if c.field == "marketSchedule"] == []
+        assert (
+            get_session(feed, "REGULAR")["marketSchedule"]
+            == "America/New_York;0930-1600;STALE-R"
+        )

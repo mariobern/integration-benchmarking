@@ -28,6 +28,7 @@ from edit_config_lib.config_ops import (  # noqa: E402
     SetRicFromResolver,
     Warning,
 )
+from edit_config_lib.config_ops import build_exchanges_by_id  # noqa: E402
 
 
 def _set_ric_mapping_summary_lines(
@@ -105,6 +106,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Signed integer, e.g. +1 or -2",
     )
     op_group.add_argument("--set-state", choices=("STABLE", "COMING_SOON", "INACTIVE"))
+    op_group.add_argument("--add-exchange-id", type=int, dest="add_exchange_id")
+    op_group.add_argument(
+        "--remove-exchange-id", action="store_true", dest="remove_exchange_id"
+    )
     op_group.add_argument("--from-spec", type=str, help="YAML spec path")
     op_group.add_argument(
         "--set-ric-mapping",
@@ -201,13 +206,15 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     print(f"Reading {config_path} ({len(feeds)} feeds)...")
 
+    exchanges_by_id = build_exchanges_by_id(data.get("exchanges", []))
+
     # Build plan
     if args.from_spec:
-        plan = parse_yaml_spec(args.from_spec)
+        plan = parse_yaml_spec(args.from_spec, exchanges_by_id)
         print(f"Parsing {args.from_spec}... {len(plan)} operations.")
     else:
         try:
-            plan = build_op_from_args(args)
+            plan = build_op_from_args(args, exchanges_by_id)
         except ValueError as e:
             print(f"ERROR: {e}", file=sys.stderr)
             return 1

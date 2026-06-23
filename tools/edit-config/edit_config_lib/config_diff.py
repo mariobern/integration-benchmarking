@@ -21,6 +21,19 @@ def _hunk_header(change: Change) -> str:
 
 def _value_lines(change: Change) -> tuple[str, str]:
     """Return (before_line, after_line) formatted as JSON-ish text."""
+    if change.field in ("exchangeId", "marketSchedule"):
+
+        def _fmt(val):
+            if change.field == "exchangeId":
+                return f'      "exchangeId": {val},'
+            return f'      "marketSchedule": "{val}",'
+
+        if change.after is None:  # delete
+            return _fmt(change.before), "      (removed)"
+        if change.before is None:  # insert
+            return "      (absent)", _fmt(change.after)
+        return _fmt(change.before), _fmt(change.after)
+
     if change.before is None and change.field in (
         "allowedPublisherIds",
         "minPublishers",
