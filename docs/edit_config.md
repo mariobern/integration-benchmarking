@@ -45,8 +45,8 @@ python3 tools/edit-config/edit_config.py --config lazer_update.json [OPERATION] 
 | `--set-state STABLE\|COMING_SOON\|INACTIVE` | Change feed state                                                          |
 | `--add-exchange-id N`                       | Assign exchange `N` and strip inherited `marketSchedule` strings           |
 | `--remove-exchange-id`                      | Remove `exchangeId` and restore `marketSchedule` strings from the exchange |
-| `--remove-ric`                              | Clear all `datascope_ric` identifier values to `""`                        |
 | `--set-ric-mapping --from-csv PATH`         | Fill empty `datascope_ric.identifier` values                               |
+| `--remove-ric`                              | Clear all `datascope_ric` identifier values to `""`                        |
 | `--from-spec PATH`                          | Apply a batched YAML spec (multiple ops)                                   |
 
 ### Targeting (≥1 required when not using `--from-spec`)

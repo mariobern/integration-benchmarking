@@ -709,6 +709,61 @@ class ClearRic:
 
         if not slots:
             return [], [
+                Warning(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    message=(
+                        f"feed {feed_id}: no datascope_ric identifier slots — "
+                        f"nothing to clear"
+                    ),
+                )
+            ]
+
+        changes: list[Change] = []
+        warnings: list[Warning] = []
+        for i, slot in enumerate(slots):
+            current = slot["identifier"]
+            if current == "":
+                continue
+            changes.append(
+                Change(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    location="datascope_ric_identifier",
+                    field="identifier",
+                    before=current,
+                    after="",
+                    index=i,
+                )
+            )
+            slot["identifier"] = ""
+            warnings.append(
+                Warning(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    message=(
+                        f"feed {feed_id}: clearing identifier slot {i} "
+                        f'({current!r} -> "")'
+                    ),
+                )
+            )
+
+        if changes and feed.get("state") == "STABLE":
+            warnings.append(
+                Warning(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    message=(
+                        f"feed {feed_id}: clearing RIC on STABLE feed — "
+                        f"breaks live benchmark"
+                    ),
+                )
+            )
+
+        return changes, warnings
+
+
+@dataclass
 class AddExchangeId:
     """Assign `exchange_id` to a feed and strip each session's now-redundant
     `marketSchedule` string (the feed inherits the exchange's calendar).
@@ -749,18 +804,6 @@ class AddExchangeId:
                     feed_id=feed_id,
                     symbol=symbol,
                     message=(
-                        f"feed {feed_id}: no datascope_ric identifier slots — "
-                        f"nothing to clear"
-                    ),
-                )
-            ]
-
-        changes: list[Change] = []
-        warnings: list[Warning] = []
-        for i, slot in enumerate(slots):
-            current = slot["identifier"]
-            if current == "":
-                continue
                         f"feed {feed_id}: asset_type {feed_asset!r} does not "
                         f"match exchange {self.exchange_id} assetClass "
                         f"{self.exchange.asset_class!r}"
@@ -786,26 +829,6 @@ class AddExchangeId:
                 Change(
                     feed_id=feed_id,
                     symbol=symbol,
-                    location="datascope_ric_identifier",
-                    field="identifier",
-                    before=current,
-                    after="",
-                    index=i,
-                )
-            )
-            slot["identifier"] = ""
-            warnings.append(
-                Warning(
-                    feed_id=feed_id,
-                    symbol=symbol,
-                    message=(
-                        f"feed {feed_id}: clearing identifier slot {i} "
-                        f'({current!r} -> "")'
-                    ),
-                )
-            )
-
-        if changes and feed.get("state") == "STABLE":
                     location="top_level",
                     field="exchangeId",
                     before=current,
@@ -855,12 +878,6 @@ class RemoveExchangeId:
                 Warning(
                     feed_id=feed_id,
                     symbol=symbol,
-                    message=(
-                        f"feed {feed_id}: clearing RIC on STABLE feed — "
-                        f"breaks live benchmark"
-                    ),
-                )
-            )
                     message=f"feed {feed_id}: no exchangeId to remove",
                 )
             )

@@ -657,6 +657,8 @@ def test_cli_remove_ric_stable_feed_footer_counts(tmp_path):
     out = result.stdout + result.stderr
     assert "STABLE feeds affected:  1" in out
     assert "STABLE feed" in out  # the per-feed warning fired
+
+
 EX_FIXTURE = Path(__file__).parent / "fixtures" / "after_with_exchanges.json"
 
 

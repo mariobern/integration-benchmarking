@@ -1066,6 +1066,8 @@ def test_yaml_remove_ric_requires_targeting(tmp_path):
     )
     with pytest.raises(ValueError, match="at least one"):
         parse_yaml_spec(str(spec))
+
+
 _EX_FIXTURE = Path(__file__).parent / "fixtures" / "after_with_exchanges.json"
 
 

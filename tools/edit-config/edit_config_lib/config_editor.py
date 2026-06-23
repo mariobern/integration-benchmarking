@@ -108,8 +108,9 @@ def _parse_signed_int(s: str) -> int:
 
 
 # store_true flags default to False; other op flags default to None.
-_BOOL_OP_FLAGS = frozenset({"set_ric_mapping", "set_ric", "remove_ric"})
-_BOOL_OP_FLAGS = frozenset({"set_ric_mapping", "set_ric", "remove_exchange_id"})
+_BOOL_OP_FLAGS = frozenset(
+    {"set_ric_mapping", "set_ric", "remove_ric", "remove_exchange_id"}
+)
 
 
 def _flag_set(args, name: str) -> bool:
@@ -181,8 +182,7 @@ def build_op_from_args(
             "no operation specified (use one of --add-publisher, "
             "--remove-publisher, --set-min-publishers, "
             "--bump-min-publishers, --set-state, --set-ric-mapping, --set-ric, "
-            "--remove-ric, "
-            "--add-exchange-id, --remove-exchange-id)"
+            "--remove-ric, --add-exchange-id, --remove-exchange-id)"
         )
     if len(selected) > 1:
         raise ValueError(f"exactly one operation flag allowed; got {selected}")

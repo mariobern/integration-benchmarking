@@ -827,6 +827,8 @@ def test_clear_ric_multi_session_indices_are_sequential():
     changes, _ = op.apply(feed)
     assert len(changes) == 2
     assert [c.index for c in changes] == [0, 1]
+
+
 from edit_config_lib.config_ops import (
     ExchangeInfo,
     build_exchanges_by_id,
