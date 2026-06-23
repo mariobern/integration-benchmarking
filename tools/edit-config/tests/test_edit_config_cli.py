@@ -657,3 +657,138 @@ def test_cli_remove_ric_stable_feed_footer_counts(tmp_path):
     out = result.stdout + result.stderr
     assert "STABLE feeds affected:  1" in out
     assert "STABLE feed" in out  # the per-feed warning fired
+EX_FIXTURE = Path(__file__).parent / "fixtures" / "after_with_exchanges.json"
+
+
+@pytest.fixture
+def ex_config_copy(tmp_path):
+    dst = tmp_path / "after_with_exchanges.json"
+    shutil.copy(EX_FIXTURE, dst)
+    return dst
+
+
+def _feed(data, fid):
+    return next(f for f in data["feeds"] if f["feedId"] == fid)
+
+
+class TestExchangeCli:
+    def test_add_exchange_id_apply(self, ex_config_copy):
+        r = run_cli(
+            [
+                "--config",
+                str(ex_config_copy),
+                "--add-exchange-id",
+                "1",
+                "--feed-id",
+                "100",
+                "--apply",
+            ]
+        )
+        assert r.returncode == 0, r.stderr
+        data = json.loads(ex_config_copy.read_text())
+        feed = _feed(data, 100)
+        assert feed["exchangeId"] == 1
+        assert all("marketSchedule" not in s for s in feed["marketSchedules"])
+
+    def test_remove_exchange_id_apply(self, ex_config_copy):
+        r = run_cli(
+            [
+                "--config",
+                str(ex_config_copy),
+                "--remove-exchange-id",
+                "--feed-id",
+                "200",
+                "--apply",
+            ]
+        )
+        assert r.returncode == 0, r.stderr
+        feed = _feed(json.loads(ex_config_copy.read_text()), 200)
+        assert "exchangeId" not in feed
+        reg = next(s for s in feed["marketSchedules"] if s["session"] == "REGULAR")
+        assert reg["marketSchedule"] == "America/New_York;0930-1600;R"
+
+    def test_unknown_exchange_id_errors(self, ex_config_copy):
+        r = run_cli(
+            [
+                "--config",
+                str(ex_config_copy),
+                "--add-exchange-id",
+                "99",
+                "--feed-id",
+                "100",
+            ]
+        )
+        assert r.returncode == 1
+        assert "not defined in exchanges" in (r.stdout + r.stderr)
+
+    def test_session_not_covered_blocks_apply(self, ex_config_copy):
+        # feed 400 has OVER_NIGHT; exchange 21 (HK) lacks it.
+        r = run_cli(
+            [
+                "--config",
+                str(ex_config_copy),
+                "--add-exchange-id",
+                "21",
+                "--feed-id",
+                "400",
+                "--apply",
+            ]
+        )
+        assert r.returncode == 1
+        assert "does not define session" in (r.stdout + r.stderr)
+        # nothing written
+        feed = _feed(json.loads(ex_config_copy.read_text()), 400)
+        assert "exchangeId" not in feed
+
+    def test_add_then_remove_round_trips_schedules(self, ex_config_copy):
+        # Add exchange 1 to feed 100 (strips its 4 OLD-* strings).
+        r1 = run_cli(
+            [
+                "--config",
+                str(ex_config_copy),
+                "--add-exchange-id",
+                "1",
+                "--feed-id",
+                "100",
+                "--apply",
+            ]
+        )
+        assert r1.returncode == 0, r1.stderr
+        # Remove it again (restores strings from exchange 1's definition).
+        r2 = run_cli(
+            [
+                "--config",
+                str(ex_config_copy),
+                "--remove-exchange-id",
+                "--feed-id",
+                "100",
+                "--apply",
+            ]
+        )
+        assert r2.returncode == 0, r2.stderr
+        feed = _feed(json.loads(ex_config_copy.read_text()), 100)
+        assert "exchangeId" not in feed
+        by_session = {
+            s["session"]: s.get("marketSchedule") for s in feed["marketSchedules"]
+        }
+        # Restored values come from exchange 1, not the original OLD-* strings.
+        assert by_session["REGULAR"] == "America/New_York;0930-1600;R"
+        assert by_session["OVER_NIGHT"] == "America/New_York;2000-0400;O"
+
+    def test_add_cleans_up_anomaly_feed(self, ex_config_copy):
+        # Feed 300 already has exchangeId 1 AND two stale strings.
+        r = run_cli(
+            [
+                "--config",
+                str(ex_config_copy),
+                "--add-exchange-id",
+                "1",
+                "--feed-id",
+                "300",
+                "--apply",
+            ]
+        )
+        assert r.returncode == 0, r.stderr
+        feed = _feed(json.loads(ex_config_copy.read_text()), 300)
+        assert feed["exchangeId"] == 1
+        assert all("marketSchedule" not in s for s in feed["marketSchedules"])

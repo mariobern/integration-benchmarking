@@ -1,6 +1,7 @@
 """Orchestrator: parse spec, resolve targets, simulate, apply."""
 
 import fnmatch
+import json
 import re
 from dataclasses import dataclass
 
@@ -52,6 +53,9 @@ from edit_config_lib.config_ops import (
     SetRicFromResolver,
     ResolvedRic,
     ClearRic,
+    AddExchangeId,
+    RemoveExchangeId,
+    ExchangeInfo,
 )
 from edit_config_lib.ric_csv import load_ric_csv, build_prefix_index, LoadError
 from edit_config_lib.config_selector import parse_selector_text, read_selector_file
@@ -72,6 +76,8 @@ _OP_FLAGS = (
     "set_ric_mapping",
     "set_ric",
     "remove_ric",
+    "add_exchange_id",
+    "remove_exchange_id",
 )
 
 
@@ -103,6 +109,7 @@ def _parse_signed_int(s: str) -> int:
 
 # store_true flags default to False; other op flags default to None.
 _BOOL_OP_FLAGS = frozenset({"set_ric_mapping", "set_ric", "remove_ric"})
+_BOOL_OP_FLAGS = frozenset({"set_ric_mapping", "set_ric", "remove_exchange_id"})
 
 
 def _flag_set(args, name: str) -> bool:
@@ -159,19 +166,23 @@ def resolve_rics_for_feed_ids(
     return out
 
 
-def build_op_from_args(args) -> list[PlannedOp]:
+def build_op_from_args(
+    args, exchanges_by_id: dict[int, ExchangeInfo] | None = None
+) -> list[PlannedOp]:
     """Build a single-element PlannedOp list from argparse Namespace.
 
     Raises ValueError on missing/multiple operation flags, missing
     targeting, etc.
     """
+    exchanges_by_id = exchanges_by_id or {}
     selected = [name for name in _OP_FLAGS if _flag_set(args, name)]
     if not selected:
         raise ValueError(
             "no operation specified (use one of --add-publisher, "
             "--remove-publisher, --set-min-publishers, "
             "--bump-min-publishers, --set-state, --set-ric-mapping, --set-ric, "
-            "--remove-ric)"
+            "--remove-ric, "
+            "--add-exchange-id, --remove-exchange-id)"
         )
     if len(selected) > 1:
         raise ValueError(f"exactly one operation flag allowed; got {selected}")
@@ -229,6 +240,16 @@ def build_op_from_args(args) -> list[PlannedOp]:
         op = SetState(value=args.set_state)
     elif name == "remove_ric":
         op = ClearRic()
+    elif name == "add_exchange_id":
+        exchange = exchanges_by_id.get(args.add_exchange_id)
+        if exchange is None:
+            raise ValueError(
+                f"--add-exchange-id {args.add_exchange_id}: exchange not "
+                f"defined in exchanges[] (known ids: {sorted(exchanges_by_id)})"
+            )
+        op = AddExchangeId(exchange_id=args.add_exchange_id, exchange=exchange)
+    elif name == "remove_exchange_id":
+        op = RemoveExchangeId(exchanges_by_id=exchanges_by_id)
     else:
         raise AssertionError(f"unhandled op {name}")
 
@@ -246,6 +267,8 @@ _OP_REQUIRED_FIELDS = {
     "set_state": {"value"},
     "set_ric_mapping": {"from_csv"},
     "remove_ric": set(),
+    "add_exchange_id": {"exchange_id"},
+    "remove_exchange_id": set(),
 }
 
 _TARGETING_KEYS = {
@@ -313,7 +336,7 @@ def _validate_keys(entry: dict, op_name: str) -> None:
         raise ValueError(f"unknown key(s) in op {op_name!r}: {sorted(extras)}")
 
 
-def _build_op_from_yaml_entry(entry: dict):
+def _build_op_from_yaml_entry(entry: dict, exchanges_by_id: dict):
     op_name = entry["op"]
     if op_name not in _OP_REQUIRED_FIELDS:
         raise ValueError(f"unknown op {op_name!r}")
@@ -347,11 +370,25 @@ def _build_op_from_yaml_entry(entry: dict):
         return SetRicMapping(prefix_to_ric=prefix_to_ric)
     if op_name == "remove_ric":
         return ClearRic()
+    if op_name == "add_exchange_id":
+        eid = entry["exchange_id"]
+        exchange = exchanges_by_id.get(eid)
+        if exchange is None:
+            raise ValueError(
+                f"add_exchange_id: exchange {eid} not defined in exchanges[] "
+                f"(known ids: {sorted(exchanges_by_id)})"
+            )
+        return AddExchangeId(exchange_id=eid, exchange=exchange)
+    if op_name == "remove_exchange_id":
+        return RemoveExchangeId(exchanges_by_id=exchanges_by_id)
     raise AssertionError(f"unhandled op {op_name}")
 
 
-def parse_yaml_spec(path: str) -> list[PlannedOp]:
+def parse_yaml_spec(path: str, exchanges_by_id: dict | None = None) -> list[PlannedOp]:
     """Load a YAML spec file and produce a list of PlannedOp."""
+    # Forwarded to _build_op_from_yaml_entry for the add_exchange_id /
+    # remove_exchange_id branches; harmless ({}) for all other ops.
+    exchanges_by_id = exchanges_by_id or {}
     with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     if not isinstance(data, dict):
@@ -368,7 +405,7 @@ def parse_yaml_spec(path: str) -> list[PlannedOp]:
             raise ValueError(f"operation #{i + 1}: must be a mapping")
         if "op" not in entry:
             raise ValueError(f"operation #{i + 1}: missing 'op' field")
-        op = _build_op_from_yaml_entry(entry)
+        op = _build_op_from_yaml_entry(entry, exchanges_by_id)
         if entry["op"] == "set_ric_mapping":
             filters = FilterSet()  # CSV is the selector
         else:
@@ -458,6 +495,7 @@ from edit_config_lib.config_text_surgery import (
     find_marketschedules_end,
     insert_field_after_open_brace,
     insert_field_before_session,
+    delete_scalar_field,
 )
 
 
@@ -518,6 +556,17 @@ def _apply_one_change(block: str, change: Change) -> str:
                 raise RuntimeError("feed-level minPublishers not found")
             s, e = tail_start + m.start(1), tail_start + m.end(1)
             return block[:s] + str(change.after) + block[e:]
+        if change.field == "exchangeId":
+            if change.after is None:
+                return delete_scalar_field(block, "exchangeId")
+            if change.before is None:
+                return insert_field_after_open_brace(
+                    block, f'"exchangeId": {change.after},'
+                )
+            span = find_int_field_span(block, "exchangeId")
+            if span is None:
+                raise RuntimeError("exchangeId field not found in feed block")
+            return block[: span[0]] + str(change.after) + block[span[1] :]
         raise RuntimeError(
             f"unsupported top-level field {change.field!r} — the new config "
             f"format keeps publisher lists only in session entries"
@@ -532,6 +581,22 @@ def _apply_one_change(block: str, change: Change) -> str:
         new_sblock = _set_session_publishers(sblock, change.after)
     elif change.field == "minPublishers":
         new_sblock = _set_session_min_publishers(sblock, change.after)
+    elif change.field == "marketSchedule":
+        if change.after is None:
+            new_sblock = delete_scalar_field(sblock, "marketSchedule")
+        else:
+            # Replace an existing value in place; otherwise insert before
+            # "session". Keeps the applier correct for insert AND update,
+            # mirroring the exchangeId branch.
+            span = find_string_field_span(sblock, "marketSchedule")
+            if span is not None:
+                new_sblock = (
+                    sblock[: span[0]] + json.dumps(change.after) + sblock[span[1] :]
+                )
+            else:
+                new_sblock = insert_field_before_session(
+                    sblock, f'"marketSchedule": {json.dumps(change.after)},'
+                )
     else:
         raise RuntimeError(f"unsupported session field {change.field!r}")
     return block[: sb[0]] + new_sblock + block[sb[1] :]

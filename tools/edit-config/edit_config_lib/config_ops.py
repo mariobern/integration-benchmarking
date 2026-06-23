@@ -20,6 +20,59 @@ US_EQUITY_SYMBOL_PREFIX = "Equity.US."
 
 
 @dataclass(frozen=True)
+class ExchangeInfo:
+    """A resolved entry from the config's top-level `exchanges[]` array.
+
+    `sessions` maps a session name (REGULAR/PRE_MARKET/...) to its
+    `marketSchedule` string — the calendar a feed inherits when it carries
+    this exchange's id.
+    """
+
+    exchange_id: int
+    name: str
+    asset_class: str
+    sessions: dict[str, str]
+
+
+def build_exchanges_by_id(exchanges: list[dict]) -> dict[int, ExchangeInfo]:
+    """Index the raw `exchanges[]` list by exchangeId. The array is sparse
+    (some ids are not yet defined); only present ids appear in the map."""
+    out: dict[int, ExchangeInfo] = {}
+    for ex in exchanges:
+        eid = ex.get("exchangeId")
+        if eid is None:
+            continue
+        sessions: dict[str, str] = {}
+        for s in ex.get("sessions", []):
+            name = s.get("session")
+            sched = s.get("marketSchedule")
+            if name is not None and sched is not None:
+                sessions[name] = sched
+        out[eid] = ExchangeInfo(
+            exchange_id=eid,
+            name=ex.get("name", ""),
+            asset_class=ex.get("assetClass", ""),
+            sessions=sessions,
+        )
+    return out
+
+
+def asset_class_matches(exchange_asset_class: str, feed_asset_type: str) -> bool:
+    """True if the exchange's assetClass plausibly matches the feed's
+    asset_type. Blanks on either side are treated as a match (nothing to
+    compare -> don't warn). Comparison strips the `EXCHANGE_ASSET_CLASS_`
+    prefix and lowercases, so `EXCHANGE_ASSET_CLASS_EQUITY` matches `equity`.
+    """
+    if not exchange_asset_class or not feed_asset_type:
+        return True
+    prefix = "EXCHANGE_ASSET_CLASS_"
+    token = exchange_asset_class
+    if token.startswith(prefix):
+        token = token[len(prefix) :]
+    return token.lower() == feed_asset_type.lower()
+
+
+@dataclass(frozen=True)
 class Change:
     """One atomic edit to a feed."""
 
@@ -656,6 +709,42 @@ class ClearRic:
 
         if not slots:
             return [], [
+class AddExchangeId:
+    """Assign `exchange_id` to a feed and strip each session's now-redundant
+    `marketSchedule` string (the feed inherits the exchange's calendar).
+
+    `exchange` is the pre-resolved ExchangeInfo for `exchange_id`, captured at
+    construction time (the id is fixed per invocation).
+    """
+
+    exchange_id: int
+    exchange: ExchangeInfo
+
+    def apply(self, feed: dict) -> tuple[list[Change], list[Warning]]:
+        feed_id = feed["feedId"]
+        symbol = feed.get("symbol", "")
+        changes: list[Change] = []
+        warnings: list[Warning] = []
+        schedules = feed.get("marketSchedules", [])
+
+        # 1. Session coverage (hard error): every feed session must exist on
+        #    the exchange, else stripping its string leaves nothing to inherit.
+        uncovered = [
+            s.get("session")
+            for s in schedules
+            if s.get("session") not in self.exchange.sessions
+        ]
+        if uncovered:
+            raise OpError(
+                f"feed {feed_id}: exchange {self.exchange_id} "
+                f"({self.exchange.name!r}) does not define session(s) "
+                f"{uncovered} that this feed has — cannot inherit a schedule"
+            )
+
+        # 2. Asset-class check (warning only).
+        feed_asset = feed.get("metadata", {}).get("asset_type", "")
+        if not asset_class_matches(self.exchange.asset_class, feed_asset):
+            warnings.append(
                 Warning(
                     feed_id=feed_id,
                     symbol=symbol,
@@ -672,6 +761,27 @@ class ClearRic:
             current = slot["identifier"]
             if current == "":
                 continue
+                        f"feed {feed_id}: asset_type {feed_asset!r} does not "
+                        f"match exchange {self.exchange_id} assetClass "
+                        f"{self.exchange.asset_class!r}"
+                    ),
+                )
+            )
+
+        # 3. exchangeId field change (+ reassignment warning).
+        current = feed.get("exchangeId")
+        if current != self.exchange_id:
+            if current is not None:
+                warnings.append(
+                    Warning(
+                        feed_id=feed_id,
+                        symbol=symbol,
+                        message=(
+                            f"feed {feed_id}: reassigning exchangeId "
+                            f"{current} -> {self.exchange_id}"
+                        ),
+                    )
+                )
             changes.append(
                 Change(
                     feed_id=feed_id,
@@ -696,6 +806,51 @@ class ClearRic:
             )
 
         if changes and feed.get("state") == "STABLE":
+                    location="top_level",
+                    field="exchangeId",
+                    before=current,
+                    after=self.exchange_id,
+                )
+            )
+            feed["exchangeId"] = self.exchange_id
+
+        # 4. Strip per-session marketSchedule strings (inheritance).
+        for s in schedules:
+            if "marketSchedule" in s:
+                changes.append(
+                    Change(
+                        feed_id=feed_id,
+                        symbol=symbol,
+                        location=s["session"],
+                        field="marketSchedule",
+                        before=s["marketSchedule"],
+                        after=None,
+                    )
+                )
+                del s["marketSchedule"]
+
+        return changes, warnings
+
+
+@dataclass
+class RemoveExchangeId:
+    """Remove a feed's `exchangeId` and restore each session's
+    `marketSchedule` string from that exchange's definition.
+
+    `exchanges_by_id` is the whole map because different feeds in a batch may
+    reference different exchanges; the schedule to restore comes from the
+    feed's current id.
+    """
+
+    exchanges_by_id: dict[int, ExchangeInfo]
+
+    def apply(self, feed: dict) -> tuple[list[Change], list[Warning]]:
+        feed_id = feed["feedId"]
+        symbol = feed.get("symbol", "")
+        warnings: list[Warning] = []
+
+        current = feed.get("exchangeId")
+        if current is None:
             warnings.append(
                 Warning(
                     feed_id=feed_id,
@@ -706,6 +861,56 @@ class ClearRic:
                     ),
                 )
             )
+                    message=f"feed {feed_id}: no exchangeId to remove",
+                )
+            )
+            return [], warnings
+
+        exchange = self.exchanges_by_id.get(current)
+        if exchange is None:
+            raise OpError(
+                f"feed {feed_id}: current exchangeId {current} is not defined "
+                f"in exchanges[] — cannot restore schedules"
+            )
+
+        schedules = feed.get("marketSchedules", [])
+        uncovered = [
+            s.get("session")
+            for s in schedules
+            if s.get("session") not in exchange.sessions
+        ]
+        if uncovered:
+            raise OpError(
+                f"feed {feed_id}: exchange {current} ({exchange.name!r}) does "
+                f"not define session(s) {uncovered} — cannot restore a schedule"
+            )
+
+        changes: list[Change] = [
+            Change(
+                feed_id=feed_id,
+                symbol=symbol,
+                location="top_level",
+                field="exchangeId",
+                before=current,
+                after=None,
+            )
+        ]
+        del feed["exchangeId"]
+
+        for s in schedules:
+            if "marketSchedule" not in s:
+                sched = exchange.sessions[s["session"]]
+                changes.append(
+                    Change(
+                        feed_id=feed_id,
+                        symbol=symbol,
+                        location=s["session"],
+                        field="marketSchedule",
+                        before=None,
+                        after=sched,
+                    )
+                )
+                s["marketSchedule"] = sched
 
         return changes, warnings
 
