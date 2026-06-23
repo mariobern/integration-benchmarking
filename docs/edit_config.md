@@ -46,6 +46,7 @@ python3 tools/edit-config/edit_config.py --config lazer_update.json [OPERATION] 
 | `--add-exchange-id N`                       | Assign exchange `N` and strip inherited `marketSchedule` strings           |
 | `--remove-exchange-id`                      | Remove `exchangeId` and restore `marketSchedule` strings from the exchange |
 | `--set-ric-mapping --from-csv PATH`         | Fill empty `datascope_ric.identifier` values                               |
+| `--remove-ric`                              | Clear all `datascope_ric` identifier values to `""`                        |
 | `--from-spec PATH`                          | Apply a batched YAML spec (multiple ops)                                   |
 
 ### Targeting (≥1 required when not using `--from-spec`)
@@ -189,6 +190,53 @@ version: 1
 operations:
   - op: set_ric_mapping
     from_csv: hk-syms.csv
+```
+
+### `--remove-ric` — clear `datascope_ric` identifiers
+
+The structural inverse of `--set-ric-mapping`: clears **every**
+`datascope_ric.identifiers[].identifier` value on each targeted feed back to the
+empty string (`""`), leaving the `datascope_ric` / `identifiers[]` scaffold in
+place. Use it when a feed was onboarded with a wrong RIC, or an asset is delisted
+and its mapping should be removed.
+
+```bash
+# dry-run (default)
+python3 tools/edit-config/edit_config.py --config lazer_update.json \
+    --remove-ric --feed-id 885
+
+# write
+python3 tools/edit-config/edit_config.py --config lazer_update.json \
+    --remove-ric --feed-id 885 --apply
+```
+
+Per-slot rules:
+
+- Non-empty `identifier` → cleared to `""`, with a warning naming the wiped value.
+- Already-empty `identifier` → NOOP (no change, no warning).
+- Feed with no `datascope_ric` identifier slots → "nothing to clear" warning.
+
+Safety:
+
+- **Dry-run is the default** — review the diff and the RIC removal summary before
+  re-running with `--apply`.
+- A targeted **STABLE** feed with a populated RIC triggers an extra warning
+  (clearing it breaks a live benchmark).
+- INACTIVE feeds are skipped (reactivate via `--set-state` first).
+
+Targeting uses the full filter set (`--feed-id`, `--feed-ids-from`,
+`--symbol-pattern`, `--asset-class`, `--state`) — the same model as the
+publisher/min-publisher ops. A broad `--symbol-pattern` / `--asset-class` can
+match many feeds, so the matched-feed count, full diff, and per-value warnings
+in the dry-run are your blast-radius check.
+
+YAML spec form:
+
+```yaml
+version: 1
+operations:
+  - op: remove_ric
+    feed_id: "884,885"
 ```
 
 ## YAML spec format

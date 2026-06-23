@@ -52,6 +52,7 @@ from edit_config_lib.config_ops import (
     SetRicMapping,
     SetRicFromResolver,
     ResolvedRic,
+    ClearRic,
     AddExchangeId,
     RemoveExchangeId,
     ExchangeInfo,
@@ -74,6 +75,7 @@ _OP_FLAGS = (
     "set_state",
     "set_ric_mapping",
     "set_ric",
+    "remove_ric",
     "add_exchange_id",
     "remove_exchange_id",
 )
@@ -106,7 +108,9 @@ def _parse_signed_int(s: str) -> int:
 
 
 # store_true flags default to False; other op flags default to None.
-_BOOL_OP_FLAGS = frozenset({"set_ric_mapping", "set_ric", "remove_exchange_id"})
+_BOOL_OP_FLAGS = frozenset(
+    {"set_ric_mapping", "set_ric", "remove_ric", "remove_exchange_id"}
+)
 
 
 def _flag_set(args, name: str) -> bool:
@@ -178,7 +182,7 @@ def build_op_from_args(
             "no operation specified (use one of --add-publisher, "
             "--remove-publisher, --set-min-publishers, "
             "--bump-min-publishers, --set-state, --set-ric-mapping, --set-ric, "
-            "--add-exchange-id, --remove-exchange-id)"
+            "--remove-ric, --add-exchange-id, --remove-exchange-id)"
         )
     if len(selected) > 1:
         raise ValueError(f"exactly one operation flag allowed; got {selected}")
@@ -234,6 +238,8 @@ def build_op_from_args(
         op = BumpMinPublishers(delta=delta, session=args.session)
     elif name == "set_state":
         op = SetState(value=args.set_state)
+    elif name == "remove_ric":
+        op = ClearRic()
     elif name == "add_exchange_id":
         exchange = exchanges_by_id.get(args.add_exchange_id)
         if exchange is None:
@@ -260,6 +266,7 @@ _OP_REQUIRED_FIELDS = {
     "bump_min_publishers": {"delta"},
     "set_state": {"value"},
     "set_ric_mapping": {"from_csv"},
+    "remove_ric": set(),
     "add_exchange_id": {"exchange_id"},
     "remove_exchange_id": set(),
 }
@@ -361,6 +368,8 @@ def _build_op_from_yaml_entry(entry: dict, exchanges_by_id: dict):
                 f"set_ric_mapping from_csv {entry['from_csv']!r}: no rows produced a known feed prefix"
             )
         return SetRicMapping(prefix_to_ric=prefix_to_ric)
+    if op_name == "remove_ric":
+        return ClearRic()
     if op_name == "add_exchange_id":
         eid = entry["exchange_id"]
         exchange = exchanges_by_id.get(eid)
