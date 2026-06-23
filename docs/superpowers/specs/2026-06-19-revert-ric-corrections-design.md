@@ -36,11 +36,11 @@ PRE_MARKET, POST_MARKET), leaving overnight RICs untouched.
 Three rows have a genuinely broken original RIC and are **skipped** (left at their
 current corrected value, per user decision):
 
-| feedId | symbol | original (skipped) | kept value | reason |
-| ------ | ------ | ------------------ | ---------- | ------ |
+| feedId | symbol | original (skipped) | kept value | reason                          |
+| ------ | ------ | ------------------ | ---------- | ------------------------------- |
 | 3227   | ALNY   | `LIN.O`            | `ALNY.O`   | `LIN.O` is Linde, wrong company |
-| 1080   | DIA    | `BAC\|DIA.N`       | `DIA`      | malformed `BAC\|` prefix |
-| 1143   | FSLR   | `FLSR.O`           | `FSLR.O`   | `FLSR` is a typo of `FSLR` |
+| 1080   | DIA    | `BAC\|DIA.N`       | `DIA`      | malformed `BAC\|` prefix        |
+| 1143   | FSLR   | `FLSR.O`           | `FSLR.O`   | `FLSR` is a typo of `FSLR`      |
 
 `BRK-A` / `BRK-B` keep their dotted-ticker originals (`BRKa.N` / `BRKb.N`), which
 are correct, and revert normally.

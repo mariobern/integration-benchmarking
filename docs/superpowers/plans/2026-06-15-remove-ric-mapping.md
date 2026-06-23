@@ -14,16 +14,16 @@
 
 ## File Structure
 
-| File | Responsibility | Change |
-| --- | --- | --- |
-| `tools/edit-config/edit_config_lib/config_ops.py` | Operation classes (`apply(feed) -> (changes, warnings)`) | **Add** `ClearRic` |
-| `tools/edit-config/edit_config_lib/config_editor.py` | Plan building (CLI args + YAML), simulation, text apply | **Modify**: register op in `_OP_FLAGS`, `_BOOL_OP_FLAGS`, `build_op_from_args`, YAML helpers; import `ClearRic` |
-| `tools/edit-config/edit_config.py` | CLI wrapper: argparse, plan summary, per-op footers | **Modify**: add `--remove-ric` flag, `_remove_ric_summary_lines`, summary-loop branch, import |
-| `docs/edit_config.md` | Per-script docs | **Modify**: ops table row + `--remove-ric` section + YAML example |
-| `CLAUDE.md` | Repo guide Scripts table | **Modify**: edit_config.py description (add "clear RIC identifiers") |
-| `tools/edit-config/tests/test_config_ops.py` | Op-level unit tests | **Add** `ClearRic` tests |
-| `tools/edit-config/tests/test_config_editor.py` | Plan-building + YAML tests | **Add** `--remove-ric` / `remove_ric` tests |
-| `tools/edit-config/tests/test_edit_config_cli.py` | End-to-end CLI tests | **Add** `--remove-ric` CLI tests |
+| File                                                 | Responsibility                                           | Change                                                                                                          |
+| ---------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `tools/edit-config/edit_config_lib/config_ops.py`    | Operation classes (`apply(feed) -> (changes, warnings)`) | **Add** `ClearRic`                                                                                              |
+| `tools/edit-config/edit_config_lib/config_editor.py` | Plan building (CLI args + YAML), simulation, text apply  | **Modify**: register op in `_OP_FLAGS`, `_BOOL_OP_FLAGS`, `build_op_from_args`, YAML helpers; import `ClearRic` |
+| `tools/edit-config/edit_config.py`                   | CLI wrapper: argparse, plan summary, per-op footers      | **Modify**: add `--remove-ric` flag, `_remove_ric_summary_lines`, summary-loop branch, import                   |
+| `docs/edit_config.md`                                | Per-script docs                                          | **Modify**: ops table row + `--remove-ric` section + YAML example                                               |
+| `CLAUDE.md`                                          | Repo guide Scripts table                                 | **Modify**: edit_config.py description (add "clear RIC identifiers")                                            |
+| `tools/edit-config/tests/test_config_ops.py`         | Op-level unit tests                                      | **Add** `ClearRic` tests                                                                                        |
+| `tools/edit-config/tests/test_config_editor.py`      | Plan-building + YAML tests                               | **Add** `--remove-ric` / `remove_ric` tests                                                                     |
+| `tools/edit-config/tests/test_edit_config_cli.py`    | End-to-end CLI tests                                     | **Add** `--remove-ric` CLI tests                                                                                |
 
 **Test run convention:** all commands run from the repo root
 `/Users/mariobernardi/Documents/GitHub/integration-benchmarking`. The
@@ -36,6 +36,7 @@
 ## Task 1: `ClearRic` operation class
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config_lib/config_ops.py` (add after `SetRicFromResolver`, before the `_STATE_WARNINGS` block near line 624)
 - Test: `tools/edit-config/tests/test_config_ops.py` (append at end of file)
 
@@ -277,6 +278,7 @@ git commit -m "feat(edit-config): add ClearRic op to clear datascope_ric identif
 ## Task 2: Wire `--remove-ric` into plan building (CLI args)
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config_lib/config_editor.py` (imports ~line 45-54; `_OP_FLAGS` ~line 65; `_BOOL_OP_FLAGS` ~line 103; `build_op_from_args` ~line 214-228)
 - Test: `tools/edit-config/tests/test_config_editor.py` (append in the `TestBuildOpFromArgs` area)
 
@@ -398,6 +400,7 @@ git commit -m "feat(edit-config): wire --remove-ric into CLI plan building"
 ## Task 3: YAML spec support (`remove_ric`)
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config_lib/config_editor.py` (`_OP_REQUIRED_FIELDS` ~line 236; `_build_op_from_yaml_entry` ~line 310-342)
 - Test: `tools/edit-config/tests/test_config_editor.py` (append)
 
@@ -484,6 +487,7 @@ git commit -m "feat(edit-config): support remove_ric in YAML specs"
 ## Task 4: CLI flag, summary footer, and end-to-end tests
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config.py` (imports ~line 25-30; argparse op group ~line 114-122; per-op summary loop ~line 271-282; add `_remove_ric_summary_lines` near the other summary helpers ~line 60-87)
 - Test: `tools/edit-config/tests/test_edit_config_cli.py` (append)
 
@@ -656,6 +660,7 @@ git commit -m "feat(edit-config): add --remove-ric CLI flag and summary footer"
 ## Task 5: Documentation
 
 **Files:**
+
 - Modify: `docs/edit_config.md`
 - Modify: `CLAUDE.md`
 
@@ -665,7 +670,7 @@ In the "Operations (exactly one per CLI invocation)" table (near line 39-47),
 add a row after the `--set-ric-mapping` row:
 
 ```markdown
-| `--remove-ric`                              | Clear all `datascope_ric` identifier values to `""`      |
+| `--remove-ric` | Clear all `datascope_ric` identifier values to `""` |
 ```
 
 - [ ] **Step 2: Add a `--remove-ric` section in `docs/edit_config.md`**
@@ -673,7 +678,7 @@ add a row after the `--set-ric-mapping` row:
 Insert this section after the `### --set-ric-mapping ...` section (after the YAML
 spec form block near line 190, before `## YAML spec format`):
 
-```markdown
+````markdown
 ### `--remove-ric` — clear `datascope_ric` identifiers
 
 The structural inverse of `--set-ric-mapping`: clears **every**
@@ -691,6 +696,7 @@ python3 tools/edit-config/edit_config.py --config lazer_update.json \
 python3 tools/edit-config/edit_config.py --config lazer_update.json \
     --remove-ric --feed-id 885 --apply
 ```
+````
 
 Per-slot rules:
 
@@ -720,6 +726,7 @@ operations:
   - op: remove_ric
     feed_id: "884,885"
 ```
+
 ```
 
 - [ ] **Step 3: Update the `CLAUDE.md` Scripts-table description**
@@ -730,21 +737,26 @@ In `CLAUDE.md`, the `tools/edit-config/edit_config.py` row currently ends with
 Find:
 
 ```
-| `tools/edit-config/edit_config.py`     | Surgical editor: add/remove publishers, set minPublishers, set state, set RIC identifiers              |
+
+| `tools/edit-config/edit_config.py` | Surgical editor: add/remove publishers, set minPublishers, set state, set RIC identifiers |
+
 ```
 
 Replace with:
 
 ```
-| `tools/edit-config/edit_config.py`     | Surgical editor: add/remove publishers, set minPublishers, set state, set/clear RIC identifiers        |
-```
+
+| `tools/edit-config/edit_config.py` | Surgical editor: add/remove publishers, set minPublishers, set state, set/clear RIC identifiers |
+
+````
 
 - [ ] **Step 4: Run pre-commit on the changed docs**
 
 Run:
 ```bash
 pre-commit run --files docs/edit_config.md CLAUDE.md
-```
+````
+
 Expected: hooks pass (prettier may reformat the Markdown tables — if it modifies
 files, re-stage them and re-run until clean).
 
@@ -767,6 +779,7 @@ Expected: PASS (all tests green)
 - [ ] **Step 2: Run pre-commit across all changed files**
 
 Run:
+
 ```bash
 pre-commit run --files \
   tools/edit-config/edit_config.py \
@@ -778,6 +791,7 @@ pre-commit run --files \
   docs/edit_config.md \
   CLAUDE.md
 ```
+
 Expected: black / prettier / trailing-whitespace / end-of-file hooks all pass.
 If any hook reformats a file, re-stage and amend the relevant commit (or add a
 fixup commit).
@@ -785,9 +799,11 @@ fixup commit).
 - [ ] **Step 3: Manual smoke test against the real config**
 
 Run (dry-run only — no `--apply`):
+
 ```bash
 python3 tools/edit-config/edit_config.py --config after.json --remove-ric --feed-id 885 2>&1 | head -40
 ```
+
 Note: `after.json` is the OLD config format and the tool will reject it with an
 "old format" error — that's expected and confirms the guard still fires. To smoke
 the happy path, point `--config` at a session-only (`lazer_update.json`-era)
@@ -814,4 +830,7 @@ Expected: all changes committed; no stray modified files.
   uses `location="datascope_ric_identifier"`, `field="identifier"`, `after=""`,
   `index=<global slot index>` — identical to `SetRicMapping`/`SetRicFromResolver`.
 - **No placeholders:** every code/step block contains the actual content.
+
+```
+
 ```

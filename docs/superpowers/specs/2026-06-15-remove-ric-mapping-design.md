@@ -6,9 +6,9 @@
 
 ## Problem
 
-`edit_config.py` can *populate* `datascope_ric` identifiers (`--set-ric-mapping`
+`edit_config.py` can _populate_ `datascope_ric` identifiers (`--set-ric-mapping`
 fills empty slots from a CSV; `--set-ric` resolves and overwrites by feed ID) but
-has no way to *unset* one. When a feed is onboarded with a wrong RIC, or an asset
+has no way to _unset_ one. When a feed is onboarded with a wrong RIC, or an asset
 is delisted, there's no supported operation to remove its RIC mapping — it must be
 hand-edited.
 
@@ -20,13 +20,13 @@ safety and visible blast radius.
 
 ## Decisions (from brainstorming)
 
-| Decision           | Choice                                                                                  |
-| ------------------ | --------------------------------------------------------------------------------------- |
-| Removal level      | **Clear value to `""`** — keep the `datascope_ric` / `identifiers[]` scaffold intact     |
-| Slot selection     | **All identifier slots** on each targeted feed; no `--session` scoping for this op       |
-| Flag name          | **`--remove-ric`** (YAML op: `remove_ric`)                                               |
-| Targeting          | **Full `FilterSet`** — `--feed-id`, `--feed-ids-from`, `--symbol-pattern`, `--asset-class`, `--state` |
-| Safety             | Warn per non-empty value cleared; extra warning on STABLE feeds; warn if feed has no slots |
+| Decision       | Choice                                                                                                |
+| -------------- | ----------------------------------------------------------------------------------------------------- |
+| Removal level  | **Clear value to `""`** — keep the `datascope_ric` / `identifiers[]` scaffold intact                  |
+| Slot selection | **All identifier slots** on each targeted feed; no `--session` scoping for this op                    |
+| Flag name      | **`--remove-ric`** (YAML op: `remove_ric`)                                                            |
+| Targeting      | **Full `FilterSet`** — `--feed-id`, `--feed-ids-from`, `--symbol-pattern`, `--asset-class`, `--state` |
+| Safety         | Warn per non-empty value cleared; extra warning on STABLE feeds; warn if feed has no slots            |
 
 ### Why clear-to-empty (not delete the slot or block)
 
@@ -47,7 +47,7 @@ feed count**, the diff shows **every** cleared value, and the new per-value +
 STABLE warnings fire in the dry-run. Restricting to feed-id only would buy
 marginal safety at the cost of consistency with the publisher/min-publisher ops
 and the bulk-cleanup use case (e.g. "wipe RICs for a delisted asset class").
-`--set-ric` is feed-id-only for a *structural* reason (it must resolve each feed
+`--set-ric` is feed-id-only for a _structural_ reason (it must resolve each feed
 by ID), not as a safety precedent.
 
 ## Design
@@ -165,6 +165,7 @@ this for free — no special handling.
 ## Testing (`tools/edit-config/tests/`)
 
 Op-level (`test_config_ops.py`):
+
 - Clears a feed with populated slots → one Change per non-empty slot, `after=""`,
   one warning per cleared value.
 - Already-empty slot → NOOP (no Change, no warning).
@@ -173,6 +174,7 @@ Op-level (`test_config_ops.py`):
 - Feed with no `datascope_ric` slots → single "nothing to clear" warning, no Changes.
 
 Editor-level (`test_config_editor.py`):
+
 - `build_op_from_args` with `--remove-ric` + `--feed-id` → `ClearRic` op, correct FilterSet.
 - `--remove-ric` with no targeting filter → `ValueError`.
 - `--symbol-pattern` targeting matches multiple feeds.
@@ -180,10 +182,12 @@ Editor-level (`test_config_editor.py`):
 - INACTIVE feed is skipped (counted in `skipped_inactive`).
 
 Apply round-trip (`test_config_editor.py` or `test_config_text_surgery.py`):
+
 - End-to-end `apply_changes` on raw fixture text → the identifier renders as `""`
   in the output and the JSON re-parses; surrounding formatting unchanged.
 
 CLI (`test_edit_config_cli.py`):
+
 - Dry-run prints the RIC removal summary footer and exits without writing.
 - `--apply` writes and the on-disk identifier is `""`.
 
