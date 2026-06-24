@@ -3,6 +3,7 @@ import io
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -624,7 +625,7 @@ def test_cli_dry_run(tmp_path):
         ],
         capture_output=True,
         text=True,
-        cwd="/home/mariobern/integration-benchmarking",
+        cwd=str(Path(__file__).resolve().parents[1]),
     )
     assert result.returncode == 0
     assert "DRY RUN" in result.stdout
@@ -650,7 +651,7 @@ def test_cli_real_run(tmp_path):
         ],
         capture_output=True,
         text=True,
-        cwd="/home/mariobern/integration-benchmarking",
+        cwd=str(Path(__file__).resolve().parents[1]),
     )
     assert result.returncode == 0
     assert "SUMMARY" in result.stdout
@@ -676,7 +677,7 @@ def test_cli_missing_summary_file(tmp_path):
         ],
         capture_output=True,
         text=True,
-        cwd="/home/mariobern/integration-benchmarking",
+        cwd=str(Path(__file__).resolve().parents[1]),
     )
     assert result.returncode != 0
 
@@ -695,7 +696,7 @@ def test_cli_prints_summary_counts(tmp_path):
         ],
         capture_output=True,
         text=True,
-        cwd="/home/mariobern/integration-benchmarking",
+        cwd=str(Path(__file__).resolve().parents[1]),
     )
     assert "Newly STABLE:" in result.stdout
     assert "Updated (already STABLE):" in result.stdout

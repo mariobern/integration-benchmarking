@@ -1,6 +1,7 @@
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -192,7 +193,7 @@ def test_cli_dry_run(tmp_path):
         ],
         capture_output=True,
         text=True,
-        cwd="/home/mariobern/integration-benchmarking",
+        cwd=str(Path(__file__).resolve().parents[1]),
     )
     assert result.returncode == 0
     assert "DRY RUN" in result.stdout
@@ -219,7 +220,7 @@ def test_cli_real_run(tmp_path):
         ],
         capture_output=True,
         text=True,
-        cwd="/home/mariobern/integration-benchmarking",
+        cwd=str(Path(__file__).resolve().parents[1]),
     )
     assert result.returncode == 0
     with open(config_file) as f:

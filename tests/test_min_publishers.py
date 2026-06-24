@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -637,7 +638,7 @@ class TestCLI:
             ],
             capture_output=True,
             text=True,
-            cwd="/home/mariobern/integration-benchmarking",
+            cwd=str(Path(__file__).resolve().parents[1]),
         )
 
         assert result.returncode == 0
@@ -662,7 +663,7 @@ class TestCLI:
             ],
             capture_output=True,
             text=True,
-            cwd="/home/mariobern/integration-benchmarking",
+            cwd=str(Path(__file__).resolve().parents[1]),
         )
 
         assert result.returncode == 0
@@ -687,7 +688,7 @@ class TestCLI:
             ],
             capture_output=True,
             text=True,
-            cwd="/home/mariobern/integration-benchmarking",
+            cwd=str(Path(__file__).resolve().parents[1]),
         )
 
         assert result.returncode == 0
