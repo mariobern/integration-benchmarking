@@ -1,6 +1,6 @@
 # Asset Classes
 
-> **Last updated:** 2026-03-02
+> **Last updated:** 2026-06-24
 >
 > **Rule:** Update this date every time this file is modified.
 
@@ -25,13 +25,15 @@
 
 These have Datascope benchmark data available:
 
-| Asset Class     | Aliases               | Notes                              |
-| --------------- | --------------------- | ---------------------------------- |
-| `fx`            | -                     | Foreign exchange (290 feeds)       |
-| `metals`        | `metal`               | Precious metals (13 feeds)         |
-| `us-equities`   | `equity-us`           | US equities + equity index futures |
-| `commodity`     | -                     | Commodities + commodity futures    |
-| `us-treasuries` | `treasuries`, `rates` | US Treasury bonds (yield values)   |
+| Asset Class           | Aliases               | Notes                                                      |
+| --------------------- | --------------------- | ---------------------------------------------------------- |
+| `fx`                  | -                     | Foreign exchange (290 feeds)                               |
+| `metals`              | `metal`               | Precious metals (13 feeds)                                 |
+| `us-equities`         | `equity-us`           | US equities + equity index futures                         |
+| `commodity`           | -                     | Commodities + commodity futures                            |
+| `us-treasuries`       | `treasuries`, `rates` | US Treasury bonds (yield values)                           |
+| `equity-<cc>-futures` | -                     | Country-specific equity futures (e.g. `equity-us-futures`) |
+| `equity-perp`         | -                     | Perpetual equity contracts (e.g. `Pyth.DC.*`)              |
 
 ## Non-Benchmarkable Asset Classes
 
@@ -125,6 +127,23 @@ Futures contracts are automatically detected by symbol pattern and use `datascop
 | `US500`   | `ES`     | S&P 500 (alias for EM) | `US500H6` -> `ESH26` |
 | `US100`   | `NQ`     | Nasdaq 100 (alias)     | `US100H6` -> `NQH26` |
 | `US30`    | `YM`     | Dow Jones (alias)      | `US30H6` -> `YMH26`  |
+
+### Equity Instrument Types
+
+Equity feeds (`asset_type = equity`) are sub-labeled by **instrument type**, read
+from `feeds_metadata_latest.metadata` (`instrument_type` key), falling back to the
+`is_futures_symbol` symbol pattern when the metadata field is absent:
+
+| instrument_type | label                 | example                                                                                 |
+| --------------- | --------------------- | --------------------------------------------------------------------------------------- |
+| `spot`          | `equity-<cc>`         | `Equity.US.AAPL/USD` → `equity-us`                                                      |
+| `future`        | `equity-<cc>-futures` | `Equity.US.DMM6/USD` → `equity-us-futures`; `Equity.HK.HKHF6/HKD` → `equity-hk-futures` |
+| `perp`          | `equity-perp`         | `Pyth.DC.AAPL/USDT` → `equity-perp`                                                     |
+| `index`         | `equity-index`        | `Equity.Index.AAPL/USD` → `equity-index`                                                |
+
+The metadata value is authoritative (it correctly marks spot stocks whose tickers
+coincidentally match the futures pattern, e.g. `Equity.DE.MUV2/EUR`); the
+`is_futures_symbol` fallback only fills feeds missing the field.
 
 ### Metal Spot RICs
 
