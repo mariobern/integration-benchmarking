@@ -40,7 +40,7 @@ class TestBuildSummary:
             "asset_class": "equity-us",
             "session": "all",
             "feed_count": 2,
-            "total_updates": 150,
+            "sampled_total_updates": 150,
         } in summary
 
     def test_metal_rollup(self):
@@ -51,7 +51,7 @@ class TestBuildSummary:
             if r["publisher_id"] == 32 and r["asset_class"] == "metal"
         ]
         assert metal_32[0]["feed_count"] == 1
-        assert metal_32[0]["total_updates"] == 20
+        assert metal_32[0]["sampled_total_updates"] == 20
         assert metal_32[0]["session"] == "all"
 
     def test_sorted_by_publisher_then_class(self):
@@ -127,7 +127,7 @@ class TestFetchPublisherFeeds:
         aapl = [r for r in rows if r.feed_id == 1163][0]
         assert aapl.asset_class == "equity-us"
         assert aapl.publisher_name == "Blueocean.Production"
-        assert aapl.update_count == 100
+        assert aapl.sampled_update_count == 100
         assert aapl.session == "regular"
 
     def test_foreign_equity_country(self):
@@ -201,7 +201,7 @@ def test_write_outputs_creates_three_csvs(tmp_path: Path):
         "symbol": "XAU/USD",
         "asset_class": "metal",
         "session": "all",
-        "update_count": "7",
+        "sampled_update_count": "7",
     }
 
     with open(paths[2]) as f:
@@ -256,8 +256,8 @@ def test_summary_splits_us_equity_by_session():
     summary = build_summary(rows)
     reg = [r for r in summary if r["session"] == "regular"][0]
     pre = [r for r in summary if r["session"] == "premarket"][0]
-    assert reg["feed_count"] == 2 and reg["total_updates"] == 160
-    assert pre["feed_count"] == 1 and pre["total_updates"] == 40
+    assert reg["feed_count"] == 2 and reg["sampled_total_updates"] == 160
+    assert pre["feed_count"] == 1 and pre["sampled_total_updates"] == 40
 
 
 class TestSessionSql:

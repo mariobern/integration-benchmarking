@@ -24,7 +24,7 @@ class PublisherFeedRow:
     feed_id: int
     symbol: str
     asset_class: str
-    update_count: int
+    sampled_update_count: int
     session: str = "all"
 
 
@@ -148,7 +148,7 @@ def build_summary(rows: list[PublisherFeedRow]) -> list[dict]:
     for r in rows:
         key = (r.publisher_id, r.asset_class, r.session)
         feed_count[key] += 1
-        total_updates[key] += r.update_count
+        total_updates[key] += r.sampled_update_count
         names[r.publisher_id] = r.publisher_name
 
     out = [
@@ -158,7 +158,7 @@ def build_summary(rows: list[PublisherFeedRow]) -> list[dict]:
             "asset_class": asset_class,
             "session": session,
             "feed_count": feed_count[(pub_id, asset_class, session)],
-            "total_updates": total_updates[(pub_id, asset_class, session)],
+            "sampled_total_updates": total_updates[(pub_id, asset_class, session)],
         }
         for (pub_id, asset_class, session) in feed_count
     ]
@@ -250,7 +250,7 @@ def fetch_publisher_feeds(
                 feed_id=int(feed_id),
                 symbol=symbol,
                 asset_class=asset_class,
-                update_count=int(update_count),
+                sampled_update_count=int(update_count),
                 session=session or "all",
             )
         )
@@ -283,7 +283,7 @@ def write_outputs(
                 "symbol",
                 "asset_class",
                 "session",
-                "update_count",
+                "sampled_update_count",
             ]
         )
         for r in sorted_rows:
@@ -295,7 +295,7 @@ def write_outputs(
                     r.symbol,
                     r.asset_class,
                     r.session,
-                    r.update_count,
+                    r.sampled_update_count,
                 ]
             )
 
@@ -309,7 +309,7 @@ def write_outputs(
                 "asset_class",
                 "session",
                 "feed_count",
-                "total_updates",
+                "sampled_total_updates",
             ]
         )
         for s in summary:
@@ -320,7 +320,7 @@ def write_outputs(
                     s["asset_class"],
                     s["session"],
                     s["feed_count"],
-                    s["total_updates"],
+                    s["sampled_total_updates"],
                 ]
             )
 
