@@ -25,13 +25,16 @@
 Move `EQUITY_COUNTRY_MAP`, `get_equity_country`, and `categorize_asset_class` out of `publisher_feeds.py` into a shared module, with tests. `publisher_feeds.py` then imports them (behavior unchanged).
 
 **Files:**
+
 - Create: `lib/asset_class.py`
 - Create: `tests/test_asset_class.py`
 - Modify: `publisher_feeds.py` (remove the three definitions + `EQUITY_COUNTRY_MAP`, lines ~38–114; add an import)
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces:
+
   - `EQUITY_COUNTRY_MAP: dict[str, str]`
   - `get_equity_country(symbol: Optional[str]) -> str`
   - `categorize_asset_class(asset_type: str, symbol: Optional[str]) -> str`
@@ -210,12 +213,15 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 Build the pure (DB-free) functions the script needs: UTC day-window bounds, long-form summary rollup, and matrix pivot. Test them in isolation.
 
 **Files:**
+
 - Create: `lib/publisher_asset_map_core.py`
 - Create: `tests/test_publisher_asset_map_core.py`
 
 **Interfaces:**
+
 - Consumes: `lib.asset_class.categorize_asset_class` (Task 1).
 - Produces:
+
   - `@dataclass PublisherFeedRow` with fields `publisher_id: int`, `publisher_name: str`, `feed_id: int`, `symbol: str`, `asset_class: str`, `update_count: int`
   - `day_window(date_str: str) -> tuple[str, str]` → `("<date> 00:00:00", "<date+1> 00:00:00")`
   - `build_summary(rows: list[PublisherFeedRow]) -> list[dict]` → one dict per (publisher_id, asset_class) with keys `publisher_id, publisher_name, asset_class, feed_count, total_updates`, sorted by `(publisher_id, asset_class)`
@@ -399,12 +405,15 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 Add DB functions to `lib/publisher_asset_map_core.py`: fetch publisher names, run the grouped query, and assemble `PublisherFeedRow` objects with categorized asset classes and the optional asset-class filter. The ClickHouse client is passed in (so it is mockable in tests).
 
 **Files:**
+
 - Modify: `lib/publisher_asset_map_core.py`
 - Modify: `tests/test_publisher_asset_map_core.py`
 
 **Interfaces:**
+
 - Consumes: `lib.asset_class.categorize_asset_class`; `day_window` (Task 2); a ClickHouse client exposing `.query(sql, parameters=dict)` returning an object with `.result_rows`.
 - Produces:
+
   - `fetch_publisher_names(client) -> dict[int, str]`
   - `fetch_publisher_feeds(client, date_str: str, asset_class_filter: Optional[str] = None) -> list[PublisherFeedRow]`
 
@@ -600,12 +609,15 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 Add the three CSV writers to `lib/publisher_asset_map_core.py`, writing into a target directory with the date in each filename. Test by writing to a `tmp_path` and reading back.
 
 **Files:**
+
 - Modify: `lib/publisher_asset_map_core.py`
 - Modify: `tests/test_publisher_asset_map_core.py`
 
 **Interfaces:**
+
 - Consumes: `PublisherFeedRow`, `build_summary`, `build_matrix` (Tasks 2–3).
 - Produces:
+
   - `write_outputs(rows: list[PublisherFeedRow], date_str: str, output_dir: Path) -> list[Path]` → writes the three CSVs and returns their paths in order `[detail, summary, matrix]`.
 
 - [ ] **Step 1: Write the failing test**
@@ -738,9 +750,11 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 Thin wrapper: parse args, connect, fetch rows, write CSVs, print a console summary. Handles the empty-result edge case.
 
 **Files:**
+
 - Create: `publisher_asset_map.py`
 
 **Interfaces:**
+
 - Consumes: `lib.config.load_config`, `lib.config.get_lazer_client`; `lib.publisher_asset_map_core.fetch_publisher_feeds`, `write_outputs`, `build_summary` (for the console block).
 - Produces: an executable script (`__main__`); no importable API other than `main()`.
 
@@ -866,16 +880,18 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 Document the script and register it in the repo's Scripts table.
 
 **Files:**
+
 - Create: `docs/publisher_asset_map.md`
 - Modify: `CLAUDE.md` (add a row to the Scripts table)
 
 **Interfaces:**
+
 - Consumes: nothing (documentation only).
 - Produces: nothing importable.
 
 - [ ] **Step 1: Write `docs/publisher_asset_map.md`**
 
-```markdown
+````markdown
 # Publisher Asset Map
 
 Maps what **every** publisher published on a specific UTC date, across all asset
@@ -885,23 +901,27 @@ short rolling window) by giving a full-day, all-publisher view.
 ## Usage
 
 \`\`\`bash
+
 # Full day, all publishers
+
 python3 publisher_asset_map.py --date 2026-06-23
 
 # Filter to one asset class
+
 python3 publisher_asset_map.py --date 2026-06-23 --asset-class metal
 
 # Custom output directory
+
 python3 publisher_asset_map.py --date 2026-06-23 --output-dir output_csv
 \`\`\`
 
 ## Arguments
 
-| Argument        | Description                                          | Default      |
-| --------------- | ---------------------------------------------------- | ------------ |
-| `--date`        | UTC day to analyze (`YYYY-MM-DD`), required          | -            |
-| `--output-dir`  | Directory for the three CSV outputs                  | `output_csv` |
-| `--asset-class` | Optional asset-class filter (e.g. `metal`, `fx`)     | All          |
+| Argument        | Description                                      | Default      |
+| --------------- | ------------------------------------------------ | ------------ |
+| `--date`        | UTC day to analyze (`YYYY-MM-DD`), required      | -            |
+| `--output-dir`  | Directory for the three CSV outputs              | `output_csv` |
+| `--asset-class` | Optional asset-class filter (e.g. `metal`, `fx`) | All          |
 
 ## How it works
 
@@ -919,11 +939,11 @@ Equities are categorized by ISO country code from the symbol suffix
 
 Three CSVs (with the date in each filename), written to `--output-dir`:
 
-| File                                       | Granularity                  | Columns                                                            |
-| ------------------------------------------ | ---------------------------- | ----------------------------------------------------------------- |
-| `publisher_asset_map_<date>.csv`           | one row per (publisher,feed) | `publisher_id, publisher_name, feed_id, symbol, asset_class, update_count` |
-| `publisher_asset_map_summary_<date>.csv`   | per (publisher, asset_class) | `publisher_id, publisher_name, asset_class, feed_count, total_updates`     |
-| `publisher_asset_map_matrix_<date>.csv`    | one row per publisher        | `publisher_id, publisher_name, <one column per asset_class>` (feed counts) |
+| File                                     | Granularity                  | Columns                                                                    |
+| ---------------------------------------- | ---------------------------- | -------------------------------------------------------------------------- |
+| `publisher_asset_map_<date>.csv`         | one row per (publisher,feed) | `publisher_id, publisher_name, feed_id, symbol, asset_class, update_count` |
+| `publisher_asset_map_summary_<date>.csv` | per (publisher, asset_class) | `publisher_id, publisher_name, asset_class, feed_count, total_updates`     |
+| `publisher_asset_map_matrix_<date>.csv`  | one row per publisher        | `publisher_id, publisher_name, <one column per asset_class>` (feed counts) |
 
 Feeds with no metadata are reported as `asset_class=unknown` with a blank symbol;
 publishers with no name match get a blank `publisher_name`.
@@ -937,7 +957,7 @@ escaped here only to keep this plan's code block intact.)
 In `CLAUDE.md`, find the Scripts table row for `publisher_report.py` and add a new row immediately after it:
 
 \`\`\`markdown
-| `publisher_asset_map.py`               | Map every publisher's feeds + asset classes for one UTC date (detail + summary + matrix CSVs)                                                  | `python3 publisher_asset_map.py --date 2026-06-23`                                                     | [docs/publisher_asset_map.md](docs/publisher_asset_map.md)               |
+| `publisher_asset_map.py` | Map every publisher's feeds + asset classes for one UTC date (detail + summary + matrix CSVs) | `python3 publisher_asset_map.py --date 2026-06-23` | [docs/publisher_asset_map.md](docs/publisher_asset_map.md) |
 \`\`\`
 
 - [ ] **Step 3: Run pre-commit (prettier) on the docs**
@@ -953,6 +973,7 @@ git commit -m "docs(asset-map): document publisher_asset_map.py
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
+````
 
 ---
 

@@ -5,7 +5,7 @@
 
 ## Problem
 
-We can currently see what a *single* publisher is publishing via `publisher_feeds.py`
+We can currently see what a _single_ publisher is publishing via `publisher_feeds.py`
 (`--publisher-id N`), which captures a short rolling time-window snapshot. There is no
 way to see, in one pass, what **every** publisher is contributing across asset classes.
 
@@ -22,15 +22,15 @@ rollups.
 
 ## Scope decisions (resolved during brainstorming)
 
-| Decision            | Choice                                                                              |
-| ------------------- | ----------------------------------------------------------------------------------- |
-| Output granularity  | Feed-level detail **plus** long-form summary **plus** wide matrix                   |
-| Time scope          | Specific date — full 24h UTC view (`00:00:00`–`24:00:00`)                            |
-| Data source         | `publisher_updates` (precise, per-update)                                            |
-| Detail columns      | `publisher_id, publisher_name, feed_id, symbol, asset_class, update_count`           |
-| Publisher names     | Live from `publishers_metadata_latest` (not the static `publishers.md`)             |
-| Packaging           | Three CSV files                                                                     |
-| Code structure      | New script + extract shared asset-class categorization into `lib/asset_class.py`    |
+| Decision           | Choice                                                                           |
+| ------------------ | -------------------------------------------------------------------------------- |
+| Output granularity | Feed-level detail **plus** long-form summary **plus** wide matrix                |
+| Time scope         | Specific date — full 24h UTC view (`00:00:00`–`24:00:00`)                        |
+| Data source        | `publisher_updates` (precise, per-update)                                        |
+| Detail columns     | `publisher_id, publisher_name, feed_id, symbol, asset_class, update_count`       |
+| Publisher names    | Live from `publishers_metadata_latest` (not the static `publishers.md`)          |
+| Packaging          | Three CSV files                                                                  |
+| Code structure     | New script + extract shared asset-class categorization into `lib/asset_class.py` |
 
 ## Architecture
 
@@ -38,11 +38,13 @@ rollups.
 
 1. **`lib/asset_class.py`** — shared asset-class categorization, extracted from
    `publisher_feeds.py` (single source of truth):
+
    - `EQUITY_COUNTRY_MAP` — symbol suffix → ISO country code
    - `get_equity_country(symbol) -> str`
    - `categorize_asset_class(asset_type, symbol) -> str` (equity → `equity-<country>`)
 
 2. **`publisher_asset_map.py`** — thin CLI wrapper:
+
    - Parses args, connects via `lib/config.get_lazer_client()`.
    - Runs the grouped query, fetches publisher names, categorizes asset classes.
    - Writes three CSVs and prints a console summary.
@@ -64,11 +66,11 @@ python3 publisher_asset_map.py --date 2026-06-23 --asset-class metal
 python3 publisher_asset_map.py --date 2026-06-23 --output-dir output_csv
 ```
 
-| Argument             | Description                                                  | Default      |
-| -------------------- | ------------------------------------------------------------ | ------------ |
-| `--date`             | UTC day to analyze (`YYYY-MM-DD`), required                  | -            |
-| `--output-dir`       | Directory for the three CSVs                                 | `output_csv` |
-| `--asset-class`      | Optional filter (e.g. `metal`, `fx`, `equity-us`)           | All          |
+| Argument        | Description                                       | Default      |
+| --------------- | ------------------------------------------------- | ------------ |
+| `--date`        | UTC day to analyze (`YYYY-MM-DD`), required       | -            |
+| `--output-dir`  | Directory for the three CSVs                      | `output_csv` |
+| `--asset-class` | Optional filter (e.g. `metal`, `fx`, `equity-us`) | All          |
 
 (No active/inactive flag: `publisher_updates` only contains publishers that
 actually sent data on the date, so the publisher set is inherently the active one.)
