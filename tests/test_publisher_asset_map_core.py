@@ -159,3 +159,43 @@ class TestFetchPublisherFeeds:
             _client(), "2026-06-23", asset_class_filter="metal"
         )
         assert {r.feed_id for r in rows} == {345}
+
+
+import csv  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+from lib.publisher_asset_map_core import write_outputs  # noqa: E402
+
+
+def test_write_outputs_creates_three_csvs(tmp_path: Path):
+    rows = [
+        PublisherFeedRow(32, "Blueocean.Production", 1163, "AAPL", "equity-us", 100),
+        PublisherFeedRow(32, "Blueocean.Production", 345, "XAU/USD", "metal", 20),
+        PublisherFeedRow(11, "Amber.Production", 345, "XAU/USD", "metal", 7),
+    ]
+    paths = write_outputs(rows, "2026-06-23", tmp_path)
+
+    assert [p.name for p in paths] == [
+        "publisher_asset_map_2026-06-23.csv",
+        "publisher_asset_map_summary_2026-06-23.csv",
+        "publisher_asset_map_matrix_2026-06-23.csv",
+    ]
+    for p in paths:
+        assert p.exists()
+
+    with open(paths[0]) as f:
+        detail = list(csv.DictReader(f))
+    assert detail[0] == {
+        "publisher_id": "11",
+        "publisher_name": "Amber.Production",
+        "feed_id": "345",
+        "symbol": "XAU/USD",
+        "asset_class": "metal",
+        "update_count": "7",
+    }
+
+    with open(paths[2]) as f:
+        matrix = list(csv.DictReader(f))
+    assert matrix[0]["publisher_id"] == "11"
+    assert matrix[0]["equity-us"] == "0"
+    assert matrix[0]["metal"] == "1"

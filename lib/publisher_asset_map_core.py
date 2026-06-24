@@ -1,8 +1,10 @@
 """Pure helpers for publisher_asset_map: day windows and rollups."""
 
+import csv
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Optional
 
 from lib.asset_class import categorize_asset_class
@@ -126,3 +128,76 @@ def fetch_publisher_feeds(
             )
         )
     return rows
+
+
+def write_outputs(
+    rows: list[PublisherFeedRow],
+    date_str: str,
+    output_dir: Path,
+) -> list[Path]:
+    """Write detail, summary, and matrix CSVs. Returns their paths in order."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    detail_path = output_dir / f"publisher_asset_map_{date_str}.csv"
+    summary_path = output_dir / f"publisher_asset_map_summary_{date_str}.csv"
+    matrix_path = output_dir / f"publisher_asset_map_matrix_{date_str}.csv"
+
+    sorted_rows = sorted(rows, key=lambda r: (r.publisher_id, r.asset_class, r.feed_id))
+    with open(detail_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "publisher_id",
+                "publisher_name",
+                "feed_id",
+                "symbol",
+                "asset_class",
+                "update_count",
+            ]
+        )
+        for r in sorted_rows:
+            writer.writerow(
+                [
+                    r.publisher_id,
+                    r.publisher_name,
+                    r.feed_id,
+                    r.symbol,
+                    r.asset_class,
+                    r.update_count,
+                ]
+            )
+
+    summary = build_summary(rows)
+    with open(summary_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "publisher_id",
+                "publisher_name",
+                "asset_class",
+                "feed_count",
+                "total_updates",
+            ]
+        )
+        for s in summary:
+            writer.writerow(
+                [
+                    s["publisher_id"],
+                    s["publisher_name"],
+                    s["asset_class"],
+                    s["feed_count"],
+                    s["total_updates"],
+                ]
+            )
+
+    classes, matrix = build_matrix(rows)
+    with open(matrix_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["publisher_id", "publisher_name", *classes])
+        for m in matrix:
+            writer.writerow(
+                [m["publisher_id"], m["publisher_name"], *[m[c] for c in classes]]
+            )
+
+    return [detail_path, summary_path, matrix_path]
