@@ -3,6 +3,8 @@ from lib.publisher_asset_map_core import (
     build_matrix,
     build_summary,
     day_window,
+    fetch_publisher_feeds,
+    fetch_publisher_names,
 )
 
 
@@ -72,3 +74,88 @@ class TestBuildMatrix:
         blue = [r for r in matrix if r["publisher_id"] == 32][0]
         assert blue["equity-us"] == 2
         assert blue["metal"] == 1
+
+
+class _FakeResult:
+    def __init__(self, rows):
+        self.result_rows = rows
+
+
+class _FakeClient:
+    """Returns names rows for the names query, feed rows otherwise."""
+
+    def __init__(self, name_rows, feed_rows):
+        self._name_rows = name_rows
+        self._feed_rows = feed_rows
+        self.last_params = None
+
+    def query(self, sql, parameters=None):
+        self.last_params = parameters
+        if "publishers_metadata_latest" in sql:
+            return _FakeResult(self._name_rows)
+        return _FakeResult(self._feed_rows)
+
+
+def _client():
+    return _FakeClient(
+        name_rows=[(32, "Blueocean.Production"), (11, "Amber.Production")],
+        feed_rows=[
+            # publisher_id, feed_id, update_count, asset_type, symbol
+            (32, 1163, 100, "equity", "AAPL"),
+            (32, 345, 20, "metal", "XAU/USD"),
+            (11, 999, 5, "equity", "VOD.L"),
+            (11, 888, 3, None, None),  # no metadata -> unknown / blank
+        ],
+    )
+
+
+class TestFetchPublisherNames:
+    def test_builds_id_to_name_map(self):
+        names = fetch_publisher_names(_client())
+        assert names == {32: "Blueocean.Production", 11: "Amber.Production"}
+
+
+class TestFetchPublisherFeeds:
+    def test_categorizes_and_names(self):
+        rows = fetch_publisher_feeds(_client(), "2026-06-23")
+        aapl = [r for r in rows if r.feed_id == 1163][0]
+        assert aapl.asset_class == "equity-us"
+        assert aapl.publisher_name == "Blueocean.Production"
+        assert aapl.update_count == 100
+
+    def test_foreign_equity_country(self):
+        rows = fetch_publisher_feeds(_client(), "2026-06-23")
+        vod = [r for r in rows if r.feed_id == 999][0]
+        assert vod.asset_class == "equity-gb"
+
+    def test_missing_metadata_is_unknown(self):
+        rows = fetch_publisher_feeds(_client(), "2026-06-23")
+        orphan = [r for r in rows if r.feed_id == 888][0]
+        assert orphan.asset_class == "unknown"
+        assert orphan.symbol == ""
+
+    def test_missing_publisher_name_is_blank(self):
+        client = _FakeClient(
+            name_rows=[],
+            feed_rows=[(7, 1, 1, "fx", "EUR/USD")],
+        )
+        rows = fetch_publisher_feeds(client, "2026-06-23")
+        assert rows[0].publisher_name == ""
+
+    def test_passes_day_window_params(self):
+        client = _client()
+        fetch_publisher_feeds(client, "2026-06-23")
+        assert client.last_params["start"] == "2026-06-23 00:00:00"
+        assert client.last_params["end"] == "2026-06-24 00:00:00"
+
+    def test_asset_class_filter_equity_country(self):
+        rows = fetch_publisher_feeds(
+            _client(), "2026-06-23", asset_class_filter="equity-us"
+        )
+        assert {r.feed_id for r in rows} == {1163}
+
+    def test_asset_class_filter_plain(self):
+        rows = fetch_publisher_feeds(
+            _client(), "2026-06-23", asset_class_filter="metal"
+        )
+        assert {r.feed_id for r in rows} == {345}
