@@ -25,15 +25,13 @@
 
 These have Datascope benchmark data available:
 
-| Asset Class           | Aliases               | Notes                                                      |
-| --------------------- | --------------------- | ---------------------------------------------------------- |
-| `fx`                  | -                     | Foreign exchange (290 feeds)                               |
-| `metals`              | `metal`               | Precious metals (13 feeds)                                 |
-| `us-equities`         | `equity-us`           | US equities + equity index futures                         |
-| `commodity`           | -                     | Commodities + commodity futures                            |
-| `us-treasuries`       | `treasuries`, `rates` | US Treasury bonds (yield values)                           |
-| `equity-<cc>-futures` | -                     | Country-specific equity futures (e.g. `equity-us-futures`) |
-| `equity-perp`         | -                     | Perpetual equity contracts (e.g. `Pyth.DC.*`)              |
+| Asset Class     | Aliases               | Notes                              |
+| --------------- | --------------------- | ---------------------------------- |
+| `fx`            | -                     | Foreign exchange (290 feeds)       |
+| `metals`        | `metal`               | Precious metals (13 feeds)         |
+| `us-equities`   | `equity-us`           | US equities + equity index futures |
+| `commodity`     | -                     | Commodities + commodity futures    |
+| `us-treasuries` | `treasuries`, `rates` | US Treasury bonds (yield values)   |
 
 ## Non-Benchmarkable Asset Classes
 
@@ -139,11 +137,13 @@ from `feeds_metadata_latest.metadata` (`instrument_type` key), falling back to t
 | `spot`          | `equity-<cc>`         | `Equity.US.AAPL/USD` → `equity-us`                                                      |
 | `future`        | `equity-<cc>-futures` | `Equity.US.DMM6/USD` → `equity-us-futures`; `Equity.HK.HKHF6/HKD` → `equity-hk-futures` |
 | `perp`          | `equity-perp`         | `Pyth.DC.AAPL/USDT` → `equity-perp`                                                     |
-| `index`         | `equity-index`        | `Equity.Index.AAPL/USD` → `equity-index`                                                |
+
+`Equity.Index.*` symbols are labeled `equity-index` via the country-code prefix parse (not
+an `instrument_type` dispatch).
 
 The metadata value is authoritative (it correctly marks spot stocks whose tickers
 coincidentally match the futures pattern, e.g. `Equity.DE.MUV2/EUR`); the
-`is_futures_symbol` fallback only fills feeds missing the field.
+`is_futures_symbol` fallback only fills spot/future feeds missing the field.
 
 ### Metal Spot RICs
 
