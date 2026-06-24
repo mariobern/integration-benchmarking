@@ -1,7 +1,8 @@
 """Asset-class categorization shared across publisher scripts.
 
-Equities are categorized by ISO country code (3166-1 alpha-2) based on
-symbol suffix; all other asset types pass through unchanged.
+Equities are categorized by ISO country code (3166-1 alpha-2) using the
+``Equity.<CC>.`` Lazer prefix first, falling back to RIC-style symbol suffix;
+all other asset types pass through unchanged.
 """
 
 from typing import Optional
@@ -53,10 +54,11 @@ EQUITY_COUNTRY_MAP = {
 
 
 def get_equity_country(symbol: Optional[str]) -> str:
-    """Determine equity country code from symbol suffix.
+    """Determine the equity country code from the symbol.
 
-    Returns ISO country code (us, gb, hk, jp, etc.) or 'us' as default
-    for plain symbols without suffix.
+    Parses the Lazer prefix ``Equity.<CC>.`` first (e.g. ``Equity.HK.0700/HKD``
+    -> ``hk``); falls back to the RIC-style suffix map (e.g. ``VOD.L`` -> ``gb``);
+    defaults to ``us`` for plain/unknown symbols.
     """
     if not symbol:
         return "us"  # Default to US if no symbol

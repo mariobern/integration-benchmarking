@@ -1,4 +1,4 @@
-"""Pure helpers for publisher_asset_map: day windows and rollups."""
+"""Pure helpers for publisher_asset_map: probe-window sampling and rollups."""
 
 import csv
 from collections import defaultdict
@@ -158,8 +158,10 @@ def fetch_publisher_names(client) -> dict[int, str]:
     return {int(row[0]): (row[1] or "") for row in result.result_rows}
 
 
-def _query_probe_windows(client, windows: list[ProbeWindow]):
+def _query_probe_windows(client, windows: list[ProbeWindow]) -> list:
     """Run one grouped count() over the given probe windows; return raw rows."""
+    if not windows:
+        return []
     conds = " OR ".join(
         f"(pu.publish_time >= {{s{i}:DateTime}} AND pu.publish_time < {{e{i}:DateTime}})"
         for i in range(len(windows))
