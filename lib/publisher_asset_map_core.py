@@ -8,7 +8,11 @@ from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-from lib.asset_class import categorize_asset_class
+from lib.asset_class import (
+    categorize_asset_class,
+    parse_instrument_type,
+    resolve_instrument_type,
+)
 from lib import sql_filters as _sf
 
 _ET = ZoneInfo("America/New_York")
@@ -185,6 +189,20 @@ def _query_probe_windows(client, windows: list[ProbeWindow]) -> list:
     return client.query(query, parameters=params).result_rows
 
 
+def fetch_equity_instrument_types(client) -> dict[int, str]:
+    """Map feed_id -> resolved instrument_type for all equity feeds."""
+    query = (
+        "SELECT pyth_lazer_id, symbol, metadata "
+        "FROM feeds_metadata_latest WHERE asset_type = 'equity'"
+    )
+    out: dict[int, str] = {}
+    for feed_id, symbol, metadata in client.query(query).result_rows:
+        out[int(feed_id)] = resolve_instrument_type(
+            parse_instrument_type(metadata or ""), symbol or ""
+        )
+    return out
+
+
 def fetch_publisher_feeds(
     client,
     date_str: str,
@@ -194,6 +212,7 @@ def fetch_publisher_feeds(
 ) -> list[PublisherFeedRow]:
     """Sample probe windows per session; return per-(publisher, feed, session) rows."""
     names = fetch_publisher_names(client)
+    instr_types = fetch_equity_instrument_types(client)
     windows = session_probe_windows(date_str, interval_min, width_min)
 
     by_session: dict[str, list[ProbeWindow]] = defaultdict(list)
@@ -207,7 +226,9 @@ def fetch_publisher_feeds(
             client, wins
         ):
             symbol = symbol or ""
-            asset_class = categorize_asset_class(asset_type or "unknown", symbol)
+            asset_class = categorize_asset_class(
+                asset_type or "unknown", symbol, instr_types.get(int(feed_id))
+            )
             session = session_label if symbol.startswith("Equity.US.") else "all"
             key = (int(publisher_id), int(feed_id), asset_class, session)
             if key in acc:
