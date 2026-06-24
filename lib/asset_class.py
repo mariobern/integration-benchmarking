@@ -1,7 +1,8 @@
 """Asset-class categorization shared across publisher scripts.
 
-Equities are categorized by ISO country code (3166-1 alpha-2) based on
-symbol suffix; all other asset types pass through unchanged.
+Equities are categorized by ISO country code (3166-1 alpha-2) using the
+``Equity.<CC>.`` Lazer prefix first, falling back to RIC-style symbol suffix;
+all other asset types pass through unchanged.
 """
 
 from typing import Optional
@@ -53,21 +54,27 @@ EQUITY_COUNTRY_MAP = {
 
 
 def get_equity_country(symbol: Optional[str]) -> str:
-    """Determine equity country code from symbol suffix.
+    """Determine the equity country code from the symbol.
 
-    Returns ISO country code (us, gb, hk, jp, etc.) or 'us' as default
-    for plain symbols without suffix.
+    Parses the Lazer prefix ``Equity.<CC>.`` first (e.g. ``Equity.HK.0700/HKD``
+    -> ``hk``); falls back to the RIC-style suffix map (e.g. ``VOD.L`` -> ``gb``);
+    defaults to ``us`` for plain/unknown symbols.
     """
     if not symbol:
         return "us"  # Default to US if no symbol
 
-    # Check for known suffixes
+    # Lazer symbols are formatted Equity.<CC>.<TICKER>/<CCY>; the country code
+    # is the second dotted segment (e.g. Equity.HK.0700/HKD -> hk).
+    parts = symbol.split(".")
+    if len(parts) >= 3 and parts[0] == "Equity":
+        return parts[1].lower()
+
+    # Fall back to RIC-style suffixes (e.g. VOD.L -> gb) for non-prefixed symbols.
     for suffix, country in EQUITY_COUNTRY_MAP.items():
         if symbol.upper().endswith(suffix.upper()):
             return country
 
-    # Plain symbols without suffix are assumed to be US equities
-    # (most common case for feeds like AAPL, MSFT, etc.)
+    # Plain symbols without prefix or known suffix are assumed US.
     return "us"
 
 
