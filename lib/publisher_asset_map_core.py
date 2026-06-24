@@ -3,12 +3,16 @@
 import csv
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from lib.asset_class import categorize_asset_class
 from lib import sql_filters as _sf
+
+_ET = ZoneInfo("America/New_York")
+_UTC = ZoneInfo("UTC")
 
 
 @dataclass
@@ -22,6 +26,58 @@ class PublisherFeedRow:
     asset_class: str
     update_count: int
     session: str = "all"
+
+
+@dataclass
+class ProbeWindow:
+    """A short [start_utc, end_utc) sampling window, labeled by its ET session."""
+
+    session: str
+    start_utc: str
+    end_utc: str
+
+
+def _session_for_et_minute(minute_of_day: int) -> str:
+    """Map an ET minute-of-day (0..1439) to its trading-session label."""
+    pre = _sf.US_EQUITY_PREMARKET_OPEN_HOUR * 60 + _sf.US_EQUITY_PREMARKET_OPEN_MINUTE
+    reg = _sf.US_EQUITY_MARKET_OPEN_HOUR * 60 + _sf.US_EQUITY_MARKET_OPEN_MINUTE
+    aft = _sf.US_EQUITY_MARKET_CLOSE_HOUR * 60 + _sf.US_EQUITY_MARKET_CLOSE_MINUTE
+    ovn = _sf.US_EQUITY_OVERNIGHT_START_HOUR * 60 + _sf.US_EQUITY_OVERNIGHT_START_MINUTE
+    m = minute_of_day
+    if m >= ovn or m < pre:
+        return "overnight"
+    if m < reg:
+        return "premarket"
+    if m < aft:
+        return "regular"
+    return "afterhours"
+
+
+def session_probe_windows(
+    date_str: str, interval_min: int = 30, width_min: int = 2
+) -> list[ProbeWindow]:
+    """Uniform 24h grid of probe windows from 04:00 ET, each labeled by ET session."""
+    d = date.fromisoformat(date_str)
+    pre_min = (
+        _sf.US_EQUITY_PREMARKET_OPEN_HOUR * 60 + _sf.US_EQUITY_PREMARKET_OPEN_MINUTE
+    )
+    day_start_et = datetime(d.year, d.month, d.day, tzinfo=_ET) + timedelta(
+        minutes=pre_min
+    )
+    n = 1440 // interval_min
+    windows: list[ProbeWindow] = []
+    for k in range(n):
+        start_et = day_start_et + timedelta(minutes=interval_min * k)
+        end_et = start_et + timedelta(minutes=width_min)
+        session = _session_for_et_minute(start_et.hour * 60 + start_et.minute)
+        windows.append(
+            ProbeWindow(
+                session=session,
+                start_utc=start_et.astimezone(_UTC).strftime("%Y-%m-%d %H:%M:%S"),
+                end_utc=end_et.astimezone(_UTC).strftime("%Y-%m-%d %H:%M:%S"),
+            )
+        )
+    return windows
 
 
 def day_window(date_str: str) -> tuple[str, str]:

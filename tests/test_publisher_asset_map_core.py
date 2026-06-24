@@ -361,3 +361,52 @@ def test_matrix_counts_us_equity_feed_once_across_sessions():
     assert classes == ["equity-us"]
     # feed 1163 appears in two sessions but must count once -> 2 distinct feeds total
     assert matrix[0]["equity-us"] == 2
+
+
+class TestSessionProbeWindows:
+    def test_count_and_width_default(self):
+        from lib.publisher_asset_map_core import session_probe_windows
+
+        ws = session_probe_windows("2026-06-23")  # interval 30, width 2
+        assert len(ws) == 48
+        from datetime import datetime
+
+        s = datetime.fromisoformat(ws[0].start_utc)
+        e = datetime.fromisoformat(ws[0].end_utc)
+        assert (e - s).total_seconds() == 120  # 2-min wide
+
+    def test_even_spacing(self):
+        from datetime import datetime
+        from lib.publisher_asset_map_core import session_probe_windows
+
+        ws = session_probe_windows("2026-06-23")
+        starts = [datetime.fromisoformat(w.start_utc) for w in ws]
+        gaps = {
+            (starts[i + 1] - starts[i]).total_seconds() for i in range(len(starts) - 1)
+        }
+        assert gaps == {1800.0}  # uniform 30-min spacing
+
+    def test_first_window_premarket_utc(self):
+        from lib.publisher_asset_map_core import session_probe_windows
+
+        ws = session_probe_windows("2026-06-23")
+        # 04:00 ET (EDT, UTC-4) -> 08:00 UTC
+        assert ws[0].session == "premarket"
+        assert ws[0].start_utc == "2026-06-23 08:00:00"
+
+    def test_session_labels_across_day(self):
+        from lib.publisher_asset_map_core import session_probe_windows
+
+        ws = session_probe_windows("2026-06-23")
+        # k = (ET-offset-from-04:00 in minutes) / 30
+        assert ws[11].session == "regular"  # 09:30 ET
+        assert ws[24].session == "afterhours"  # 16:00 ET
+        assert ws[32].session == "overnight"  # 20:00 ET
+
+    def test_overnight_crosses_into_next_utc_day(self):
+        from lib.publisher_asset_map_core import session_probe_windows
+
+        ws = session_probe_windows("2026-06-23")
+        # 02:00 ET next day -> 06:00 UTC on 2026-06-24
+        assert ws[44].session == "overnight"
+        assert ws[44].start_utc.startswith("2026-06-24")
