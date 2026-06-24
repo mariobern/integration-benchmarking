@@ -7,7 +7,7 @@ short rolling window) by giving a sampled, all-publisher view.
 ## Usage
 
 ```bash
-# Full day, all publishers
+# All publishers, sampled probe windows (default grid)
 python3 publisher_asset_map.py --date 2026-06-23
 
 # Filter to one asset class
