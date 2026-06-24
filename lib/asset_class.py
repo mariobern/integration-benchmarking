@@ -61,13 +61,18 @@ def get_equity_country(symbol: Optional[str]) -> str:
     if not symbol:
         return "us"  # Default to US if no symbol
 
-    # Check for known suffixes
+    # Lazer symbols are formatted Equity.<CC>.<TICKER>/<CCY>; the country code
+    # is the second dotted segment (e.g. Equity.HK.0700/HKD -> hk).
+    parts = symbol.split(".")
+    if len(parts) >= 3 and parts[0] == "Equity":
+        return parts[1].lower()
+
+    # Fall back to RIC-style suffixes (e.g. VOD.L -> gb) for non-prefixed symbols.
     for suffix, country in EQUITY_COUNTRY_MAP.items():
         if symbol.upper().endswith(suffix.upper()):
             return country
 
-    # Plain symbols without suffix are assumed to be US equities
-    # (most common case for feeds like AAPL, MSFT, etc.)
+    # Plain symbols without prefix or known suffix are assumed US.
     return "us"
 
 
