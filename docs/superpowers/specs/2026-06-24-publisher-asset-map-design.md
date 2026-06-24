@@ -69,7 +69,9 @@ python3 publisher_asset_map.py --date 2026-06-23 --output-dir output_csv
 | `--date`             | UTC day to analyze (`YYYY-MM-DD`), required                  | -            |
 | `--output-dir`       | Directory for the three CSVs                                 | `output_csv` |
 | `--asset-class`      | Optional filter (e.g. `metal`, `fx`, `equity-us`)           | All          |
-| `--include-inactive` | Include publishers flagged inactive in `publishers_metadata` | Off          |
+
+(No active/inactive flag: `publisher_updates` only contains publishers that
+actually sent data on the date, so the publisher set is inherently the active one.)
 
 ## Data flow
 
@@ -94,7 +96,7 @@ python3 publisher_asset_map.py --date 2026-06-23 --output-dir output_csv
 
    (`start` = `<date> 00:00:00`, `end` = next day `00:00:00`; parameterized query.)
 
-3. Fetch `publisher_id → name` (and active flag) from `publishers_metadata_latest`.
+3. Fetch `publisher_id → name` from `publishers_metadata_latest`.
 
 4. For each row, derive `asset_class` via `lib.asset_class.categorize_asset_class`.
 
