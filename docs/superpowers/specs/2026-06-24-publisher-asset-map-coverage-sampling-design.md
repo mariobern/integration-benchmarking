@@ -31,8 +31,8 @@ falls in — eliminating per-row `toTimeZone` entirely.
 | Decision                 | Choice                                                                     |
 | ------------------------ | -------------------------------------------------------------------------- |
 | Metric                   | Exact update counts, but only within sampled probe windows                 |
-| Sampling default         | 5 probes × 3 minutes per session (configurable)                            |
-| Session attribution      | By which probe window (no per-row `toTimeZone`)                            |
+| Sampling default         | Uniform 24h grid: a probe every 30 min, 2 min wide (configurable)          |
+| Session attribution      | By which ET session each probe falls in (no per-row `toTimeZone`)          |
 | Branch                   | Replace the exhaustive session work on `feat/publisher-asset-map-sessions` |
 | International equity fix | KEPT as-is (`get_equity_country` prefix parse, already implemented)        |
 | Explicit gap flagging    | Out of scope (coverage data makes gaps visible; see Non-goals)             |
@@ -49,28 +49,37 @@ falls in — eliminating per-row `toTimeZone` entirely.
 | `afterhours` | 16:00–20:00                 | 240          |
 | `overnight`  | 20:00 → 04:00 (next ET day) | 480          |
 
-Within each session of length `L` minutes, place `N` (default 5) probe windows
-of width `W` (default 3) minutes, evenly spaced and deterministic:
+Probes are placed on a **uniform 24h grid**, NOT clustered per session — so that
+markets with their own schedules (HK/JP/KR/CN/EU equities, etc.) get even
+coverage rather than being under-sampled in the wide gaps of the 8-hour overnight
+session. Starting at premarket open (04:00 ET), a probe is placed every
+`interval` (default 30) minutes, each `width` (default 2) minutes wide, across
+the full 24h trading day (04:00 ET `D` → 04:00 ET `D+1`). That is
+`1440 / interval` probes (48 at the default).
 
-```
-probe i start (minutes from session start) = round(i * (L - W) / (N - 1))   for i in 0..N-1
-```
-
-(For `N == 1`, a single probe at the session start.) Each probe's ET start/end
-is converted to a UTC `DateTime` string using the date's ET offset, resolved
-DST-aware via `zoneinfo.ZoneInfo("America/New_York")`. Because the overnight
-session crosses ET midnight, probes for date `D` span roughly 04:00 ET `D`
-(premarket start) to 04:00 ET `D+1` (overnight end).
+Each probe's start time is converted to a UTC `DateTime` string using the date's
+ET offset, resolved DST-aware via `zoneinfo.ZoneInfo("America/New_York")`. Each
+probe is **labeled with the ET session that contains its start time** (the four
+sessions tile the 24h clock, so every probe falls in exactly one). Because the
+overnight session crosses ET midnight, the late probes land on the next UTC day.
 
 A probe window is `(session_label, start_utc, end_utc)`.
+
+**Why a uniform grid (not per-session counts):** measured on the live cluster,
+query cost is ~linear in total sampled minutes (~1.7s/min) and concurrency does
+NOT help (the cluster is scan-bound and already parallelizes within a query; 12
+concurrent workers gave only ~20% over sequential). A uniform grid lets coverage
+density and runtime be tuned by two simple knobs (`interval`, `width`) while
+guaranteeing even 24h coverage. The default (every 30 min × 2 min = 96 sampled
+min) runs in ~2.7 min, vs ~13 min for the exhaustive full-day scan.
 
 ## Data flow
 
 1. Connect via `lib/config.get_lazer_client()`; fetch publisher names from
    `publishers_metadata_latest` (unchanged).
-2. Compute probe windows for all four sessions.
+2. Compute the uniform-grid probe windows and group them by their session label.
 3. Run **one query per session** (4 queries). Each query restricts
-   `publish_time` to that session's `N` probe windows (an `OR` of `[start,end)`
+   `publish_time` to that session's probe windows (an `OR` of `[start,end)`
    ranges, parameterized) and groups by `(publisher_id, feed_id, asset_type,
 symbol)` with `count() AS sampled_update_count`. No session SQL, no
    `toTimeZone`.
@@ -84,9 +93,11 @@ symbol)` with `count() AS sampled_update_count`. No session SQL, no
      across all four session queries).
 5. Apply the optional `--asset-class` filter to the assembled (categorized) rows.
 
-The four session queries are independent and MAY run concurrently (a small
-`ThreadPoolExecutor` with one ClickHouse client per worker). Sequential is an
-acceptable fallback; each query reads only `N×W` minutes of data.
+The four session queries run **sequentially** by default. Concurrency was
+measured to give only ~20% (the cluster is scan-bound), so it is not worth the
+added complexity of multiple clients; keep it simple and sequential. Print
+progress as each session query completes, plus total elapsed time, so a ~2.7 min
+run never looks hung.
 
 ## Output schema
 
@@ -121,8 +132,8 @@ elapsed query time.
 | `--date`               | ET trading date (`YYYY-MM-DD`), required | -            |
 | `--output-dir`         | Output directory                         | `output_csv` |
 | `--asset-class`        | Optional asset-class filter              | All          |
-| `--probes-per-session` | Probe windows per session                | 5            |
-| `--probe-width-min`    | Probe window width in minutes            | 3            |
+| `--probe-interval-min` | Spacing between probe windows (minutes)  | 30           |
+| `--probe-width-min`    | Probe window width in minutes            | 2            |
 
 ## Code structure
 
@@ -130,12 +141,13 @@ In `lib/publisher_asset_map_core.py`:
 
 - **Remove** `_et_session_bounds` and `session_case_sql` (exhaustive-only).
 - **Add** `ProbeWindow` (dataclass: `session: str`, `start_utc: str`, `end_utc: str`).
-- **Add** `session_probe_windows(date_str, probes_per_session=5, probe_width_min=3) -> list[ProbeWindow]`
-  (pure; ET ranges from `sql_filters`, DST offset from `zoneinfo`).
+- **Add** `session_probe_windows(date_str, interval_min=30, width_min=2) -> list[ProbeWindow]`
+  (pure; uniform 24h grid from premarket open, each probe labeled by the ET
+  session containing it; ET ranges from `sql_filters`, DST offset from `zoneinfo`).
 - **Rename** `PublisherFeedRow.update_count` → `sampled_update_count`.
 - **Replace** `fetch_publisher_feeds` with `fetch_publisher_feeds(client, date_str,
-probes_per_session=5, probe_width_min=3, asset_class_filter=None)` running the
-  per-session probe queries and merging.
+interval_min=30, width_min=2, asset_class_filter=None)` running the per-session
+  probe queries (sequential) and merging.
 - Update `build_summary` (emit `sampled_total_updates`), `write_outputs`
   (renamed columns), and `feeds_by_session`/`feeds_by_asset_class` references to
   the renamed field. `build_matrix` stays distinct-feed counts.
@@ -149,16 +161,18 @@ full-day).
 
 ## Testing
 
-- `session_probe_windows`: unit-test deterministic placement (count, width,
-  even spacing), DST-correct UTC conversion for a known date, and the overnight
-  session crossing into the next UTC day.
+- `session_probe_windows`: unit-test the uniform grid (probe count =
+  `1440 / interval`, width, even `interval` spacing from premarket open, correct
+  session label per probe), DST-correct UTC conversion for a known date, and the
+  overnight probes crossing into the next UTC day.
 - `fetch_publisher_feeds` (fake client returning per-window rows): session
   attribution by window label, `all` for non-US symbols, summing across probes,
   international-equity categorization, `--asset-class` filter.
 - `build_summary`/`write_outputs`: renamed columns; per-session split; matrix
   still distinct-feed and session-agnostic.
-- Live smoke test: confirm sub-minute runtime, real session values for US
-  equities, country segregation for international equities, `all` for crypto.
+- Live smoke test: confirm the default run completes in roughly ~2–3 min (vs
+  ~13 min exhaustive), with real session values for US equities, country
+  segregation for international equities, and `all` for crypto/fx/intl.
 
 ## Non-goals (YAGNI)
 
