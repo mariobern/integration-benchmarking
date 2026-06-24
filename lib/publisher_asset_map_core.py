@@ -72,6 +72,18 @@ def feeds_by_asset_class(rows: list[PublisherFeedRow]) -> dict[str, int]:
     return {cls: len(feed_ids) for cls, feed_ids in sorted(feeds.items())}
 
 
+_SESSION_ORDER = ("premarket", "regular", "afterhours", "overnight")
+
+
+def feeds_by_session(rows: list[PublisherFeedRow]) -> dict[str, int]:
+    """Distinct US-equity feed count per session, in canonical session order."""
+    feeds: dict[str, set] = defaultdict(set)
+    for r in rows:
+        if r.asset_class == "equity-us":
+            feeds[r.session].add(r.feed_id)
+    return {s: len(feeds[s]) for s in _SESSION_ORDER if s in feeds}
+
+
 def build_summary(rows: list[PublisherFeedRow]) -> list[dict]:
     """One row per (publisher_id, asset_class, session) with counts."""
     feed_count: dict[tuple[int, str, str], int] = defaultdict(int)

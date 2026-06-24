@@ -17,6 +17,7 @@ from pathlib import Path
 from lib.config import get_lazer_client, load_config
 from lib.publisher_asset_map_core import (
     feeds_by_asset_class,
+    feeds_by_session,
     fetch_publisher_feeds,
     write_outputs,
 )
@@ -81,6 +82,12 @@ def main():
     print("\nFeeds by asset class (distinct feeds across all publishers):")
     for asset_class, count in per_class.items():
         print(f"  {asset_class}: {count}")
+
+    per_session = feeds_by_session(rows)
+    if per_session:
+        print("\nUS-equity feeds by session (distinct feeds):")
+        for session, count in per_session.items():
+            print(f"  {session}: {count}")
 
     print("\nWrote:")
     for p in paths:

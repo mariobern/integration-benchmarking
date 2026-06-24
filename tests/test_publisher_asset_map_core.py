@@ -282,3 +282,44 @@ class TestSessionSql:
             assert label in sql
         for bound in ("240", "570", "960", "1200"):
             assert bound in sql
+
+
+def test_feeds_by_session_us_equity_only():
+    from lib.publisher_asset_map_core import feeds_by_session
+
+    rows = [
+        PublisherFeedRow(
+            28,
+            "MEMX.Production",
+            1163,
+            "Equity.US.AAPL/USD",
+            "equity-us",
+            100,
+            "regular",
+        ),
+        PublisherFeedRow(
+            28,
+            "MEMX.Production",
+            1163,
+            "Equity.US.AAPL/USD",
+            "equity-us",
+            40,
+            "premarket",
+        ),
+        PublisherFeedRow(
+            28,
+            "MEMX.Production",
+            1164,
+            "Equity.US.MSFT/USD",
+            "equity-us",
+            60,
+            "regular",
+        ),
+        # non-US-equity rows are ignored
+        PublisherFeedRow(
+            11, "Amber.Production", 999, "Equity.HK.0700/HKD", "equity-hk", 9, "all"
+        ),
+        PublisherFeedRow(1, "Lazer.Binance", 1, "Crypto.BTC/USD", "crypto", 5, "all"),
+    ]
+    # premarket: feed 1163; regular: feeds 1163 + 1164 (distinct)
+    assert feeds_by_session(rows) == {"premarket": 1, "regular": 2}
