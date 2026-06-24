@@ -164,11 +164,21 @@ class TestISINCache:
         assert cache.get("aapl") is not None
         assert cache.get("Aapl") is not None
 
-    def test_ttl_expiration(self, tmp_path: Path) -> None:
-        cache = ISINCache(cache_dir=tmp_path, ttl_seconds=0)
+    def test_ttl_expiration(self, tmp_path: Path, monkeypatch) -> None:
+        # Drive a controlled clock so expiry does not depend on wall-clock
+        # resolution (with ttl_seconds=0 a same-tick get/put reads as fresh).
+        import isin_resolver_v2
+
+        clock = {"now": 1000.0}
+        monkeypatch.setattr(isin_resolver_v2.time, "time", lambda: clock["now"])
+
+        cache = ISINCache(cache_dir=tmp_path, ttl_seconds=3600)
         result = ISINResult(ticker="AAPL", isin="US0378331005", source="test")
-        cache.put(result)
-        assert cache.get("AAPL") is None
+        cache.put(result)  # cached_at = 1000
+
+        assert cache.get("AAPL") is not None  # within TTL
+        clock["now"] = 1000.0 + 3601  # advance just past TTL
+        assert cache.get("AAPL") is None  # expired
 
     def test_clear(self, tmp_path: Path) -> None:
         cache = ISINCache(cache_dir=tmp_path, ttl_seconds=3600)
