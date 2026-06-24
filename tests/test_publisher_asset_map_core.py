@@ -114,6 +114,10 @@ class TestFetchPublisherNames:
         names = fetch_publisher_names(_client())
         assert names == {32: "Blueocean.Production", 11: "Amber.Production"}
 
+    def test_null_publisher_name_becomes_empty(self):
+        client = _FakeClient(name_rows=[(7, None)], feed_rows=[])
+        assert fetch_publisher_names(client) == {7: ""}
+
 
 class TestFetchPublisherFeeds:
     def test_categorizes_and_names(self):

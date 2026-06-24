@@ -83,12 +83,12 @@ def build_matrix(rows: list[PublisherFeedRow]) -> tuple[list[str], list[dict]]:
 def fetch_publisher_names(client) -> dict[int, str]:
     """Map publisher_id -> name from publishers_metadata_latest (live)."""
     query = """
-        SELECT publisher_id, name
+        SELECT publisher_id, publisher_name
         FROM publishers_metadata_latest
         FINAL
     """
     result = client.query(query)
-    return {int(row[0]): row[1] for row in result.result_rows}
+    return {int(row[0]): (row[1] or "") for row in result.result_rows}
 
 
 def fetch_publisher_feeds(
