@@ -81,16 +81,24 @@ def get_equity_country(symbol: Optional[str]) -> str:
     return "us"
 
 
-def categorize_asset_class(asset_type: str, symbol: Optional[str]) -> str:
-    """Categorize asset class, adding country suffix for equities.
+def categorize_asset_class(
+    asset_type: str, symbol: Optional[str], instrument_type: Optional[str] = None
+) -> str:
+    """Categorize asset class, encoding equity instrument type when provided.
 
-    For equity assets, returns 'equity-{country}' based on symbol pattern.
-    For other assets, returns the original asset_type.
+    For equities: ``perp`` -> ``equity-perp``; ``future`` ->
+    ``equity-<country>-futures``; otherwise ``equity-<country>``. When
+    ``instrument_type`` is None the result matches the prior country-only
+    behavior. Non-equity assets return their ``asset_type`` unchanged.
     """
-    if asset_type == "equity":
-        country = get_equity_country(symbol)
-        return f"equity-{country}"
-    return asset_type
+    if asset_type != "equity":
+        return asset_type
+    if instrument_type == "perp":
+        return "equity-perp"
+    country = get_equity_country(symbol)
+    if instrument_type == "future":
+        return f"equity-{country}-futures"
+    return f"equity-{country}"
 
 
 def parse_instrument_type(metadata_json: str) -> Optional[str]:

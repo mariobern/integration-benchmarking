@@ -105,3 +105,40 @@ class TestInstrumentType:
 
         assert resolve_instrument_type(None, "Equity.US.DMM6/USD") == "future"
         assert resolve_instrument_type(None, "Equity.US.ANSS/USD") == "spot"
+
+
+class TestCategorizeInstrument:
+    def test_us_future(self):
+        assert (
+            categorize_asset_class("equity", "Equity.US.DMM6/USD", "future")
+            == "equity-us-futures"
+        )
+
+    def test_hk_future(self):
+        assert (
+            categorize_asset_class("equity", "Equity.HK.HKHF6/HKD", "future")
+            == "equity-hk-futures"
+        )
+
+    def test_perp(self):
+        assert (
+            categorize_asset_class("equity", "Pyth.DC.AAPL/USDT", "perp")
+            == "equity-perp"
+        )
+
+    def test_spot_excludes_futures_suffix(self):
+        # German collision marked spot in metadata -> stays spot equity-de
+        assert (
+            categorize_asset_class("equity", "Equity.DE.MUV2/EUR", "spot")
+            == "equity-de"
+        )
+
+    def test_index_falls_through(self):
+        assert (
+            categorize_asset_class("equity", "Equity.Index.AAPL/USD", "index")
+            == "equity-index"
+        )
+
+    def test_none_preserves_default(self):
+        assert categorize_asset_class("equity", "Equity.US.AAPL/USD") == "equity-us"
+        assert categorize_asset_class("metal", "XAU/USD") == "metal"
