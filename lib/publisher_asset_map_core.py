@@ -13,7 +13,7 @@ from lib import sql_filters as _sf
 
 @dataclass
 class PublisherFeedRow:
-    """One (publisher, feed) contribution on the analyzed date."""
+    """One (publisher, feed, session) contribution on the analyzed date."""
 
     publisher_id: int
     publisher_name: str
@@ -21,6 +21,7 @@ class PublisherFeedRow:
     symbol: str
     asset_class: str
     update_count: int
+    session: str = "all"
 
 
 def day_window(date_str: str) -> tuple[str, str]:
@@ -134,24 +135,35 @@ def fetch_publisher_feeds(
     start, end = day_window(date_str)
     names = fetch_publisher_names(client)
 
+    session_expr = session_case_sql("pu.publish_time", "fm.symbol")
     query = """
         SELECT
             pu.publisher_id AS publisher_id,
             pu.price_feed_id AS feed_id,
             count() AS update_count,
             fm.asset_type AS asset_type,
-            fm.symbol AS symbol
+            fm.symbol AS symbol,
+            __SESSION_CASE__ AS session
         FROM publisher_updates pu
         LEFT JOIN feeds_metadata_latest fm ON pu.price_feed_id = fm.pyth_lazer_id
         WHERE pu.publish_time >= {start:DateTime}
           AND pu.publish_time <  {end:DateTime}
-        GROUP BY pu.publisher_id, pu.price_feed_id, fm.asset_type, fm.symbol
-        ORDER BY pu.publisher_id, fm.asset_type, pu.price_feed_id
-    """
+        GROUP BY pu.publisher_id, pu.price_feed_id, fm.asset_type, fm.symbol, session
+        ORDER BY pu.publisher_id, fm.asset_type, pu.price_feed_id, session
+    """.replace(
+        "__SESSION_CASE__", session_expr
+    )
     result = client.query(query, parameters={"start": start, "end": end})
 
     rows: list[PublisherFeedRow] = []
-    for publisher_id, feed_id, update_count, asset_type, symbol in result.result_rows:
+    for (
+        publisher_id,
+        feed_id,
+        update_count,
+        asset_type,
+        symbol,
+        session,
+    ) in result.result_rows:
         asset_type = asset_type or "unknown"
         symbol = symbol or ""
         asset_class = categorize_asset_class(asset_type, symbol)
@@ -167,6 +179,7 @@ def fetch_publisher_feeds(
                 symbol=symbol,
                 asset_class=asset_class,
                 update_count=int(update_count),
+                session=session or "all",
             )
         )
     return rows

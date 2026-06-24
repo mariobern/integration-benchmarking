@@ -100,11 +100,11 @@ def _client():
     return _FakeClient(
         name_rows=[(32, "Blueocean.Production"), (11, "Amber.Production")],
         feed_rows=[
-            # publisher_id, feed_id, update_count, asset_type, symbol
-            (32, 1163, 100, "equity", "AAPL"),
-            (32, 345, 20, "metal", "XAU/USD"),
-            (11, 999, 5, "equity", "VOD.L"),
-            (11, 888, 3, None, None),  # no metadata -> unknown / blank
+            # publisher_id, feed_id, update_count, asset_type, symbol, session
+            (32, 1163, 100, "equity", "Equity.US.AAPL/USD", "regular"),
+            (32, 345, 20, "metal", "XAU/USD", "all"),
+            (11, 999, 5, "equity", "Equity.HK.0700/HKD", "all"),
+            (11, 888, 3, None, None, "all"),  # no metadata -> unknown / blank
         ],
     )
 
@@ -126,22 +126,25 @@ class TestFetchPublisherFeeds:
         assert aapl.asset_class == "equity-us"
         assert aapl.publisher_name == "Blueocean.Production"
         assert aapl.update_count == 100
+        assert aapl.session == "regular"
 
     def test_foreign_equity_country(self):
         rows = fetch_publisher_feeds(_client(), "2026-06-23")
-        vod = [r for r in rows if r.feed_id == 999][0]
-        assert vod.asset_class == "equity-gb"
+        hk = [r for r in rows if r.feed_id == 999][0]
+        assert hk.asset_class == "equity-hk"
+        assert hk.session == "all"
 
     def test_missing_metadata_is_unknown(self):
         rows = fetch_publisher_feeds(_client(), "2026-06-23")
         orphan = [r for r in rows if r.feed_id == 888][0]
         assert orphan.asset_class == "unknown"
         assert orphan.symbol == ""
+        assert orphan.session == "all"
 
     def test_missing_publisher_name_is_blank(self):
         client = _FakeClient(
             name_rows=[],
-            feed_rows=[(7, 1, 1, "fx", "EUR/USD")],
+            feed_rows=[(7, 1, 1, "fx", "EUR/USD", "all")],
         )
         rows = fetch_publisher_feeds(client, "2026-06-23")
         assert rows[0].publisher_name == ""
