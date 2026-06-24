@@ -199,3 +199,15 @@ def test_write_outputs_creates_three_csvs(tmp_path: Path):
     assert matrix[0]["publisher_id"] == "11"
     assert matrix[0]["equity-us"] == "0"
     assert matrix[0]["metal"] == "1"
+
+
+def test_feeds_by_asset_class_counts_distinct_feeds():
+    from lib.publisher_asset_map_core import feeds_by_asset_class
+
+    rows = [
+        PublisherFeedRow(32, "Blueocean.Production", 345, "XAU/USD", "metal", 20),
+        PublisherFeedRow(11, "Amber.Production", 345, "XAU/USD", "metal", 7),
+        PublisherFeedRow(32, "Blueocean.Production", 1163, "AAPL", "equity-us", 100),
+    ]
+    # feed 345 is shared by two publishers -> counted once
+    assert feeds_by_asset_class(rows) == {"equity-us": 1, "metal": 1}

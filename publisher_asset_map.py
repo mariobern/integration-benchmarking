@@ -12,11 +12,14 @@ Usage:
 
 import argparse
 import sys
-from collections import defaultdict
 from pathlib import Path
 
 from lib.config import get_lazer_client, load_config
-from lib.publisher_asset_map_core import fetch_publisher_feeds, write_outputs
+from lib.publisher_asset_map_core import (
+    feeds_by_asset_class,
+    fetch_publisher_feeds,
+    write_outputs,
+)
 
 
 def main():
@@ -53,7 +56,7 @@ def main():
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print(f"Error querying ClickHouse: {e}", file=sys.stderr)
+        print(f"Error during initialization or query: {e}", file=sys.stderr)
         sys.exit(1)
 
     if not rows:
@@ -67,9 +70,7 @@ def main():
 
     publishers = {r.publisher_id for r in rows}
     feeds = {r.feed_id for r in rows}
-    per_class_feeds = defaultdict(set)
-    for r in rows:
-        per_class_feeds[r.asset_class].add(r.feed_id)
+    per_class = feeds_by_asset_class(rows)
 
     print(f"\n{'='*50}")
     print("SUMMARY")
@@ -78,8 +79,8 @@ def main():
     print(f"Publishers seen: {len(publishers)}")
     print(f"Unique feeds: {len(feeds)}")
     print("\nFeeds by asset class (distinct feeds across all publishers):")
-    for asset_class in sorted(per_class_feeds):
-        print(f"  {asset_class}: {len(per_class_feeds[asset_class])}")
+    for asset_class, count in per_class.items():
+        print(f"  {asset_class}: {count}")
 
     print("\nWrote:")
     for p in paths:

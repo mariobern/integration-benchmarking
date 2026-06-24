@@ -29,6 +29,14 @@ def day_window(date_str: str) -> tuple[str, str]:
     return (f"{start.isoformat()} 00:00:00", f"{end.isoformat()} 00:00:00")
 
 
+def feeds_by_asset_class(rows: list[PublisherFeedRow]) -> dict[str, int]:
+    """Distinct feed count per asset class across all publishers."""
+    feeds: dict[str, set] = defaultdict(set)
+    for r in rows:
+        feeds[r.asset_class].add(r.feed_id)
+    return {cls: len(feed_ids) for cls, feed_ids in sorted(feeds.items())}
+
+
 def build_summary(rows: list[PublisherFeedRow]) -> list[dict]:
     """One row per (publisher_id, asset_class) with feed_count and total_updates."""
     feed_count: dict[tuple[int, str], int] = defaultdict(int)
