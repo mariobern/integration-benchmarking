@@ -73,12 +73,12 @@ def feeds_by_asset_class(rows: list[PublisherFeedRow]) -> dict[str, int]:
 
 
 def build_summary(rows: list[PublisherFeedRow]) -> list[dict]:
-    """One row per (publisher_id, asset_class) with feed_count and total_updates."""
-    feed_count: dict[tuple[int, str], int] = defaultdict(int)
-    total_updates: dict[tuple[int, str], int] = defaultdict(int)
+    """One row per (publisher_id, asset_class, session) with counts."""
+    feed_count: dict[tuple[int, str, str], int] = defaultdict(int)
+    total_updates: dict[tuple[int, str, str], int] = defaultdict(int)
     names: dict[int, str] = {}
     for r in rows:
-        key = (r.publisher_id, r.asset_class)
+        key = (r.publisher_id, r.asset_class, r.session)
         feed_count[key] += 1
         total_updates[key] += r.update_count
         names[r.publisher_id] = r.publisher_name
@@ -88,12 +88,13 @@ def build_summary(rows: list[PublisherFeedRow]) -> list[dict]:
             "publisher_id": pub_id,
             "publisher_name": names[pub_id],
             "asset_class": asset_class,
-            "feed_count": feed_count[(pub_id, asset_class)],
-            "total_updates": total_updates[(pub_id, asset_class)],
+            "session": session,
+            "feed_count": feed_count[(pub_id, asset_class, session)],
+            "total_updates": total_updates[(pub_id, asset_class, session)],
         }
-        for (pub_id, asset_class) in feed_count
+        for (pub_id, asset_class, session) in feed_count
     ]
-    out.sort(key=lambda r: (r["publisher_id"], r["asset_class"]))
+    out.sort(key=lambda r: (r["publisher_id"], r["asset_class"], r["session"]))
     return out
 
 
@@ -198,7 +199,9 @@ def write_outputs(
     summary_path = output_dir / f"publisher_asset_map_summary_{date_str}.csv"
     matrix_path = output_dir / f"publisher_asset_map_matrix_{date_str}.csv"
 
-    sorted_rows = sorted(rows, key=lambda r: (r.publisher_id, r.asset_class, r.feed_id))
+    sorted_rows = sorted(
+        rows, key=lambda r: (r.publisher_id, r.asset_class, r.feed_id, r.session)
+    )
     with open(detail_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(
@@ -208,6 +211,7 @@ def write_outputs(
                 "feed_id",
                 "symbol",
                 "asset_class",
+                "session",
                 "update_count",
             ]
         )
@@ -219,6 +223,7 @@ def write_outputs(
                     r.feed_id,
                     r.symbol,
                     r.asset_class,
+                    r.session,
                     r.update_count,
                 ]
             )
@@ -231,6 +236,7 @@ def write_outputs(
                 "publisher_id",
                 "publisher_name",
                 "asset_class",
+                "session",
                 "feed_count",
                 "total_updates",
             ]
@@ -241,6 +247,7 @@ def write_outputs(
                     s["publisher_id"],
                     s["publisher_name"],
                     s["asset_class"],
+                    s["session"],
                     s["feed_count"],
                     s["total_updates"],
                 ]

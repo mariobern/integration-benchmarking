@@ -38,6 +38,7 @@ class TestBuildSummary:
             "publisher_id": 32,
             "publisher_name": "Blueocean.Production",
             "asset_class": "equity-us",
+            "session": "all",
             "feed_count": 2,
             "total_updates": 150,
         } in summary
@@ -51,10 +52,11 @@ class TestBuildSummary:
         ]
         assert metal_32[0]["feed_count"] == 1
         assert metal_32[0]["total_updates"] == 20
+        assert metal_32[0]["session"] == "all"
 
     def test_sorted_by_publisher_then_class(self):
         summary = build_summary(_rows())
-        keys = [(r["publisher_id"], r["asset_class"]) for r in summary]
+        keys = [(r["publisher_id"], r["asset_class"], r["session"]) for r in summary]
         assert keys == sorted(keys)
 
 
@@ -198,6 +200,7 @@ def test_write_outputs_creates_three_csvs(tmp_path: Path):
         "feed_id": "345",
         "symbol": "XAU/USD",
         "asset_class": "metal",
+        "session": "all",
         "update_count": "7",
     }
 
@@ -218,6 +221,43 @@ def test_feeds_by_asset_class_counts_distinct_feeds():
     ]
     # feed 345 is shared by two publishers -> counted once
     assert feeds_by_asset_class(rows) == {"equity-us": 1, "metal": 1}
+
+
+def test_summary_splits_us_equity_by_session():
+    rows = [
+        PublisherFeedRow(
+            28,
+            "MEMX.Production",
+            1163,
+            "Equity.US.AAPL/USD",
+            "equity-us",
+            100,
+            "regular",
+        ),
+        PublisherFeedRow(
+            28,
+            "MEMX.Production",
+            1163,
+            "Equity.US.AAPL/USD",
+            "equity-us",
+            40,
+            "premarket",
+        ),
+        PublisherFeedRow(
+            28,
+            "MEMX.Production",
+            1164,
+            "Equity.US.MSFT/USD",
+            "equity-us",
+            60,
+            "regular",
+        ),
+    ]
+    summary = build_summary(rows)
+    reg = [r for r in summary if r["session"] == "regular"][0]
+    pre = [r for r in summary if r["session"] == "premarket"][0]
+    assert reg["feed_count"] == 2 and reg["total_updates"] == 160
+    assert pre["feed_count"] == 1 and pre["total_updates"] == 40
 
 
 class TestSessionSql:
