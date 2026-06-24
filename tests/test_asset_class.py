@@ -67,3 +67,41 @@ class TestCategorizeAssetClass:
 
     def test_fx_passthrough(self):
         assert categorize_asset_class("fx", "EUR/USD") == "fx"
+
+
+class TestInstrumentType:
+    def test_parse_present(self):
+        from lib.asset_class import parse_instrument_type
+
+        meta = '{"items":[{"key":"asset_type","value":{"stringValue":"equity"}},{"key":"instrument_type","value":{"stringValue":"future"}}]}'
+        assert parse_instrument_type(meta) == "future"
+
+    def test_parse_perp(self):
+        from lib.asset_class import parse_instrument_type
+
+        meta = '{"items":[{"key":"instrument_type","value":{"stringValue":"perp"}}]}'
+        assert parse_instrument_type(meta) == "perp"
+
+    def test_parse_absent_key(self):
+        from lib.asset_class import parse_instrument_type
+
+        meta = '{"items":[{"key":"asset_type","value":{"stringValue":"equity"}}]}'
+        assert parse_instrument_type(meta) is None
+
+    def test_parse_empty_or_malformed(self):
+        from lib.asset_class import parse_instrument_type
+
+        assert parse_instrument_type("") is None
+        assert parse_instrument_type("not json") is None
+
+    def test_resolve_present_passthrough(self):
+        from lib.asset_class import resolve_instrument_type
+
+        assert resolve_instrument_type("spot", "Equity.DE.MUV2/EUR") == "spot"
+        assert resolve_instrument_type("perp", "Pyth.DC.AAPL/USDT") == "perp"
+
+    def test_resolve_missing_uses_heuristic(self):
+        from lib.asset_class import resolve_instrument_type
+
+        assert resolve_instrument_type(None, "Equity.US.DMM6/USD") == "future"
+        assert resolve_instrument_type(None, "Equity.US.ANSS/USD") == "spot"

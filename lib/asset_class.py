@@ -5,7 +5,10 @@ Equities are categorized by ISO country code (3166-1 alpha-2) using the
 all other asset types pass through unchanged.
 """
 
+import json
 from typing import Optional
+
+from lib.symbol_utils import is_futures_symbol
 
 # Symbol suffix to ISO country code mapping for equities
 EQUITY_COUNTRY_MAP = {
@@ -88,3 +91,27 @@ def categorize_asset_class(asset_type: str, symbol: Optional[str]) -> str:
         country = get_equity_country(symbol)
         return f"equity-{country}"
     return asset_type
+
+
+def parse_instrument_type(metadata_json: str) -> Optional[str]:
+    """Return the ``instrument_type`` value from a feed's metadata JSON, or None.
+
+    Metadata shape: {"items": [{"key": ..., "value": {"stringValue": ...}}, ...]}.
+    """
+    if not metadata_json:
+        return None
+    try:
+        items = json.loads(metadata_json).get("items", [])
+    except (json.JSONDecodeError, TypeError, AttributeError):
+        return None
+    for item in items:
+        if item.get("key") == "instrument_type":
+            return item.get("value", {}).get("stringValue")
+    return None
+
+
+def resolve_instrument_type(raw: Optional[str], symbol: str) -> str:
+    """Resolve a feed's instrument type: metadata value if present, else heuristic."""
+    if raw:
+        return raw
+    return "future" if is_futures_symbol(symbol) else "spot"
