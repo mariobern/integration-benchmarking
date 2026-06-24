@@ -323,3 +323,41 @@ def test_feeds_by_session_us_equity_only():
     ]
     # premarket: feed 1163; regular: feeds 1163 + 1164 (distinct)
     assert feeds_by_session(rows) == {"premarket": 1, "regular": 2}
+
+
+def test_matrix_counts_us_equity_feed_once_across_sessions():
+    from lib.publisher_asset_map_core import build_matrix
+
+    rows = [
+        PublisherFeedRow(
+            28,
+            "MEMX.Production",
+            1163,
+            "Equity.US.AAPL/USD",
+            "equity-us",
+            100,
+            "regular",
+        ),
+        PublisherFeedRow(
+            28,
+            "MEMX.Production",
+            1163,
+            "Equity.US.AAPL/USD",
+            "equity-us",
+            40,
+            "premarket",
+        ),
+        PublisherFeedRow(
+            28,
+            "MEMX.Production",
+            1164,
+            "Equity.US.MSFT/USD",
+            "equity-us",
+            60,
+            "overnight",
+        ),
+    ]
+    classes, matrix = build_matrix(rows)
+    assert classes == ["equity-us"]
+    # feed 1163 appears in two sessions but must count once -> 2 distinct feeds total
+    assert matrix[0]["equity-us"] == 2

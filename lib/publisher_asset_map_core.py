@@ -111,19 +111,22 @@ def build_summary(rows: list[PublisherFeedRow]) -> list[dict]:
 
 
 def build_matrix(rows: list[PublisherFeedRow]) -> tuple[list[str], list[dict]]:
-    """Wide pivot: publisher rows, one column per asset class (feed counts)."""
+    """Wide pivot: publisher rows, one column per asset class (distinct feed counts).
+
+    Session-agnostic: a feed published across multiple sessions counts once.
+    """
     classes = sorted({r.asset_class for r in rows})
-    counts: dict[int, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    feeds: dict[int, dict[str, set]] = defaultdict(lambda: defaultdict(set))
     names: dict[int, str] = {}
     for r in rows:
-        counts[r.publisher_id][r.asset_class] += 1
+        feeds[r.publisher_id][r.asset_class].add(r.feed_id)
         names[r.publisher_id] = r.publisher_name
 
     matrix = []
-    for pub_id in sorted(counts):
+    for pub_id in sorted(feeds):
         row = {"publisher_id": pub_id, "publisher_name": names[pub_id]}
         for cls in classes:
-            row[cls] = counts[pub_id].get(cls, 0)
+            row[cls] = len(feeds[pub_id].get(cls, set()))
         matrix.append(row)
     return classes, matrix
 
