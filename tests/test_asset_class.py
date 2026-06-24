@@ -142,3 +142,18 @@ class TestCategorizeInstrument:
     def test_none_preserves_default(self):
         assert categorize_asset_class("equity", "Equity.US.AAPL/USD") == "equity-us"
         assert categorize_asset_class("metal", "XAU/USD") == "metal"
+
+    def test_parse_malformed_item_shapes(self):
+        from lib.asset_class import parse_instrument_type
+
+        # items not dicts
+        assert parse_instrument_type('{"items":["foo"]}') is None
+        # value not a dict
+        assert (
+            parse_instrument_type(
+                '{"items":[{"key":"instrument_type","value":"future"}]}'
+            )
+            is None
+        )
+        # top-level non-object JSON
+        assert parse_instrument_type("[1,2,3]") is None

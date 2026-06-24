@@ -113,8 +113,11 @@ def parse_instrument_type(metadata_json: str) -> Optional[str]:
     except (json.JSONDecodeError, TypeError, AttributeError):
         return None
     for item in items:
+        if not isinstance(item, dict):
+            continue
         if item.get("key") == "instrument_type":
-            return item.get("value", {}).get("stringValue")
+            value = item.get("value")
+            return value.get("stringValue") if isinstance(value, dict) else None
     return None
 
 
