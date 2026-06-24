@@ -80,46 +80,6 @@ def session_probe_windows(
     return windows
 
 
-def day_window(date_str: str) -> tuple[str, str]:
-    """Return [start, end) ClickHouse DateTime strings for the full UTC day."""
-    start = date.fromisoformat(date_str)
-    end = start + timedelta(days=1)
-    return (f"{start.isoformat()} 00:00:00", f"{end.isoformat()} 00:00:00")
-
-
-def _et_session_bounds() -> tuple[int, int, int, int]:
-    """ET session boundaries as minutes-from-midnight, from sql_filters constants.
-
-    Returns (premarket_start, regular_start, afterhours_start, overnight_start).
-    """
-    return (
-        _sf.US_EQUITY_PREMARKET_OPEN_HOUR * 60 + _sf.US_EQUITY_PREMARKET_OPEN_MINUTE,
-        _sf.US_EQUITY_MARKET_OPEN_HOUR * 60 + _sf.US_EQUITY_MARKET_OPEN_MINUTE,
-        _sf.US_EQUITY_MARKET_CLOSE_HOUR * 60 + _sf.US_EQUITY_MARKET_CLOSE_MINUTE,
-        _sf.US_EQUITY_OVERNIGHT_START_HOUR * 60 + _sf.US_EQUITY_OVERNIGHT_START_MINUTE,
-    )
-
-
-def session_case_sql(time_column: str, symbol_column: str) -> str:
-    """Build a ClickHouse expression bucketing each row into a trading session.
-
-    Non-US-equity symbols (not matching 'Equity.US.%') yield 'all'. US-equity
-    rows are bucketed by ET wall-clock minute-of-day into the four sessions,
-    which tile the 24h clock with no gaps.
-    """
-    pre, reg, aft, ovn = _et_session_bounds()
-    et = f"toTimeZone({time_column}, 'America/New_York')"
-    m = f"(toHour({et}) * 60 + toMinute({et}))"
-    return (
-        "multiIf("
-        f"{symbol_column} NOT LIKE 'Equity.US.%', 'all', "
-        f"{m} >= {ovn} OR {m} < {pre}, 'overnight', "
-        f"{m} < {reg}, 'premarket', "
-        f"{m} < {aft}, 'regular', "
-        "'afterhours')"
-    )
-
-
 def feeds_by_asset_class(rows: list[PublisherFeedRow]) -> dict[str, int]:
     """Distinct feed count per asset class across all publishers."""
     feeds: dict[str, set] = defaultdict(set)
@@ -198,60 +158,74 @@ def fetch_publisher_names(client) -> dict[int, str]:
     return {int(row[0]): (row[1] or "") for row in result.result_rows}
 
 
-def fetch_publisher_feeds(
-    client,
-    date_str: str,
-    asset_class_filter: Optional[str] = None,
-) -> list[PublisherFeedRow]:
-    """Query one UTC day of publisher_updates, grouped per (publisher, feed)."""
-    start, end = day_window(date_str)
-    names = fetch_publisher_names(client)
-
-    session_expr = session_case_sql("pu.publish_time", "fm.symbol")
-    query = """
+def _query_probe_windows(client, windows: list[ProbeWindow]):
+    """Run one grouped count() over the given probe windows; return raw rows."""
+    conds = " OR ".join(
+        f"(pu.publish_time >= {{s{i}:DateTime}} AND pu.publish_time < {{e{i}:DateTime}})"
+        for i in range(len(windows))
+    )
+    params: dict[str, str] = {}
+    for i, w in enumerate(windows):
+        params[f"s{i}"] = w.start_utc
+        params[f"e{i}"] = w.end_utc
+    query = f"""
         SELECT
             pu.publisher_id AS publisher_id,
             pu.price_feed_id AS feed_id,
-            count() AS update_count,
+            count() AS sampled_update_count,
             fm.asset_type AS asset_type,
-            fm.symbol AS symbol,
-            __SESSION_CASE__ AS session
+            fm.symbol AS symbol
         FROM publisher_updates pu
         LEFT JOIN feeds_metadata_latest fm ON pu.price_feed_id = fm.pyth_lazer_id
-        WHERE pu.publish_time >= {start:DateTime}
-          AND pu.publish_time <  {end:DateTime}
-        GROUP BY pu.publisher_id, pu.price_feed_id, fm.asset_type, fm.symbol, session
-        ORDER BY pu.publisher_id, fm.asset_type, pu.price_feed_id, session
-    """.replace(
-        "__SESSION_CASE__", session_expr
-    )
-    result = client.query(query, parameters={"start": start, "end": end})
+        WHERE {conds}
+        GROUP BY pu.publisher_id, pu.price_feed_id, fm.asset_type, fm.symbol
+    """
+    return client.query(query, parameters=params).result_rows
+
+
+def fetch_publisher_feeds(
+    client,
+    date_str: str,
+    interval_min: int = 30,
+    width_min: int = 2,
+    asset_class_filter: Optional[str] = None,
+) -> list[PublisherFeedRow]:
+    """Sample probe windows per session; return per-(publisher, feed, session) rows."""
+    names = fetch_publisher_names(client)
+    windows = session_probe_windows(date_str, interval_min, width_min)
+
+    by_session: dict[str, list[ProbeWindow]] = defaultdict(list)
+    for w in windows:
+        by_session[w.session].append(w)
+
+    # (publisher_id, feed_id, asset_class, session) -> [summed_count, symbol]
+    acc: dict[tuple[int, int, str, str], list] = {}
+    for session_label, wins in by_session.items():
+        for publisher_id, feed_id, cnt, asset_type, symbol in _query_probe_windows(
+            client, wins
+        ):
+            symbol = symbol or ""
+            asset_class = categorize_asset_class(asset_type or "unknown", symbol)
+            session = session_label if symbol.startswith("Equity.US.") else "all"
+            key = (int(publisher_id), int(feed_id), asset_class, session)
+            if key in acc:
+                acc[key][0] += int(cnt)
+            else:
+                acc[key] = [int(cnt), symbol]
 
     rows: list[PublisherFeedRow] = []
-    for (
-        publisher_id,
-        feed_id,
-        update_count,
-        asset_type,
-        symbol,
-        session,
-    ) in result.result_rows:
-        asset_type = asset_type or "unknown"
-        symbol = symbol or ""
-        asset_class = categorize_asset_class(asset_type, symbol)
-
+    for (pub_id, feed_id, asset_class, session), (cnt, symbol) in acc.items():
         if asset_class_filter and asset_class != asset_class_filter:
             continue
-
         rows.append(
             PublisherFeedRow(
-                publisher_id=int(publisher_id),
-                publisher_name=names.get(int(publisher_id), ""),
-                feed_id=int(feed_id),
+                publisher_id=pub_id,
+                publisher_name=names.get(pub_id, ""),
+                feed_id=feed_id,
                 symbol=symbol,
                 asset_class=asset_class,
-                sampled_update_count=int(update_count),
-                session=session or "all",
+                sampled_update_count=cnt,
+                session=session,
             )
         )
     return rows
