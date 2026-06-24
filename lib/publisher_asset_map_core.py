@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from lib.asset_class import categorize_asset_class
+from lib import sql_filters as _sf
 
 
 @dataclass
@@ -27,6 +28,39 @@ def day_window(date_str: str) -> tuple[str, str]:
     start = date.fromisoformat(date_str)
     end = start + timedelta(days=1)
     return (f"{start.isoformat()} 00:00:00", f"{end.isoformat()} 00:00:00")
+
+
+def _et_session_bounds() -> tuple[int, int, int, int]:
+    """ET session boundaries as minutes-from-midnight, from sql_filters constants.
+
+    Returns (premarket_start, regular_start, afterhours_start, overnight_start).
+    """
+    return (
+        _sf.US_EQUITY_PREMARKET_OPEN_HOUR * 60 + _sf.US_EQUITY_PREMARKET_OPEN_MINUTE,
+        _sf.US_EQUITY_MARKET_OPEN_HOUR * 60 + _sf.US_EQUITY_MARKET_OPEN_MINUTE,
+        _sf.US_EQUITY_MARKET_CLOSE_HOUR * 60 + _sf.US_EQUITY_MARKET_CLOSE_MINUTE,
+        _sf.US_EQUITY_OVERNIGHT_START_HOUR * 60 + _sf.US_EQUITY_OVERNIGHT_START_MINUTE,
+    )
+
+
+def session_case_sql(time_column: str, symbol_column: str) -> str:
+    """Build a ClickHouse expression bucketing each row into a trading session.
+
+    Non-US-equity symbols (not matching 'Equity.US.%') yield 'all'. US-equity
+    rows are bucketed by ET wall-clock minute-of-day into the four sessions,
+    which tile the 24h clock with no gaps.
+    """
+    pre, reg, aft, ovn = _et_session_bounds()
+    et = f"toTimeZone({time_column}, 'America/New_York')"
+    m = f"(toHour({et}) * 60 + toMinute({et}))"
+    return (
+        "multiIf("
+        f"{symbol_column} NOT LIKE 'Equity.US.%', 'all', "
+        f"{m} >= {ovn} OR {m} < {pre}, 'overnight', "
+        f"{m} < {reg}, 'premarket', "
+        f"{m} < {aft}, 'regular', "
+        "'afterhours')"
+    )
 
 
 def feeds_by_asset_class(rows: list[PublisherFeedRow]) -> dict[str, int]:

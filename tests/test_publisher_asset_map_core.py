@@ -215,3 +215,27 @@ def test_feeds_by_asset_class_counts_distinct_feeds():
     ]
     # feed 345 is shared by two publishers -> counted once
     assert feeds_by_asset_class(rows) == {"equity-us": 1, "metal": 1}
+
+
+class TestSessionSql:
+    def test_bounds_from_constants(self):
+        from lib.publisher_asset_map_core import _et_session_bounds
+
+        assert _et_session_bounds() == (240, 570, 960, 1200)
+
+    def test_session_case_sql_has_labels_and_bounds(self):
+        from lib.publisher_asset_map_core import session_case_sql
+
+        sql = session_case_sql("pu.publish_time", "fm.symbol")
+        for token in ("multiIf", "America/New_York", "Equity.US.%", "fm.symbol"):
+            assert token in sql
+        for label in (
+            "'all'",
+            "'premarket'",
+            "'regular'",
+            "'afterhours'",
+            "'overnight'",
+        ):
+            assert label in sql
+        for bound in ("240", "570", "960", "1200"):
+            assert bound in sql
