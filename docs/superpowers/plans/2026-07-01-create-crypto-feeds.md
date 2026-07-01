@@ -4,7 +4,7 @@
 
 **Goal:** Add 12 new crypto spot `/USD` price feeds to `lazer.json`, modeled verbatim on existing feed 3329, with per-feed data from `crypto.csv`, all in `COMING_SOON` state — using final feed IDs 3407, 3408, 3410–3419 (ADI/USD remapped from 3409 to 3419 because 3409 is already an unrelated existing feed).
 
-**Architecture:** A one-off Python generator script (lives in the scratchpad, not committed) deep-copies feed 3329's dict as a template, applies per-feed overrides from `crypto.csv`, serializes each new feed to text matching the file's 4-space feed-object indentation, and splices the blocks into the raw `lazer.json` text at **two** insertion points (after feed 3406, and after feed 3409) so that feed 3409 itself is never touched and the file stays sorted ascending by `feedId`. Raw-text insertion keeps the rest of the ~7 MB file byte-for-byte unchanged. The only committed artifact is the modified `lazer.json`. This mirrors the prior xStocks batch (see `docs/superpowers/plans/2026-06-29-create-xstocks-feeds.md`).
+**Architecture:** A one-off Python generator script (lives in the scratchpad, not committed) deep-copies feed 3329's dict as a template, applies per-feed overrides from `crypto.csv`, serializes each new feed to text matching the file's 4-space feed-object indentation, and splices the blocks into the raw `lazer.json` text at **two** insertion points (after feed 3406, and after feed 3409) so that feed 3409 itself is never touched and the file stays sorted ascending by `feedId`. Raw-text insertion keeps the rest of the ~7 MB file byte-for-byte unchanged. `lazer.json` is gitignored (a local config working copy, like `after.json`), so the modified file is verified on disk but never committed — there is no committed artifact from this plan. This mirrors the prior xStocks batch (see `docs/superpowers/plans/2026-06-29-create-xstocks-feeds.md`), minus the commit step, which does not apply here.
 
 **Tech Stack:** Python 3 stdlib only (`json`, `csv`, `copy`). Run with `python3` (no `python` on this system).
 
@@ -192,18 +192,20 @@ Expected: no output (dry run wrote nothing).
 
 ---
 
-### Task 2: Apply the splice and commit
+### Task 2: Apply the splice
 
-Run the generator in write mode, verify the modified file, and commit.
+Run the generator in write mode and verify the modified file. `lazer.json` is
+gitignored (a local config working copy, like `after.json`), so this task
+ends with a verified on-disk file — not a git commit.
 
 **Files:**
 
-- Modify: `lazer.json` (adds 12 feed blocks: 2 after feed 3406, 10 after feed 3409)
+- Modify: `lazer.json` (adds 12 feed blocks: 2 after feed 3406, 10 after feed 3409) — gitignored, not committed
 
 **Interfaces:**
 
 - Consumes: `create_crypto_feeds.py` from Task 1.
-- Produces: committed `lazer.json` with feeds 3407, 3408, 3410–3419.
+- Produces: `lazer.json` on disk with feeds 3407, 3408, 3410–3419 added.
 
 - [ ] **Step 1: Run in write mode**
 
@@ -254,23 +256,25 @@ Expected: only `lazer.json` changed, with insertions and **0 deletions** (e.g. `
 Run: `cd /Users/mariobernardi/Documents/GitHub/integration-benchmarking && grep -n '"feedId": 3407,\|"feedId": 3409,\|"feedId": 3419,' lazer.json`
 Expected: all three lines found, in ascending order (3407, then 3409, then 3419), each at 6-space indent matching surrounding feeds.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: No git commit — `lazer.json` is a gitignored local working copy**
+
+`lazer.json` matches the `lazer*.json` pattern in `.gitignore` (confirmed via
+`git check-ignore -v lazer.json` and `git add -n lazer.json`, which errors
+with "The following paths are ignored by one of your .gitignore files").
+Like `after.json`, it's a local config working copy that is never committed
+to git — do **not** run `git add -f` to force it in. The task's deliverable
+is the modified file on disk, verified by Steps 2–4 above. Confirm the
+working tree state with:
 
 ```bash
 cd /Users/mariobernardi/Documents/GitHub/integration-benchmarking
-git add lazer.json
-git commit -m "feat(lazer): add crypto COMING_SOON feeds 3407-3419
-
-Add 12 spot /USD crypto feeds modeled on feed 3329 (Crypto.SPCXX/USD),
-with per-feed data from crypto.csv. All COMING_SOON, minChannel rate
-0.200000000s, publisher list and minPublishers copied from 3329.
-ADI/USD remapped from feedId 3409 to 3419 since 3409 is an existing,
-unrelated feed (Equity.US.ECHO/USD) left untouched.
-
-Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+git status --short lazer.json
 ```
 
-(`lazer.json` is data, not covered by the black/prettier hooks; no pre-commit run needed for this file.)
+Expected: no output (the file is ignored, so it never shows as a pending
+change) — this is expected and correct, not a sign the write failed. The
+`--write` run's own printed report (`WROTE lazer.json`) plus the independent
+verification in Step 2 are the record that the change happened.
 
 ---
 
