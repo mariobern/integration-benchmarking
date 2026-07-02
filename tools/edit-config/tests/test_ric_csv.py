@@ -63,6 +63,33 @@ def test_derive_symbol_prefixes_hk():
     ]
 
 
+def test_derive_symbol_prefixes_kr():
+    assert derive_symbol_prefixes("005930.KS") == [
+        "Equity.KR.005930-KR/",
+        "Equity.KR.005930/",
+    ]
+    assert derive_symbol_prefixes("000660.KS") == [
+        "Equity.KR.000660-KR/",
+        "Equity.KR.000660/",
+    ]
+
+
+def test_derive_symbol_prefixes_jp():
+    assert derive_symbol_prefixes("7203.T") == [
+        "Equity.JP.7203-JP/",
+        "Equity.JP.7203/",
+    ]
+    assert derive_symbol_prefixes("6758.T") == [
+        "Equity.JP.6758-JP/",
+        "Equity.JP.6758/",
+    ]
+
+
+def test_derive_symbol_prefixes_non_digit_ticker_returns_empty():
+    assert derive_symbol_prefixes("ABCD.KS") == []
+    assert derive_symbol_prefixes("ABCD.T") == []
+
+
 def test_derive_symbol_prefixes_unknown_suffix_returns_empty():
     assert derive_symbol_prefixes("AAPL.O") == []
     assert derive_symbol_prefixes("EUR=") == []

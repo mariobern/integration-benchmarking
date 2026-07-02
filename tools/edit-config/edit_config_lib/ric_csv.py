@@ -55,17 +55,30 @@ def load_ric_csv(path: str) -> list[RicEntry]:
     return entries
 
 
+_SUFFIX_TO_EXCHANGE = {
+    ".HK": "HK",
+    ".KS": "KR",
+    ".T": "JP",
+}
+
+
 def derive_symbol_prefixes(ric: str) -> list[str]:
     """Map a RIC to the candidate Lazer feed symbol prefixes.
 
-    v1 supports only HK equities: `NNNN.HK` -> both `Equity.HK.NNNN-HK/`
-    (legacy form) and `Equity.HK.NNNN/` (current form).
-    Returns [] for RICs we don't know how to map.
+    Supports HK (`NNNN.HK`), KR (`NNNN.KS`), and JP (`NNNN.T`) equities: each
+    maps to both `Equity.<EXCH>.NNNN-<EXCH>/` (legacy form) and
+    `Equity.<EXCH>.NNNN/` (current form). Returns [] for RICs we don't know
+    how to map, or whose ticker portion isn't all-digits.
     """
-    if ric.endswith(".HK"):
-        head = ric[: -len(".HK")]
-        if head.isdigit():
-            return [f"Equity.HK.{head}-HK/", f"Equity.HK.{head}/"]
+    for suffix, exchange in _SUFFIX_TO_EXCHANGE.items():
+        if ric.endswith(suffix):
+            head = ric[: -len(suffix)]
+            if head.isdigit():
+                return [
+                    f"Equity.{exchange}.{head}-{exchange}/",
+                    f"Equity.{exchange}.{head}/",
+                ]
+            return []
     return []
 
 
