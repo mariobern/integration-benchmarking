@@ -23,7 +23,7 @@ class RicEntry:
     exchange_code: str
 
 
-_REQUIRED_COLUMNS = ("Ticker", "RIC", "Exchange Code")
+_REQUIRED_COLUMNS = ("RIC",)
 
 
 def load_ric_csv(path: str) -> list[RicEntry]:
