@@ -162,7 +162,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--from-csv",
         type=str,
-        help="CSV path for --set-ric-mapping (LSEG-style: requires Ticker, RIC, Exchange Code columns).",
+        help=(
+            "CSV path for --set-ric-mapping (requires a RIC column; "
+            "Ticker and Exchange Code are optional)."
+        ),
     )
     p.add_argument(
         "--symbols",

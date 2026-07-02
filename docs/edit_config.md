@@ -152,10 +152,11 @@ python3 tools/edit-config/edit_config.py --config lazer_update.json \
     --set-ric --feed-ids-from feed_ids.txt --apply
 ```
 
-**Contrast with `--set-ric-mapping`** — `--set-ric-mapping` is HK-only, matches
-feeds by symbol prefix from a CSV, writes one RIC to every slot, and only fills
-_empty_ slots. `--set-ric` resolves RICs automatically by feed ID, differentiates
-day vs overnight slots, and overwrites non-empty values that differ.
+**Contrast with `--set-ric-mapping`** — `--set-ric-mapping` matches feeds by
+symbol prefix from a CSV (HK, KR, and JP equities), writes one RIC to every
+slot, and only fills _empty_ slots. `--set-ric` resolves RICs automatically by
+feed ID, differentiates day vs overnight slots, and overwrites non-empty
+values that differ.
 
 ### `--set-ric-mapping` — fill empty `datascope_ric` identifiers
 
@@ -172,9 +173,10 @@ python3 tools/edit-config/edit_config.py \
 
 (Default is dry-run; add `--apply` to write changes.)
 
-The CSV must have `Ticker`, `RIC`, and `Exchange Code` columns. v1 supports HK
-equities only — rows whose RIC does not map to a known feed-symbol prefix are
-reported as unmatched in the summary.
+The CSV must have a `RIC` column; `Ticker` and `Exchange Code` are optional
+(accepted if present, ignored by matching). Supports HK (`NNNN.HK`), KR
+(`NNNN.KS`), and JP (`NNNN.T`) equities — rows whose RIC does not map to a
+known feed-symbol prefix are reported as unmatched in the summary.
 
 Per-slot rules:
 
