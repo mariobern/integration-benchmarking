@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - `derive_symbol_prefixes()` must keep returning `[]` (not raise) for RICs it doesn't recognize — existing HK behavior and the "silent skip" contract in `SetRicMapping` depend on this.
-- The `Ticker` and `Exchange Code` CSV columns must remain accepted when present (existing HK fixture `hk-syms-sample.csv` must keep passing unmodified) — only the *requirement* is relaxed, not the fields.
+- The `Ticker` and `Exchange Code` CSV columns must remain accepted when present (existing HK fixture `hk-syms-sample.csv` must keep passing unmodified) — only the _requirement_ is relaxed, not the fields.
 - No changes to `config_ops.py`, `config_editor.py`, `config_text_surgery.py`, or the CLI's `--set-ric-mapping`/`--from-csv` operation wiring — this is a data-layer change only, per the design's Non-goals section.
 - Ticker portion of a matched RIC must be all-digits before deriving a prefix (same guard as the existing HK case) — e.g. `AAPL.O` must not match anything.
 
@@ -20,10 +20,12 @@
 ## Task 1: Generalize `derive_symbol_prefixes()` to KR/JP
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config_lib/ric_csv.py:58-69`
 - Test: `tools/edit-config/tests/test_ric_csv.py`
 
 **Interfaces:**
+
 - Consumes: nothing new (pure function, same signature `derive_symbol_prefixes(ric: str) -> list[str]`).
 - Produces: `derive_symbol_prefixes()` now also returns two prefixes for `.KS` RICs (`Equity.KR.<code>-KR/`, `Equity.KR.<code>/`) and `.T` RICs (`Equity.JP.<code>-JP/`, `Equity.JP.<code>/`), in addition to the existing `.HK` behavior. `build_prefix_index()` (unchanged, `tools/edit-config/edit_config_lib/ric_csv.py:72-82`) automatically picks these up since it just calls `derive_symbol_prefixes()` per entry.
 
@@ -133,11 +135,13 @@ EOF
 ## Task 2: Relax `load_ric_csv()` required columns to just `RIC`
 
 **Files:**
+
 - Modify: `tools/edit-config/edit_config_lib/ric_csv.py:26-55`
 - Test: `tools/edit-config/tests/test_ric_csv.py`
 - Test fixture: `tools/edit-config/tests/fixtures/ric-only-sample.csv` (new)
 
 **Interfaces:**
+
 - Consumes: nothing new.
 - Produces: `load_ric_csv(path: str) -> list[RicEntry]` (signature unchanged). `RicEntry.ticker` / `RicEntry.exchange_code` are now `""` when the source CSV lacks those columns, instead of the load failing with `LoadError`.
 
@@ -216,10 +220,12 @@ EOF
 ## Task 3: Update docs and CLI help text
 
 **Files:**
+
 - Modify: `docs/edit_config.md:155-177`
 - Modify: `tools/edit-config/edit_config.py:162-166`
 
 **Interfaces:**
+
 - Consumes: nothing (docs/help-text only, no runtime behavior).
 - Produces: nothing consumed by later tasks.
 
@@ -305,10 +311,12 @@ EOF
 ## Task 4: Apply `prune.txt` to `lazer_new.json`
 
 **Files:**
+
 - Read only: `prune.txt`, `lazer_new.json`
 - No test file — this task is a real-data verification/rollout step, not new library code.
 
 **Interfaces:**
+
 - Consumes: `derive_symbol_prefixes()` (Task 1), `load_ric_csv()` (Task 2) — both exercised indirectly through the `edit_config.py` CLI.
 - Produces: the edited `lazer_new.json` (25 `datascope_ric.identifier` slots filled) and a `.bak` backup file.
 

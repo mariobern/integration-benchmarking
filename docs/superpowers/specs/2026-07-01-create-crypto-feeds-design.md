@@ -33,20 +33,20 @@ existing feed shares any target `symbol` or `metadata.name`.
 
 Final ID mapping:
 
-| feed_id (final) | CSV row (`name`)     |
-| ---------------- | -------------------- |
-| 3407              | BEAT/USD              |
-| 3408              | YLDS/USD              |
-| 3410              | U/USD                 |
-| 3411              | STABLE/USD            |
-| 3412              | BFUSD/USD             |
-| 3413              | HTX/USD               |
-| 3414              | M/USD                 |
-| 3415              | LAB/USD               |
-| 3416              | WBT/USD               |
-| 3417              | RAIN/USD              |
-| 3418              | ANSEM/USD             |
-| 3419              | ADI/USD (remapped from 3409) |
+| feed_id (final) | CSV row (`name`)             |
+| --------------- | ---------------------------- |
+| 3407            | BEAT/USD                     |
+| 3408            | YLDS/USD                     |
+| 3410            | U/USD                        |
+| 3411            | STABLE/USD                   |
+| 3412            | BFUSD/USD                    |
+| 3413            | HTX/USD                      |
+| 3414            | M/USD                        |
+| 3415            | LAB/USD                      |
+| 3416            | WBT/USD                      |
+| 3417            | RAIN/USD                     |
+| 3418            | ANSEM/USD                    |
+| 3419            | ADI/USD (remapped from 3409) |
 
 ## Template (feed 3329, verbatim)
 
@@ -90,15 +90,15 @@ Final ID mapping:
 
 Every field not listed here is copied **verbatim** from feed 3329.
 
-| Field                       | Value                     | Source / rule                                          |
-| --------------------------- | -------------------------- | ------------------------------------------------------- |
-| `feedId`                    | 3407, 3408, 3410–3419      | CSV `feed_id`, except ADI/USD remapped to 3419 (see above) |
-| `symbol`                    | `Crypto.{TICKER}/USD`      | CSV `name` column, ticker = text before `/USD`           |
-| `metadata.name`             | `{TICKER}USD`               | same ticker                                              |
-| `metadata.description`      | trimmed CSV `description`  | CSV, used **verbatim** — not reformatted into xStock-style `<NAME> XSTOCK / US DOLLAR` wording, since these are real crypto tokens, not tokenized equities |
-| `metadata.cmc_id.uintValue` | CSV `cmc_id` as string     | CSV                                                      |
-| `state`                     | `COMING_SOON`               | requirement (template is `STABLE`)                       |
-| `minChannel.rate`           | `0.200000000s`              | requirement (already matches template)                   |
+| Field                       | Value                     | Source / rule                                                                                                                                              |
+| --------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `feedId`                    | 3407, 3408, 3410–3419     | CSV `feed_id`, except ADI/USD remapped to 3419 (see above)                                                                                                 |
+| `symbol`                    | `Crypto.{TICKER}/USD`     | CSV `name` column, ticker = text before `/USD`                                                                                                             |
+| `metadata.name`             | `{TICKER}USD`             | same ticker                                                                                                                                                |
+| `metadata.description`      | trimmed CSV `description` | CSV, used **verbatim** — not reformatted into xStock-style `<NAME> XSTOCK / US DOLLAR` wording, since these are real crypto tokens, not tokenized equities |
+| `metadata.cmc_id.uintValue` | CSV `cmc_id` as string    | CSV                                                                                                                                                        |
+| `state`                     | `COMING_SOON`             | requirement (template is `STABLE`)                                                                                                                         |
+| `minChannel.rate`           | `0.200000000s`            | requirement (already matches template)                                                                                                                     |
 
 ### Copied verbatim from 3329
 

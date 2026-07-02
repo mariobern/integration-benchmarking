@@ -26,13 +26,13 @@ are validated as present but are never actually read by the matching logic
 
 ## Decisions (locked during brainstorming)
 
-| #                     | Decision                                                                                                                                                                         |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Matching strategy     | Symbol-prefix derivation (same mechanism as HK), **not** a new feed-id-keyed op. `Feed ID` in `prune.txt` is not consulted — it was cross-checked during design (see Verification) but plays no functional role in the shipped tool. |
-| Prefix shape          | `.KS` → `Equity.KR.`; `.T` → `Equity.JP.`. Each RIC yields two candidate prefixes, mirroring HK: bare (`Equity.KR.<code>/`) and legacy-suffixed (`Equity.KR.<code>-KR/`). Ticker portion must be all-digits (same guard as HK). |
-| CSV required columns  | Relax `_REQUIRED_COLUMNS` in `ric_csv.py` to just `("RIC",)`. `Ticker` and `Exchange Code` become optional, defaulting to `""` when the column is absent or the cell is empty. `prune.txt` loads unmodified. |
-| Scope of `SetRicMapping` / CLI | No changes. Existing fill-empty / skip-non-empty / skip-unmatched-symbol / warn-no-slots semantics apply as-is. |
-| Docs                  | Update `docs/edit_config.md`: drop "v1 supports HK equities only" language for `--set-ric-mapping`; state KR/JP are also supported and that `Ticker`/`Exchange Code` are optional. |
+| #                              | Decision                                                                                                                                                                                                                             |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Matching strategy              | Symbol-prefix derivation (same mechanism as HK), **not** a new feed-id-keyed op. `Feed ID` in `prune.txt` is not consulted — it was cross-checked during design (see Verification) but plays no functional role in the shipped tool. |
+| Prefix shape                   | `.KS` → `Equity.KR.`; `.T` → `Equity.JP.`. Each RIC yields two candidate prefixes, mirroring HK: bare (`Equity.KR.<code>/`) and legacy-suffixed (`Equity.KR.<code>-KR/`). Ticker portion must be all-digits (same guard as HK).      |
+| CSV required columns           | Relax `_REQUIRED_COLUMNS` in `ric_csv.py` to just `("RIC",)`. `Ticker` and `Exchange Code` become optional, defaulting to `""` when the column is absent or the cell is empty. `prune.txt` loads unmodified.                         |
+| Scope of `SetRicMapping` / CLI | No changes. Existing fill-empty / skip-non-empty / skip-unmatched-symbol / warn-no-slots semantics apply as-is.                                                                                                                      |
+| Docs                           | Update `docs/edit_config.md`: drop "v1 supports HK equities only" language for `--set-ric-mapping`; state KR/JP are also supported and that `Ticker`/`Exchange Code` are optional.                                                   |
 
 ## Verification done during design (informs test cases, not shipped logic)
 
