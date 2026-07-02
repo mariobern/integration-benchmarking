@@ -69,18 +69,22 @@ class _Result:
 
 
 class _FakeClient:
-    """Returns name rows for the names query and fixed feed rows for each probe query."""
+    """Names query -> name_rows; publisher_updates query -> feed_rows;
+    equity-metadata query -> instr_rows."""
 
-    def __init__(self, name_rows, feed_rows):
+    def __init__(self, name_rows, feed_rows, instr_rows=None):
         self._name_rows = name_rows
         self._feed_rows = feed_rows
+        self._instr_rows = instr_rows or []
         self.feed_query_count = 0
 
     def query(self, sql, parameters=None):
         if "publishers_metadata_latest" in sql:
             return _Result(self._name_rows)
-        self.feed_query_count += 1
-        return _Result(self._feed_rows)
+        if "publisher_updates" in sql:
+            self.feed_query_count += 1
+            return _Result(self._feed_rows)
+        return _Result(self._instr_rows)
 
 
 def _client():
@@ -389,3 +393,68 @@ class TestSessionProbeWindows:
         # 02:00 ET next day -> 06:00 UTC on 2026-06-24
         assert ws[44].session == "overnight"
         assert ws[44].start_utc.startswith("2026-06-24")
+
+
+def test_fetch_equity_instrument_types_resolves():
+    from lib.publisher_asset_map_core import fetch_equity_instrument_types
+
+    client = _FakeClient(
+        name_rows=[],
+        feed_rows=[],
+        instr_rows=[
+            (
+                1,
+                "Equity.US.AAPL/USD",
+                '{"items":[{"key":"instrument_type","value":{"stringValue":"spot"}}]}',
+            ),
+            (2, "Equity.US.DMH6/USD", ""),  # missing metadata -> heuristic future
+            (3, "Equity.US.ANSS/USD", ""),  # missing -> heuristic spot
+        ],
+    )
+    assert fetch_equity_instrument_types(client) == {1: "spot", 2: "future", 3: "spot"}
+
+
+def test_fetch_labels_futures_and_perp():
+    client = _FakeClient(
+        name_rows=[(28, "MEMX.Production")],
+        feed_rows=[
+            (
+                28,
+                5001,
+                9,
+                "equity",
+                "Equity.US.DMM6/USD",
+            ),  # future (US -> session split)
+            (
+                28,
+                5002,
+                4,
+                "equity",
+                "Pyth.DC.AAPL/USDT",
+            ),  # perp (not Equity.US. -> all)
+        ],
+        instr_rows=[
+            (
+                5001,
+                "Equity.US.DMM6/USD",
+                '{"items":[{"key":"instrument_type","value":{"stringValue":"future"}}]}',
+            ),
+            (
+                5002,
+                "Pyth.DC.AAPL/USDT",
+                '{"items":[{"key":"instrument_type","value":{"stringValue":"perp"}}]}',
+            ),
+        ],
+    )
+    rows = fetch_publisher_feeds(client, "2026-06-23")
+    fut = [r for r in rows if r.feed_id == 5001]
+    perp = [r for r in rows if r.feed_id == 5002][0]
+    assert fut and all(r.asset_class == "equity-us-futures" for r in fut)
+    assert {r.session for r in fut} == {
+        "premarket",
+        "regular",
+        "afterhours",
+        "overnight",
+    }
+    assert perp.asset_class == "equity-perp"
+    assert perp.session == "all"
