@@ -1,8 +1,8 @@
 """Load LSEG-style RIC CSVs and derive feed symbol prefixes.
 
 The CSV contains one row per security with columns including `Ticker`,
-`RIC`, and `Exchange Code`. For v1 we only know how to derive a feed
-symbol prefix for HK rows (RIC ending in `.HK`).
+`RIC`, and `Exchange Code`. We derive a feed symbol prefix for HK, KR,
+and JP rows (RIC ending in `.HK`, `.KS`, or `.T`).
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ class RicEntry:
     exchange_code: str
 
 
-_REQUIRED_COLUMNS = ("Ticker", "RIC", "Exchange Code")
+_REQUIRED_COLUMNS = ("RIC",)
 
 
 def load_ric_csv(path: str) -> list[RicEntry]:
@@ -55,17 +55,30 @@ def load_ric_csv(path: str) -> list[RicEntry]:
     return entries
 
 
+_SUFFIX_TO_EXCHANGE = {
+    ".HK": "HK",
+    ".KS": "KR",
+    ".T": "JP",
+}
+
+
 def derive_symbol_prefixes(ric: str) -> list[str]:
     """Map a RIC to the candidate Lazer feed symbol prefixes.
 
-    v1 supports only HK equities: `NNNN.HK` -> both `Equity.HK.NNNN-HK/`
-    (legacy form) and `Equity.HK.NNNN/` (current form).
-    Returns [] for RICs we don't know how to map.
+    Supports HK (`NNNN.HK`), KR (`NNNN.KS`), and JP (`NNNN.T`) equities: each
+    maps to both `Equity.<EXCH>.NNNN-<EXCH>/` (legacy form) and
+    `Equity.<EXCH>.NNNN/` (current form). Returns [] for RICs we don't know
+    how to map, or whose ticker portion isn't all-digits.
     """
-    if ric.endswith(".HK"):
-        head = ric[: -len(".HK")]
-        if head.isdigit():
-            return [f"Equity.HK.{head}-HK/", f"Equity.HK.{head}/"]
+    for suffix, exchange in _SUFFIX_TO_EXCHANGE.items():
+        if ric.endswith(suffix):
+            head = ric[: -len(suffix)]
+            if head.isdigit():
+                return [
+                    f"Equity.{exchange}.{head}-{exchange}/",
+                    f"Equity.{exchange}.{head}/",
+                ]
+            return []
     return []
 
 

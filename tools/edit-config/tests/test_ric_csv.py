@@ -42,6 +42,20 @@ def test_load_ric_csv_raises_on_missing_columns(tmp_path):
         load_ric_csv(str(p))
 
 
+def test_load_ric_csv_accepts_ric_only_columns():
+    entries = load_ric_csv(str(FIXTURES / "ric-only-sample.csv"))
+    assert len(entries) == 2
+    assert entries[0] == RicEntry(ticker="", ric="005930.KS", exchange_code="")
+    assert entries[1] == RicEntry(ticker="", ric="7203.T", exchange_code="")
+
+
+def test_load_ric_csv_still_raises_when_ric_column_missing(tmp_path):
+    p = tmp_path / "no-ric.csv"
+    p.write_text("Ticker,Exchange Code\n700,HKG\n", encoding="utf-8")
+    with pytest.raises(LoadError, match="missing required column"):
+        load_ric_csv(str(p))
+
+
 def test_load_ric_csv_raises_on_duplicate_ric(tmp_path):
     p = tmp_path / "dup.csv"
     p.write_text(
@@ -61,6 +75,33 @@ def test_derive_symbol_prefixes_hk():
         "Equity.HK.0002-HK/",
         "Equity.HK.0002/",
     ]
+
+
+def test_derive_symbol_prefixes_kr():
+    assert derive_symbol_prefixes("005930.KS") == [
+        "Equity.KR.005930-KR/",
+        "Equity.KR.005930/",
+    ]
+    assert derive_symbol_prefixes("000660.KS") == [
+        "Equity.KR.000660-KR/",
+        "Equity.KR.000660/",
+    ]
+
+
+def test_derive_symbol_prefixes_jp():
+    assert derive_symbol_prefixes("7203.T") == [
+        "Equity.JP.7203-JP/",
+        "Equity.JP.7203/",
+    ]
+    assert derive_symbol_prefixes("6758.T") == [
+        "Equity.JP.6758-JP/",
+        "Equity.JP.6758/",
+    ]
+
+
+def test_derive_symbol_prefixes_non_digit_ticker_returns_empty():
+    assert derive_symbol_prefixes("ABCD.KS") == []
+    assert derive_symbol_prefixes("ABCD.T") == []
 
 
 def test_derive_symbol_prefixes_unknown_suffix_returns_empty():

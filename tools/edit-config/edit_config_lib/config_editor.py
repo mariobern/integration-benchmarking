@@ -200,7 +200,7 @@ def build_op_from_args(
         if not prefix_to_ric:
             raise ValueError(
                 f"--from-csv {args.from_csv}: no rows produced a known feed prefix "
-                f"(v1 supports HK rows only)"
+                f"(supported suffixes: .HK, .KS, .T)"
             )
         op = SetRicMapping(prefix_to_ric=prefix_to_ric)
         filters = FilterSet()  # matches every feed; deliberately skip validate()

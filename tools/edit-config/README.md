@@ -35,7 +35,7 @@ python3 tools/edit-config/edit_config.py --config after.json \
 - `--set-min-publishers / --bump-min-publishers` — control minimum quorum
 - `--set-state` — change feed state (STABLE / COMING_SOON / INACTIVE)
 - `--set-ric-mapping --from-csv PATH` — fill empty `datascope_ric.identifier`
-  values from an LSEG CSV (HK equities in v1). See
+  values from an LSEG CSV (HK, KR, and JP equities). See
   [docs/edit_config.md#--set-ric-mapping--fill-empty-datascope_ric-identifiers](../../docs/edit_config.md#--set-ric-mapping--fill-empty-datascope_ric-identifiers).
 
 ## Docs
