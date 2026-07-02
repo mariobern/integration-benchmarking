@@ -1,8 +1,8 @@
 """Load LSEG-style RIC CSVs and derive feed symbol prefixes.
 
 The CSV contains one row per security with columns including `Ticker`,
-`RIC`, and `Exchange Code`. For v1 we only know how to derive a feed
-symbol prefix for HK rows (RIC ending in `.HK`).
+`RIC`, and `Exchange Code`. We derive a feed symbol prefix for HK, KR,
+and JP rows (RIC ending in `.HK`, `.KS`, or `.T`).
 """
 
 from __future__ import annotations
