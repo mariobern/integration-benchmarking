@@ -37,6 +37,10 @@ import pytz
 from IPython.display import display
 from jinja2 import Template
 import clickhouse_connect
+from lazer_dq.benchmark_identifiers import (
+    resolve_benchmark_identifier,
+    session_for_mode,
+)
 
 warnings.filterwarnings("ignore")
 pio.renderers.default = "iframe_connected"
@@ -933,6 +937,7 @@ def main():
     symbol = None
     ticker = None
     ric = None
+    session_name = session_for_mode(mode)
 
     # === CELL 5 ===
     # query mapping for feed_id and exponent
@@ -941,6 +946,7 @@ def main():
             pyth_lazer_id as feed_id,
             symbol,
             exponent,
+            market_schedules,
             updated_at
         FROM feeds_metadata_latest
         FINAL
@@ -956,6 +962,13 @@ def main():
             symbol = df_feed_metadata["symbol"].iloc[0]
             ticker = symbol.rsplit(".", 1)[-1].split("/")[0]
             print(f"Symbol: {symbol}, Ticker: {ticker}")
+
+            ric = resolve_benchmark_identifier(
+                df_feed_metadata["market_schedules"].iloc[0], session_name
+            )
+            print(f"Mode: {mode} -> session: {session_name}, RIC: {ric}")
+            if ric is None:
+                print(f"Warning: no datascope RIC found for session '{session_name}'")
     except Exception as e:
         print(f"Error loading feed metadata from ClickHouse: {e}")
 

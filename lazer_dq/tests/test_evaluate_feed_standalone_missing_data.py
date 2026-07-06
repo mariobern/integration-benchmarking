@@ -33,11 +33,37 @@ def _mock_client_factory():
 
     def query_df(sql, *args, **kwargs):
         if "feeds_metadata_latest" in sql:
+            import json as _json
+
+            market_schedules = _json.dumps(
+                [
+                    {
+                        "session": s,
+                        "benchmarkMapping": {
+                            "datascope_ric": {
+                                "identifiers": [
+                                    {
+                                        "identifier": ric,
+                                        "validFrom": "1970-01-01T00:00:00Z",
+                                    }
+                                ]
+                            }
+                        },
+                    }
+                    for s, ric in [
+                        ("REGULAR", "AAPL.O"),
+                        ("PRE_MARKET", "AAPL.O"),
+                        ("POST_MARKET", "AAPL.O"),
+                        ("OVER_NIGHT", "AAPL.BLUE"),
+                    ]
+                ]
+            )
             return pd.DataFrame(
                 {
                     "feed_id": [123],
                     "symbol": ["Equity.US.AAPL/USD"],
                     "exponent": [-5],
+                    "market_schedules": [market_schedules],
                     "updated_at": [pd.Timestamp("2026-05-19 00:00:00")],
                 }
             )
@@ -140,3 +166,4 @@ def test_empty_benchmark_exits_2_with_diagnostic(
     # ric is None because no normal RIC mapping path ran; the diagnostic
     # must still render without raising.
     assert "ric=" in out
+    assert "RIC:" in out  # resolution line printed
