@@ -37,6 +37,10 @@ import pytz
 from IPython.display import display
 from jinja2 import Template
 import clickhouse_connect
+from lazer_dq.benchmark_identifiers import (
+    resolve_benchmark_identifier,
+    session_for_mode,
+)
 
 warnings.filterwarnings("ignore")
 pio.renderers.default = "iframe_connected"
@@ -123,7 +127,7 @@ def merge_benchmark_and_publisher_data(df_benchmark_data, df_publisher_data):
             start_time = time(16, 0, 0)
             end_time = time(20, 0, 0)
             time_label = "US post-market hours (16:00:00-20:00:00 EST)"
-        elif mode == "us-equities-overnight":
+        elif mode == "us-equities-overnight" or mode == "us-equities-on":
             start_time = time(20, 0, 0)
             end_time = time(4, 0, 0)
             time_label = "US overnight hours (20:00:00-4:00:00 EST)"
@@ -843,7 +847,7 @@ def parse_args():
     parser.add_argument(
         "--mode",
         required=True,
-        help="Mode (e.g. fx, metals, us-equities, us-equities-pre, us-equities-post, us-equities-overnight, hk-equities, us-futures, us-treasuries)",
+        help="Mode (e.g. fx, metals, us-equities, us-equities-pre, us-equities-post, us-equities-overnight, us-equities-on, hk-equities, us-futures, us-treasuries-yield, us-treasuries-price)",
     )
     parser.add_argument(
         "--cluster", required=True, help="Cluster name (e.g. lazer-prod)"
@@ -933,6 +937,7 @@ def main():
     symbol = None
     ticker = None
     ric = None
+    session_name = session_for_mode(mode)
 
     # === CELL 5 ===
     # query mapping for feed_id and exponent
@@ -941,6 +946,7 @@ def main():
             pyth_lazer_id as feed_id,
             symbol,
             exponent,
+            market_schedules,
             updated_at
         FROM feeds_metadata_latest
         FINAL
@@ -956,6 +962,13 @@ def main():
             symbol = df_feed_metadata["symbol"].iloc[0]
             ticker = symbol.rsplit(".", 1)[-1].split("/")[0]
             print(f"Symbol: {symbol}, Ticker: {ticker}")
+
+            ric = resolve_benchmark_identifier(
+                df_feed_metadata["market_schedules"].iloc[0], session_name
+            )
+            print(f"Mode: {mode} -> session: {session_name}, RIC: {ric}")
+            if ric is None:
+                print(f"Warning: no datascope RIC found for session '{session_name}'")
     except Exception as e:
         print(f"Error loading feed metadata from ClickHouse: {e}")
 
@@ -1108,21 +1121,29 @@ def main():
     # === CELL 10 ===
     print(df_publisher_data.head())
 
-    # === CELL 11 (UNCHANGED) ===
-    # Process benchmark data if we have a valid RIC from ticker mapping
+    # === CELL 11 ===
+    # Process benchmark data, keyed on the RIC resolved from market_schedules.
+    if ric is None:
+        print(
+            f"No datascope RIC configured for feed {feed_id} "
+            f"(mode={mode}, session={session_name}); skipping analysis."
+        )
+        sys.exit(2)
+
     if mode == "fx" or mode == "metals":
         benchmark_query = f"""
             SELECT
                 date_time as benchmark_timestamp,
-                pyth_lazer_id as feed_id,
+                ric,
+                {feed_id} as feed_id,
                 price as benchmark_price,
                 bid_price,
                 ask_price
             FROM datascope_fx_benchmark_data
             WHERE toDate(date_time) = '{date}'
-              AND pyth_lazer_id = '{feed_id}'
+              AND ric = '{ric}'
               AND price IS NOT NULL
-            ORDER BY benchmark_timestamp ASC, pyth_lazer_id
+            ORDER BY benchmark_timestamp ASC, ric
         """
     elif mode in (
         "us-equities",
@@ -1133,14 +1154,15 @@ def main():
         benchmark_query = f"""
             SELECT
                 date_time as benchmark_timestamp,
-                pyth_lazer_id as feed_id,
+                ric,
+                {feed_id} as feed_id,
                 price as benchmark_price,
                 bid_price,
                 ask_price,
                 qualifiers
             FROM datascope_global_equities_benchmark_data
             WHERE toDate(date_time) = '{date}'
-              AND pyth_lazer_id = '{feed_id}'
+              AND ric = '{ric}'
               AND price IS NOT NULL
               AND (
                 qualifiers IS NULL
@@ -1162,9 +1184,9 @@ def main():
                 AND NOT match(qualifiers, 'PD_[A-Za-z0-9_]*')
                 )
                 )
-            ORDER BY benchmark_timestamp ASC, pyth_lazer_id
+            ORDER BY benchmark_timestamp ASC, ric
         """
-    elif mode == "us-equities-overnight":
+    elif mode == "us-equities-overnight" or mode == "us-equities-on":
         benchmark_query = f"""
             SELECT
                 date_time as benchmark_timestamp,
@@ -1176,7 +1198,7 @@ def main():
                 qualifiers
             FROM datascope_global_equities_benchmark_data
             WHERE toDate(date_time) = '{date}'
-              AND ric = '{ticker}.BLUE'
+              AND ric = '{ric}'
               AND price IS NOT NULL
               AND (
                 qualifiers IS NULL
@@ -1190,43 +1212,61 @@ def main():
                     )
                    )
                   )
-            ORDER BY benchmark_timestamp ASC, feed_id
+            ORDER BY benchmark_timestamp ASC, ric
         """
     elif mode == "us-futures":
         benchmark_query = f"""
             SELECT
                 date_time as benchmark_timestamp,
-                pyth_lazer_id as feed_id,
+                ric,
+                {feed_id} as feed_id,
                 price as benchmark_price,
                 bid_price,
                 ask_price
             FROM datascope_futures_benchmark_data
             WHERE toDate(date_time) = '{date}'
-              AND pyth_lazer_id = '{feed_id}'
+              AND ric = '{ric}'
               AND price IS NOT NULL
               AND (
                 qualifiers IS NULL
                 OR (
-                    qualifiers NOT LIKE 'SBL[OFFBK_TYPE];K[BLKSALCOND]%'
-                    AND qualifiers NOT LIKE 'Spread Price|Spread Volume[USER]%'
+                    qualifiers NOT LIKE '%SBL[OFFBK_TYPE]%'
+                    AND qualifiers NOT LIKE '%SYS[OFFBK_TYPE]%'
+                    AND qualifiers NOT LIKE '%Spread Price|Spread Volume[USER]%'
                     AND qualifiers NOT LIKE 'Block Trade[USER]%'
                     )
                   )
-            ORDER BY benchmark_timestamp ASC, pyth_lazer_id
+            ORDER BY benchmark_timestamp ASC, ric
         """
-    elif mode == "us-treasuries":
+    elif mode == "us-treasuries-yield":
         benchmark_query = f"""
             SELECT
                 date_time as benchmark_timestamp,
-                pyth_lazer_id as feed_id,
+                ric,
+                {feed_id} as feed_id,
                 yield as benchmark_price,
                 bid_yield as bid_price,
                 ask_yield as ask_price
             FROM datascope_us_treasury_benchmark_data
             WHERE toDate(date_time) = '{date}'
-              AND pyth_lazer_id = '{feed_id}'
+              AND ric = '{ric}'
               AND price IS NOT NULL
-            ORDER BY benchmark_timestamp ASC, pyth_lazer_id
+            ORDER BY benchmark_timestamp ASC, ric
+        """
+    elif mode == "us-treasuries-price":
+        benchmark_query = f"""
+            SELECT
+                date_time as benchmark_timestamp,
+                ric,
+                {feed_id} as feed_id,
+                price as benchmark_price,
+                bid_price as bid_price,
+                ask_price as ask_price
+            FROM datascope_us_treasury_benchmark_data
+            WHERE toDate(date_time) = '{date}'
+              AND ric = '{ric}'
+              AND price IS NOT NULL
+            ORDER BY benchmark_timestamp ASC, ric
         """
 
     df_benchmark_data = pd.DataFrame()
