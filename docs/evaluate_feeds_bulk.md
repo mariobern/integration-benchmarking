@@ -53,11 +53,31 @@ feed_id,date,mode
 1060,2026-05-04,us-equities-pre
 922,2026-04-13,us-equities-overnight
 2503,2026-05-04,hk-equities
+346,2026-05-04,us-treasuries-yield
 ```
 
 - Empty rows are skipped.
 - Rows with fewer than 3 columns are skipped with a warning.
 - Whitespace around cells is trimmed.
+
+## Supported Modes
+
+The `mode` column selects the benchmark table and the market session whose Datascope RIC the benchmark is looked up by. The engine resolves the RIC from the feed's `feeds_metadata_latest.market_schedules` (`benchmarkMapping.datascope_ric`, most recent `validFrom`) for the session shown below, then queries the benchmark table by that RIC.
+
+| Mode                                       | Benchmark table                                | Session (RIC lookup) |
+| ------------------------------------------ | ---------------------------------------------- | -------------------- |
+| `fx`                                       | `datascope_fx_benchmark_data`                  | REGULAR              |
+| `metals`                                   | `datascope_fx_benchmark_data` (EMA-smoothed)   | REGULAR              |
+| `us-equities`                              | `datascope_global_equities_benchmark_data`     | REGULAR              |
+| `us-equities-pre`                          | `datascope_global_equities_benchmark_data`     | PRE_MARKET           |
+| `us-equities-post`                         | `datascope_global_equities_benchmark_data`     | POST_MARKET          |
+| `us-equities-overnight` / `us-equities-on` | `datascope_global_equities_benchmark_data`     | OVER_NIGHT           |
+| `hk-equities`                              | `datascope_global_equities_benchmark_data`     | REGULAR              |
+| `us-futures`                               | `datascope_futures_benchmark_data`             | REGULAR              |
+| `us-treasuries-yield`                      | `datascope_us_treasury_benchmark_data` (yield) | REGULAR              |
+| `us-treasuries-price`                      | `datascope_us_treasury_benchmark_data` (price) | REGULAR              |
+
+A feed whose `market_schedules` has no `datascope_ric` for the relevant session is **skipped** (engine exit `2`). Crypto feeds carry a `coinpaprika_symbol` rather than a `datascope_ric`, so they are not benchmarkable here and skip.
 
 ## Time Window Resolution
 
@@ -91,11 +111,12 @@ The engine's stdio is inherited so its progress logs stream live to the terminal
 The runner itself writes no files — the standalone engine owns all output. After the loop, the runner prints:
 
 ```
-Processed <N> feeds: <S> succeeded, <F> failed.
-Failed: ['<feed_id>@<date>', ...]   # only if any failed
+Processed <N> feeds: <S> succeeded, <SK> skipped (no data), <F> failed.
+Skipped (no data): ['<feed_id>@<date>', ...]   # only if any skipped
+Failed: ['<feed_id>@<date>', ...]              # only if any failed
 ```
 
-Exit code: `0` if all rows succeeded, `1` if any row failed.
+Rows that exit `2` (no benchmark/RIC data) count as **skipped**, not failed. Exit code: `0` if no row failed (skips are fine), `1` if any row failed.
 
 ## Errors
 
@@ -107,10 +128,10 @@ Exit code: `0` if all rows succeeded, `1` if any row failed.
 
 Per-row engine exits propagate up through the soft-failure loop. Useful codes to know:
 
-| Engine exit code | Meaning                                                                                                                                                                            |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `0`              | Analysis ran end-to-end; artifacts written under `--output-path`.                                                                                                                  |
-| `2`              | No benchmark data available for the feed/date/mode tuple (e.g., non-trading day, holiday, or feed not yet ingested into Datascope). Engine prints a diagnostic and skips analysis. |
-| other non-zero   | Unexpected engine error (e.g., ClickHouse connection failure). See engine stderr.                                                                                                  |
+| Engine exit code | Meaning                                                                                                                                                                                                                      |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`              | Analysis ran end-to-end; artifacts written under `--output-path`.                                                                                                                                                            |
+| `2`              | No benchmark data for the feed/date/mode tuple — non-trading day, holiday, feed not yet ingested into Datascope, or **no `datascope_ric` configured** for the feed's session. Engine prints a diagnostic and skips analysis. |
+| other non-zero   | Unexpected engine error (e.g., ClickHouse connection failure). See engine stderr.                                                                                                                                            |
 
-All non-zero engine exits are treated as soft failures by the bulk runner and contribute to the `Failed:` list and final `1` exit code.
+Exit `2` rows are counted as **skipped** (they appear in the `Skipped (no data):` list and do **not** cause a `1` exit). Every other non-zero exit is a soft **failure**: it is logged, added to the `Failed:` list, and makes the final bulk exit code `1`. The batch always continues to the next row.
