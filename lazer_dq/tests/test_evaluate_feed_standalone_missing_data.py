@@ -163,7 +163,7 @@ def test_empty_benchmark_exits_2_with_diagnostic(
     out = capsys.readouterr().out
     assert "No benchmark data available" in out
     assert f"mode={mode}" in out
-    # ric is None because no normal RIC mapping path ran; the diagnostic
-    # must still render without raising.
+    # ric now resolves to a real RIC from the mocked market_schedules; the
+    # empty benchmark TABLE (not a null ric) is what drives the clean rc=2 exit.
     assert "ric=" in out
     assert "RIC:" in out  # resolution line printed

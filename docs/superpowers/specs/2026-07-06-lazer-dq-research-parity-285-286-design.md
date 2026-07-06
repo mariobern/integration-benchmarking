@@ -201,8 +201,9 @@ merge with publisher data ──► metrics ──► plots / stats / readiness
 - **No RIC configured** → explicit `sys.exit(2)` with a distinguishable log message.
 - **RIC configured but no benchmark rows** (holiday, market closed, un-ingested) → existing
   empty-result `sys.exit(2)` at line 1273.
-- **Unknown mode** (e.g. a stale `us-treasuries` CSV row after the rename) → `benchmark_query`
-  unassigned → error, by design (fail fast on an unsupported mode).
+- **Unknown/stale mode** (e.g. a stale `us-treasuries` CSV row after the rename) → `benchmark_query`
+  is left unassigned; the resulting `UnboundLocalError` is caught by the engine's broad benchmark
+  `except`, yielding an empty result and a soft `sys.exit(2)` (skip), same as any no-data case.
 - `evaluate_feeds_bulk` treats every non-zero engine exit as a soft failure and proceeds to
   the next row.
 

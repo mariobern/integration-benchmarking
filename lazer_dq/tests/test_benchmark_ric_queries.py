@@ -44,9 +44,7 @@ def _metadata_df():
     )
 
 
-def _run_and_capture(
-    engine, monkeypatch, tmp_path, mode, metadata_df=None, no_ric=False
-):
+def _run_and_capture(engine, monkeypatch, tmp_path, mode, metadata_df=None):
     sql_log = []
     md = metadata_df if metadata_df is not None else _metadata_df()
 
@@ -123,6 +121,8 @@ def _benchmark_sql(sql_log):
         ("metals", "AAPL.O", "datascope_fx_benchmark_data"),
         ("us-equities", "AAPL.O", "datascope_global_equities_benchmark_data"),
         ("hk-equities", "AAPL.O", "datascope_global_equities_benchmark_data"),
+        ("us-equities-pre", "AAPL.O", "datascope_global_equities_benchmark_data"),
+        ("us-equities-post", "AAPL.O", "datascope_global_equities_benchmark_data"),
         (
             "us-equities-overnight",
             "AAPL.BLUE",
