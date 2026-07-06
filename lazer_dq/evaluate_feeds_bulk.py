@@ -45,7 +45,7 @@ def compute_times_from_mode(date: str, mode: str) -> tuple[str, str]:
         start_ny, end_ny = "08:30:00", "09:30:00"
     elif mode_lower == "us-equities-post":
         start_ny, end_ny = "16:30:00", "17:30:00"
-    elif mode_lower == "us-equities-overnight":
+    elif mode_lower in ("us-equities-overnight", "us-equities-on"):
         start_ny, end_ny = "20:00:00", "21:00:00"
     else:
         start_ny, end_ny = "09:30:00", "10:30:00"

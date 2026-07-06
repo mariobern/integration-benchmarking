@@ -127,7 +127,7 @@ def merge_benchmark_and_publisher_data(df_benchmark_data, df_publisher_data):
             start_time = time(16, 0, 0)
             end_time = time(20, 0, 0)
             time_label = "US post-market hours (16:00:00-20:00:00 EST)"
-        elif mode == "us-equities-overnight":
+        elif mode == "us-equities-overnight" or mode == "us-equities-on":
             start_time = time(20, 0, 0)
             end_time = time(4, 0, 0)
             time_label = "US overnight hours (20:00:00-4:00:00 EST)"
@@ -847,7 +847,7 @@ def parse_args():
     parser.add_argument(
         "--mode",
         required=True,
-        help="Mode (e.g. fx, metals, us-equities, us-equities-pre, us-equities-post, us-equities-overnight, hk-equities, us-futures, us-treasuries)",
+        help="Mode (e.g. fx, metals, us-equities, us-equities-pre, us-equities-post, us-equities-overnight, us-equities-on, hk-equities, us-futures, us-treasuries-yield, us-treasuries-price)",
     )
     parser.add_argument(
         "--cluster", required=True, help="Cluster name (e.g. lazer-prod)"

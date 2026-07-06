@@ -44,6 +44,22 @@ def test_time_computation_us_equities_overnight():
     )
 
 
+def test_time_computation_us_equities_on_alias():
+    # us-equities-on is an alias for us-equities-overnight (EDT: 20:00 NY -> 00:00 UTC).
+    assert compute_times_from_mode("2026-05-04", "us-equities-on") == (
+        "00:00:00",
+        "01:00:00",
+    )
+
+
+def test_time_computation_us_treasuries_price_default_window():
+    # Treasuries modes use the default REGULAR window (EST: 09:30 NY -> 14:30 UTC).
+    assert compute_times_from_mode("2026-12-15", "us-treasuries-price") == (
+        "14:30:00",
+        "15:30:00",
+    )
+
+
 def test_time_computation_default_mode():
     # 2026-12-15 is EST (UTC-5): 09:30 NY -> 14:30 UTC, 10:30 NY -> 15:30 UTC.
     # "us-equities" (and any unknown mode) hits the default branch.
@@ -101,7 +117,7 @@ def test_argv_construction(monkeypatch):
         target_pub_count=4,
     )
 
-    assert ok is True
+    assert ok == "ok"
     assert len(captured) == 1
     assert captured[0] == [
         sys.executable,
@@ -290,7 +306,9 @@ def test_summary_line_counts(tmp_path, monkeypatch, capsys):
         main()
 
     captured = capsys.readouterr()
-    assert "Processed 2 feeds: 1 succeeded, 1 failed." in captured.out
+    assert (
+        "Processed 2 feeds: 1 succeeded, 0 skipped (no data), 1 failed." in captured.out
+    )
     assert "1021@2026-05-04" in captured.out
 
 

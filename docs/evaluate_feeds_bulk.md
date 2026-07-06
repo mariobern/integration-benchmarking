@@ -67,7 +67,7 @@ When `--start-time` / `--end-time` are not both provided, the window is computed
 | ------------------------------------------------------------- | ----------------- | ------------------ |
 | `us-equities-pre`                                             | 08:30:00–09:30:00 | `America/New_York` |
 | `us-equities-post`                                            | 16:30:00–17:30:00 | `America/New_York` |
-| `us-equities-overnight`                                       | 20:00:00–21:00:00 | `America/New_York` |
+| `us-equities-overnight` / `us-equities-on`                    | 20:00:00–21:00:00 | `America/New_York` |
 | `hk-equities`                                                 | 09:30:00–10:30:00 | `Asia/Hong_Kong`   |
 | `us-equities` _(or any other value, including unknown modes)_ | 09:30:00–10:30:00 | `America/New_York` |
 
