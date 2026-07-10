@@ -117,6 +117,14 @@ def test_time_computation_kr_equities():
     )
 
 
+def test_time_computation_kr_equities_winter_matches_summer():
+    # No DST in Korea — winter date must produce identical UTC times.
+    assert compute_times_from_mode("2026-12-15", "kr-equities") == (
+        "00:00:00",
+        "01:00:00",
+    )
+
+
 def test_time_computation_in_equities():
     # IST is fixed UTC+5:30 (no DST): 09:15 IST -> 03:45 UTC, 10:15 IST -> 04:45 UTC.
     assert compute_times_from_mode("2026-05-04", "in-equities") == (

@@ -8,6 +8,9 @@ Two sheets per run:
 Per-asset-class layout. Pick the asset class with --asset-class:
   us-equities (default) — 4 modes: regular, pre, post, overnight (24-col layout)
   hk-equities           — 1 mode:  regular (6-col layout)
+  jp-equities           — 1 mode:  regular (6-col layout)
+  kr-equities           — 1 mode:  regular (6-col layout)
+  in-equities           — 1 mode:  regular (6-col layout)
 
 Adding a new asset class = adding one entry to ASSET_CLASS_CONFIG.
 
