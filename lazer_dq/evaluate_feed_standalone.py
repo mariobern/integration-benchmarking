@@ -847,7 +847,7 @@ def parse_args():
     parser.add_argument(
         "--mode",
         required=True,
-        help="Mode (e.g. fx, metals, us-equities, us-equities-pre, us-equities-post, us-equities-overnight, us-equities-on, hk-equities, us-futures, us-treasuries-yield, us-treasuries-price)",
+        help="Mode (e.g. fx, metals, us-equities, us-equities-pre, us-equities-post, us-equities-overnight, us-equities-on, hk-equities, jp-equities, kr-equities, in-equities, us-futures, us-treasuries-yield, us-treasuries-price)",
     )
     parser.add_argument(
         "--cluster", required=True, help="Cluster name (e.g. lazer-prod)"
@@ -1150,6 +1150,9 @@ def main():
         "us-equities-pre",
         "us-equities-post",
         "hk-equities",
+        "jp-equities",
+        "kr-equities",
+        "in-equities",
     ):
         benchmark_query = f"""
             SELECT
@@ -1181,6 +1184,9 @@ def main():
                 AND qualifiers NOT LIKE '%DAP[IRGCOND]%'
                 AND qualifiers NOT LIKE '%102[ODDSALCOND]%'
                 AND qualifiers NOT LIKE '%101[IRGSALCOND]%'
+                AND qualifiers NOT LIKE '%141[IRGCOND]%'
+                AND qualifiers NOT LIKE '%2835[IRGCOND]%'
+                AND qualifiers NOT LIKE '%4575[IRGCOND]%'
                 AND NOT match(qualifiers, 'PD_[A-Za-z0-9_]*')
                 )
                 )
