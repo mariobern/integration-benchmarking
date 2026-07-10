@@ -93,6 +93,46 @@ def test_time_computation_hk_equities_case_insensitive():
     )
 
 
+def test_time_computation_jp_equities():
+    # JST is fixed UTC+9 (no DST): 09:00 JST -> 00:00 UTC, 10:00 JST -> 01:00 UTC.
+    assert compute_times_from_mode("2026-05-04", "jp-equities") == (
+        "00:00:00",
+        "01:00:00",
+    )
+
+
+def test_time_computation_jp_equities_winter_matches_summer():
+    # No DST in Japan — winter date must produce identical UTC times.
+    assert compute_times_from_mode("2026-12-15", "jp-equities") == (
+        "00:00:00",
+        "01:00:00",
+    )
+
+
+def test_time_computation_kr_equities():
+    # KST is fixed UTC+9 (no DST): 09:00 KST -> 00:00 UTC, 10:00 KST -> 01:00 UTC.
+    assert compute_times_from_mode("2026-05-04", "kr-equities") == (
+        "00:00:00",
+        "01:00:00",
+    )
+
+
+def test_time_computation_in_equities():
+    # IST is fixed UTC+5:30 (no DST): 09:15 IST -> 03:45 UTC, 10:15 IST -> 04:45 UTC.
+    assert compute_times_from_mode("2026-05-04", "in-equities") == (
+        "03:45:00",
+        "04:45:00",
+    )
+
+
+def test_time_computation_in_equities_case_insensitive():
+    # mode_lower normalization should accept mixed-case input.
+    assert compute_times_from_mode("2026-12-15", "IN-Equities") == (
+        "03:45:00",
+        "04:45:00",
+    )
+
+
 # ---------- run_standalone ----------
 
 
