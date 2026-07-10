@@ -63,6 +63,24 @@ ASSET_CLASS_CONFIG: dict = {
         "default_max_ros": {"hk-equities": 1.0},
         "default_min_hit": {"hk-equities": 80.0},
     },
+    "jp-equities": {
+        "modes": ["jp-equities"],
+        "sessions": {"jp-equities": "REGULAR"},
+        "default_max_ros": {"jp-equities": 1.0},
+        "default_min_hit": {"jp-equities": 80.0},
+    },
+    "kr-equities": {
+        "modes": ["kr-equities"],
+        "sessions": {"kr-equities": "REGULAR"},
+        "default_max_ros": {"kr-equities": 1.0},
+        "default_min_hit": {"kr-equities": 80.0},
+    },
+    "in-equities": {
+        "modes": ["in-equities"],
+        "sessions": {"in-equities": "REGULAR"},
+        "default_max_ros": {"in-equities": 1.0},
+        "default_min_hit": {"in-equities": 80.0},
+    },
 }
 
 # Back-compat aliases — kept so any external code importing these names keeps working.

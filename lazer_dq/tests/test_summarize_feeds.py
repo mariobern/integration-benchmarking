@@ -714,6 +714,15 @@ def test_registry_has_hk_equities_entry():
     assert cfg["default_min_hit"] == {"hk-equities": 80.0}
 
 
+@pytest.mark.parametrize("asset_class", ["jp-equities", "kr-equities", "in-equities"])
+def test_asset_class_config_has_new_markets(asset_class):
+    cfg = ASSET_CLASS_CONFIG[asset_class]
+    assert cfg["modes"] == [asset_class]
+    assert cfg["sessions"] == {asset_class: "REGULAR"}
+    assert cfg["default_max_ros"] == {asset_class: 1.0}
+    assert cfg["default_min_hit"] == {asset_class: 80.0}
+
+
 def test_legacy_constants_still_match_us_equities_registry_entry():
     """Back-compat: MODE_ORDER / MODE_TO_SESSION still exist for any external importer."""
     from lazer_dq.summarize_feeds import MODE_ORDER, MODE_TO_SESSION
