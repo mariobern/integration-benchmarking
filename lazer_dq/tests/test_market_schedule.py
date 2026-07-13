@@ -124,3 +124,24 @@ def test_parse_midnight_end_as_0000():
     s = parse_market_schedule(MIDNIGHT_END)
     assert s.days[4] == ((17 * 60, 1440),)  # Friday 17:00-24:00 (0000)
     assert s.days[5] == ()  # Saturday closed
+
+
+def test_parse_rejects_invalid_hhmm_minutes():
+    # "0165" has MM=65 which is invalid (MM must be <= 59)
+    bad_schedule = "America/New_York;0165-1600,C,C,C,C,C,C;"
+    with pytest.raises(ValueError, match="bad HHMM token"):
+        parse_market_schedule(bad_schedule)
+
+
+def test_parse_rejects_invalid_override_date():
+    # "1332" has month=13 which is invalid (month must be 01-12)
+    bad_schedule = "America/New_York;C,C,C,C,C,C,C;1332/C"
+    with pytest.raises(ValueError, match="bad override date"):
+        parse_market_schedule(bad_schedule)
+
+
+def test_parse_2400_as_range_end_still_works():
+    # "2400" at end of range should parse to 1440, not fail
+    schedule = "America/New_York;0930-2400,C,C,C,C,C,C;"
+    s = parse_market_schedule(schedule)
+    assert s.days[0] == ((9 * 60 + 30, 1440),)

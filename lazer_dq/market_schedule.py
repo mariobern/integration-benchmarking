@@ -31,7 +31,11 @@ class MarketSchedule:
 def _parse_hhmm(token: str) -> int:
     if len(token) != 4 or not token.isdigit():
         raise ValueError(f"bad HHMM token: {token!r}")
-    minutes = int(token[:2]) * 60 + int(token[2:])
+    hh = int(token[:2])
+    mm = int(token[2:])
+    if mm > 59:
+        raise ValueError(f"bad HHMM token: {token!r}")
+    minutes = hh * 60 + mm
     if minutes > 1440:
         raise ValueError(f"HHMM out of range: {token!r}")
     return minutes
@@ -84,6 +88,10 @@ def parse_market_schedule(s: str) -> MarketSchedule:
                 raise ValueError(f"bad override token: {ov!r}")
             if len(mmdd) != 4 or not mmdd.isdigit():
                 raise ValueError(f"bad override date: {mmdd!r}")
+            mm = int(mmdd[:2])
+            dd = int(mmdd[2:])
+            if not (1 <= mm <= 12) or not (1 <= dd <= 31):
+                raise ValueError(f"bad override date: {mmdd!r}")
             overrides[mmdd] = _parse_ranges(spec)
     return MarketSchedule(tz=tz, days=days, overrides=overrides)
 
@@ -110,13 +118,15 @@ def open_minutes_mask(
     return pd.Series(out, index=idx)
 
 
-def build_exchanges_by_id(config: dict) -> dict:
+def build_exchanges_by_id(config: dict) -> dict[int, dict]:
     return {
         ex["exchangeId"]: ex for ex in config.get("exchanges", []) if "exchangeId" in ex
     }
 
 
-def resolve_schedule_string(feed: dict, session_entry: dict, exchanges_by_id: dict):
+def resolve_schedule_string(
+    feed: dict, session_entry: dict, exchanges_by_id: dict
+) -> str | None:
     """Inline `marketSchedule` string, else the exchange's same-session one."""
     if "marketSchedule" in session_entry:
         return session_entry["marketSchedule"]
