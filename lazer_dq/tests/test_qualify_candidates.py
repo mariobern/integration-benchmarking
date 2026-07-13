@@ -48,9 +48,22 @@ def test_engine_mode_for_mapping():
     assert (
         engine_mode_for(_fs("equity", "Equity.HK.0700/HKD", "REGULAR")) == "hk-equities"
     )
+    assert (
+        engine_mode_for(_fs("equity", "Equity.JP.7203/JPY", "REGULAR")) == "jp-equities"
+    )
+    assert (
+        engine_mode_for(_fs("equity", "Equity.KR.005930/KRW", "REGULAR"))
+        == "kr-equities"
+    )
+    assert (
+        engine_mode_for(_fs("equity", "Equity.IN.RELIANCE/INR", "REGULAR"))
+        == "in-equities"
+    )
+    # Non-REGULAR sessions on single-mode foreign markets -> peer path
+    assert engine_mode_for(_fs("equity", "Equity.JP.7203/JPY", "PRE_MARKET")) is None
     # No engine support -> peer path
     assert engine_mode_for(_fs("crypto", "Crypto.BTC/USD", "REGULAR")) is None
-    assert engine_mode_for(_fs("equity", "Equity.JP.7203/JPY", "REGULAR")) is None
+    assert engine_mode_for(_fs("equity", "Equity.CN.600519/CNY", "REGULAR")) is None
     assert engine_mode_for(_fs("funding-rate", "FundingRate.X/USD", "REGULAR")) is None
 
 

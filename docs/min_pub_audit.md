@@ -242,13 +242,15 @@ Two paths, chosen per (feed, session) by `engine_mode_for`:
 | `equity`      | `Equity.US.*`, session `POST_MARKET` | `us-equities-post`      |
 | `equity`      | `Equity.US.*`, session `OVER_NIGHT`  | `us-equities-overnight` |
 | `equity`      | `Equity.HK.*`, session `REGULAR`     | `hk-equities`           |
+| `equity`      | `Equity.JP.*`, session `REGULAR`     | `jp-equities`           |
+| `equity`      | `Equity.KR.*`, session `REGULAR`     | `kr-equities`           |
+| `equity`      | `Equity.IN.*`, session `REGULAR`     | `in-equities`           |
 | anything else | everything not matched above         | **peer path** (`None`)  |
 
 The "peer path" row above covers crypto, funding-rate, nav, redemption-rate,
-custom, and crypto-index feeds, `Equity.HK.*` sessions other than `REGULAR`,
-and — on this branch — `Equity.JP.*` / `Equity.KR.*` / `Equity.IN.*`, since
-the DQ engine has no modes for them here (see the coverage-gap caveat
-below).
+custom, and crypto-index feeds, non-`REGULAR` sessions on the single-mode
+foreign markets (HK/JP/KR/IN), and equity markets with no DQ-engine mode
+(e.g. `Equity.CN.*`).
 
 - **Engine path** (`mode` resolved): runs
   `evaluate_feed_standalone` as a subprocess for up to 3 most recent
@@ -257,10 +259,17 @@ below).
   under `--reports-dir`), stopping at
   the first date that exits `0` and yields non-empty stats. If all three
   dates exit `2` (no benchmark data) or error, the (feed, session) is
-  flagged `no_benchmark_data`. Pass criteria (`engine_gate`): `n_observations
-  > = --min-obs`, and then either the mode's own default thresholds from
-`lazer_dq/summarize_feeds.ASSET_CLASS_CONFIG` (`rmse_over_spread`/`hit_rate_0.1pct`— currently defined for the four`us-equities\*`modes and`hk-equities`), or, for modes with no entry there (fx, metals, commodity,
-`us-treasuries-yield`), the engine's own `pass_fail` column.
+  flagged `no_benchmark_data`. Pass criteria (`engine_gate`), after
+  `n_observations >= --min-obs` in all cases: (1) equity modes
+  (`us-equities*`, `hk-equities`, `jp-equities`, `kr-equities`,
+  `in-equities`) use the per-mode `rmse_over_spread` / `hit_rate_0.1pct`
+  thresholds from `lazer_dq/summarize_feeds.ASSET_CLASS_CONFIG`; (2) fx,
+  metals, commodity, and `us-treasuries-yield` use the matching per-tier
+  `nrmse` / hit-rate bar from `lib/thresholds.py` (regular tier for
+  fx/treasuries, relaxed for metals/commodity) via
+  `lib.thresholds.passes_benchmark` — the same bar the feed's existing
+  publishers are evaluated against; (3) any other mode falls back to the
+  stats row's own `pass_fail` column.
 - **Peer path** (`mode is None`): uses `lazer_dq/peer_benchmark.py`. Window
   is the last `--peer-days` (default 2) days of the session's open-minute
   mask (never extending past its start). Reference is the feed's own
@@ -454,8 +463,8 @@ window).
 
 ## 6. Caveats
 
-- **Peer-benchmark circularity.** For feeds with no Datascope coverage (and,
-  on this branch, `Equity.JP.*`/`Equity.KR.*`/`Equity.IN.*`), Gate 2 checks a
+- **Peer-benchmark circularity.** For feeds with no Datascope coverage,
+  Gate 2 checks a
   candidate against the feed's own `price_feeds` aggregate — which is itself
   built from the currently allowed publishers, potentially including
   publishers close to the same margin problem being fixed. This is a design
@@ -488,11 +497,10 @@ False` unconditionally — no candidate can ever clear Gate 2 for that
   requiring zero. If the linter subprocess fails outright, times out, or
   its output is unparseable, the check degrades to `SKIPPED` rather than
   blocking the apply.
-- **Equity coverage gap.** `engine_mode_for` only routes `Equity.US.*` and
-  `Equity.HK.*` (`REGULAR` session) to the DQ engine. JP/KR/IN equities have
-  no engine mode on this branch, so they always take the peer path — even
-  though Datascope coverage for those markets may exist elsewhere in the
-  codebase (a separate, not-yet-merged branch adds `jp-equities` /
-  `kr-equities` / `in-equities` modes to `evaluate_feed_standalone`). Once
-  those modes land here, `engine_mode_for` should be extended to route them
-  to the engine path for a stronger quality signal.
+- **Equity coverage gap.** `engine_mode_for` routes `Equity.US.*` (all four
+  sessions) and the `REGULAR` session of `Equity.HK.*` / `Equity.JP.*` /
+  `Equity.KR.*` / `Equity.IN.*` to the DQ engine. Other equity markets
+  (e.g. `Equity.CN.*`) have no engine mode and take the peer path; extend
+  `SINGLE_MODE_EQUITY_PREFIXES` in `qualify_candidates.py` when a new
+  market's mode lands in `summarize_feeds.ASSET_CLASS_CONFIG` and
+  `evaluate_feeds_bulk.compute_times_from_mode`.

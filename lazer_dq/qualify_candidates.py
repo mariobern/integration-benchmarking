@@ -159,6 +159,16 @@ US_EQUITY_SESSION_MODES = {
     "OVER_NIGHT": "us-equities-overnight",
 }
 
+# Foreign single-mode equity markets: symbol prefix -> DQ-engine mode
+# (REGULAR session only; other sessions on these feeds route to the peer
+# path). Modes must exist in summarize_feeds.ASSET_CLASS_CONFIG.
+SINGLE_MODE_EQUITY_PREFIXES = {
+    "Equity.HK.": "hk-equities",
+    "Equity.JP.": "jp-equities",
+    "Equity.KR.": "kr-equities",
+    "Equity.IN.": "in-equities",
+}
+
 ENGINE_MODE_THRESHOLDS = {}
 for _ac in ASSET_CLASS_CONFIG.values():
     for _m in _ac["modes"]:
@@ -181,12 +191,10 @@ def engine_mode_for(fs: FeedSession):
     if fs.asset_type == "equity":
         if fs.symbol.startswith("Equity.US."):
             return US_EQUITY_SESSION_MODES.get(fs.session)
-        if fs.symbol.startswith("Equity.HK.") and fs.session == "REGULAR":
-            return "hk-equities"
-        # TODO(#287): once jp/kr/in-equities modes land in
-        # summarize_feeds.ASSET_CLASS_CONFIG, add Equity.JP./Equity.KR./
-        # Equity.IN. prefix checks here (mirroring the Equity.HK. case
-        # above) — otherwise those feeds keep routing to the peer path.
+        if fs.session == "REGULAR":
+            for prefix, mode in SINGLE_MODE_EQUITY_PREFIXES.items():
+                if fs.symbol.startswith(prefix):
+                    return mode
     return None
 
 
