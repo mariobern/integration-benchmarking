@@ -27,7 +27,13 @@ class PeerThresholds:
 
 
 def _last_per_second(df: pd.DataFrame) -> pd.Series:
+    """Return the temporally-last price observation per second.
+
+    Rows are sorted by ts (stable sort) before grouping to ensure the last
+    observation is selected by time, not by position in the input DataFrame.
+    """
     out = df.copy()
+    out = out.sort_values("ts", kind="stable")
     out["second"] = out["ts"].dt.floor("1s")
     return out.groupby("second")["price"].last()
 
@@ -59,9 +65,10 @@ def evaluate_peer(
     diff = aligned["pub_price"] - aligned["agg_price"]
     rmse = float(np.sqrt((diff**2).mean()))
     agg_range = float(aligned["agg_price"].max() - aligned["agg_price"].min())
-    hit_rate = float(
-        ((diff.abs() / aligned["agg_price"]).abs() <= 0.001).mean() * 100.0
-    )
+    # Use |agg_price| as denominator (funding rates can be negative; spec formula
+    # would misbehave for negative references). Guard against zero by replacing with NaN.
+    denom = aligned["agg_price"].abs().replace(0.0, np.nan)
+    hit_rate = float(((diff.abs() / denom) <= 0.001).mean() * 100.0)
     result["hit_rate_pct"] = hit_rate
     if agg_range <= 0:
         result["reason"] = "zero_range"

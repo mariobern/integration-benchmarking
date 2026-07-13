@@ -3,8 +3,6 @@ import pandas as pd
 
 from lazer_dq.peer_benchmark import PeerThresholds, align_per_second, evaluate_peer
 
-RNG = np.random.default_rng(42)
-
 
 def _series(start, n_seconds, price_fn, per_second=2):
     ts, price = [], []
@@ -76,3 +74,46 @@ def test_evaluate_peer_insufficient_obs_and_zero_range():
     flat_pub = _series("2026-07-06", 1500, lambda i: 100.0)
     r = evaluate_peer(flat_pub, flat_agg, thresholds)
     assert r["passed"] is False and r["reason"] == "zero_range"
+
+
+def test_align_handles_out_of_order_timestamps():
+    """Test that temporally-last row is picked even when rows are in descending time order."""
+    pub = pd.DataFrame(
+        {
+            "ts": pd.to_datetime(
+                [
+                    "2026-07-06 00:00:00.900",  # Descending order within second 00
+                    "2026-07-06 00:00:00.100",
+                ],
+                utc=True,
+            ),
+            "price": [999.0, 1.0],  # Later row (00.900) has price 999.0
+        }
+    )
+    agg = pd.DataFrame(
+        {
+            "ts": pd.to_datetime(["2026-07-06 00:00:00.500"], utc=True),
+            "price": [100.0],
+        }
+    )
+    aligned = align_per_second(pub, agg)
+    # Should pick temporally-last pub obs in second 00, which is 00.900 with price 999.0
+    assert len(aligned) == 1
+    assert aligned.iloc[0]["pub_price"] == 999.0
+
+
+def test_evaluate_peer_zero_agg_price_rows_count_as_miss():
+    """Test that zero agg_price rows don't crash and count as misses."""
+    agg = _series("2026-07-06", 1500, lambda i: 100.0 + i * 0.01)
+    pub = _series("2026-07-06", 1500, lambda i: (100.0 + i * 0.01) * 1.0001)
+
+    # Inject some zero prices into agg to test guard against division by zero
+    agg_with_zeros = agg.copy()
+    agg_with_zeros.loc[10:20, "price"] = 0.0
+
+    result = evaluate_peer(pub, agg_with_zeros, PeerThresholds())
+
+    # Should not raise and returned result should have passed as a bool
+    assert isinstance(result["passed"], bool)
+    # The series is still good overall (only ~11 zero rows in 1500), so it should pass
+    assert result["passed"] is True
