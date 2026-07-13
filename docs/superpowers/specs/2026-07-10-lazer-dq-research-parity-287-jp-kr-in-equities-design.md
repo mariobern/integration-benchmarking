@@ -15,20 +15,20 @@ Research PR #287 touches three files:
 
 Mapping research files → `lazer_dq`:
 
-| Research file | lazer_dq file |
-| ------------- | ------------- |
-| `evaluate_feeds.py` / `.sh` (session windows) | `lazer_dq/evaluate_feeds_bulk.py` |
+| Research file                                                | lazer_dq file                          |
+| ------------------------------------------------------------ | -------------------------------------- |
+| `evaluate_feeds.py` / `.sh` (session windows)                | `lazer_dq/evaluate_feeds_bulk.py`      |
 | `publisher_benchmark_eval.ipynb` (benchmark query + filters) | `lazer_dq/evaluate_feed_standalone.py` |
 
 `summarize_feeds.py` is integration-repo-only (not in #287) and is extended here so the downstream summary flow works for the new markets, mirroring the earlier hk-equities addition.
 
 ## New market windows (from #287)
 
-| Mode          | Local window        | Timezone       | DST  |
-| ------------- | ------------------- | -------------- | ---- |
-| `jp-equities` | 09:00:00–10:00:00   | Asia/Tokyo     | none |
-| `kr-equities` | 09:00:00–10:00:00   | Asia/Seoul     | none |
-| `in-equities` | 09:15:00–10:15:00   | Asia/Kolkata   | none |
+| Mode          | Local window      | Timezone     | DST  |
+| ------------- | ----------------- | ------------ | ---- |
+| `jp-equities` | 09:00:00–10:00:00 | Asia/Tokyo   | none |
+| `kr-equities` | 09:00:00–10:00:00 | Asia/Seoul   | none |
+| `in-equities` | 09:15:00–10:15:00 | Asia/Kolkata | none |
 
 These are the local first-hour windows converted to UTC. None of the three timezones observe DST, so the UTC offset is fixed year-round (JST +9, KST +9, IST +5:30).
 

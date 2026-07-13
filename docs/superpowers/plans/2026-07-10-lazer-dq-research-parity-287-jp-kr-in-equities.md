@@ -23,10 +23,12 @@
 ### Task 1: Bulk runner session windows (jp/kr/in)
 
 **Files:**
+
 - Modify: `lazer_dq/evaluate_feeds_bulk.py` (`compute_times_from_mode`, after the `hk-equities` branch ~line 38-42)
 - Test: `lazer_dq/tests/test_evaluate_feeds_bulk.py`
 
 **Interfaces:**
+
 - Consumes: `compute_times_from_mode(date: str, mode: str) -> tuple[str, str]` and its inner helper `_local_to_utc(t: str, tz: str) -> str` (already present).
 - Produces: `compute_times_from_mode` returns correct `(start_utc, end_utc)` HH:MM:SS strings for `jp-equities`, `kr-equities`, `in-equities`.
 
@@ -122,10 +124,12 @@ git commit -m "feat(lazer_dq): add jp/kr/in equities session windows to bulk run
 ### Task 2: Standalone engine — benchmark branch, qualifier filters, help text
 
 **Files:**
+
 - Modify: `lazer_dq/evaluate_feed_standalone.py` (equities benchmark branch tuple ~line 1148; qualifier filter block ~line 1183; `--mode` help ~line 850)
 - Test: `lazer_dq/tests/test_benchmark_ric_queries.py`
 
 **Interfaces:**
+
 - Consumes: the module-level `main()` entrypoint exercised via `test_benchmark_ric_queries.py`'s `_run_and_capture(engine, monkeypatch, tmp_path, mode)` helper and `_benchmark_sql(sql_log)` (both already present).
 - Produces: for modes `jp-equities`, `kr-equities`, `in-equities`, the engine builds a query against `datascope_global_equities_benchmark_data`; the equities filter (all equities modes) includes `141[IRGCOND]`, `2835[IRGCOND]`, `4575[IRGCOND]`.
 
@@ -238,10 +242,12 @@ git commit -m "feat(lazer_dq): route jp/kr/in equities to global-equities table;
 ### Task 3: summarize_feeds asset-class entries (jp/kr/in)
 
 **Files:**
+
 - Modify: `lazer_dq/summarize_feeds.py` (`ASSET_CLASS_CONFIG` dict, after the `hk-equities` entry ~line 64)
 - Test: `lazer_dq/tests/test_summarize_feeds.py`
 
 **Interfaces:**
+
 - Consumes: the module-level `ASSET_CLASS_CONFIG` dict; `--asset-class` argparse uses `choices=sorted(ASSET_CLASS_CONFIG.keys())`, and the output layout branches on `us-equities` (24-col) vs. all others (6-col single-mode), so new single-mode entries route through the 6-col path automatically.
 - Produces: `ASSET_CLASS_CONFIG` contains `jp-equities`, `kr-equities`, `in-equities`, each single-mode, `REGULAR` session, `default_max_ros` 1.0, `default_min_hit` 80.0.
 
@@ -314,9 +320,11 @@ git commit -m "feat(lazer_dq): add jp/kr/in single-mode asset classes to summari
 ### Task 4: Documentation — CLAUDE.md gotchas
 
 **Files:**
+
 - Modify: `CLAUDE.md` (Key Gotchas section — lines ~185, ~186, ~191)
 
 **Interfaces:**
+
 - Consumes: nothing (docs only).
 - Produces: gotchas reflecting jp/kr/in support.
 
