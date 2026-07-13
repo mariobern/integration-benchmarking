@@ -229,26 +229,30 @@ how good its price is. Candidates that fail this gate never reach Gate 2; if
 
 Two paths, chosen per (feed, session) by `engine_mode_for`:
 
-| `asset_type`  | `symbol` / `session` condition                            | Engine mode             |
-| ------------- | --------------------------------------------------------- | ----------------------- |
-| `fx`          | —                                                         | `fx`                    |
-| `metal`       | —                                                         | `metals`                |
-| `commodity`   | —                                                         | `commodity`             |
-| `rates`       | —                                                         | `us-treasuries-yield`   |
-| `equity`      | `Equity.US.*`, session `REGULAR`                          | `us-equities`           |
-| `equity`      | `Equity.US.*`, session `PRE_MARKET`                       | `us-equities-pre`       |
-| `equity`      | `Equity.US.*`, session `POST_MARKET`                      | `us-equities-post`      |
-| `equity`      | `Equity.US.*`, session `OVER_NIGHT`                       | `us-equities-overnight` |
-| `equity`      | `Equity.HK.*`, session `REGULAR`                          | `hk-equities`           |
-| anything else | (crypto, funding-rate, nav, redemption-rate, custom,      | **peer path** (`None`)  |
-|               | crypto-index, `Equity.HK.*` non-REGULAR, and — on this    |                         |
-|               | branch — `Equity.JP.*`/`Equity.KR.*`/`Equity.IN.*`, since |                         |
-|               | the DQ engine has no modes for them here)                 |                         |
+| `asset_type`  | `symbol` / `session` condition       | Engine mode             |
+| ------------- | ------------------------------------ | ----------------------- |
+| `fx`          | —                                    | `fx`                    |
+| `metal`       | —                                    | `metals`                |
+| `commodity`   | —                                    | `commodity`             |
+| `rates`       | —                                    | `us-treasuries-yield`   |
+| `equity`      | `Equity.US.*`, session `REGULAR`     | `us-equities`           |
+| `equity`      | `Equity.US.*`, session `PRE_MARKET`  | `us-equities-pre`       |
+| `equity`      | `Equity.US.*`, session `POST_MARKET` | `us-equities-post`      |
+| `equity`      | `Equity.US.*`, session `OVER_NIGHT`  | `us-equities-overnight` |
+| `equity`      | `Equity.HK.*`, session `REGULAR`     | `hk-equities`           |
+| anything else | everything not matched above         | **peer path** (`None`)  |
+
+The "peer path" row above covers crypto, funding-rate, nav, redemption-rate,
+custom, and crypto-index feeds, `Equity.HK.*` sessions other than `REGULAR`,
+and — on this branch — `Equity.JP.*` / `Equity.KR.*` / `Equity.IN.*`, since
+the DQ engine has no modes for them here (see the coverage-gap caveat
+below).
 
 - **Engine path** (`mode` resolved): runs
   `evaluate_feed_standalone` as a subprocess for up to 3 most recent
-  weekdays in the window (newest first; a date is skipped if `stats.csv`
-  already exists under `--reports-dir`, so re-runs are cheap), stopping at
+  weekdays in the window (newest first; the subprocess call itself is
+  skipped — reusing the cached `stats.csv` — for any date already present
+  under `--reports-dir`), stopping at
   the first date that exits `0` and yields non-empty stats. If all three
   dates exit `2` (no benchmark data) or error, the (feed, session) is
   flagged `no_benchmark_data`. Pass criteria (`engine_gate`): `n_observations
