@@ -48,6 +48,7 @@ from lazer_dq.summarize_feeds import (
     load_excluded_publishers,
     load_stats,
 )
+from lib.thresholds import passes_benchmark
 
 FLAG_REASONS = (
     "no_candidates",
@@ -98,8 +99,6 @@ ACTIVITY_QUERY = """
         pu.publisher_id AS publisher_id,
         count() AS n_updates
     FROM publisher_updates pu
-    INNER JOIN publishers_metadata_latest pml
-        ON pu.publisher_id = pml.publisher_id
     PREWHERE pu.price_feed_id = {feed_id:UInt64}
     WHERE pu.publish_time >= {start:String}
       AND pu.publish_time < {end:String}
@@ -108,8 +107,13 @@ ACTIVITY_QUERY = """
         OR (pu.status = 'REJECTED' AND pu.status_reason = 'UNAUTHORIZED')
       )
       AND pu.price IS NOT NULL
-      AND pml.key_type IN ('production', 'Production')
     GROUP BY minute, publisher_id
+"""
+
+PRODUCTION_PUBLISHERS_QUERY = """
+    SELECT DISTINCT publisher_id
+    FROM publishers_metadata_latest
+    WHERE key_type IN ('production', 'Production')
 """
 
 PER_SECOND_PRICES_QUERY = """
@@ -179,10 +183,41 @@ def engine_mode_for(fs: FeedSession):
             return US_EQUITY_SESSION_MODES.get(fs.session)
         if fs.symbol.startswith("Equity.HK.") and fs.session == "REGULAR":
             return "hk-equities"
+        # TODO(#287): once jp/kr/in-equities modes land in
+        # summarize_feeds.ASSET_CLASS_CONFIG, add Equity.JP./Equity.KR./
+        # Equity.IN. prefix checks here (mirroring the Equity.HK. case
+        # above) — otherwise those feeds keep routing to the peer path.
     return None
 
 
+# Modes not covered by ENGINE_MODE_THRESHOLDS (i.e. not in
+# summarize_feeds.ASSET_CLASS_CONFIG) but for which the repo defines a
+# per-tier pass/fail bar in lib/thresholds.py. Gate 2 uses that bar instead
+# of the engine's hardcoded (stricter) pass_fail so candidates are held to
+# the same tier their feed's existing publishers are evaluated against.
+TIER_GATED_MODES = {"fx", "metals", "commodity", "us-treasuries-yield"}
+
+
 def engine_gate(stats_row: dict, mode: str, min_obs: int) -> bool:
+    """Gate 2 (quality) pass/fail for one candidate's engine stats row.
+
+    Three cases, in priority order:
+      1. mode in ENGINE_MODE_THRESHOLDS (us-equities*/hk-equities, sourced
+         from summarize_feeds.ASSET_CLASS_CONFIG): rmse_over_spread and
+         hit_rate_0.1pct vs the per-mode configured thresholds.
+      2. mode in TIER_GATED_MODES (fx, metals, commodity,
+         us-treasuries-yield): nrmse and hit_rate_0.1pct vs the matching
+         per-tier SessionThresholds from lib/thresholds.py (regular tier for
+         fx and us-treasuries-yield; relaxed tier for metals/commodity) via
+         lib.thresholds.passes_benchmark — the same bar used to evaluate the
+         feed's current publishers, rather than the engine's stricter
+         hardcoded pass_fail fallback.
+      3. Any other/unknown mode: falls back to the stats row's own
+         `pass_fail` column (engine's hardcoded nrmse<0.01, or nrmse<0.05
+         with hit_rate>=98).
+
+    `n_observations >= min_obs` is enforced first in all cases.
+    """
     try:
         n_obs = int(float(stats_row["n_observations"]))
     except (KeyError, ValueError):
@@ -198,7 +233,44 @@ def engine_gate(stats_row: dict, mode: str, min_obs: int) -> bool:
             )
         except (KeyError, ValueError):
             return False
+    if mode in TIER_GATED_MODES:
+        try:
+            nrmse = float(stats_row["nrmse"])
+            hit_rate = float(stats_row["hit_rate_0.1pct"])
+        except (KeyError, ValueError):
+            return False
+        return passes_benchmark(nrmse, hit_rate, mode=mode)
     return stats_row.get("pass_fail") == "pass"
+
+
+def _warn_if_worst_minute_diverges_from_audit(fs, audit_row, before: int) -> None:
+    """Print a warning if Stage 2's worst_minute_before disagrees with Stage 1.
+
+    Both are the worst-minute active-allowed-publisher count over the same
+    window, so they should normally match. Coerce defensively (the audit
+    value round-trips through a CSV and may be a string/float, or absent for
+    NO_SCHEDULE-era rows) and skip silently when it can't be compared. This
+    never fails the run — mask/data differences between the audit and
+    qualify runs (e.g. re-audited window, updated schedule) can explain
+    small deltas.
+    """
+    audited_raw = audit_row.get("worst_minute_active")
+    if audited_raw is None:
+        return
+    try:
+        audited_val = float(audited_raw)
+    except (TypeError, ValueError):
+        return
+    if audited_val != audited_val:  # NaN
+        return
+    audited_val = int(audited_val)
+    if audited_val != before:
+        print(
+            f"  warning: feed {fs.feed_id} session {fs.session} worst_minute_before="
+            f"{before} differs from audit worst_minute_active={audited_val} "
+            "(both computed over the same window; mask/data differences "
+            "between the audit and qualify runs can explain small deltas)"
+        )
 
 
 def _open_minute_set(mask: pd.Series) -> set:
@@ -303,6 +375,20 @@ def peer_windows(mask: pd.Series, peer_days: int):
     return start.strftime("%Y-%m-%d %H:%M:%S"), end.strftime("%Y-%m-%d %H:%M:%S")
 
 
+def fetch_production_publisher_ids(client) -> set:
+    """Production-key publisher_ids, queried once per run.
+
+    Candidate discovery requires production keys (see qualify_feed); the
+    activity matrix itself is no longer joined against
+    publishers_metadata_latest so it covers every submitting publisher,
+    matching the Stage-1 audit.
+    """
+    df = client.query_df(PRODUCTION_PUBLISHERS_QUERY)
+    if not len(df):
+        return set()
+    return set(df["publisher_id"].astype(int))
+
+
 def fetch_aggregate(client, feed_id, start, end):
     """price_feeds per-second series; tries channels 1..3 (engine pattern)."""
     for channel in (1, 2, 3):
@@ -329,7 +415,9 @@ def _restrict_to_mask(df: pd.DataFrame, mask: pd.Series) -> pd.DataFrame:
     return df[minutes.isin(open_minutes)].assign(ts=ts)
 
 
-def qualify_feed(client, fs_list, audit_by_key, args, excluded, activity_dir):
+def qualify_feed(
+    client, fs_list, audit_by_key, args, excluded, activity_dir, production_pubs
+):
     """Qualify one feed's flagged sessions. Returns (candidate_rows, summary_rows, flag_rows)."""
     feed_id = fs_list[0].feed_id
     start_s = args.start_utc.strftime("%Y-%m-%d %H:%M:%S")
@@ -368,8 +456,11 @@ def qualify_feed(client, fs_list, audit_by_key, args, excluded, activity_dir):
         def flag(reason, detail=""):
             flag_rows.append({**base, "reason": reason, "detail": detail})
 
+        before = projected_worst_minute(matrix, mask, set(fs.allowed))
+        _warn_if_worst_minute_diverges_from_audit(fs, audit_row, before)
+
         all_pubs = set(matrix["publisher_id"].astype(int)) if len(matrix) else set()
-        candidates = sorted(all_pubs - set(fs.allowed) - excluded)
+        candidates = sorted((all_pubs & production_pubs) - set(fs.allowed) - excluded)
         if not candidates:
             flag("no_candidates", f"{len(all_pubs)} submitting, all allowed/excluded")
             summary_rows.append(_summary(base, fs, args, mask, matrix, [], 0, 0, 0))
@@ -629,6 +720,16 @@ def main(argv=None) -> int:
         if (fs.feed_id, fs.session) in flagged_keys and fs.schedule_str is not None:
             by_feed.setdefault(fs.feed_id, []).append(fs)
 
+    covered_keys = {
+        (fs.feed_id, fs.session) for fs_list in by_feed.values() for fs in fs_list
+    }
+    dropped_keys = sorted(set(flagged_keys.keys()) - covered_keys)
+    for feed_id, session in dropped_keys:
+        print(
+            f"  warning: flagged feed {feed_id} session {session} dropped — "
+            "not found among STABLE sessions or schedule unresolvable"
+        )
+
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     activity_dir = out_dir / "min_pub_activity"
@@ -636,12 +737,20 @@ def main(argv=None) -> int:
     from lib.config import get_lazer_client, load_config
 
     client = get_lazer_client(load_config())
+    production_pubs = fetch_production_publisher_ids(client)
+    print(f"{len(production_pubs)} production-key publishers")
     all_candidates, all_summaries, all_flags = [], [], []
     for i, (feed_id, fs_list) in enumerate(sorted(by_feed.items()), 1):
         print(f"[{i}/{len(by_feed)}] qualifying feed {feed_id} ({fs_list[0].symbol})")
         try:
             c, s, f = qualify_feed(
-                client, fs_list, flagged_keys, args, excluded, activity_dir
+                client,
+                fs_list,
+                flagged_keys,
+                args,
+                excluded,
+                activity_dir,
+                production_pubs,
             )
         except Exception as e:  # soft-fail per feed
             print(f"  feed {feed_id} FAILED: {e}")

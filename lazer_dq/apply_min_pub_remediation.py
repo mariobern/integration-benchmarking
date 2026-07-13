@@ -231,6 +231,31 @@ def verify_projection(
         mask = open_minutes_mask(
             parse_market_schedule(fs.schedule_str), start_utc, end_utc
         )
+        open_minutes = mask.index[mask.to_numpy()]
+        if matrix.empty or len(open_minutes) == 0:
+            rows.append(
+                {
+                    "check": "projected_margin",
+                    "feed_id": feed_id,
+                    "session": session,
+                    "status": "SKIPPED",
+                    "detail": "activity matrix does not cover verification window",
+                }
+            )
+            continue
+        matrix_min, matrix_max = matrix["minute"].min(), matrix["minute"].max()
+        mask_min, mask_max = open_minutes.min(), open_minutes.max()
+        if mask_max < matrix_min or mask_min > matrix_max:
+            rows.append(
+                {
+                    "check": "projected_margin",
+                    "feed_id": feed_id,
+                    "session": session,
+                    "status": "SKIPPED",
+                    "detail": "activity matrix does not cover verification window",
+                }
+            )
+            continue
         projected = projected_worst_minute(matrix, mask, set(fs.allowed))
         target = int(srow.iloc[0]["target"])
         met_target = bool(srow.iloc[0]["met_target"])

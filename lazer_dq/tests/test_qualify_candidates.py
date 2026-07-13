@@ -60,22 +60,86 @@ def test_engine_gate_with_and_without_configured_thresholds():
         "hit_rate_0.1pct": "95",
         "n_observations": "5000",
         "pass_fail": "fail",
+        "nrmse": "0.03",
     }
     row_bad = {
         "rmse_over_spread": "5.0",
         "hit_rate_0.1pct": "95",
         "n_observations": "5000",
         "pass_fail": "pass",
+        "nrmse": "0.2",
     }
     # us-equities has configured thresholds (max_ros 1.0, min_hit 80) -> uses them
     assert engine_gate(row_good, "us-equities", min_obs=1000) is True
     assert engine_gate(row_bad, "us-equities", min_obs=1000) is False
-    # fx has no configured thresholds -> falls back to engine pass_fail
-    assert engine_gate(row_bad, "fx", min_obs=1000) is True
-    assert engine_gate(row_good, "fx", min_obs=1000) is False
     # observation floor always applies
     thin = dict(row_good, n_observations="10")
     assert engine_gate(thin, "us-equities", min_obs=1000) is False
+
+
+def test_engine_gate_tier_thresholds_for_fx_metals_commodity_treasuries():
+    # fx (regular tier: nrmse<0.01 auto, or nrmse<0.05 & hit>=95)
+    fx_pass = {"n_observations": "5000", "nrmse": "0.03", "hit_rate_0.1pct": "96"}
+    assert engine_gate(fx_pass, "fx", min_obs=1000) is True
+    # conditional needs hit>=95; hit=90 fails unless nrmse<0.01 auto-pass
+    fx_fail = {"n_observations": "5000", "nrmse": "0.03", "hit_rate_0.1pct": "90"}
+    assert engine_gate(fx_fail, "fx", min_obs=1000) is False
+    fx_auto = {"n_observations": "5000", "nrmse": "0.005", "hit_rate_0.1pct": "0"}
+    assert engine_gate(fx_auto, "fx", min_obs=1000) is True
+
+    # us-treasuries-yield uses the same regular tier as fx
+    treasuries_pass = {
+        "n_observations": "5000",
+        "nrmse": "0.03",
+        "hit_rate_0.1pct": "96",
+    }
+    assert engine_gate(treasuries_pass, "us-treasuries-yield", min_obs=1000) is True
+    treasuries_fail = {
+        "n_observations": "5000",
+        "nrmse": "0.03",
+        "hit_rate_0.1pct": "90",
+    }
+    assert engine_gate(treasuries_fail, "us-treasuries-yield", min_obs=1000) is False
+
+    # metals/commodity (relaxed tier: nrmse<0.05 auto, or nrmse<0.15 & hit>=85)
+    metals_auto = {"n_observations": "5000", "nrmse": "0.03", "hit_rate_0.1pct": "90"}
+    assert engine_gate(metals_auto, "metals", min_obs=1000) is True
+    commodity_cond = {
+        "n_observations": "5000",
+        "nrmse": "0.12",
+        "hit_rate_0.1pct": "86",
+    }
+    assert engine_gate(commodity_cond, "commodity", min_obs=1000) is True
+    commodity_fail = {
+        "n_observations": "5000",
+        "nrmse": "0.12",
+        "hit_rate_0.1pct": "80",
+    }
+    assert engine_gate(commodity_fail, "commodity", min_obs=1000) is False
+
+    # observation floor still applies for tier-gated modes
+    thin = dict(fx_pass, n_observations="10")
+    assert engine_gate(thin, "fx", min_obs=1000) is False
+
+
+def test_engine_gate_unknown_mode_falls_back_to_engine_pass_fail():
+    row_bad = {
+        "rmse_over_spread": "5.0",
+        "hit_rate_0.1pct": "95",
+        "n_observations": "5000",
+        "pass_fail": "pass",
+        "nrmse": "0.2",
+    }
+    row_good = {
+        "rmse_over_spread": "0.5",
+        "hit_rate_0.1pct": "95",
+        "n_observations": "5000",
+        "pass_fail": "fail",
+        "nrmse": "0.03",
+    }
+    # some future/unknown mode not in ENGINE_MODE_THRESHOLDS or TIER_GATED_MODES
+    assert engine_gate(row_bad, "some-future-mode", min_obs=1000) is True
+    assert engine_gate(row_good, "some-future-mode", min_obs=1000) is False
 
 
 def _matrix_and_mask():

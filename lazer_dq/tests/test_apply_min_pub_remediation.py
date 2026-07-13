@@ -1,10 +1,12 @@
 import json
+from datetime import datetime, timezone
 
 import pandas as pd
 
 from lazer_dq.apply_min_pub_remediation import (
     _parse_linter_error_count,
     build_spec,
+    verify_projection,
     verify_static,
 )
 
@@ -177,3 +179,72 @@ def test_parse_linter_error_count_no_summary_zero_rc():
     text = "Linter ran successfully with no output"
     result = _parse_linter_error_count(text, 0)
     assert result == 0, f"Expected 0, got {result}"
+
+
+def _selected_and_summary_for_feed_10():
+    selected = pd.DataFrame(
+        [
+            {
+                "feed_id": 10,
+                "symbol": "Equity.US.A/USD",
+                "session": "REGULAR",
+                "candidate_publisher_id": 7,
+                "selected": True,
+                "selection_rank": 1,
+                "quality_path": "engine",
+            }
+        ]
+    )
+    summary = pd.DataFrame(
+        [{"feed_id": 10, "session": "REGULAR", "target": 4, "met_target": True}]
+    )
+    return selected, summary
+
+
+def _write_matrix(activity_dir, feed_id, minutes, publisher_ids):
+    activity_dir.mkdir(parents=True, exist_ok=True)
+    rows = [
+        {"minute": m, "publisher_id": pid, "n_updates": 1}
+        for m in minutes
+        for pid in publisher_ids
+    ]
+    pd.DataFrame(rows, columns=["minute", "publisher_id", "n_updates"]).to_csv(
+        activity_dir / f"feed_{feed_id}.csv.gz", index=False
+    )
+
+
+def test_verify_projection_skipped_when_matrix_does_not_cover_window(tmp_path):
+    config = _mini_config([1, 2, 3, 7])
+    selected, summary = _selected_and_summary_for_feed_10()
+    activity_dir = tmp_path / "min_pub_activity"
+    # Matrix covers an entirely different window than the one being verified.
+    matrix_minutes = pd.date_range("2026-06-01 13:30", periods=3, freq="1min", tz="UTC")
+    _write_matrix(activity_dir, 10, matrix_minutes, [1, 2, 3, 7])
+
+    start_utc = datetime(2026, 7, 6, tzinfo=timezone.utc)
+    end_utc = datetime(2026, 7, 6, 0, 5, tzinfo=timezone.utc)
+    rows = verify_projection(
+        config, selected, summary, activity_dir, start_utc, end_utc
+    )
+    assert len(rows) == 1
+    assert rows[0]["check"] == "projected_margin"
+    assert rows[0]["status"] == "SKIPPED"
+    assert "does not cover" in rows[0]["detail"]
+
+
+def test_verify_projection_normal_path_when_window_overlaps(tmp_path):
+    config = _mini_config([1, 2, 3, 7])
+    selected, summary = _selected_and_summary_for_feed_10()
+    activity_dir = tmp_path / "min_pub_activity"
+    start_utc = datetime(2026, 7, 6, tzinfo=timezone.utc)
+    end_utc = datetime(2026, 7, 6, 0, 5, tzinfo=timezone.utc)
+    matrix_minutes = pd.date_range("2026-07-06 00:00", periods=5, freq="1min", tz="UTC")
+    # allowed [1,2,3,7] all active every minute -> worst-minute 4 >= target 4 -> PASS
+    _write_matrix(activity_dir, 10, matrix_minutes, [1, 2, 3, 7])
+
+    rows = verify_projection(
+        config, selected, summary, activity_dir, start_utc, end_utc
+    )
+    assert len(rows) == 1
+    assert rows[0]["check"] == "projected_margin"
+    assert rows[0]["status"] == "PASS"
