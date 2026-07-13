@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -74,11 +75,55 @@ def run_edit_config(config_path, spec_path, apply: bool) -> int:
     return subprocess.run(argv, check=False).returncode
 
 
+def _parse_linter_error_count(text: str, returncode: int) -> int | None:
+    """Parse linter error count from JSON or text output.
+
+    Args:
+        text: Combined stdout + stderr from the linter.
+        returncode: Exit code from the linter subprocess.
+
+    Returns:
+        Error count if found, 0 if linter ran cleanly with no errors,
+        None if the linter failed or output format is unrecognized.
+    """
+    # Try JSON format first (most reliable).
+    # JSON may span multiple lines, so extract the JSON object.
+    json_match = re.search(r"\{[\s\S]*\}", text)
+    if json_match:
+        try:
+            data = json.loads(json_match.group(0))
+            if "findings" in data:
+                errors = [f for f in data["findings"] if f.get("severity") == "ERROR"]
+                return len(errors)
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # Fall back to Summary line regex parsing.
+    match = re.search(r"Summary:\s*(\d+)\s+errors", text)
+    if match:
+        return int(match.group(1))
+
+    # Summary line absent: check returncode to decide if linter failed.
+    if returncode != 0:
+        return None  # Linter itself failed (e.g., old-format assumption).
+    return 0  # Linter ran successfully; no summary means no errors.
+
+
 def count_linter_errors(config_path) -> int | None:
-    """Linter error-line count, or None if the linter can't run on this config."""
+    """Linter error count, or None if the linter can't run on this config.
+
+    Prefers JSON output (--format json) for reliable parsing.
+    """
     try:
         result = subprocess.run(
-            [sys.executable, str(LINTER), "--config", str(config_path)],
+            [
+                sys.executable,
+                str(LINTER),
+                "--config",
+                str(config_path),
+                "--format",
+                "json",
+            ],
             check=False,
             capture_output=True,
             text=True,
@@ -87,10 +132,7 @@ def count_linter_errors(config_path) -> int | None:
     except Exception:
         return None
     text = result.stdout + result.stderr
-    errors = [l for l in text.splitlines() if "ERROR" in l.upper()]
-    if result.returncode != 0 and not errors:
-        return None  # linter itself failed (e.g. old-format assumption)
-    return len(errors)
+    return _parse_linter_error_count(text, result.returncode)
 
 
 def _session_allowed(config: dict) -> dict:

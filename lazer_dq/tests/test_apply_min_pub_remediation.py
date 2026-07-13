@@ -1,6 +1,12 @@
+import json
+
 import pandas as pd
 
-from lazer_dq.apply_min_pub_remediation import build_spec, verify_static
+from lazer_dq.apply_min_pub_remediation import (
+    _parse_linter_error_count,
+    build_spec,
+    verify_static,
+)
 
 
 def _selected_df():
@@ -109,3 +115,65 @@ def test_verify_static_pass_and_fail():
     # duplicate publisher entry -> static FAIL
     dup = verify_static(_mini_config([1, 2, 3, 7, 7]), selected, summary)
     assert any(r["check"] == "static_margin" and r["status"] == "FAIL" for r in dup)
+
+
+def test_parse_linter_error_count_json_format():
+    """JSON with 5070 errors + 2773 warnings, rc=1."""
+    json_output = """{
+  "findings": [
+    {
+      "rule_id": "E005",
+      "severity": "ERROR",
+      "message": "STABLE feed with no publishers"
+    },
+    {
+      "rule_id": "W001",
+      "severity": "WARNING",
+      "message": "some warning"
+    }
+  ]
+}"""
+    # Create 5070 error entries + 2773 warning entries.
+    errors = [{"severity": "ERROR", "rule_id": f"E{i}"} for i in range(5070)]
+    warnings = [{"severity": "WARNING", "rule_id": f"W{i}"} for i in range(2773)]
+    findings = errors + warnings
+    full_json = json.dumps({"findings": findings})
+
+    result = _parse_linter_error_count(full_json, 1)
+    assert result == 5070, f"Expected 5070, got {result}"
+
+
+def test_parse_linter_error_count_summary_line():
+    """Text output with 'Summary: 5070 errors, 2773 warnings' + rc=1."""
+    text = """NOTE: baseline unavailable
+ERRORS (5070 found):
+  E005: STABLE feed with no publishers
+  E008: publisherIds not in list
+...
+Summary: 5070 errors, 2773 warnings
+"""
+    result = _parse_linter_error_count(text, 1)
+    assert result == 5070, f"Expected 5070, got {result}"
+
+
+def test_parse_linter_error_count_zero_errors():
+    """Text output 'Summary: 0 errors, 3 warnings', rc=0."""
+    text = """WARNINGS (3 found):
+Summary: 0 errors, 3 warnings
+"""
+    result = _parse_linter_error_count(text, 0)
+    assert result == 0, f"Expected 0, got {result}"
+
+
+def test_parse_linter_error_count_no_summary_nonzero_rc():
+    """No Summary line, rc=2 -> None (linter failed)."""
+    text = "Some error output without summary"
+    result = _parse_linter_error_count(text, 2)
+    assert result is None, f"Expected None, got {result}"
+
+
+def test_parse_linter_error_count_no_summary_zero_rc():
+    """No Summary line, rc=0 -> 0 (linter succeeded, no errors found)."""
+    text = "Linter ran successfully with no output"
+    result = _parse_linter_error_count(text, 0)
+    assert result == 0, f"Expected 0, got {result}"
