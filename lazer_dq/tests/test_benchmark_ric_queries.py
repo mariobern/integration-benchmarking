@@ -129,6 +129,9 @@ def _benchmark_sql(sql_log):
             "datascope_global_equities_benchmark_data",
         ),
         ("us-equities-on", "AAPL.BLUE", "datascope_global_equities_benchmark_data"),
+        ("jp-equities", "AAPL.O", "datascope_global_equities_benchmark_data"),
+        ("kr-equities", "AAPL.O", "datascope_global_equities_benchmark_data"),
+        ("in-equities", "AAPL.O", "datascope_global_equities_benchmark_data"),
         ("us-futures", "AAPL.O", "datascope_futures_benchmark_data"),
         ("us-treasuries-yield", "AAPL.O", "datascope_us_treasury_benchmark_data"),
         ("us-treasuries-price", "AAPL.O", "datascope_us_treasury_benchmark_data"),
@@ -151,6 +154,23 @@ def test_futures_qualifier_filter_broadened(engine, monkeypatch, tmp_path):
     assert "'%SBL[OFFBK_TYPE]%'" in sql
     assert "'%SYS[OFFBK_TYPE]%'" in sql
     assert "'%Spread Price|Spread Volume[USER]%'" in sql
+
+
+def test_equities_new_qualifier_filters_present(engine, monkeypatch, tmp_path):
+    # PR #287 added three IRGCOND filters to the shared equities branch;
+    # they must appear for every equities mode.
+    for mode in (
+        "us-equities",
+        "hk-equities",
+        "jp-equities",
+        "kr-equities",
+        "in-equities",
+    ):
+        sql_log, _ = _run_and_capture(engine, monkeypatch, tmp_path, mode)
+        sql = _benchmark_sql(sql_log)
+        assert "'%141[IRGCOND]%'" in sql
+        assert "'%2835[IRGCOND]%'" in sql
+        assert "'%4575[IRGCOND]%'" in sql
 
 
 def test_treasuries_price_selects_price(engine, monkeypatch, tmp_path):

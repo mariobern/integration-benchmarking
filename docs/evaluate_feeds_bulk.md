@@ -53,6 +53,7 @@ feed_id,date,mode
 1060,2026-05-04,us-equities-pre
 922,2026-04-13,us-equities-overnight
 2503,2026-05-04,hk-equities
+2601,2026-05-04,jp-equities
 346,2026-05-04,us-treasuries-yield
 ```
 
@@ -73,6 +74,9 @@ The `mode` column selects the benchmark table and the market session whose Datas
 | `us-equities-post`                         | `datascope_global_equities_benchmark_data`     | POST_MARKET          |
 | `us-equities-overnight` / `us-equities-on` | `datascope_global_equities_benchmark_data`     | OVER_NIGHT           |
 | `hk-equities`                              | `datascope_global_equities_benchmark_data`     | REGULAR              |
+| `jp-equities`                              | `datascope_global_equities_benchmark_data`     | REGULAR              |
+| `kr-equities`                              | `datascope_global_equities_benchmark_data`     | REGULAR              |
+| `in-equities`                              | `datascope_global_equities_benchmark_data`     | REGULAR              |
 | `us-futures`                               | `datascope_futures_benchmark_data`             | REGULAR              |
 | `us-treasuries-yield`                      | `datascope_us_treasury_benchmark_data` (yield) | REGULAR              |
 | `us-treasuries-price`                      | `datascope_us_treasury_benchmark_data` (price) | REGULAR              |
@@ -81,7 +85,7 @@ A feed whose `market_schedules` has no `datascope_ric` for the relevant session 
 
 ## Time Window Resolution
 
-When `--start-time` / `--end-time` are not both provided, the window is computed per row from the `mode` column. Local market windows are converted to UTC via `zoneinfo` (handles EDT/EST automatically based on the date; HKT is fixed UTC+8 with no DST).
+When `--start-time` / `--end-time` are not both provided, the window is computed per row from the `mode` column. Local market windows are converted to UTC via `zoneinfo` (handles EDT/EST automatically based on the date; the Asian-equity timezones are fixed offsets with no DST — HKT/JST/KST and IST).
 
 | Mode                                                          | Local window      | Timezone           |
 | ------------------------------------------------------------- | ----------------- | ------------------ |
@@ -89,6 +93,9 @@ When `--start-time` / `--end-time` are not both provided, the window is computed
 | `us-equities-post`                                            | 16:30:00–17:30:00 | `America/New_York` |
 | `us-equities-overnight` / `us-equities-on`                    | 20:00:00–21:00:00 | `America/New_York` |
 | `hk-equities`                                                 | 09:30:00–10:30:00 | `Asia/Hong_Kong`   |
+| `jp-equities`                                                 | 09:00:00–10:00:00 | `Asia/Tokyo`       |
+| `kr-equities`                                                 | 09:00:00–10:00:00 | `Asia/Seoul`       |
+| `in-equities`                                                 | 09:15:00–10:15:00 | `Asia/Kolkata`     |
 | `us-equities` _(or any other value, including unknown modes)_ | 09:30:00–10:30:00 | `America/New_York` |
 
 Providing **both** `--start-time` and `--end-time` bypasses mode-based computation for every row.
