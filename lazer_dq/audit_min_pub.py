@@ -28,7 +28,6 @@ import pandas as pd
 
 from lazer_dq.market_schedule import open_minutes_mask, parse_market_schedule
 from lazer_dq.min_pub_common import (
-    FeedSession,
     deprecated_stable_feeds,
     hygiene_rows,
     iter_stable_sessions,
@@ -142,9 +141,12 @@ def audit_feed(client, feed_sessions, start_utc, end_utc, prolonged_threshold):
         if fs.schedule_str is None:
             rows.append({**base, "classification": "NO_SCHEDULE"})
             continue
-        mask = open_minutes_mask(
-            parse_market_schedule(fs.schedule_str), start_utc, end_utc
-        )
+        try:
+            schedule = parse_market_schedule(fs.schedule_str)
+        except ValueError:
+            rows.append({**base, "classification": "NO_SCHEDULE"})
+            continue
+        mask = open_minutes_mask(schedule, start_utc, end_utc)
         counts = active_counts_for_session(per_minute, mask, fs.allowed)
         metrics = audit_metrics(counts, fs.effective_min_pub, prolonged_threshold)
         rows.append({**base, **metrics, "classification": classify(metrics)})
