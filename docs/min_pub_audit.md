@@ -112,9 +112,11 @@ rows in ClickHouse count as `active = 0`.
 | `worst_minute_active`       | minimum active-publisher count over open minutes                     |
 | `prolonged`                 | `True` if `longest_run_le_min_plus_1 >= --prolonged-threshold`       |
 
-`SKIPPED_DEPRECATED` and `NO_SCHEDULE` rows only populate `feed_id`,
-`symbol`, `session` (where applicable) and `classification` — no metrics
-columns.
+`SKIPPED_DEPRECATED` rows only populate `feed_id`, `symbol`, and
+`classification`. `NO_SCHEDULE` rows populate `feed_id`, `symbol`,
+`asset_type`, `session`, `effective_min_pub`, `allowed_count`,
+`static_margin`, and `classification` — only the per-minute metrics columns
+(open_minutes, minutes_below_min, etc.) are blank.
 
 ### Classification semantics
 
@@ -473,10 +475,10 @@ False` unconditionally — no candidate can ever clear Gate 2 for that
 - **`NO_SCHEDULE` rows never reach Stage 2.** Any session whose
   `marketSchedule` string is missing or fails to parse is classified
   `NO_SCHEDULE` in Stage 1 and is silently excluded from Stage 2's flagged
-  set (`iter_stable_sessions` only yields sessions where `schedule_str is
-not None`, and Stage 2 additionally requires it to be a resolvable
-  schedule when building its worklist). A `NO_SCHEDULE` feed needs its
-  config schedule fixed by hand before this pipeline can help it.
+  set (the filter `schedule_str is not None` lives in
+  `qualify_candidates.py`'s `main()` when building the worklist). A
+  `NO_SCHEDULE` feed needs its config schedule fixed by hand before this
+  pipeline can help it.
 - **The linter check can be `SKIPPED`, not just pass/fail.** `config_linter.py`
   was built for the old (feed-level `allowedPublisherIds`) config format —
   see the `New config format` gotcha below. Against a new-format config it
