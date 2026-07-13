@@ -14,6 +14,7 @@ env/
 
 # Output files
 *.csv
+*.csv.gz
 !price_id_list.csv
 quick_benchmark_results.csv
 backups/pre-perf-optimization
