@@ -129,6 +129,23 @@ def find_session_block(feed_block: str, session_name: str) -> tuple[int, int] | 
     return (pos, close_idx + 1)
 
 
+def find_metadata_block(block: str) -> tuple[int, int] | None:
+    """Locate the {…} value of the feed-level `metadata` object within
+    `block` (the raw text of a single feed object).
+
+    Returns (start, end) where start is the opening '{' and end is one
+    past the matching '}'. None if the field is absent.
+    """
+    match = re.search(r'"metadata"\s*:\s*\{', block)
+    if match is None:
+        return None
+    open_idx = match.end() - 1
+    close_idx = find_matching_close(block, open_idx)
+    if close_idx is None:
+        return None
+    return (open_idx, close_idx + 1)
+
+
 def find_publisher_array_span(block: str) -> tuple[int, int] | None:
     """Locate the [ … ] value of `allowedPublisherIds` within `block`.
 

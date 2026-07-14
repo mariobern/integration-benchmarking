@@ -130,6 +130,54 @@ class TestCli:
         assert result.returncode == 0
         assert "WARNING" in result.stdout or "warning" in result.stdout.lower()
 
+    def test_set_state_inactive_marks_description_deprecated(self, config_copy):
+        result = run_cli(
+            [
+                "--config",
+                str(config_copy),
+                "--set-state",
+                "INACTIVE",
+                "--feed-id",
+                "922",
+                "--apply",
+            ]
+        )
+        assert result.returncode == 0, result.stderr
+        data = json.loads(config_copy.read_text())
+        f = next(x for x in data["feeds"] if x["feedId"] == 922)
+        assert f["state"] == "INACTIVE"
+        assert f["metadata"]["description"] == "DEPRECATED FEED - APPLE INC / US DOLLAR"
+
+    def test_reactivation_round_trips_description(self, config_copy):
+        deactivate = run_cli(
+            [
+                "--config",
+                str(config_copy),
+                "--set-state",
+                "INACTIVE",
+                "--feed-id",
+                "922",
+                "--apply",
+            ]
+        )
+        assert deactivate.returncode == 0, deactivate.stderr
+        reactivate = run_cli(
+            [
+                "--config",
+                str(config_copy),
+                "--set-state",
+                "STABLE",
+                "--feed-id",
+                "922",
+                "--apply",
+            ]
+        )
+        assert reactivate.returncode == 0, reactivate.stderr
+        data = json.loads(config_copy.read_text())
+        f = next(x for x in data["feeds"] if x["feedId"] == 922)
+        assert f["state"] == "STABLE"
+        assert f["metadata"]["description"] == "APPLE INC / US DOLLAR"
+
     def test_yaml_spec(self, config_copy, tmp_path):
         spec = tmp_path / "spec.yaml"
         spec.write_text(

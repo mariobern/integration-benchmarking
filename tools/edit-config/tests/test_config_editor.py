@@ -628,6 +628,48 @@ class TestApplyChanges:
         assert f1["minPublishers"] == 2
         assert f100["minPublishers"] == 4
 
+    def test_metadata_description_change(self):
+        change = Change(
+            feed_id=922,
+            symbol="Equity.US.AAPL/USD",
+            location="metadata",
+            field="description",
+            before="APPLE INC / US DOLLAR",
+            after="DEPRECATED FEED - APPLE INC / US DOLLAR",
+        )
+        new_raw = apply_changes(self.raw, [change])
+        new_data = json.loads(new_raw)
+        f = next(x for x in new_data["feeds"] if x["feedId"] == 922)
+        assert f["metadata"]["description"] == "DEPRECATED FEED - APPLE INC / US DOLLAR"
+        # other feeds' descriptions untouched
+        f100 = next(x for x in new_data["feeds"] if x["feedId"] == 100)
+        assert f100["metadata"]["description"] == "EURO / US DOLLAR"
+
+    def test_state_and_description_together(self):
+        changes = [
+            Change(
+                feed_id=922,
+                symbol="Equity.US.AAPL/USD",
+                location="top_level",
+                field="state",
+                before="STABLE",
+                after="INACTIVE",
+            ),
+            Change(
+                feed_id=922,
+                symbol="Equity.US.AAPL/USD",
+                location="metadata",
+                field="description",
+                before="APPLE INC / US DOLLAR",
+                after="DEPRECATED FEED - APPLE INC / US DOLLAR",
+            ),
+        ]
+        new_raw = apply_changes(self.raw, changes)
+        new_data = json.loads(new_raw)
+        f = next(x for x in new_data["feeds"] if x["feedId"] == 922)
+        assert f["state"] == "INACTIVE"
+        assert f["metadata"]["description"] == "DEPRECATED FEED - APPLE INC / US DOLLAR"
+
     def test_empty_changes_is_identity(self):
         assert apply_changes(self.raw, []) == self.raw
 

@@ -5,6 +5,8 @@ feedId, symbol, and (optionally) session — far more useful than raw
 line numbers in a 3 MB file.
 """
 
+import json
+
 from edit_config_lib.config_ops import Change
 
 
@@ -14,7 +16,9 @@ def _format_publisher_list(ids: list[int]) -> str:
 
 def _hunk_header(change: Change) -> str:
     base = f"@@ feedId {change.feed_id} ({change.symbol})"
-    if change.location != "top_level":
+    if change.location == "metadata":
+        base += ", metadata"
+    elif change.location != "top_level":
         base += f", session {change.location}"
     return base + " @@"
 
@@ -57,6 +61,9 @@ def _value_lines(change: Change) -> tuple[str, str]:
     elif change.field == "state":
         b = f'      "state": "{change.before}",'
         a = f'      "state": "{change.after}",'
+    elif change.field == "description":
+        b = f'      "description": {json.dumps(change.before)},'
+        a = f'      "description": {json.dumps(change.after)},'
     else:
         b = f'      "{change.field}": {change.before!r},'
         a = f'      "{change.field}": {change.after!r},'

@@ -38,6 +38,7 @@
       ],
       "metadata": {
         "asset_type": "fx",
+        "description": "EURO / US DOLLAR",
         "name": "EURUSD",
         "symbol": "FX.EUR/USD"
       },
@@ -82,6 +83,7 @@
       ],
       "metadata": {
         "asset_type": "equity",
+        "description": "APPLE INC / US DOLLAR",
         "name": "AAPL",
         "symbol": "Equity.US.AAPL/USD"
       },
@@ -125,6 +127,7 @@
       ],
       "metadata": {
         "asset_type": "crypto",
+        "description": "NEW COIN / US DOLLAR",
         "name": "NEWCOIN",
         "symbol": "Crypto.NEW/USD"
       },
@@ -147,6 +150,7 @@
       ],
       "metadata": {
         "asset_type": "fx",
+        "description": "OLD PAIR / US DOLLAR",
         "name": "OLDPAIR",
         "symbol": "FX.OLD/USD"
       },

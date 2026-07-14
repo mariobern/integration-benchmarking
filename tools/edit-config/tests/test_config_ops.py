@@ -458,6 +458,63 @@ class TestSetState:
             op.apply(feed)
 
 
+class TestSetStateDeprecationPrefix:
+    """--set-state INACTIVE marks metadata.description as deprecated;
+    reactivating strips the mark."""
+
+    def test_deactivation_prefixes_description(self, feeds):
+        feed = feed_by_id(feeds, 922)
+        changes, _ = SetState(value="INACTIVE").apply(feed)
+        assert (
+            feed["metadata"]["description"] == "DEPRECATED FEED - APPLE INC / US DOLLAR"
+        )
+        desc = [c for c in changes if c.field == "description"]
+        assert len(desc) == 1
+        assert desc[0].location == "metadata"
+        assert desc[0].before == "APPLE INC / US DOLLAR"
+        assert desc[0].after == "DEPRECATED FEED - APPLE INC / US DOLLAR"
+        # state change still emitted, and first
+        assert changes[0].field == "state"
+
+    def test_deactivation_does_not_double_prefix(self, feeds):
+        feed = feed_by_id(feeds, 5000)  # COMING_SOON
+        feed["metadata"]["description"] = "DEPRECATED FEED - NEW COIN / US DOLLAR"
+        changes, _ = SetState(value="INACTIVE").apply(feed)
+        assert (
+            feed["metadata"]["description"] == "DEPRECATED FEED - NEW COIN / US DOLLAR"
+        )
+        assert [c.field for c in changes] == ["state"]
+
+    def test_deactivation_missing_description_warns(self, feeds):
+        feed = feed_by_id(feeds, 1)  # no metadata.description in fixture
+        changes, warns = SetState(value="INACTIVE").apply(feed)
+        assert feed["state"] == "INACTIVE"
+        assert [c.field for c in changes] == ["state"]
+        assert any("description" in w.message for w in warns)
+
+    def test_reactivation_strips_prefix(self, feeds):
+        feed = feed_by_id(feeds, 6000)  # INACTIVE
+        feed["metadata"]["description"] = "DEPRECATED FEED - OLD PAIR / US DOLLAR"
+        changes, _ = SetState(value="STABLE").apply(feed)
+        assert feed["metadata"]["description"] == "OLD PAIR / US DOLLAR"
+        desc = [c for c in changes if c.field == "description"]
+        assert len(desc) == 1
+        assert desc[0].location == "metadata"
+
+    def test_reactivation_without_prefix_leaves_description(self, feeds):
+        feed = feed_by_id(feeds, 6000)  # INACTIVE, unprefixed description
+        changes, _ = SetState(value="STABLE").apply(feed)
+        assert feed["metadata"]["description"] == "OLD PAIR / US DOLLAR"
+        assert [c.field for c in changes] == ["state"]
+
+    def test_downgrade_to_coming_soon_also_strips(self, feeds):
+        feed = feed_by_id(feeds, 100)  # STABLE
+        feed["metadata"]["description"] = "DEPRECATED FEED - EURO / US DOLLAR"
+        changes, _ = SetState(value="COMING_SOON").apply(feed)
+        assert feed["metadata"]["description"] == "EURO / US DOLLAR"
+        assert {c.field for c in changes} == {"state", "description"}
+
+
 # ---------------------------------------------------------------------------
 # SetRicMapping
 # ---------------------------------------------------------------------------
