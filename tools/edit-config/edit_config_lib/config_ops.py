@@ -938,6 +938,8 @@ _STATE_WARNINGS = {
     ("INACTIVE", "STABLE"): "reactivation of INACTIVE feed — verify intent",
 }
 
+DEPRECATION_PREFIX = "DEPRECATED FEED - "
+
 
 @dataclass
 class SetState:
@@ -975,6 +977,40 @@ class SetState:
                     feed_id=feed_id,
                     symbol=symbol,
                     message=f"feed {feed_id}: {msg}",
+                )
+            )
+
+        # Deactivation marks metadata.description as deprecated;
+        # any other target state removes the mark.
+        metadata = feed.get("metadata") or {}
+        desc = metadata.get("description")
+        new_desc = None
+        if self.value == "INACTIVE":
+            if desc is None:
+                warnings.append(
+                    Warning(
+                        feed_id=feed_id,
+                        symbol=symbol,
+                        message=(
+                            f"feed {feed_id}: no metadata.description to mark "
+                            f"as DEPRECATED"
+                        ),
+                    )
+                )
+            elif not desc.startswith(DEPRECATION_PREFIX):
+                new_desc = DEPRECATION_PREFIX + desc
+        elif desc is not None and desc.startswith(DEPRECATION_PREFIX):
+            new_desc = desc[len(DEPRECATION_PREFIX) :]
+        if new_desc is not None:
+            metadata["description"] = new_desc
+            changes.append(
+                Change(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    location="metadata",
+                    field="description",
+                    before=desc,
+                    after=new_desc,
                 )
             )
         return changes, warnings

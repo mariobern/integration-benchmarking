@@ -59,6 +59,20 @@ class TestRenderDiff:
         assert '"state": "STABLE"' in out
         assert '"state": "COMING_SOON"' in out
 
+    def test_description_field_renders_quoted_with_metadata_header(self):
+        change = Change(
+            feed_id=922,
+            symbol="Equity.US.AAPL/USD",
+            location="metadata",
+            field="description",
+            before="APPLE INC / US DOLLAR",
+            after="DEPRECATED FEED - APPLE INC / US DOLLAR",
+        )
+        out = render_diff([change])
+        assert "@@ feedId 922 (Equity.US.AAPL/USD), metadata @@" in out
+        assert '"description": "APPLE INC / US DOLLAR"' in out
+        assert '"description": "DEPRECATED FEED - APPLE INC / US DOLLAR"' in out
+
     def test_truncation(self):
         changes = [
             Change(

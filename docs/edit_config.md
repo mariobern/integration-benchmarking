@@ -42,7 +42,7 @@ python3 tools/edit-config/edit_config.py --config lazer_update.json [OPERATION] 
 | `--remove-publisher INT`                    | Remove publisher from session `allowedPublisherIds` list                   |
 | `--set-min-publishers INT`                  | Set `minPublishers` to a value                                             |
 | `--bump-min-publishers ±INT`                | Adjust `minPublishers` by signed delta (clamped at 1)                      |
-| `--set-state STABLE\|COMING_SOON\|INACTIVE` | Change feed state                                                          |
+| `--set-state STABLE\|COMING_SOON\|INACTIVE` | Change feed state (INACTIVE also marks the description as deprecated)      |
 | `--add-exchange-id N`                       | Assign exchange `N` and strip inherited `marketSchedule` strings           |
 | `--remove-exchange-id`                      | Remove `exchangeId` and restore `marketSchedule` strings from the exchange |
 | `--set-ric-mapping --from-csv PATH`         | Fill empty `datascope_ric.identifier` values                               |
@@ -240,6 +240,29 @@ operations:
   - op: remove_ric
     feed_id: "884,885"
 ```
+
+## State changes and the deprecation mark (`--set-state`)
+
+Setting a feed to `INACTIVE` also prepends `DEPRECATED FEED - ` to the feed's
+`metadata.description`, so the deprecation is visible anywhere the description
+is displayed:
+
+```bash
+python3 tools/edit-config/edit_config.py --config lazer_update.json \
+    --set-state INACTIVE --feed-id 922 --apply
+# "APPLE INC / US DOLLAR" -> "DEPRECATED FEED - APPLE INC / US DOLLAR"
+```
+
+Rules:
+
+- The prefix is added once — a description that already starts with
+  `DEPRECATED FEED - ` is left untouched.
+- Setting the state back to `STABLE` or `COMING_SOON` strips the prefix, so a
+  deactivate/reactivate round-trip restores the original description.
+- A feed with no `metadata.description` still changes state; a warning notes
+  that there was no description to mark.
+- Both edits show as separate hunks in the dry-run diff (the description hunk
+  is labelled `metadata`).
 
 ## YAML spec format
 

@@ -488,6 +488,7 @@ from collections import defaultdict
 from edit_config_lib.config_text_surgery import (
     find_feed_block,
     find_session_block,
+    find_metadata_block,
     find_publisher_array_span,
     find_int_field_span,
     find_string_field_span,
@@ -539,6 +540,19 @@ def _apply_one_change(block: str, change: Change) -> str:
             )
         start, end, _current = ric_spans[change.index]
         return block[:start] + f'"{change.after}"' + block[end:]
+
+    if change.location == "metadata":
+        if change.field != "description":
+            raise RuntimeError(f"unsupported metadata field {change.field!r}")
+        mb = find_metadata_block(block)
+        if mb is None:
+            raise RuntimeError("metadata block not found in feed block")
+        mblock = block[mb[0] : mb[1]]
+        span = find_string_field_span(mblock, "description")
+        if span is None:
+            raise RuntimeError("metadata.description not found in feed block")
+        new_mblock = mblock[: span[0]] + json.dumps(change.after) + mblock[span[1] :]
+        return block[: mb[0]] + new_mblock + block[mb[1] :]
 
     if change.location == "top_level":
         if change.field == "state":
