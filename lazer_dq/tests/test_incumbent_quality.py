@@ -11,6 +11,7 @@ from lazer_dq.incumbent_quality import (
     ensure_new_format,
     load_audit_classifications,
     parse_args,
+    prune_orphan_rows,
     resume_done_feed_ids,
     summarize_session,
     verdict_from_engine,
@@ -179,6 +180,27 @@ def test_resume_done_feed_ids(tmp_path):
     assert resume_done_feed_ids(p) == set()
     p.write_text("feed_id,symbol\n1,X\n1,X\n7,Y\n")
     assert resume_done_feed_ids(p) == {1, 7}
+
+
+def test_resume_done_feed_ids_empty_file_returns_empty_set(tmp_path):
+    p = tmp_path / "incumbent_quality_summary.csv"
+    p.touch()  # 0-byte file, e.g. crash before the first feed completed
+    assert resume_done_feed_ids(p) == set()
+
+
+def test_prune_orphan_rows(tmp_path):
+    p = tmp_path / "incumbent_report.csv"
+    p.write_text("feed_id,publisher_id\n1,10\n2,20\n,99\n")
+    dropped = prune_orphan_rows(p, {1})
+    assert dropped == 1
+    remaining = pd.read_csv(p)
+    assert len(remaining) == 2
+    assert 1 in set(remaining["feed_id"].dropna().astype(int))
+    assert 2 not in set(remaining["feed_id"].dropna().astype(int))
+    assert remaining["feed_id"].isna().sum() == 1  # blank feed_id row kept
+
+    missing = tmp_path / "does_not_exist.csv"
+    assert prune_orphan_rows(missing, {1}) == 0
 
 
 def test_parse_args_defaults():

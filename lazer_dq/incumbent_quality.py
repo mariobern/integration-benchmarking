@@ -175,7 +175,40 @@ def load_audit_classifications(path) -> dict:
 def resume_done_feed_ids(summary_path: Path) -> set:
     if not Path(summary_path).exists():
         return set()
-    return set(pd.read_csv(summary_path, usecols=["feed_id"])["feed_id"].astype(int))
+    try:
+        df = pd.read_csv(summary_path, usecols=["feed_id"])
+    except pd.errors.EmptyDataError:
+        return set()
+    return set(df["feed_id"].astype(int))
+
+
+def prune_orphan_rows(path: Path, done_feed_ids: set) -> int:
+    """Drop rows from an existing CSV whose feed_id is not in done_feed_ids.
+
+    Rows with a blank/non-numeric feed_id are kept defensively. Rewrites the
+    file in place. Missing or empty file is a no-op returning 0.
+    """
+    path = Path(path)
+    if not path.exists():
+        return 0
+    try:
+        df = pd.read_csv(path)
+    except pd.errors.EmptyDataError:
+        return 0
+    if df.empty or "feed_id" not in df.columns:
+        return 0
+
+    def _keep(value) -> bool:
+        try:
+            return int(value) in done_feed_ids
+        except (TypeError, ValueError):
+            return True  # blank/non-numeric feed_id: keep defensively
+
+    keep_mask = df["feed_id"].map(_keep)
+    dropped = int((~keep_mask).sum())
+    if dropped:
+        df.loc[keep_mask].to_csv(path, index=False)
+    return dropped
 
 
 def parse_args(argv=None):
@@ -465,7 +498,14 @@ def main(argv=None) -> int:
 
     from lib.config import ThreadLocalClients, load_config
 
-    new_file = not (args.resume and summary_path.exists())
+    resuming = args.resume and summary_path.exists()
+    if resuming:
+        for path in (report_path, flagged_path):
+            n_pruned = prune_orphan_rows(path, done)
+            if n_pruned:
+                print(f"Resume: pruned {n_pruned} orphan rows from {path}")
+
+    new_file = not resuming
     file_mode = "w" if new_file else "a"
     report_f = open(report_path, file_mode, newline="")
     summary_f = open(summary_path, file_mode, newline="")
@@ -482,6 +522,8 @@ def main(argv=None) -> int:
     if new_file:
         for w in (report_w, summary_w, flagged_w):
             w.writeheader()
+        for f in (report_f, summary_f, flagged_f):
+            f.flush()
 
     write_lock = threading.Lock()
     failures = 0
@@ -516,8 +558,16 @@ def main(argv=None) -> int:
                     report_w.writerows(report_rows)
                     summary_w.writerows(summary_rows)
                     flagged_w.writerows(flagged_rows)
-                    for f in (report_f, summary_f, flagged_f):
-                        f.flush()
+                    # Flush order is intentional: summary is the resume marker
+                    # (resume_done_feed_ids reads it), so it must be made
+                    # durable last. A crash between report/flagged flush and
+                    # summary flush leaves orphan report/flagged rows for a
+                    # feed --resume will safely re-sweep and prune next run;
+                    # the reverse order could mark a feed done whose report
+                    # rows never landed.
+                    report_f.flush()
+                    flagged_f.flush()
+                    summary_f.flush()
                 n_fail = sum(r["n_fail"] for r in summary_rows)
                 print(
                     f"  [{i}/{len(todo)}] feed {fid}: "
