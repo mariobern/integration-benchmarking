@@ -199,3 +199,338 @@ def parse_args(argv=None):
     p.add_argument("--output-dir", default="output_csv")
     p.add_argument("--publishers-md", default="publishers.md")
     return p.parse_args(argv)
+
+
+def _score_engine(rows, fs, mode, args):
+    """Datascope path: one engine run per feed/date serves every publisher."""
+    stats, used_date = None, None
+    for date in candidate_dates(args.start_utc, args.end_utc):
+        if run_engine(fs.feed_id, date, mode, args.cluster, args.reports_dir) == "ok":
+            stats = load_stats(args.reports_dir, args.cluster, mode, fs.feed_id, date)
+            if stats:
+                used_date = date
+                break
+    if not stats:
+        for row in rows:
+            row.update({"verdict": "NO_BENCHMARK", "reason": "no_engine_data"})
+        return
+    stats_by_pid = {}
+    for r in stats:
+        try:
+            stats_by_pid[int(float(r["publisher_id"]))] = r
+        except (KeyError, ValueError):
+            continue
+    for row in rows:
+        srow = stats_by_pid.get(row["publisher_id"])
+        verdict, reason = verdict_from_engine(srow, mode, args.min_obs)
+        row["benchmark_date"] = used_date
+        if srow is not None:
+            row.update(
+                {
+                    "rmse_over_spread": srow.get("rmse_over_spread", ""),
+                    "hit_rate": srow.get("hit_rate_0.1pct", ""),
+                    "nrmse": srow.get("nrmse", ""),
+                    "n_obs": srow.get("n_observations", ""),
+                }
+            )
+        row.update({"verdict": verdict, "reason": reason})
+
+
+def _score_peer(client, rows, fs, mask, thresholds, args):
+    """Peer path: each publisher vs the price_feeds aggregate."""
+    window = peer_windows(mask, args.peer_days)
+    if window is None:
+        for row in rows:
+            row.update({"verdict": "NO_BENCHMARK", "reason": "no_open_minutes"})
+        return
+    pstart, pend = window
+    agg_df = restrict_to_mask(fetch_aggregate(client, fs.feed_id, pstart, pend), mask)
+    if agg_df.empty:
+        for row in rows:
+            row.update({"verdict": "NO_BENCHMARK", "reason": "no_aggregate_data"})
+        return
+    pids = [row["publisher_id"] for row in rows]
+    if pids:
+        pub_all = client.query_df(
+            PER_SECOND_PRICES_QUERY,
+            parameters={
+                "feed_id": fs.feed_id,
+                "start": pstart,
+                "end": pend,
+                "publisher_ids": pids,
+            },
+        )
+        pub_all = restrict_to_mask(pub_all, mask)
+    else:
+        pub_all = pd.DataFrame(columns=["ts", "publisher_id", "price"])
+    for row in rows:
+        if len(pub_all):
+            pub_df = pub_all[pub_all["publisher_id"] == row["publisher_id"]][
+                ["ts", "price"]
+            ]
+        else:
+            pub_df = pd.DataFrame(columns=["ts", "price"])
+        result = evaluate_peer(pub_df, agg_df[["ts", "price"]], thresholds)
+        verdict, reason = verdict_from_peer(result)
+        row.update(
+            {
+                "benchmark_date": f"{pstart}..{pend}",
+                "nrmse": round(result["nrmse"], 6)
+                if result["nrmse"] == result["nrmse"]
+                else "",
+                "hit_rate": round(result["hit_rate_pct"], 2)
+                if result["hit_rate_pct"] == result["hit_rate_pct"]
+                else "",
+                "n_obs": result["n_observations"],
+                "verdict": verdict,
+                "reason": reason,
+            }
+        )
+
+
+def _skip_session(base, fs, reason, detail):
+    summary = {
+        **base,
+        "quality_path": "none",
+        "n_incumbents": len(fs.allowed),
+        "n_pass": 0,
+        "n_fail": 0,
+        "n_no_data": 0,
+        "n_no_benchmark": 0,
+        "all_pass": False,
+        "n_candidates": 0,
+        "n_candidates_pass": 0,
+    }
+    flagged = {
+        **base,
+        "publisher_id": "",
+        "publisher_role": "",
+        "verdict": "",
+        "reason": reason,
+        "detail": detail,
+    }
+    return summary, flagged
+
+
+def evaluate_feed(client, fs_list, args, excluded, production_pubs):
+    """Sweep all sessions of one feed. Returns (report, summary, flagged) row lists."""
+    feed_id = fs_list[0].feed_id
+    start_s = args.start_utc.strftime("%Y-%m-%d %H:%M:%S")
+    end_s = args.end_utc.strftime("%Y-%m-%d %H:%M:%S")
+    matrix = client.query_df(
+        ACTIVITY_QUERY,
+        parameters={"feed_id": feed_id, "start": start_s, "end": end_s},
+    )
+    if len(matrix):
+        matrix["minute"] = pd.to_datetime(matrix["minute"], utc=True)
+    else:
+        matrix = pd.DataFrame(columns=["minute", "publisher_id", "n_updates"])
+    matrix_pubs = set(matrix["publisher_id"].astype(int)) if len(matrix) else set()
+
+    thresholds = PeerThresholds(
+        nrmse_auto=args.peer_nrmse_auto,
+        nrmse_cond=args.peer_nrmse_cond,
+        min_hit_rate_pct=args.peer_hit_rate,
+        min_obs=args.min_obs,
+    )
+    report_rows, summary_rows, flagged_rows = [], [], []
+
+    for fs in fs_list:
+        base = {
+            "feed_id": fs.feed_id,
+            "symbol": fs.symbol,
+            "session": fs.session,
+            "asset_type": fs.asset_type,
+        }
+        if fs.schedule_str is None:
+            s, f = _skip_session(
+                base, fs, "no_schedule", "market schedule unresolvable"
+            )
+            summary_rows.append(s)
+            flagged_rows.append(f)
+            continue
+        try:
+            schedule = parse_market_schedule(fs.schedule_str)
+        except ValueError:
+            s, f = _skip_session(base, fs, "no_schedule", "market schedule unparsable")
+            summary_rows.append(s)
+            flagged_rows.append(f)
+            continue
+        mask = open_minutes_mask(schedule, args.start_utc, args.end_utc)
+
+        pubs = [("incumbent", pid) for pid in sorted(fs.allowed)]
+        if args.include_candidates:
+            pubs += [
+                ("candidate", pid)
+                for pid in discover_candidates(
+                    matrix_pubs, production_pubs, fs.allowed, excluded
+                )
+            ]
+        mode = engine_mode_for(fs)
+        quality_path = "engine" if mode else "peer"
+        rows = [
+            {
+                **base,
+                "publisher_id": pid,
+                "publisher_role": role,
+                "quality_path": quality_path,
+                "engine_mode": mode or "",
+                "benchmark_date": "",
+                "activity_pct": round(activity_pct(matrix, mask, pid), 4),
+                "rmse_over_spread": "",
+                "hit_rate": "",
+                "nrmse": "",
+                "n_obs": "",
+            }
+            for role, pid in pubs
+        ]
+        if mode:
+            _score_engine(rows, fs, mode, args)
+        else:
+            _score_peer(client, rows, fs, mask, thresholds, args)
+
+        report_rows.extend(rows)
+        summary_rows.append(
+            {**base, "quality_path": quality_path, **summarize_session(rows)}
+        )
+        for row in rows:
+            failing_incumbent = (
+                row["publisher_role"] == "incumbent" and row["verdict"] != "PASS"
+            )
+            failing_candidate = (
+                row["publisher_role"] == "candidate" and row["verdict"] == "FAIL"
+            )
+            if failing_incumbent or failing_candidate:
+                flagged_rows.append(
+                    {
+                        **{
+                            k: row[k]
+                            for k in (
+                                "feed_id",
+                                "symbol",
+                                "session",
+                                "publisher_id",
+                                "publisher_role",
+                                "verdict",
+                                "reason",
+                            )
+                        },
+                        "detail": (
+                            f"activity={row['activity_pct']}, nrmse={row['nrmse']}, "
+                            f"hit={row['hit_rate']}, n_obs={row['n_obs']}"
+                        ),
+                    }
+                )
+    return report_rows, summary_rows, flagged_rows
+
+
+def main(argv=None) -> int:
+    args = parse_args(argv)
+    args.start_utc = datetime.strptime(args.start_date, "%Y-%m-%d").replace(
+        tzinfo=timezone.utc
+    )
+    args.end_utc = datetime.strptime(args.end_date, "%Y-%m-%d").replace(
+        tzinfo=timezone.utc
+    )
+
+    config = json.loads(Path(args.config).read_text())
+    ensure_new_format(config)
+
+    audit_cls = load_audit_classifications(args.audit_csv) if args.audit_csv else {}
+    excluded = load_excluded_publishers(args.publishers_md) | set(
+        args.exclude_publisher
+    )
+
+    by_feed = {}
+    for fs in iter_stable_sessions(config):
+        if args.feed_id and fs.feed_id not in args.feed_id:
+            continue
+        by_feed.setdefault(fs.feed_id, []).append(fs)
+
+    out_dir = Path(args.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    report_path = out_dir / "incumbent_report.csv"
+    summary_path = out_dir / "incumbent_quality_summary.csv"
+    flagged_path = out_dir / "flagged_incumbents.csv"
+
+    done = resume_done_feed_ids(summary_path) if args.resume else set()
+    if done:
+        print(f"Resume: skipping {len(done)} already-swept feeds")
+    todo = {fid: fss for fid, fss in by_feed.items() if fid not in done}
+    print(
+        f"Sweeping {len(todo)} feeds "
+        f"({args.start_utc:%Y-%m-%d} .. {args.end_utc:%Y-%m-%d}, "
+        f"candidates={'on' if args.include_candidates else 'off'})"
+    )
+
+    from lib.config import ThreadLocalClients, load_config
+
+    new_file = not (args.resume and summary_path.exists())
+    file_mode = "w" if new_file else "a"
+    report_f = open(report_path, file_mode, newline="")
+    summary_f = open(summary_path, file_mode, newline="")
+    flagged_f = open(flagged_path, file_mode, newline="")
+    report_w = csv.DictWriter(
+        report_f, fieldnames=REPORT_COLUMNS, extrasaction="ignore"
+    )
+    summary_w = csv.DictWriter(
+        summary_f, fieldnames=SUMMARY_COLUMNS, extrasaction="ignore"
+    )
+    flagged_w = csv.DictWriter(
+        flagged_f, fieldnames=FLAGGED_COLUMNS, extrasaction="ignore"
+    )
+    if new_file:
+        for w in (report_w, summary_w, flagged_w):
+            w.writeheader()
+
+    write_lock = threading.Lock()
+    failures = 0
+    with ThreadLocalClients(load_config(), lazer_only=True) as pool:
+        production_pubs = (
+            fetch_production_publisher_ids(pool.get_lazer_client())
+            if args.include_candidates
+            else set()
+        )
+        if args.include_candidates:
+            print(f"{len(production_pubs)} production-key publishers")
+
+        def run_one(fss):
+            client = pool.get_lazer_client()
+            return evaluate_feed(client, fss, args, excluded, production_pubs)
+
+        with ThreadPoolExecutor(max_workers=args.workers) as executor:
+            futures = {executor.submit(run_one, fss): fid for fid, fss in todo.items()}
+            for i, future in enumerate(as_completed(futures), 1):
+                fid = futures[future]
+                try:
+                    report_rows, summary_rows, flagged_rows = future.result()
+                except Exception as e:  # soft-fail per feed (bulk-runner pattern)
+                    failures += 1
+                    print(f"  [{i}/{len(todo)}] feed {fid} FAILED: {e}")
+                    continue
+                for row in summary_rows:
+                    row["audit_classification"] = audit_cls.get(
+                        (row["feed_id"], row["session"]), ""
+                    )
+                with write_lock:
+                    report_w.writerows(report_rows)
+                    summary_w.writerows(summary_rows)
+                    flagged_w.writerows(flagged_rows)
+                    for f in (report_f, summary_f, flagged_f):
+                        f.flush()
+                n_fail = sum(r["n_fail"] for r in summary_rows)
+                print(
+                    f"  [{i}/{len(todo)}] feed {fid}: "
+                    f"{len(report_rows)} publishers, {n_fail} failing incumbents"
+                )
+    for f in (report_f, summary_f, flagged_f):
+        f.close()
+    print(
+        f"Done ({failures} feed failures) -> "
+        f"{report_path}, {summary_path}, {flagged_path}"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
