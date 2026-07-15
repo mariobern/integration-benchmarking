@@ -4,8 +4,10 @@
 
 Measure the price quality of every incumbent (currently-allowed) publisher on
 every session of every STABLE feed in a Lazer config — the population the
-min_pub pipeline never benchmarks (its quality gate only scores _candidate_
-publishers on WARN/CRITICAL feed-sessions).
+min*pub pipeline never benchmarks (its quality gate only scores \_candidate*
+publishers on WARN/CRITICAL feed-sessions). With `--include-candidates`, the
+same sweep also scores candidate (non-allowed) publishers on every
+feed-session, with identical thresholds.
 
 ## Deliverables
 
@@ -31,25 +33,40 @@ Branch: `feat/incumbent-quality` (off `main`).
   import (option A), not an `--incumbents` flag on the existing script and
   not the older `lib/publisher_eval` stack (whose metrics would not be
   comparable with candidate-qualification results).
+- **Candidates behind a flag**: `--include-candidates` (default off) extends
+  the sweep to non-allowed publishers. Always-on was rejected (future
+  incumbent-only sweeps shouldn't pay candidate-discovery cost);
+  incumbents-only was rejected (candidate scores on OK/WARN feeds are a
+  ready-made bench for future additions). The first production run uses the
+  flag.
 
 ## Data flow
 
 For each `FeedSession` from `iter_stable_sessions(config)` (new-format,
 session-only configs — same contract as the rest of `lazer_dq`):
 
-1. **Incumbents** = the session entry's `allowedPublisherIds`.
+1. **Incumbents** = the session entry's `allowedPublisherIds`. With
+   `--include-candidates`, **candidates** = production-key publishers (via
+   `fetch_production_publisher_ids`) with submissions to the feed in the
+   window that are NOT in `allowedPublisherIds` — the same discovery rule as
+   `qualify_candidates`. Every evaluated publisher carries a
+   `publisher_role` of `incumbent` or `candidate`.
 2. **Quality path** picks itself per feed-session, identical to
    qualification:
    - **Datascope path** — when `engine_mode_for(fs)` resolves a mode: run the
      DQ engine (`run_engine`, i.e. `evaluate_feed_standalone`) once per
      feed/date over `candidate_dates(start, end)`; the engine emits
-     per-publisher stats; gate each incumbent with `engine_gate(stats_row,
-mode, min_obs)`.
+     per-publisher stats for EVERY publisher that submitted (this is how
+     qualification scored non-allowed candidates), so one engine run serves
+     both roles; gate each publisher with `engine_gate(stats_row, mode,
+min_obs)`.
    - **Peer path** — everything else (crypto, redemption rates, NAV, funding
-     rates, …): fetch the incumbent's per-second ACCEPTED prices and the
-     `price_feeds` aggregate (`fetch_aggregate`), restrict to the session's
-     open-minutes mask, score with `peer_benchmark.evaluate_peer` using the
-     same `PeerThresholds` as qualification.
+     rates, …): fetch the publisher's per-second prices (incumbents:
+     `ACCEPTED`; candidates: `ACCEPTED` + `UNAUTHORIZED`-rejected, as in
+     qualification) and the `price_feeds` aggregate (`fetch_aggregate`),
+     restrict to the session's open-minutes mask, score with
+     `peer_benchmark.evaluate_peer` using the same `PeerThresholds` as
+     qualification.
 3. **Activity** — each incumbent also gets `activity_pct` over the session's
    open minutes (context only, NOT a gate; publisher presence is the min_pub
    audit's job).
@@ -66,11 +83,11 @@ unchanged (its tests must still pass).
 
 ## Outputs (written to `--output-dir`, default `output_csv/`)
 
-| File                            | Grain                            | Contents                                                                                                                                                                 |
-| ------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `incumbent_report.csv`          | publisher × feed-session         | feed_id, symbol, session, publisher_id, quality_path (engine/peer), engine_mode, activity_pct, rmse_over_spread, hit_rate, nrmse, n_obs, verdict                         |
-| `incumbent_quality_summary.csv` | feed-session                     | feed_id, symbol, session, asset_type, quality_path, n_incumbents, n_pass, n_fail, n_no_data, n_no_benchmark, all_pass, audit_classification (blank unless `--audit-csv`) |
-| `flagged_incumbents.csv`        | failing publisher × feed-session | feed_id, symbol, session, publisher_id, verdict, reason, detail                                                                                                          |
+| File                            | Grain                            | Contents                                                                                                                                                                                                  |
+| ------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `incumbent_report.csv`          | publisher × feed-session         | feed_id, symbol, session, publisher_id, publisher_role (incumbent/candidate), quality_path (engine/peer), engine_mode, activity_pct, rmse_over_spread, hit_rate, nrmse, n_obs, verdict                    |
+| `incumbent_quality_summary.csv` | feed-session                     | feed_id, symbol, session, asset_type, quality_path, n_incumbents, n_pass, n_fail, n_no_data, n_no_benchmark, all_pass, n_candidates, n_candidates_pass, audit_classification (blank unless `--audit-csv`) |
+| `flagged_incumbents.csv`        | failing publisher × feed-session | feed_id, symbol, session, publisher_id, publisher_role, verdict, reason, detail (incumbents only unless `--include-candidates`; failing candidates included when the flag is on)                          |
 
 `--audit-csv <min_pub_audit CSV>` joins the Stage-1 min_pub classification
 onto summary rows by (feed_id, session), so "OK feeds with failing
@@ -82,6 +99,7 @@ incumbents" — the headline question — falls straight out of the summary.
 python3 -m lazer_dq.incumbent_quality \
     --config lazer_new.json \
     --start-date 2026-07-08 --end-date 2026-07-15 \
+    [--include-candidates] \
     [--workers 8] [--feed-id ...] [--resume] \
     [--peer-days N] [--audit-csv output_csv/min_pub_audit_X.csv] \
     [--output-dir output_csv]
@@ -110,9 +128,10 @@ python3 -m lazer_dq.incumbent_quality \
 ## Testing
 
 - Pytest units (no ClickHouse), matching existing `tests/` style for
-  lazer_dq: incumbent enumeration from config fixtures, verdict mapping
-  (PASS/FAIL/NO_DATA/NO_BENCHMARK), summary rollup arithmetic, resume-key
-  filtering, audit-CSV join, old-format config rejection.
+  lazer_dq: incumbent enumeration from config fixtures, candidate discovery
+  (allowed-list exclusion + production-key filter), verdict mapping
+  (PASS/FAIL/NO_DATA/NO_BENCHMARK), summary rollup arithmetic (both roles),
+  resume-key filtering, audit-CSV join, old-format config rejection.
 - Existing suite must stay green (especially `qualify_candidates` tests,
   since shared helpers may move).
 - Live smoke before the production run: ~3 hand-picked feeds — one Datascope
@@ -121,16 +140,20 @@ python3 -m lazer_dq.incumbent_quality \
 
 ## First run & report
 
-- Full sweep of `lazer_new.json` over a recent 7-day window (multi-hour,
-  `--workers 8+`, resumable).
-- `docs/incumbent_quality_report_<run-date>.md`: pass rates by asset type
-  and quality path; the OK-feeds-with-failing-incumbents table (via
-  `--audit-csv` join); NO_DATA / NO_BENCHMARK inventory; caveats
-  (peer-path circularity, engine soft-skips, flat-reference feeds).
+- Full sweep of `lazer_new.json` over a recent 7-day window with
+  `--include-candidates` (multi-hour, `--workers 8+`, resumable).
+- `docs/incumbent_quality_report_<run-date>.md`: pass rates by asset type,
+  quality path, and publisher role; the OK-feeds-with-failing-incumbents
+  table (via `--audit-csv` join); passing-candidate bench per feed;
+  NO_DATA / NO_BENCHMARK inventory; caveats (peer-path circularity, engine
+  soft-skips, flat-reference feeds).
 
 ## Out of scope
 
 - Leave-one-out / peer-median methodology (rejected during brainstorming).
+- Candidate _selection_ and remediation-spec generation — this tool measures
+  both roles but never applies gate-1 activity filtering or picks
+  publishers to add; that remains `qualify_candidates`' job.
 - Changing minPublishers, publisher lists, or any config mutation — this
   stage only measures.
 - Uptime / presence auditing (min_pub audit owns that).
