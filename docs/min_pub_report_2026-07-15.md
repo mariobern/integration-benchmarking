@@ -56,6 +56,23 @@ Known caveats:
 
 ## 3. Audit results (Stage 1)
 
+**What the classifications mean.** For every open minute of a feed-session,
+the audit counts the distinct currently-allowed publishers with at least one
+`ACCEPTED` update in that minute ("active"); a minute with no data counts as 0. The classification is the worst margin observed vs the feed's effective
+minPublishers across the whole window:
+
+| Classification | Definition                                                                             | Interpretation                                                                                                                                       |
+| -------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CRITICAL**   | At least one open minute with active publishers **at or below** minPublishers          | The feed ran with zero margin (at min) or was already under-published (below min); losing one more publisher stalls — or has stalled — the aggregate |
+| **WARN**       | Never at/below minPublishers, but at least one minute at **exactly minPublishers + 1** | Margin of a single publisher at the worst minute — one publisher outage away from CRITICAL                                                           |
+| **OK**         | Every open minute had **at least minPublishers + 2** active publishers                 | Margin of two or more publishers at all times                                                                                                        |
+
+Independently of the classification, a row is marked **prolonged** when its
+longest consecutive run of minutes at ≤ minPublishers + 1 lasted 30 minutes
+or more (`--prolonged-threshold` default) — a structural gap rather than a
+transient dip. (A fourth value, `NO_SCHEDULE`, is emitted for sessions whose
+market schedule cannot be resolved; none occurred in this run.)
+
 Classification by asset type (feed-sessions, sorted by non-OK count):
 
 | Asset type             | OK   | WARN | CRITICAL | Total |
