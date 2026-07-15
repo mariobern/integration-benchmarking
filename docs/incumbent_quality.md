@@ -32,12 +32,12 @@ multi-hour; run with `--resume` so restarts are cheap.
 
 ## Verdicts
 
-| Verdict        | Meaning                                                                                                                   |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `PASS`         | Met the quality gate for the feed's path                                                                                  |
-| `FAIL`         | Enough data, failed the gate                                                                                              |
-| `NO_DATA`      | No (or too few) observations for this publisher in the window (`reason`: no_submissions, insufficient_obs, no_engine_row) |
-| `NO_BENCHMARK` | The reference itself was unavailable (`reason`: no_engine_data, no_aggregate_data, zero_range, no_open_minutes)           |
+| Verdict        | Meaning                                                                                                                                  |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `PASS`         | Met the quality gate for the feed's path                                                                                                 |
+| `FAIL`         | Enough data, failed the gate                                                                                                             |
+| `NO_DATA`      | No (or too few) observations for this publisher in the window (`reason`: no_submissions, insufficient_obs, no_engine_row, bad_stats_row) |
+| `NO_BENCHMARK` | The reference itself was unavailable (`reason`: no_engine_data, no_aggregate_data, zero_range, no_open_minutes)                          |
 
 ## Outputs (in `--output-dir`, default `output_csv/`)
 
