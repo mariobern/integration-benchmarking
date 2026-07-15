@@ -83,11 +83,11 @@ unchanged (its tests must still pass).
 
 ## Outputs (written to `--output-dir`, default `output_csv/`)
 
-| File                            | Grain                            | Contents                                                                                                                                                                                                  |
-| ------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `incumbent_report.csv`          | publisher × feed-session         | feed_id, symbol, session, publisher_id, publisher_role (incumbent/candidate), quality_path (engine/peer), engine_mode, activity_pct, rmse_over_spread, hit_rate, nrmse, n_obs, verdict                    |
-| `incumbent_quality_summary.csv` | feed-session                     | feed_id, symbol, session, asset_type, quality_path, n_incumbents, n_pass, n_fail, n_no_data, n_no_benchmark, all_pass, n_candidates, n_candidates_pass, audit_classification (blank unless `--audit-csv`) |
-| `flagged_incumbents.csv`        | failing publisher × feed-session | feed_id, symbol, session, publisher_id, publisher_role, verdict, reason, detail (incumbents only unless `--include-candidates`; failing candidates included when the flag is on)                          |
+| File                            | Grain                            | Contents                                                                                                                                                                                                       |
+| ------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `incumbent_report.csv`          | publisher × feed-session         | feed_id, symbol, session, publisher_id, publisher_role (incumbent/candidate), quality_path (engine/peer), engine_mode, benchmark_date, activity_pct, rmse_over_spread, hit_rate, nrmse, n_obs, verdict, reason |
+| `incumbent_quality_summary.csv` | feed-session                     | feed_id, symbol, session, asset_type, quality_path, n_incumbents, n_pass, n_fail, n_no_data, n_no_benchmark, all_pass, n_candidates, n_candidates_pass, audit_classification (blank unless `--audit-csv`)      |
+| `flagged_incumbents.csv`        | failing publisher × feed-session | feed_id, symbol, session, publisher_id, publisher_role, verdict, reason, detail (incumbents only unless `--include-candidates`; failing candidates included when the flag is on)                               |
 
 `--audit-csv <min_pub_audit CSV>` joins the Stage-1 min_pub classification
 onto summary rows by (feed_id, session), so "OK feeds with failing
