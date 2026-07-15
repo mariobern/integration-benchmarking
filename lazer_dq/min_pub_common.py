@@ -8,6 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterator
 
+import pandas as pd
+
 from lazer_dq.market_schedule import build_exchanges_by_id, resolve_schedule_string
 
 DEPRECATED_PREFIX = "DEPRECATED"
@@ -90,3 +92,17 @@ def hygiene_rows(config: dict) -> list:
             }
         )
     return rows
+
+
+def open_minute_set(mask: pd.Series) -> set:
+    """The mask's open minutes as a set (mask: bool Series indexed by minute)."""
+    return set(mask.index[mask.to_numpy()])
+
+
+def restrict_to_mask(df: pd.DataFrame, mask: pd.Series) -> pd.DataFrame:
+    """Rows whose minute-floored ts is an open minute; ts coerced to UTC datetime."""
+    if df.empty:
+        return df
+    ts = pd.to_datetime(df["ts"], utc=True)
+    minutes = ts.dt.floor("1min")
+    return df[minutes.isin(open_minute_set(mask))].assign(ts=ts)

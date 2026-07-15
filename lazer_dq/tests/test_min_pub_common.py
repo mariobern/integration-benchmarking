@@ -1,8 +1,12 @@
+import pandas as pd
+
 from lazer_dq.min_pub_common import (
     FeedSession,
     deprecated_stable_feeds,
     hygiene_rows,
     iter_stable_sessions,
+    open_minute_set,
+    restrict_to_mask,
 )
 
 CONFIG = {
@@ -96,3 +100,34 @@ def test_hygiene_rows_flag_min_pub_exceeding_allowed():
     assert by_id[12]["issue"] == "no_allowed_publishers"
     assert by_id[14]["issue"] == "min_pub_exceeds_allowed"
     assert by_id[14]["allowed_union_count"] == 2
+
+
+def test_open_minute_set_returns_only_open_minutes():
+    idx = pd.date_range("2026-07-06 00:00", periods=4, freq="1min", tz="UTC")
+    mask = pd.Series([True, False, True, False], index=idx)
+    assert open_minute_set(mask) == {idx[0], idx[2]}
+
+
+def test_restrict_to_mask_filters_closed_minutes_and_coerces_ts():
+    idx = pd.date_range("2026-07-06 00:00", periods=4, freq="1min", tz="UTC")
+    mask = pd.Series([True, False, True, False], index=idx)
+    df = pd.DataFrame(
+        {
+            "ts": [
+                "2026-07-06 00:00:30",
+                "2026-07-06 00:01:30",
+                "2026-07-06 00:02:59",
+            ],
+            "price": [1.0, 2.0, 3.0],
+        }
+    )
+    out = restrict_to_mask(df, mask)
+    assert list(out["price"]) == [1.0, 3.0]
+    assert str(out["ts"].dtype).startswith("datetime64")
+
+
+def test_restrict_to_mask_empty_df_passthrough():
+    idx = pd.date_range("2026-07-06 00:00", periods=1, freq="1min", tz="UTC")
+    mask = pd.Series([True], index=idx)
+    df = pd.DataFrame(columns=["ts", "price"])
+    assert restrict_to_mask(df, mask).empty
