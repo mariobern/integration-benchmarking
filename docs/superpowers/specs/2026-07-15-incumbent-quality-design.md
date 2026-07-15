@@ -4,7 +4,7 @@
 
 Measure the price quality of every incumbent (currently-allowed) publisher on
 every session of every STABLE feed in a Lazer config — the population the
-min*pub pipeline never benchmarks (its quality gate only scores \_candidate*
+`min_pub` pipeline never benchmarks (its quality gate only scores candidate
 publishers on WARN/CRITICAL feed-sessions). With `--include-candidates`, the
 same sweep also scores candidate (non-allowed) publishers on every
 feed-session, with identical thresholds.
@@ -67,12 +67,12 @@ min_obs)`.
      restrict to the session's open-minutes mask, score with
      `peer_benchmark.evaluate_peer` using the same `PeerThresholds` as
      qualification.
-3. **Activity** — each incumbent also gets `activity_pct` over the session's
-   open minutes (context only, NOT a gate; publisher presence is the min_pub
-   audit's job).
-4. **Verdict per incumbent**: `PASS` / `FAIL` / `NO_DATA` (no ACCEPTED
-   submissions in the window) / `NO_BENCHMARK` (engine soft-skip — exit 2 —
-   or empty/zero-range aggregate).
+3. **Activity** — each evaluated publisher (both roles) also gets
+   `activity_pct` over the session's open minutes (context only, NOT a gate;
+   publisher presence is the `min_pub` audit's job).
+4. **Verdict per publisher**: `PASS` / `FAIL` / `NO_DATA` (no submissions in
+   the window for the role's status set) / `NO_BENCHMARK` (engine soft-skip —
+   exit 2 — or empty/zero-range aggregate).
 
 Shared helpers are imported from `lazer_dq.qualify_candidates`,
 `lazer_dq.peer_benchmark`, `lazer_dq.min_pub_common`, and
