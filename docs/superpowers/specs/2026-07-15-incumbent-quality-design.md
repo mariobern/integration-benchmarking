@@ -116,8 +116,10 @@ python3 -m lazer_dq.incumbent_quality \
 
 ## Error handling
 
-- Publisher with zero ACCEPTED rows in the window → verdict `NO_DATA`
-  (not FAIL — could be schedule/maintenance; flagged separately).
+- Publisher with zero rows in the window for its role's status set
+  (incumbents: `ACCEPTED`; candidates: `ACCEPTED` + `UNAUTHORIZED`-rejected)
+  → verdict `NO_DATA` (not FAIL — could be schedule/maintenance; flagged
+  separately).
 - Engine exit 2 (no benchmark data for that feed/date/mode) → try the next
   candidate date; if all dates skip → `NO_BENCHMARK`.
 - Zero-range aggregate on the peer path (flat NAV class) → `NO_BENCHMARK`
