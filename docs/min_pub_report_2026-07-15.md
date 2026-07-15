@@ -308,8 +308,13 @@ stale and should be re-audited after the remediation spec is applied.
 ## 8. Appendix B — all flagged feed-sessions with qualification outcome
 
 CRITICAL first, then WARN; `Cand/G1/G2/Sel` = candidates discovered / passed
-activity gate / passed quality gate / selected. `Worst min` is the lowest
-per-minute active-publisher count observed in the audit window.
+activity gate / passed quality gate / selected. `Worst min` is
+`qualify_candidates`'s own re-derivation of the worst per-minute
+active-publisher count (`worst_minute_before`), which counts both ACCEPTED
+and UNAUTHORIZED-rejected updates from currently-allowed publishers — it is
+not directly comparable to §3's audit-derived `worst_minute_active` and can
+diverge from it for the same feed/session (e.g. feed 1572: 0 in §3 vs 4
+here).
 
 | Feed  | Symbol                          | Session     | Class    | Reason                   | Cand | G1  | G2  | Sel | Worst min | Target | Detail                                               |
 | ----- | ------------------------------- | ----------- | -------- | ------------------------ | ---- | --- | --- | --- | --------- | ------ | ---------------------------------------------------- |
