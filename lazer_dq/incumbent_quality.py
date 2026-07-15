@@ -67,6 +67,22 @@ REPORT_COLUMNS = [
     "verdict",
     "reason",
 ]
+INCUMBENT_PRICES_QUERY = """
+    SELECT
+        toStartOfSecond(pu.publish_time) AS ts,
+        pu.publisher_id AS publisher_id,
+        argMax(pu.price, pu.publish_time) AS price
+    FROM publisher_updates pu
+    PREWHERE pu.price_feed_id = {feed_id:UInt64}
+    WHERE pu.publish_time >= {start:String}
+      AND pu.publish_time < {end:String}
+      AND pu.status = 'ACCEPTED'
+      AND pu.price IS NOT NULL
+      AND pu.publisher_id IN {publisher_ids:Array(UInt64)}
+    GROUP BY ts, publisher_id
+    ORDER BY ts
+"""
+
 SUMMARY_COLUMNS = [
     "feed_id",
     "symbol",
@@ -269,8 +285,30 @@ def _score_engine(rows, fs, mode, args):
         row.update({"verdict": verdict, "reason": reason})
 
 
+def _fetch_role_prices(client, query, fs, pstart, pend, pids, mask):
+    """Per-second prices for one role's publisher_ids, or the empty shape."""
+    if not pids:
+        return pd.DataFrame(columns=["ts", "publisher_id", "price"])
+    df = client.query_df(
+        query,
+        parameters={
+            "feed_id": fs.feed_id,
+            "start": pstart,
+            "end": pend,
+            "publisher_ids": pids,
+        },
+    )
+    return restrict_to_mask(df, mask)
+
+
 def _score_peer(client, rows, fs, mask, thresholds, args):
-    """Peer path: each publisher vs the price_feeds aggregate."""
+    """Peer path: each publisher vs the price_feeds aggregate.
+
+    Incumbents are fetched with INCUMBENT_PRICES_QUERY (ACCEPTED only, no
+    production-key filter); candidates are fetched with
+    qualify_candidates.PER_SECOND_PRICES_QUERY (ACCEPTED + UNAUTHORIZED,
+    production-key-filtered), mirroring the qualification pipeline's rules.
+    """
     window = peer_windows(mask, args.peer_days)
     if window is None:
         for row in rows:
@@ -282,20 +320,24 @@ def _score_peer(client, rows, fs, mask, thresholds, args):
         for row in rows:
             row.update({"verdict": "NO_BENCHMARK", "reason": "no_aggregate_data"})
         return
-    pids = [row["publisher_id"] for row in rows]
-    if pids:
-        pub_all = client.query_df(
-            PER_SECOND_PRICES_QUERY,
-            parameters={
-                "feed_id": fs.feed_id,
-                "start": pstart,
-                "end": pend,
-                "publisher_ids": pids,
-            },
-        )
-        pub_all = restrict_to_mask(pub_all, mask)
-    else:
-        pub_all = pd.DataFrame(columns=["ts", "publisher_id", "price"])
+    incumbent_pids = [
+        row["publisher_id"] for row in rows if row["publisher_role"] == "incumbent"
+    ]
+    candidate_pids = [
+        row["publisher_id"] for row in rows if row["publisher_role"] == "candidate"
+    ]
+    inc_df = _fetch_role_prices(
+        client, INCUMBENT_PRICES_QUERY, fs, pstart, pend, incumbent_pids, mask
+    )
+    cand_df = _fetch_role_prices(
+        client, PER_SECOND_PRICES_QUERY, fs, pstart, pend, candidate_pids, mask
+    )
+    frames = [df for df in (inc_df, cand_df) if len(df)]
+    pub_all = (
+        pd.concat(frames, ignore_index=True)
+        if frames
+        else pd.DataFrame(columns=["ts", "publisher_id", "price"])
+    )
     for row in rows:
         if len(pub_all):
             pub_df = pub_all[pub_all["publisher_id"] == row["publisher_id"]][

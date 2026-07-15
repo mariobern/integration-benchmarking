@@ -52,8 +52,11 @@ multi-hour; run with `--resume` so restarts are cheap.
   qualification); a dominant bad incumbent partially self-validates.
 - **Flat-reference feeds** (zero price variance, e.g. NAV) can never pass
   the peer gate — they come back `NO_BENCHMARK`/`zero_range`.
-- **Non-production incumbents**: the per-second price query filters to
-  production keys, so an incumbent publishing only with a non-production key
-  scores `NO_DATA`.
+- **Incumbents vs candidates, price query**: incumbents are scored from
+  their `ACCEPTED` submissions with no key-type filter (an incumbent may
+  publish with a non-production key and still score normally); candidates
+  are production-key-only by discovery (`fetch_production_publisher_ids`,
+  same as `qualify_candidates`) and are scored from `ACCEPTED` +
+  `UNAUTHORIZED`-rejected submissions, mirroring qualification.
 - **Engine benchmark date** is the most recent weekday with engine data in
   the window (up to 3 tried), not the whole window.

@@ -258,8 +258,10 @@ class FakeClient:
         self.activity = activity
         self.aggregate = aggregate
         self.per_second = per_second
+        self.calls = []
 
     def query_df(self, query, parameters=None):
+        self.calls.append(query)
         if "price_feeds" in query:
             return self.aggregate.copy()
         if "toStartOfMinute" in query:
@@ -320,6 +322,22 @@ def test_evaluate_feed_peer_path_verdicts():
     # flagged: failing incumbents (FAIL + NO_DATA) but not the passing candidate
     flagged_keys = {(r["publisher_id"], r["verdict"]) for r in flagged}
     assert flagged_keys == {(11, "FAIL"), (12, "NO_DATA")}
+    # incumbents and candidates are fetched with different queries: incumbents
+    # get ACCEPTED-only, no production-key filter; candidates get the
+    # qualify_candidates query (ACCEPTED + UNAUTHORIZED, production-key-only).
+    per_second_calls = [
+        q for q in client.calls if "price_feeds" not in q and "toStartOfMinute" not in q
+    ]
+    assert len(per_second_calls) == 2
+    incumbent_calls = [
+        q for q in per_second_calls if "publishers_metadata_latest" not in q
+    ]
+    candidate_calls = [q for q in per_second_calls if "publishers_metadata_latest" in q]
+    assert len(incumbent_calls) == 1
+    assert "ACCEPTED" in incumbent_calls[0]
+    assert "UNAUTHORIZED" not in incumbent_calls[0]
+    assert len(candidate_calls) == 1
+    assert "UNAUTHORIZED" in candidate_calls[0]
 
 
 def test_evaluate_feed_peer_path_without_candidates_flag():
