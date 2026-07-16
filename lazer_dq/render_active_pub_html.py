@@ -180,7 +180,7 @@ def main(argv=None) -> int:
     out_path = (
         Path(args.output) if args.output else Path(args.summary).with_suffix(".html")
     )
-    out_path.write_text(render_page(summary, detail, args.top))
+    out_path.write_text(render_page(summary, detail, args.top), encoding="utf-8")
     print(f"Report written to {out_path}")
     return 0
 
