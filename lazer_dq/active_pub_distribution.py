@@ -17,11 +17,25 @@ Run:
 """
 from __future__ import annotations
 
+import argparse
+import csv
+import json
+import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
+from lazer_dq.audit_min_pub import default_window
+from lazer_dq.incumbent_quality import prune_orphan_rows, resume_done_feed_ids
 from lazer_dq.market_schedule import open_minutes_mask, parse_market_schedule
-from lazer_dq.min_pub_common import FeedSession
+from lazer_dq.min_pub_common import (
+    FeedSession,
+    deprecated_stable_feeds,
+    iter_stable_sessions,
+)
 
 
 def histogram_pcts(active_counts: np.ndarray) -> dict[int, float]:
@@ -112,9 +126,37 @@ DETAIL_COLUMNS = [
 ]
 
 
+PER_MINUTE_COUNTS_QUERY = """
+    SELECT
+        toStartOfMinute(publish_time) AS minute,
+        publisher_id,
+        countIf(status = 'ACCEPTED') AS accepted
+    FROM publisher_updates
+    PREWHERE price_feed_id = {feed_id:UInt64}
+    WHERE publish_time >= {start:String}
+      AND publish_time < {end:String}
+    GROUP BY minute, publisher_id
+    HAVING accepted > 0
+    ORDER BY minute
+"""
+
+
 def fetch_per_minute_counts(client, feed_id, start_utc, end_utc):
-    """Placeholder; defined with the query in the CLI section (Task 3)."""
-    raise NotImplementedError
+    """dict UTC-minute pd.Timestamp -> {publisher_id: accepted_update_count}."""
+    result = client.query(
+        PER_MINUTE_COUNTS_QUERY,
+        parameters={
+            "feed_id": feed_id,
+            "start": start_utc.strftime("%Y-%m-%d %H:%M:%S"),
+            "end": end_utc.strftime("%Y-%m-%d %H:%M:%S"),
+        },
+    )
+    out = {}
+    for minute, publisher_id, accepted in result.result_rows:
+        out.setdefault(pd.Timestamp(minute, tz="UTC"), {})[int(publisher_id)] = int(
+            accepted
+        )
+    return out
 
 
 def _base(fs: FeedSession) -> dict:
@@ -207,3 +249,123 @@ def process_feed(client, feed_sessions, start_utc, end_utc):
         summaries.append(s)
         details.extend(d)
     return summaries, details
+
+
+def parse_args(argv=None):
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--config", required=True)
+    p.add_argument("--start-date", help="UTC start date YYYY-MM-DD (inclusive)")
+    p.add_argument("--end-date", help="UTC end date YYYY-MM-DD (exclusive)")
+    p.add_argument("--workers", type=int, default=8)
+    p.add_argument("--feed-id", type=int, nargs="*", help="restrict to these feeds")
+    p.add_argument("--resume", action="store_true")
+    p.add_argument("--output-dir", default="output_csv")
+    return p.parse_args(argv)
+
+
+def main(argv=None) -> int:
+    from datetime import datetime, timezone
+
+    args = parse_args(argv)
+    if bool(args.start_date) != bool(args.end_date):
+        print("ERROR: pass both --start-date and --end-date, or neither")
+        return 1
+    if args.start_date:
+        start_utc = datetime.strptime(args.start_date, "%Y-%m-%d").replace(
+            tzinfo=timezone.utc
+        )
+        end_utc = datetime.strptime(args.end_date, "%Y-%m-%d").replace(
+            tzinfo=timezone.utc
+        )
+    else:
+        start_utc, end_utc = default_window()
+
+    config = json.loads(Path(args.config).read_text())
+    out_dir = Path(args.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stamp = f"{start_utc:%Y-%m-%d}_{end_utc:%Y-%m-%d}"
+    summary_path = out_dir / f"active_pub_distribution_{stamp}.csv"
+    detail_path = out_dir / f"active_pub_publishers_{stamp}.csv"
+
+    by_feed = {}
+    for fs in iter_stable_sessions(config):
+        if args.feed_id and fs.feed_id not in args.feed_id:
+            continue
+        by_feed.setdefault(fs.feed_id, []).append(fs)
+
+    resuming = args.resume and summary_path.exists()
+    done = resume_done_feed_ids(summary_path) if args.resume else set()
+    if resuming:
+        n_pruned = prune_orphan_rows(detail_path, done)
+        if n_pruned:
+            print(f"Resume: pruned {n_pruned} orphan rows from {detail_path}")
+        print(f"Resume: skipping {len(done)} already-processed feeds")
+    todo = {fid: fss for fid, fss in by_feed.items() if fid not in done}
+    print(f"Processing {len(todo)} feeds ({start_utc:%Y-%m-%d} .. {end_utc:%Y-%m-%d})")
+
+    from lib.config import ThreadLocalClients, load_config
+
+    mode = "a" if resuming else "w"
+    summary_f = open(summary_path, mode, newline="")
+    detail_f = open(detail_path, mode, newline="")
+    summary_w = csv.DictWriter(
+        summary_f, fieldnames=SUMMARY_COLUMNS, extrasaction="ignore", restval=""
+    )
+    detail_w = csv.DictWriter(
+        detail_f, fieldnames=DETAIL_COLUMNS, extrasaction="ignore", restval=""
+    )
+    if not resuming:
+        summary_w.writeheader()
+        detail_w.writeheader()
+        for row in deprecated_stable_feeds(config):
+            summary_w.writerow(
+                {
+                    "feed_id": row["feed_id"],
+                    "symbol": row["symbol"],
+                    "note": "SKIPPED_DEPRECATED",
+                }
+            )
+        summary_f.flush()
+        detail_f.flush()
+
+    write_lock = threading.Lock()
+    failures = 0
+    with ThreadLocalClients(load_config(), lazer_only=True) as pool:
+
+        def run_one(feed_sessions):
+            client = pool.get_lazer_client()
+            return process_feed(client, feed_sessions, start_utc, end_utc)
+
+        with ThreadPoolExecutor(max_workers=args.workers) as executor:
+            futures = {executor.submit(run_one, fss): fid for fid, fss in todo.items()}
+            for i, future in enumerate(as_completed(futures), 1):
+                fid = futures[future]
+                try:
+                    summaries, details = future.result()
+                except Exception as e:  # soft-fail, continue (bulk-runner pattern)
+                    failures += 1
+                    print(f"  [{i}/{len(todo)}] feed {fid} FAILED: {e}")
+                    continue
+                with write_lock:
+                    # Flush order is intentional: the summary row is the
+                    # resume marker, so it must be made durable last. A crash
+                    # in between leaves orphan detail rows that --resume
+                    # prunes on the next run.
+                    detail_w.writerows(details)
+                    detail_f.flush()
+                    summary_w.writerows(summaries)
+                    summary_f.flush()
+                worst = max(
+                    (s.get("pct_minutes_le_min", 0.0) or 0.0 for s in summaries),
+                    default=0.0,
+                )
+                print(f"  [{i}/{len(todo)}] feed {fid}: worst <=min_pub {worst:.1f}%")
+    summary_f.close()
+    detail_f.close()
+    print(f"Summary written to {summary_path}")
+    print(f"Per-publisher detail written to {detail_path} ({failures} feed failures)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

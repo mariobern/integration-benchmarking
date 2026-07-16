@@ -170,3 +170,45 @@ def test_process_feed_valid_schedule(monkeypatch):
     assert summaries[0]["open_minutes"] == 1440
     assert summaries[0]["active_pub_count"] == 1
     assert len(details) == 3
+
+
+from lazer_dq.active_pub_distribution import fetch_per_minute_counts, parse_args
+
+
+class _StubResult:
+    def __init__(self, rows):
+        self.result_rows = rows
+
+
+class _StubClient:
+    def __init__(self, rows):
+        self._rows = rows
+        self.calls = []
+
+    def query(self, q, parameters=None):
+        self.calls.append(parameters)
+        return _StubResult(self._rows)
+
+
+def test_fetch_per_minute_counts_shapes_rows():
+    from datetime import datetime, timezone
+
+    ts0 = datetime(2026, 7, 13, 9, 0)
+    client = _StubClient([(ts0, 10, 5), (ts0, 20, 1)])
+    out = fetch_per_minute_counts(
+        client,
+        1,
+        datetime(2026, 7, 13, tzinfo=timezone.utc),
+        datetime(2026, 7, 14, tzinfo=timezone.utc),
+    )
+    key = pd.Timestamp("2026-07-13 09:00", tz="UTC")
+    assert out == {key: {10: 5, 20: 1}}
+    assert client.calls[0]["feed_id"] == 1
+    assert client.calls[0]["start"] == "2026-07-13 00:00:00"
+
+
+def test_parse_args_defaults():
+    args = parse_args(["--config", "x.json"])
+    assert args.workers == 8
+    assert args.output_dir == "output_csv"
+    assert not args.resume
