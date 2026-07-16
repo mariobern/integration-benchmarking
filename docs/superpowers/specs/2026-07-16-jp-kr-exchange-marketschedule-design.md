@@ -26,7 +26,11 @@ Scope and Verification below.
 - Feeds checked but not changed: `Equity.HK.*` (105 feeds) — confirmed
   already at the target state, included only in the verification step.
 - Out of scope: any other feed/symbol prefix; changing feed `state`;
-  changing `minPublishers` or publisher lists.
+  changing `minPublishers` or publisher lists. `Equity.CN.*` (exchange 22,
+  "Shanghai Stock Exchange") was considered too — 13 of 15 feeds already
+  have `exchangeId: 22`, 2 (`510310`, `510330`, both COMING_SOON CSI 300
+  ETFs) still don't — but excluded from this pass by explicit decision;
+  those 2 feeds are left as-is, still carrying their own `marketSchedule`.
 
 ## Approach
 
