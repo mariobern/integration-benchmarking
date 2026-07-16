@@ -90,13 +90,18 @@ publisher outages: rosters exist but essentially nobody publishes.
   (FundingRate.Hyperliquid.BTC/ETH at 92M/91.5M updates) alongside genuinely
   dead component feeds. `allowed_count = 1` needs its own policy, not the
   histogram lens.
-- **`unlisted_active_count` fired on 1,129 sessions — too many for config
-  drift alone.** Most likely production accepts on the feed-level publisher
-  union while this tool scopes strictly per-session (plus real drift: the
-  config snapshot is from 2026-07-15, inside the window). Needs confirmation
-  with the Lazer team before treating per-session allowed lists as
-  authoritative; per-session metrics here may slightly undercount
-  cross-session publishers.
+- **`unlisted_active_count` fired on 1,129 sessions — measured cause:
+  cross-session acceptance, not drift.** For 97.1% of these sessions the
+  unlisted count fits entirely within "publishers allowed on a sibling
+  session of the same feed" (checked against `lazer_new.json`: median 4
+  unlisted vs median 6 union-minus-session publishers). Production appears
+  to accept on the feed-level publisher union while the config expresses
+  lists per session; only 27 sessions have unlisted publishers with no
+  cross-session explanation (consistent with genuine drift — the snapshot
+  is from 2026-07-15, inside the window). Implications: per-session metrics
+  here are conservative (real contributor counts may be slightly higher),
+  and session-level roster edits may not be enforced at the gateway — needs
+  confirmation with the Lazer team.
 - **Participation ≠ volume.** A publisher ticking once per minute counts
   fully present here while contributing ~1% of updates. Read this report's
   participation view together with the concentration columns.
