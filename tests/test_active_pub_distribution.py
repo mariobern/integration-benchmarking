@@ -212,3 +212,91 @@ def test_parse_args_defaults():
     assert args.workers == 8
     assert args.output_dir == "output_csv"
     assert not args.resume
+
+
+from lazer_dq.render_active_pub_html import parse_hist, render_page
+
+
+def _report_frames():
+    summary = pd.DataFrame(
+        [
+            {
+                "feed_id": 1,
+                "symbol": "Equity.US.AAA/USD",
+                "asset_type": "equity",
+                "session": "REGULAR",
+                "note": "",
+                "effective_min_pub": 2,
+                "allowed_count": 4,
+                "active_pub_count": 3,
+                "never_published_count": 1,
+                "unlisted_active_count": 0,
+                "open_minutes": 100,
+                "total_accepted_updates": 900,
+                "pct_minutes_le_min": 40.0,
+                "pct_minutes_le_min_plus_1": 90.0,
+                "p10_active": 1.0,
+                "median_active": 2.0,
+                "p90_active": 3.0,
+                "worst_minute_active": 1,
+                "active_hist": "1:40.00;2:50.00;3:10.00",
+                "effective_publishers": 1.8,
+                "top1_share_pct": 70.0,
+                "top3_share_pct": 99.0,
+            },
+            {
+                "feed_id": 2,
+                "symbol": "Fx.EUR/USD",
+                "asset_type": "fx",
+                "session": "REGULAR",
+                "note": "NO_SCHEDULE",
+                "effective_min_pub": 2,
+                "allowed_count": 5,
+            },
+        ]
+    )
+    detail = pd.DataFrame(
+        [
+            {
+                "feed_id": 1,
+                "symbol": "Equity.US.AAA/USD",
+                "session": "REGULAR",
+                "publisher_id": 10,
+                "accepted_updates": 630,
+                "update_share_pct": 70.0,
+                "minutes_active": 90,
+                "pct_open_minutes_active": 90.0,
+                "rank": 1,
+            },
+            {
+                "feed_id": 1,
+                "symbol": "Equity.US.AAA/USD",
+                "session": "REGULAR",
+                "publisher_id": 20,
+                "accepted_updates": 270,
+                "update_share_pct": 30.0,
+                "minutes_active": 60,
+                "pct_open_minutes_active": 60.0,
+                "rank": 2,
+            },
+        ]
+    )
+    return summary, detail
+
+
+def test_parse_hist():
+    assert parse_hist("3:0.52;4:12.10") == {3: 0.52, 4: 12.1}
+    assert parse_hist("") == {}
+    assert parse_hist(float("nan")) == {}
+
+
+def test_render_page_smoke():
+    summary, detail = _report_frames()
+    page = render_page(summary, detail, top=10)
+    assert "Equity.US.AAA/USD" in page
+    assert 'class="bar crit"' in page  # k <= min_pub bars marked
+    assert "red bars" in page  # not color-alone
+    assert "10 (70%)" in page  # dominant publisher callout
+    assert "NO_SCHEDULE" in page  # note rows still in the table
+    assert "prefers-color-scheme" in page  # dark mode defined
+    assert "<script src" not in page  # self-contained
