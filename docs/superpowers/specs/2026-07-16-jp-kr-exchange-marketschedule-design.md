@@ -71,6 +71,39 @@ targeting can't distinguish the two markets.
   their existing `marketSchedule`.
 - **KR feeds already at `exchangeId: 24`** (2 feeds): already consistent
   with the target state; the op no-ops (or shows no diff) for these.
+- **KR futures (`KSM6`, `KSU6`, `KQM6`, `KQU6`)** — 4 `Equity.KR.*` feeds
+  with `metadata.instrument_type == "future"` (KRX derivatives contracts,
+  not spot). Their original schedule (`Asia/Seoul;0900-1545,...`) genuinely
+  differs from the Korea Exchange spot schedule (`0900-1530,...`, and two
+  fewer holidays), so exchange inheritance was wrong for them. The initial
+  `--add-exchange-id 24 --symbol-pattern "Equity.KR.*"` pass incorrectly
+  applied the spot schedule to these 4 (there's no `--symbol-pattern`
+  granular enough to exclude just the futures roots from the KR pass).
+  Corrected afterward with a one-off script (see Post-hoc correction
+  below), reusing `edit_config_lib`'s tested text-surgery machinery since
+  `--remove-exchange-id` would have restored the exchange's schedule
+  (still wrong) rather than each feed's actual original one. Verified: no
+  `Equity.JP.*` feed has `instrument_type == "future"` (all 235 active JP
+  feeds are spot), so no equivalent correction was needed on the JP side.
+
+## Post-hoc correction: KR futures schedule override
+
+After the initial JP/KR pass, 4 KR futures feeds were found to have been
+given the wrong (spot) schedule. Corrected via a one-off script (not part
+of `edit_config.py`'s CLI, since no existing op restores a feed's own
+historical schedule rather than the exchange's) that:
+
+1. Removed `exchangeId: 24` from feeds 2994 (`KSM6`), 2995 (`KSU6`), 3003
+   (`KQM6`), 3004 (`KQU6`).
+2. Restored their `REGULAR` session `marketSchedule` to
+   `Asia/Seoul;0900-1545,0900-1545,0900-1545,0900-1545,0900-1545,C,C;0101/C,0216/C,0217/C,0218/C,0302/C,0501/C,0505/C,0525/C,0817/C,0924/C,0925/C,1005/C,1009/C,1225/C,1231/C`
+   (recovered from `lazer_new.json`, an untouched copy of the original
+   config).
+
+The script used `edit_config_lib.config_editor.apply_changes` /
+`write_with_backup` directly with hand-built `Change` records — the same
+tested text-surgery path `edit_config.py` itself uses, just composed
+outside the CLI's fixed operation set.
 
 ## Verification
 
@@ -89,8 +122,11 @@ After both `--apply` runs:
 
 - [x] All active `Equity.JP.*` feeds have `exchangeId: 29` and no
       `marketSchedule` string in any session. (235/235, verified 2026-07-16)
-- [x] All active `Equity.KR.*` feeds have `exchangeId: 24` and no
-      `marketSchedule` string in any session. (105/105, verified 2026-07-16)
+- [x] All active `Equity.KR.*` spot feeds have `exchangeId: 24` and no
+      `marketSchedule` string in any session; the 4 KR futures feeds
+      (`KSM6`, `KSU6`, `KQM6`, `KQU6`) keep their own distinct
+      `marketSchedule` instead, with no `exchangeId`. (101/101 spot +
+      4/4 futures, verified 2026-07-16)
 - [x] INACTIVE feeds in all three sets (JP, KR, HK) left untouched.
       (1 JP, 2 KR, 5 HK — all still carry their original `marketSchedule`)
 - [x] Confirmed (not changed) that all active `Equity.HK.*` feeds already
