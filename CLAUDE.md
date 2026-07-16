@@ -165,6 +165,8 @@ Scripts are thin CLI wrappers that parse arguments and delegate to `lib/`.
 
 ## Documentation Layout
 
+**Every new doc must carry a date**: put a `Last updated: YYYY-MM-DD` line directly under the title when creating any doc, and bump it on every later modification (this generalizes the existing `docs/asset-classes.md` gotcha).
+
 Almost all docs live under `docs/`:
 
 - **Per-script docs**: `docs/<script_name>.md` (linked from the Scripts table above).

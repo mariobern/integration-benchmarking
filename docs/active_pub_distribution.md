@@ -1,5 +1,7 @@
 # active_pub_distribution — active-publisher histogram + concentration
 
+Last updated: 2026-07-16
+
 Diagnostic sweep of all STABLE (feed, session) pairs in a new-format Lazer
 config. Answers two questions the min_pub audit's CRITICAL/WARN/OK collapses
 away:
