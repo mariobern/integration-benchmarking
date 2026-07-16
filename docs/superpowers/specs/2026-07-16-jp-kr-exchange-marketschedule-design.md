@@ -9,13 +9,22 @@ Assign `exchangeId: 29` (Tokyo Stock Exchange) to all `Equity.JP.*` feeds and
 `lazer_kr_jp.json`, so each feed inherits its exchange's trading calendar
 instead of carrying its own `marketSchedule` string.
 
+`Equity.HK.*` (exchange 21, "The Stock Exchange of Hong Kong Ltd") was
+initially in scope too, but investigation found it already done: 100 of 105
+HK feeds already carry `exchangeId: 21` with `marketSchedule` fully stripped;
+the remaining 5 are `INACTIVE` (the same population `--add-exchange-id`
+would skip if re-run). HK is therefore verification-only in this pass — see
+Scope and Verification below.
+
 ## Scope
 
 - Config file: `lazer_kr_jp.json` (local, gitignored working copy — most
   recently modified, already carries prior exchange-inheritance work for
   other markets).
-- Feeds in scope: all feeds whose `symbol` starts with `Equity.JP.` (236
-  feeds) or `Equity.KR.` (107 feeds).
+- Feeds changed by this pass: all feeds whose `symbol` starts with
+  `Equity.JP.` (236 feeds) or `Equity.KR.` (107 feeds).
+- Feeds checked but not changed: `Equity.HK.*` (105 feeds) — confirmed
+  already at the target state, included only in the verification step.
 - Out of scope: any other feed/symbol prefix; changing feed `state`;
   changing `minPublishers` or publisher lists.
 
@@ -68,6 +77,9 @@ After both `--apply` runs:
 2. Spot-check that no active (`STABLE`/`COMING_SOON`) `Equity.JP.*` or
    `Equity.KR.*` feed retains a `marketSchedule` key in any session entry,
    and that `exchangeId` is `29`/`24` respectively.
+3. Spot-check `Equity.HK.*` as a read-only confirmation (no op run): every
+   active feed already has `exchangeId: 21` and no `marketSchedule` string;
+   only the 5 pre-existing INACTIVE feeds lack it.
 
 ## Definition of done
 
@@ -75,6 +87,8 @@ After both `--apply` runs:
       `marketSchedule` string in any session.
 - [ ] All active `Equity.KR.*` feeds have `exchangeId: 24` and no
       `marketSchedule` string in any session.
-- [ ] INACTIVE feeds in both sets left untouched.
+- [ ] INACTIVE feeds in all three sets (JP, KR, HK) left untouched.
+- [ ] Confirmed (not changed) that all active `Equity.HK.*` feeds already
+      have `exchangeId: 21` and no `marketSchedule` string.
 - [ ] Config linter passes (or pre-existing warnings only, no new ones
       introduced by this change).
