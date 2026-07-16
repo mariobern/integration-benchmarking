@@ -87,12 +87,18 @@ After both `--apply` runs:
 
 ## Definition of done
 
-- [ ] All active `Equity.JP.*` feeds have `exchangeId: 29` and no
-      `marketSchedule` string in any session.
-- [ ] All active `Equity.KR.*` feeds have `exchangeId: 24` and no
-      `marketSchedule` string in any session.
-- [ ] INACTIVE feeds in all three sets (JP, KR, HK) left untouched.
-- [ ] Confirmed (not changed) that all active `Equity.HK.*` feeds already
-      have `exchangeId: 21` and no `marketSchedule` string.
-- [ ] Config linter passes (or pre-existing warnings only, no new ones
-      introduced by this change).
+- [x] All active `Equity.JP.*` feeds have `exchangeId: 29` and no
+      `marketSchedule` string in any session. (235/235, verified 2026-07-16)
+- [x] All active `Equity.KR.*` feeds have `exchangeId: 24` and no
+      `marketSchedule` string in any session. (105/105, verified 2026-07-16)
+- [x] INACTIVE feeds in all three sets (JP, KR, HK) left untouched.
+      (1 JP, 2 KR, 5 HK — all still carry their original `marketSchedule`)
+- [x] Confirmed (not changed) that all active `Equity.HK.*` feeds already
+      have `exchangeId: 21` and no `marketSchedule` string. (100/100)
+- [x] Config linter passes (or pre-existing warnings only, no new ones
+      introduced by this change). JP and HK line counts unchanged (468,
+      200). KR dropped from 207 to 205: 2 `W003` "schedule deviates from
+      majority" warnings resolved as a side effect, since those 2 feeds no
+      longer carry their own (deviating) `marketSchedule` string — not a
+      regression. No `W011` (exchangeId set but marketSchedule not
+      stripped) lines for any JP/KR feed.
