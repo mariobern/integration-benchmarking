@@ -41,7 +41,12 @@ import pandas as pd
 
 from lazer_dq.evaluate_feeds_bulk import compute_times_from_mode
 from lazer_dq.market_schedule import open_minutes_mask, parse_market_schedule
-from lazer_dq.min_pub_common import FeedSession, iter_stable_sessions
+from lazer_dq.min_pub_common import (
+    FeedSession,
+    iter_stable_sessions,
+    open_minute_set,
+    restrict_to_mask,
+)
 from lazer_dq.peer_benchmark import PeerThresholds, evaluate_peer
 from lazer_dq.summarize_feeds import (
     ASSET_CLASS_CONFIG,
@@ -281,12 +286,8 @@ def _warn_if_worst_minute_diverges_from_audit(fs, audit_row, before: int) -> Non
         )
 
 
-def _open_minute_set(mask: pd.Series) -> set:
-    return set(mask.index[mask.to_numpy()])
-
-
 def activity_pct(matrix_df: pd.DataFrame, mask: pd.Series, publisher_id: int) -> float:
-    open_minutes = _open_minute_set(mask)
+    open_minutes = open_minute_set(mask)
     if not open_minutes:
         return 0.0
     pub_minutes = set(
@@ -412,15 +413,6 @@ def fetch_aggregate(client, feed_id, start, end):
         if len(df):
             return df
     return pd.DataFrame(columns=["ts", "price"])
-
-
-def _restrict_to_mask(df: pd.DataFrame, mask: pd.Series) -> pd.DataFrame:
-    if df.empty:
-        return df
-    ts = pd.to_datetime(df["ts"], utc=True)
-    minutes = ts.dt.floor("1min")
-    open_minutes = _open_minute_set(mask)
-    return df[minutes.isin(open_minutes)].assign(ts=ts)
 
 
 def qualify_feed(
@@ -572,7 +564,7 @@ def qualify_feed(
                 continue
             pstart, pend = window
             agg_df = fetch_aggregate(client, fs.feed_id, pstart, pend)
-            agg_df = _restrict_to_mask(agg_df, mask)
+            agg_df = restrict_to_mask(agg_df, mask)
             if agg_df.empty:
                 flag("no_benchmark_data", "no aggregate (price_feeds) data")
                 summary_rows.append(
@@ -588,7 +580,7 @@ def qualify_feed(
                     "publisher_ids": list(gate1),
                 },
             )
-            pub_all = _restrict_to_mask(pub_all, mask)
+            pub_all = restrict_to_mask(pub_all, mask)
             for pid in gate1:
                 row = rows_by_pid[pid]
                 row.update(
