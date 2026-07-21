@@ -1,6 +1,6 @@
 # Active publisher distribution — findings, 2026-07-08 → 2026-07-15
 
-Last updated: 2026-07-16
+Last updated: 2026-07-21
 
 First production run of `lazer_dq/active_pub_distribution.py` (PR #58), sweeping
 every STABLE (feed, session) in `lazer_new.json` (prod snapshot 2026-07-15)
@@ -100,11 +100,55 @@ publisher outages: rosters exist but essentially nobody publishes.
   cross-session explanation (consistent with genuine drift — the snapshot
   is from 2026-07-15, inside the window). Implications: per-session metrics
   here are conservative (real contributor counts may be slightly higher),
-  and session-level roster edits may not be enforced at the gateway — needs
-  confirmation with the Lazer team.
+  and session-level roster edits may not be enforced at the gateway.
+  **Confirmed 2026-07-21 (see "Enforcement semantics" below): enforcement is
+  feed-level union; session lists are additive, not authoritative.**
 - **Participation ≠ volume.** A publisher ticking once per minute counts
   fully present here while contributing ~1% of updates. Read this report's
   participation view together with the concentration columns.
+
+## Enforcement semantics (confirmed 2026-07-21)
+
+The `unlisted_active_count` question from §5 was settled by probing
+`publisher_updates` (`status` / `status_reason = 'UNAUTHORIZED'`) directly:
+
+**Session-level allowed lists are additive, not authoritative. A publisher on
+any one session's list is ACCEPTED across all of that feed's sessions; a
+populated session list never denies a publisher permissioned elsewhere on the
+feed. Enforcement resolves at the feed (union) level.**
+
+Definitive example — feed 931 `Equity.US.ADP/USD`, publisher 20: config-listed
+only on `PRE_MARKET` / `POST_MARKET`, explicitly absent from `REGULAR`, yet
+ACCEPTED straight through REGULAR hours (13:30–20:00 UTC), 13.68M accepted / **0
+unauthorized** over 6 days. Six of six tested cross-session feeds identical (0
+unauthorized in every case); 326 STABLE feeds carry cross-session roster
+differences. A prior 2-day look at feed 2316 (pubs 4/19) initially resembled a
+session boundary but a 6-day day×hour grid showed a one-time roster edit on
+07-20, not a recurring band — no recurring per-session denial exists anywhere in
+the sampled traffic.
+
+Consequences for remediation:
+
+- **Adding** backup publishers to dilute a dominant source works — the grant is
+  feed-wide (applies to every session), so no need to touch the feed-union
+  separately.
+- You **cannot session-scope a publisher out** via config. Removing a bad
+  publisher (e.g. pub 71) from one session's list does nothing while it remains
+  on any sibling session/the union; to stop it you must remove it from **all**
+  sessions of the feed.
+- Session-level "dead slot" pruning (the 1,186 slots) is **cosmetic** for
+  enforcement — the feed union still grants — so it is hygiene, not risk
+  reduction.
+- Per-session `allowed_count` here is a **conservative lower bound**; the true
+  accepted set is the feed union.
+
+Reproduce: for a feed whose sessions have differing `allowedPublisherIds`, pick
+a publisher listed on one session but absent from another, then query
+`publisher_updates` grouped by `toHour(publish_time)` counting
+`countIf(status='ACCEPTED')` vs `countIf(status='REJECTED' AND
+status_reason='UNAUTHORIZED')` — acceptance during the absent session's hours
+with zero UNAUTHORIZED proves additive union. Use a ≥6-day window and a day×hour
+grid to distinguish a recurring session band from a one-time roster edit.
 
 ## 6. Suggested next steps
 
