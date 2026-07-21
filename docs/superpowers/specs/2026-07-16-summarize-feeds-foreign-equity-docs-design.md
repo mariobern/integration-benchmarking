@@ -20,7 +20,7 @@ Investigation confirmed:
   1 mode, `REGULAR` session, `default_max_ros` 1.0, `default_min_hit` 80.0.
 - `CLAUDE.md` already lists all four foreign single-mode equity classes
   correctly in its `summarize_feeds` asset class, `jp-equities /
-  kr-equities / in-equities modes`, and `Equities qualifier filter`
+kr-equities / in-equities modes`, and `Equities qualifier filter`
   bullets. No `CLAUDE.md` changes are needed.
 - `docs/summarize_feeds.md`'s "Asset Classes & Modes" section only shows a
   table for `hk-equities`; `jp-equities`/`kr-equities`/`in-equities` are
@@ -67,7 +67,7 @@ In the "Asset Classes & Modes" section of `docs/summarize_feeds.md`:
 
 3. Update the usage-example comment above the `--asset-class hk-equities`
    example (currently `# HK equities (1 mode); see Asset Classes & Modes
-   below`) to note it applies to HK/JP/KR/IN equities, so the single
+below`) to note it applies to HK/JP/KR/IN equities, so the single
    example is clearly read as representative of all four rather than
    HK-specific.
 

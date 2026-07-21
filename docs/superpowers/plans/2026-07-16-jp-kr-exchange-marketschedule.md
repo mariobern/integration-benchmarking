@@ -18,12 +18,14 @@
 
 ---
 
-### Task 1: Apply exchangeId 29 to Equity.JP.* feeds
+### Task 1: Apply exchangeId 29 to Equity.JP.\* feeds
 
 **Files:**
+
 - Modify (via tool, not by hand): `lazer_kr_jp.json`
 
 **Interfaces:**
+
 - Consumes: `tools/edit-config/edit_config.py`'s existing `--add-exchange-id` op (no code changes).
 - Produces: `lazer_kr_jp.json` with all 235 active `Equity.JP.*` feeds carrying `exchangeId: 29` and no `marketSchedule` string in any session. Task 3 depends on this being applied before it runs its verification.
 
@@ -92,12 +94,14 @@ inactive feeds still carrying marketSchedule (expected all 1): 1
 
 ---
 
-### Task 2: Apply exchangeId 24 to Equity.KR.* feeds
+### Task 2: Apply exchangeId 24 to Equity.KR.\* feeds
 
 **Files:**
+
 - Modify (via tool, not by hand): `lazer_kr_jp.json`
 
 **Interfaces:**
+
 - Consumes: same `--add-exchange-id` op as Task 1, run against Task 1's output (`lazer_kr_jp.json` already has JP changes applied).
 - Produces: `lazer_kr_jp.json` with all 105 active `Equity.KR.*` feeds carrying `exchangeId: 24` and no `marketSchedule` string in any session (2 of these already had `exchangeId: 24` before this plan started, so they show as no-ops in the diff). Task 3 depends on this being applied.
 
@@ -136,7 +140,7 @@ Backup written: lazer_kr_jp.json.bak
 Wrote 206 changes to lazer_kr_jp.json.
 ```
 
-Note: this overwrites the `.bak` file Task 1 created, with a snapshot taken *after* Task 1's changes. That's fine — `.bak` is a single-step undo, not a full history.
+Note: this overwrites the `.bak` file Task 1 created, with a snapshot taken _after_ Task 1's changes. That's fine — `.bak` is a single-step undo, not a full history.
 
 - [ ] **Step 3: Spot-check the result**
 
@@ -167,9 +171,11 @@ total=107 active=105 inactive=2 correct=105
 ### Task 3: Verify JP/KR result and confirm HK/CN untouched
 
 **Files:**
+
 - Read-only: `lazer_kr_jp.json`
 
 **Interfaces:**
+
 - Consumes: `lazer_kr_jp.json` as left by Task 1 and Task 2.
 - Produces: pass/fail confirmation for the plan's Definition of Done. No file changes.
 
