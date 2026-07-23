@@ -87,6 +87,29 @@ Source of truth: `lazer_newest.json` (new-format, session-only publisher lists).
 
 DEPRECATED-symbol feeds are skipped by the loader. ~2,554 STABLE feed-sessions.
 
+### Session coverage (US equities)
+
+US-equities feeds carry each trading session as a **distinct `marketSchedules`
+entry** — REGULAR, PRE_MARKET, POST_MARKET, OVER_NIGHT — each with its own
+`allowedPublisherIds`, its own `minPublishers`, and its own resolved schedule
+string. This means every session gets a **standalone analysis row automatically**,
+with no special-casing:
+
+- **One row per session** — `iter_stable_sessions()` yields one `FeedSession` per
+  entry, so PRE_MARKET / POST_MARKET / OVER_NIGHT each get their own verdict.
+- **Per-session floor** — e.g. AAPL is REGULAR `minPublishers=3` vs 2 for the others;
+  each session is judged against its own floor.
+- **Per-session mask** — the resolved schedule strings are genuinely distinct per
+  session (REGULAR `0930-1600`, PRE_MARKET `0400-0930`, POST_MARKET `1600-2000`,
+  OVER_NIGHT `0000-0400 & 2000-2400`), so updates are masked to the correct window
+  with no cross-contamination.
+
+Because this analysis only reads `price_feeds.publisher_count` and never touches a
+Datascope benchmark, **OVER_NIGHT needs no special-casing** (unlike `quick_benchmark`,
+which requires `--overnight` + publisher-32 peer logic) — it is just another masked
+window. The only masking subtlety is that OVER_NIGHT crosses midnight and has two
+disjoint intervals per day; this is covered by an explicit test case.
+
 ### Query
 
 Per feed, over `[start, end)`, using the feed's own `minChannel` as the
@@ -121,7 +144,6 @@ All statistics are computed from the single masked `counts[]` array (numpy):
 | `median` | median contributor count |
 | `pct_at_floor` | fraction of in-session updates with `publisher_count <= min_pub` — **primary trigger** |
 | `pct_at_floor_1` | fraction with `publisher_count <= min_pub + 1` (context) |
-| `worst_day_min` | lowest single-day `min` across the window (catches one bad day) |
 | `n_updates` | total in-session aggregate updates (conclusiveness guard) |
 
 `pct_at_floor` / `pct_at_floor_1` are reported as percentages (0–100).
@@ -149,8 +171,7 @@ Ordering precedence for a feed-session: NO_DATA > LOW_SAMPLE > CRITICAL > WARN >
 
 ```
 feed_id, symbol, asset_type, session, effective_min_pub,
-n_updates, min, p1, p5, median, pct_at_floor, pct_at_floor_1,
-worst_day_min, verdict
+n_updates, min, p1, p5, median, pct_at_floor, pct_at_floor_1, verdict
 ```
 
 Sorted by verdict precedence (CRITICAL first), then `pct_at_floor` descending.
@@ -188,7 +209,8 @@ python3 -m lazer_dq.active_min_pub \
   `warn_pct`, LOW_SAMPLE at `n_updates == min_updates - 1` vs `== min_updates`,
   NO_DATA at `n_updates == 0`.
 - Session masking: updates outside open hours are excluded from `counts[]`.
-- `worst_day_min` picks the lowest single-day minimum across a multi-day window.
+- OVER_NIGHT midnight-crossing, multi-interval mask (`0000-0400 & 2000-2400`)
+  keeps only updates inside either interval.
 - `minChannel` is used for the query (no channel probing).
 
 ## Documentation
