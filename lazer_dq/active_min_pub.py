@@ -76,6 +76,25 @@ def distribution_stats(counts: np.ndarray, min_pub: int) -> dict:
     }
 
 
+def masked_counts(rows, schedule_str, start_utc, end_utc) -> np.ndarray:
+    """Per-update publisher_count values whose minute is open per the schedule.
+
+    rows: (publish_time_naive_utc, publisher_count) tuples from ClickHouse.
+    Raises ValueError on a malformed schedule string (caller handles).
+    """
+    if not rows:
+        return np.array([], dtype=int)
+    schedule = parse_market_schedule(schedule_str)
+    mask = open_minutes_mask(schedule, start_utc, end_utc)
+    open_minutes = set(mask.index[mask.to_numpy()])
+    out = []
+    for ts, count in rows:
+        minute = pd.Timestamp(ts, tz="UTC").floor("min")
+        if minute in open_minutes:
+            out.append(count)
+    return np.array(out, dtype=int)
+
+
 def classify(
     stats: dict, critical_pct: float, warn_pct: float, min_updates: int
 ) -> str:

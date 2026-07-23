@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import numpy as np
 import pandas as pd
 
@@ -5,6 +7,7 @@ from lazer_dq.active_min_pub import (
     RESULT_COLUMNS,
     classify,
     distribution_stats,
+    masked_counts,
 )
 
 
@@ -95,3 +98,47 @@ def test_result_columns_contract():
         "pct_at_floor_1",
         "verdict",
     ]
+
+
+def test_masked_counts_keeps_only_open_minutes():
+    start = datetime(2026, 7, 14, tzinfo=timezone.utc)  # Tuesday
+    end = datetime(2026, 7, 15, tzinfo=timezone.utc)
+    # REGULAR NY 0930-1600 -> 13:30-20:00 UTC (EDT = UTC-4 in July).
+    sched = "America/New_York;0930-1600,0930-1600,0930-1600,0930-1600,0930-1600,C,C;"
+    rows = [
+        (datetime(2026, 7, 14, 13, 30, 0, 500000), 5),  # 13:30 UTC open -> keep
+        (datetime(2026, 7, 14, 13, 30, 0, 900000), 4),  # same minute, keep
+        (datetime(2026, 7, 14, 12, 0, 0), 2),  # 12:00 UTC pre-open -> drop
+        (datetime(2026, 7, 14, 20, 0, 0), 3),  # 20:00 UTC == close (exclusive) -> drop
+        (datetime(2026, 7, 14, 19, 59, 0), 7),  # 19:59 UTC open -> keep
+    ]
+    counts = masked_counts(rows, sched, start, end)
+    assert sorted(counts.tolist()) == [4, 5, 7]
+
+
+def test_masked_counts_overnight_midnight_crossing():
+    start = datetime(2026, 7, 14, tzinfo=timezone.utc)
+    end = datetime(2026, 7, 15, tzinfo=timezone.utc)
+    # OVER_NIGHT NY 0000-0400 & 2000-2400 -> UTC 04:00-08:00 & 00:00-04:00 (EDT).
+    sched = (
+        "America/New_York;"
+        "0000-0400&2000-2400,0000-0400&2000-2400,0000-0400&2000-2400,"
+        "0000-0400&2000-2400,0000-0400,C,2000-2400;"
+    )
+    rows = [
+        (datetime(2026, 7, 14, 5, 0, 0), 2),  # NY 01:00 -> in 0000-0400 -> keep
+        (
+            datetime(2026, 7, 14, 1, 0, 0),
+            9,
+        ),  # NY 21:00 (prev day) -> in 2000-2400 -> keep
+        (datetime(2026, 7, 14, 12, 0, 0), 5),  # NY 08:00 -> daytime -> drop
+    ]
+    counts = masked_counts(rows, sched, start, end)
+    assert sorted(counts.tolist()) == [2, 9]
+
+
+def test_masked_counts_empty_rows():
+    start = datetime(2026, 7, 14, tzinfo=timezone.utc)
+    end = datetime(2026, 7, 15, tzinfo=timezone.utc)
+    sched = "UTC;O,O,O,O,O,O,O"
+    assert masked_counts([], sched, start, end).tolist() == []
