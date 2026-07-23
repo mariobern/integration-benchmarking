@@ -221,8 +221,8 @@ _VERDICT_ORDER = [
 
 _CSV_SORT_ORDER = [
     "CRITICAL",
-    "OK",
     "WARN",
+    "OK",
     "LOW_SAMPLE",
     "NO_DATA",
     "NO_SCHEDULE",

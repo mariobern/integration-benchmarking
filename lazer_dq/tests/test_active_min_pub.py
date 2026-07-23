@@ -318,8 +318,8 @@ def test_sort_rows_critical_first_then_pct_desc():
     assert [r["verdict"] for r in out] == [
         "CRITICAL",
         "CRITICAL",
-        "OK",
         "WARN",
+        "OK",
         "NO_DATA",
     ]
     # within CRITICAL, higher pct_at_floor first
