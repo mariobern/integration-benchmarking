@@ -1,5 +1,9 @@
 """Stage 1 of the min_pub pipeline: audit active publishers vs minPublishers.
 
+NOTE: measures per-MINUTE distinct ACCEPTED publishers (availability). For the
+aggregate contributor-count headroom question (per-aggregate publisher_count vs
+minPublishers) use lazer_dq.active_min_pub instead — different question.
+
 For every STABLE (feed, session) in a new-format Lazer config, counts
 distinct ACCEPTED allowed publishers per minute over a UTC date window,
 restricted to the session's open hours, and classifies:
