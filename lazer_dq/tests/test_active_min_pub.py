@@ -267,3 +267,38 @@ def test_analyze_feed_malformed_schedule_yields_no_schedule():
     result = analyze_feed(client, [bad], start, end, 1.0, 5.0, 100)
     assert result[0]["verdict"] == "NO_SCHEDULE"
     assert set(result[0].keys()) == set(RESULT_COLUMNS)
+
+
+from lazer_dq.active_min_pub import default_window, parse_args, summarize
+
+
+def test_default_window_is_seven_full_utc_days():
+    start, end = default_window()
+    assert (end - start) == pd.Timedelta(days=7).to_pytimedelta()
+    assert end.hour == 0 and end.minute == 0 and end.second == 0
+
+
+def test_parse_args_defaults():
+    args = parse_args(["--config", "lazer_newest.json"])
+    assert args.config == "lazer_newest.json"
+    assert args.critical_pct == 1.0
+    assert args.warn_pct == 5.0
+    assert args.min_updates == 100
+    assert args.workers == 8
+
+
+def test_summarize_tallies_by_verdict():
+    rows = [
+        {"verdict": "CRITICAL"},
+        {"verdict": "CRITICAL"},
+        {"verdict": "WARN"},
+        {"verdict": "OK"},
+        {"verdict": "NO_DATA"},
+        {"verdict": "LOW_SAMPLE"},
+    ]
+    tally = summarize(rows)
+    assert tally["CRITICAL"] == 2
+    assert tally["WARN"] == 1
+    assert tally["OK"] == 1
+    assert tally["NO_DATA"] == 1
+    assert tally["LOW_SAMPLE"] == 1

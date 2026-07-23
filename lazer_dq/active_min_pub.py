@@ -180,3 +180,129 @@ def analyze_feed(
         verdict = classify(stats, critical_pct, warn_pct, min_updates)
         out.append({**base, **stats, "verdict": verdict})
     return out
+
+
+def default_window():
+    """Last 7 full UTC days: [today-7 00:00, today 00:00)."""
+    end = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    return end - timedelta(days=7), end
+
+
+def summarize(rows) -> dict:
+    tally: dict = {}
+    for r in rows:
+        tally[r["verdict"]] = tally.get(r["verdict"], 0) + 1
+    return tally
+
+
+def parse_args(argv=None):
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--config", required=True)
+    p.add_argument("--start-date", help="UTC start date YYYY-MM-DD (inclusive)")
+    p.add_argument("--end-date", help="UTC end date YYYY-MM-DD (exclusive)")
+    p.add_argument("--critical-pct", type=float, default=1.0)
+    p.add_argument("--warn-pct", type=float, default=5.0)
+    p.add_argument("--min-updates", type=int, default=100)
+    p.add_argument("--workers", type=int, default=8)
+    p.add_argument("--feed-id", type=int, nargs="*", help="restrict to these feeds")
+    p.add_argument("--output-dir", default="output_csv")
+    return p.parse_args(argv)
+
+
+_VERDICT_ORDER = ["NO_DATA", "LOW_SAMPLE", "CRITICAL", "WARN", "OK", "NO_SCHEDULE"]
+
+
+def main(argv=None) -> int:
+    args = parse_args(argv)
+    if bool(args.start_date) != bool(args.end_date):
+        print("ERROR: pass both --start-date and --end-date, or neither")
+        return 1
+    if args.start_date:
+        start_utc = datetime.strptime(args.start_date, "%Y-%m-%d").replace(
+            tzinfo=timezone.utc
+        )
+        end_utc = datetime.strptime(args.end_date, "%Y-%m-%d").replace(
+            tzinfo=timezone.utc
+        )
+    else:
+        start_utc, end_utc = default_window()
+
+    config = json.loads(Path(args.config).read_text())
+    out_dir = Path(args.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    by_feed: dict = {}
+    for fs in iter_stable_sessions(config):
+        if args.feed_id and fs.feed_id not in args.feed_id:
+            continue
+        by_feed.setdefault(fs.feed_id, []).append(fs)
+
+    out_path = out_dir / (f"active_min_pub_{start_utc:%Y-%m-%d}_{end_utc:%Y-%m-%d}.csv")
+    print(
+        f"Analyzing {len(by_feed)} feeds ({start_utc:%Y-%m-%d} .. {end_utc:%Y-%m-%d})"
+    )
+
+    from lib.config import ThreadLocalClients, load_config
+
+    write_lock = threading.Lock()
+    all_rows: list = []
+    csv_file = open(out_path, "w", newline="")
+    writer = csv.DictWriter(csv_file, fieldnames=RESULT_COLUMNS, extrasaction="ignore")
+    writer.writeheader()
+
+    failures = 0
+    with ThreadLocalClients(load_config(), lazer_only=True) as pool:
+
+        def run_one(feed_sessions):
+            client = pool.get_lazer_client()
+            return analyze_feed(
+                client,
+                feed_sessions,
+                start_utc,
+                end_utc,
+                args.critical_pct,
+                args.warn_pct,
+                args.min_updates,
+            )
+
+        with ThreadPoolExecutor(max_workers=args.workers) as executor:
+            futures = {
+                executor.submit(run_one, fss): fid for fid, fss in by_feed.items()
+            }
+            for i, future in enumerate(as_completed(futures), 1):
+                fid = futures[future]
+                try:
+                    rows = future.result()
+                except Exception as e:  # soft-fail, continue
+                    failures += 1
+                    print(f"  [{i}/{len(by_feed)}] feed {fid} FAILED: {e}")
+                    continue
+                with write_lock:
+                    writer.writerows(rows)
+                    csv_file.flush()
+                    all_rows.extend(rows)
+    csv_file.close()
+
+    tally = summarize(all_rows)
+    print(f"\nAnalysis written to {out_path} ({failures} feed failures)")
+    for v in _VERDICT_ORDER:
+        if v in tally:
+            print(f"  {v:12} {tally[v]}")
+
+    critical = sorted(
+        (r for r in all_rows if r["verdict"] == "CRITICAL"),
+        key=lambda r: r["pct_at_floor"],
+        reverse=True,
+    )
+    if critical:
+        print(f"\nCRITICAL feed-sessions ({len(critical)}):")
+        for r in critical:
+            print(
+                f"  feed {r['feed_id']:>5} {r['symbol']:24} {r['session']:11} "
+                f"min_pub={r['effective_min_pub']} pct_at_floor={r['pct_at_floor']:.2f}%"
+            )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
