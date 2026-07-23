@@ -42,6 +42,8 @@ RESULT_COLUMNS = [
     "p1",
     "p5",
     "median",
+    "pct_below_par",
+    "pct_at_par",
     "pct_at_floor",
     "pct_at_floor_1",
     "verdict",
@@ -94,21 +96,17 @@ def distribution_stats(counts: np.ndarray, min_pub: int) -> dict:
     """
     n = int(len(counts))
     if n == 0:
-        return {
-            "n_updates": 0,
-            "min": 0,
-            "p1": 0.0,
-            "p5": 0.0,
-            "median": 0.0,
-            "pct_at_floor": 0.0,
-            "pct_at_floor_1": 0.0,
-        }
+        return _zeroed_stats()
     return {
         "n_updates": n,
         "min": int(counts.min()),
         "p1": float(np.percentile(counts, 1)),
         "p5": float(np.percentile(counts, 5)),
         "median": float(np.median(counts)),
+        # below par = strictly under the floor (a breach); at par = exactly the
+        # floor (compliant but zero redundancy). Their sum is pct_at_floor.
+        "pct_below_par": float((counts < min_pub).mean() * 100.0),
+        "pct_at_par": float((counts == min_pub).mean() * 100.0),
         "pct_at_floor": float((counts <= min_pub).mean() * 100.0),
         "pct_at_floor_1": float((counts <= min_pub + 1).mean() * 100.0),
     }
@@ -131,13 +129,24 @@ def masked_counts(rows, schedule_str, start_utc, end_utc) -> np.ndarray:
 
 
 def classify(
-    stats: dict, critical_pct: float, warn_pct: float, min_updates: int
+    stats: dict,
+    breach_pct: float,
+    critical_pct: float,
+    warn_pct: float,
+    min_updates: int,
 ) -> str:
-    """Verdict precedence: NO_DATA > LOW_SAMPLE > CRITICAL > WARN > OK."""
+    """Verdict precedence: NO_DATA > LOW_SAMPLE > BREACH > CRITICAL > WARN > OK.
+
+    BREACH   = below par (publisher_count < minPublishers) >= breach_pct.
+    CRITICAL = at or below the floor (<= minPublishers) >= critical_pct, but not
+               a breach — in practice predominantly at par.
+    """
     if stats["n_updates"] == 0:
         return "NO_DATA"
     if stats["n_updates"] < min_updates:
         return "LOW_SAMPLE"
+    if stats["pct_below_par"] >= breach_pct:
+        return "BREACH"
     if stats["pct_at_floor"] >= critical_pct:
         return "CRITICAL"
     if stats["pct_at_floor"] == 0.0 and stats["pct_at_floor_1"] >= warn_pct:
@@ -195,6 +204,8 @@ def _zeroed_stats() -> dict:
         "p1": 0.0,
         "p5": 0.0,
         "median": 0.0,
+        "pct_below_par": 0.0,
+        "pct_at_par": 0.0,
         "pct_at_floor": 0.0,
         "pct_at_floor_1": 0.0,
     }
@@ -225,7 +236,8 @@ def histogram_rows(fs, counts) -> list:
 
 
 def analyze_feed(
-    client, feed_sessions, start_utc, end_utc, critical_pct, warn_pct, min_updates
+    client, feed_sessions, start_utc, end_utc,
+    breach_pct, critical_pct, warn_pct, min_updates,
 ) -> tuple:
     """One price_feeds query for the feed.
 
@@ -250,7 +262,7 @@ def analyze_feed(
             summary_out.append({**base, **_zeroed_stats(), "verdict": "NO_SCHEDULE"})
             continue
         stats = distribution_stats(counts, fs.effective_min_pub)
-        verdict = classify(stats, critical_pct, warn_pct, min_updates)
+        verdict = classify(stats, breach_pct, critical_pct, warn_pct, min_updates)
         summary_out.append({**base, **stats, "verdict": verdict})
         hist_out.extend(histogram_rows(fs, counts))
     return summary_out, hist_out
@@ -274,6 +286,7 @@ def parse_args(argv=None):
     p.add_argument("--config", required=True)
     p.add_argument("--start-date", help="UTC start date YYYY-MM-DD (inclusive)")
     p.add_argument("--end-date", help="UTC end date YYYY-MM-DD (exclusive)")
+    p.add_argument("--breach-pct", type=float, default=1.0)
     p.add_argument("--critical-pct", type=float, default=1.0)
     p.add_argument("--warn-pct", type=float, default=5.0)
     p.add_argument("--min-updates", type=int, default=100)
@@ -291,6 +304,7 @@ def parse_args(argv=None):
 _VERDICT_ORDER = [
     "NO_DATA",
     "LOW_SAMPLE",
+    "BREACH",
     "CRITICAL",
     "WARN",
     "OK",
@@ -299,6 +313,7 @@ _VERDICT_ORDER = [
 ]
 
 _CSV_SORT_ORDER = [
+    "BREACH",
     "CRITICAL",
     "WARN",
     "OK",
@@ -376,6 +391,7 @@ def main(argv=None) -> int:
                 feed_sessions,
                 start_utc,
                 end_utc,
+                args.breach_pct,
                 args.critical_pct,
                 args.warn_pct,
                 args.min_updates,
@@ -419,17 +435,30 @@ def main(argv=None) -> int:
         if v in tally:
             print(f"  {v:12} {tally[v]}")
 
+    breach = sorted(
+        (r for r in all_rows if r["verdict"] == "BREACH"),
+        key=lambda r: r["pct_below_par"],
+        reverse=True,
+    )
+    if breach:
+        print(f"\nBREACH feed-sessions ({len(breach)}) — below minPublishers:")
+        for r in breach:
+            print(
+                f"  feed {r['feed_id']:>5} {r['symbol']:24} {r['session']:11} "
+                f"min_pub={r['effective_min_pub']} pct_below_par={r['pct_below_par']:.2f}%"
+            )
+
     critical = sorted(
         (r for r in all_rows if r["verdict"] == "CRITICAL"),
-        key=lambda r: r["pct_at_floor"],
+        key=lambda r: r["pct_at_par"],
         reverse=True,
     )
     if critical:
-        print(f"\nCRITICAL feed-sessions ({len(critical)}):")
+        print(f"\nCRITICAL feed-sessions ({len(critical)}) — at minPublishers:")
         for r in critical:
             print(
                 f"  feed {r['feed_id']:>5} {r['symbol']:24} {r['session']:11} "
-                f"min_pub={r['effective_min_pub']} pct_at_floor={r['pct_at_floor']:.2f}%"
+                f"min_pub={r['effective_min_pub']} pct_at_par={r['pct_at_par']:.2f}%"
             )
 
     for verdict_name in ("LOW_SAMPLE", "NO_DATA"):

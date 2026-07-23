@@ -25,7 +25,8 @@ at the aggregate level?" — the input to feed-by-feed remediation.
         [--critical-pct 1.0] [--warn-pct 5.0] [--min-updates 100] [--workers 8]
 
 `--start-date`/`--end-date` are UTC (`end` exclusive). Omit both for the last 7
-full UTC days. `--feed-id N ...` restricts the sweep. `--exclude-internal` drops
+full UTC days. `--breach-pct` (default 1.0), `--critical-pct` (1.0), and `--warn-pct`
+(5.0) tune the verdict thresholds. `--feed-id N ...` restricts the sweep. `--exclude-internal` drops
 internal feed families (`Pyth.*`, `Custom.*`, `Internal.*`, `FeedComponent.*`)
 from the sweep entirely — use it for a purely consumer-facing report.
 
@@ -38,10 +39,12 @@ Two CSVs are written per run.
 One row per feed-session (sorted CRITICAL first, then `pct_at_floor` descending):
 
 `feed_id, symbol, asset_type, session, effective_min_pub, n_updates, min, p1, p5,
-median, pct_at_floor, pct_at_floor_1, verdict`
+median, pct_below_par, pct_at_par, pct_at_floor, pct_at_floor_1, verdict`
 
-- `pct_at_floor` — % of in-session updates with `publisher_count <= min_pub` (primary trigger).
-- `pct_at_floor_1` — % with `publisher_count <= min_pub + 1` (context).
+- `pct_below_par` — % of in-session updates with `publisher_count < minPublishers` (a breach).
+- `pct_at_par` — % with `publisher_count == minPublishers` (compliant, zero redundancy).
+- `pct_at_floor` — % `<= minPublishers` = below par + at par.
+- `pct_at_floor_1` — % with `publisher_count <= minPublishers + 1` (context).
 
 ### Histogram — `output_csv/active_min_pub_histogram_<start>_<end>.csv`
 
@@ -57,21 +60,23 @@ see exactly where each feed-session's distribution sits relative to its floor.
 
 ### Verdicts
 
-The **floor** is each feed's `minPublishers`. Two metrics drive the verdict:
-`pct_at_floor` (% of in-session aggregates with `publisher_count <= minPublishers`)
-and `pct_at_floor_1` (% with `publisher_count <= minPublishers + 1`).
+The **floor** is each feed's `minPublishers`. Floor contact is split into
+**below par** (`publisher_count < minPublishers` — a breach) and **at par**
+(`== minPublishers` — compliant but zero redundancy).
 
-Precedence: NO_DATA > LOW_SAMPLE > CRITICAL > WARN > OK.
+Precedence: NO_DATA > LOW_SAMPLE > **BREACH** > CRITICAL > WARN > OK.
 
-- **CRITICAL** — `pct_at_floor >= --critical-pct` (default **1.0%**): at least 1%
-  of aggregates ran **at or below** the floor (`publisher_count <= minPublishers`).
-  Hits its minimum regularly.
+- **BREACH** — `pct_below_par >= --breach-pct` (default **1.0%**): ≥1% of aggregates
+  published with **fewer** than `minPublishers` publishers. A breach of the min-pub
+  guarantee — the strongest signal.
+- **CRITICAL** — `pct_at_floor >= --critical-pct` (default **1.0%**) and not a breach:
+  ≥1% **at or below** the floor. In practice predominantly **at par** (exactly
+  `minPublishers`), since below-par-heavy feeds become BREACH. Compliant but fragile.
 - **WARN** — `pct_at_floor == 0` **and** `pct_at_floor_1 >= --warn-pct`
   (default **5.0%**): never at the floor, but ≥5% ran exactly **one above** it
   (`= minPublishers + 1`). One dropout from CRITICAL.
 - **OK** — everything else: **< 1%** at the floor, and — if never at it — **< 5%**
-  one above. Rarely at or near the floor. (Gap by construction: a feed at the floor
-  only _rarely_, `0 < pct_at_floor < 1%`, is neither CRITICAL nor WARN — it lands here.)
+  one above. Rarely at or near the floor.
 - **LOW_SAMPLE** — fewer than `--min-updates` (default 100) in-session updates.
 - **NO_DATA** — no aggregate updates in the window (non-trading / not ingested).
 - **NO_SCHEDULE** — session has no resolvable/parsable market schedule.

@@ -29,9 +29,23 @@ def test_distribution_stats_basic():
     assert s["pct_at_floor"] == 20.0
     # pct_at_floor_1: publisher_count <= 3 -> 3/10 = 30.0
     assert s["pct_at_floor_1"] == 30.0
+    # nothing strictly below 2; the two at-floor updates are exactly at par
+    assert s["pct_below_par"] == 0.0
+    assert s["pct_at_par"] == 20.0
     # percentiles are numpy linear-interp values
     assert s["p1"] == float(np.percentile(counts, 1))
     assert s["p5"] == float(np.percentile(counts, 5))
+
+
+def test_distribution_stats_below_and_at_par():
+    # min_pub=2: one below par (1), two at par (2, 2), rest above.
+    counts = np.array([1, 2, 2, 3, 5])
+    s = distribution_stats(counts, min_pub=2)
+    assert s["pct_below_par"] == 20.0  # 1/5 strictly below 2
+    assert s["pct_at_par"] == 40.0  # 2/5 exactly at 2
+    assert s["pct_at_floor"] == 60.0  # <= 2 -> 3/5
+    # below + at == at_floor
+    assert s["pct_below_par"] + s["pct_at_par"] == s["pct_at_floor"]
 
 
 def test_distribution_stats_empty():
@@ -43,47 +57,63 @@ def test_distribution_stats_empty():
     assert s["median"] == 0.0
 
 
-def _stats(n_updates, pct_at_floor, pct_at_floor_1):
+def _stats(n_updates, pct_at_floor, pct_at_floor_1, pct_below_par=0.0):
     return {
         "n_updates": n_updates,
+        "pct_below_par": pct_below_par,
+        "pct_at_par": pct_at_floor - pct_below_par,
         "pct_at_floor": pct_at_floor,
         "pct_at_floor_1": pct_at_floor_1,
     }
 
 
+def _classify(s):
+    return classify(s, breach_pct=1.0, critical_pct=1.0, warn_pct=5.0, min_updates=100)
+
+
 def test_classify_no_data_before_everything():
-    s = _stats(0, 0.0, 0.0)
-    assert classify(s, critical_pct=1.0, warn_pct=5.0, min_updates=100) == "NO_DATA"
+    assert _classify(_stats(0, 0.0, 0.0)) == "NO_DATA"
 
 
 def test_classify_low_sample_below_min_updates():
-    s = _stats(99, 50.0, 50.0)  # would be CRITICAL if it had samples
-    assert classify(s, critical_pct=1.0, warn_pct=5.0, min_updates=100) == "LOW_SAMPLE"
+    # would be CRITICAL if it had samples
+    assert _classify(_stats(99, 50.0, 50.0)) == "LOW_SAMPLE"
 
 
 def test_classify_critical_at_threshold():
-    s = _stats(500, 1.0, 1.0)  # exactly at critical_pct
-    assert classify(s, critical_pct=1.0, warn_pct=5.0, min_updates=100) == "CRITICAL"
+    # exactly at critical_pct, all at par (no below-par)
+    assert _classify(_stats(500, 1.0, 1.0)) == "CRITICAL"
+
+
+def test_classify_breach_before_critical():
+    # 2% below par (>= breach_pct) -> BREACH, even though also at/above critical
+    assert _classify(_stats(500, 5.0, 5.0, pct_below_par=2.0)) == "BREACH"
+
+
+def test_classify_below_breach_threshold_stays_critical():
+    # below par present but under breach_pct -> still CRITICAL (at-or-below >= 1%)
+    assert _classify(_stats(500, 5.0, 5.0, pct_below_par=0.5)) == "CRITICAL"
+
+
+def test_classify_breach_at_threshold():
+    # exactly at breach_pct
+    assert _classify(_stats(500, 1.0, 1.0, pct_below_par=1.0)) == "BREACH"
 
 
 def test_classify_warn_only_when_floor_untouched():
-    s = _stats(500, 0.0, 5.0)  # never at floor, but >=warn_pct at floor+1
-    assert classify(s, critical_pct=1.0, warn_pct=5.0, min_updates=100) == "WARN"
+    # never at floor, but >=warn_pct at floor+1
+    assert _classify(_stats(500, 0.0, 5.0)) == "WARN"
 
 
 def test_classify_ok():
-    s = _stats(500, 0.0, 4.9)  # below warn_pct at floor+1
-    assert classify(s, critical_pct=1.0, warn_pct=5.0, min_updates=100) == "OK"
+    # below warn_pct at floor+1
+    assert _classify(_stats(500, 0.0, 4.9)) == "OK"
 
 
 def test_classify_min_updates_boundary_is_low_sample_exclusive():
     # n_updates == min_updates is NOT low sample (>= passes)
-    s_at = _stats(100, 0.0, 0.0)
-    assert classify(s_at, critical_pct=1.0, warn_pct=5.0, min_updates=100) == "OK"
-    s_below = _stats(100, 2.0, 2.0)
-    assert (
-        classify(s_below, critical_pct=1.0, warn_pct=5.0, min_updates=100) == "CRITICAL"
-    )
+    assert _classify(_stats(100, 0.0, 0.0)) == "OK"
+    assert _classify(_stats(100, 2.0, 2.0)) == "CRITICAL"
 
 
 def test_result_columns_contract():
@@ -98,6 +128,8 @@ def test_result_columns_contract():
         "p1",
         "p5",
         "median",
+        "pct_below_par",
+        "pct_at_par",
         "pct_at_floor",
         "pct_at_floor_1",
         "verdict",
@@ -233,6 +265,7 @@ def test_analyze_feed_one_row_per_session_with_verdict():
         [_regular_session()],
         start,
         end,
+        breach_pct=1.0,
         critical_pct=1.0,
         warn_pct=5.0,
         min_updates=100,
@@ -255,7 +288,7 @@ def test_analyze_feed_no_data_when_no_channel_has_rows():
     start = datetime(2026, 7, 14, tzinfo=timezone.utc)
     end = datetime(2026, 7, 15, tzinfo=timezone.utc)
     client = ChannelClient({})  # empty
-    summary, hist = analyze_feed(client, [_regular_session()], start, end, 1.0, 5.0, 100)
+    summary, hist = analyze_feed(client, [_regular_session()], start, end, 1.0, 1.0, 5.0, 100)
     assert summary[0]["verdict"] == "NO_DATA"
     assert summary[0]["n_updates"] == 0
     assert hist == []  # no updates -> no histogram rows
@@ -275,7 +308,7 @@ def test_analyze_feed_malformed_schedule_yields_no_schedule():
         effective_min_pub=2,
         schedule_str="not-a-schedule",
     )
-    summary, hist = analyze_feed(client, [bad], start, end, 1.0, 5.0, 100)
+    summary, hist = analyze_feed(client, [bad], start, end, 1.0, 1.0, 5.0, 100)
     assert summary[0]["verdict"] == "NO_SCHEDULE"
     assert set(summary[0].keys()) == set(RESULT_COLUMNS)
     assert hist == []  # NO_SCHEDULE session contributes no histogram rows
@@ -364,7 +397,7 @@ def test_analyze_feed_none_min_pub_yields_no_min_pub():
         effective_min_pub=None,
         schedule_str="UTC;O,O,O,O,O,O,O",
     )
-    summary, hist = analyze_feed(client, [fs], start, end, 1.0, 5.0, 100)
+    summary, hist = analyze_feed(client, [fs], start, end, 1.0, 1.0, 5.0, 100)
     assert summary[0]["verdict"] == "NO_MIN_PUB"
     assert set(summary[0].keys()) == set(RESULT_COLUMNS)
     assert hist == []  # NO_MIN_PUB session contributes no histogram rows
