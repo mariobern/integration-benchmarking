@@ -7,6 +7,7 @@ from lazer_dq.active_min_pub import (
     HISTOGRAM_COLUMNS,
     RESULT_COLUMNS,
     classify,
+    derive_asset_type,
     distribution_stats,
     histogram_rows,
     masked_counts,
@@ -387,6 +388,39 @@ def test_histogram_rows_counts_per_distinct_value():
         assert r["feed_id"] == 1080
         assert r["session"] == "OVER_NIGHT"
         assert r["effective_min_pub"] == 2
+
+
+def test_derive_asset_type_splits_index_feeds():
+    # .Index. feeds get a '<class>-index' asset type per underlying class
+    assert derive_asset_type("Equity.Index.NVDA/USD", "equity") == "equity-index"
+    assert (
+        derive_asset_type("Commodities.Index.COPPER/USD", "commodity")
+        == "commodity-index"
+    )
+    assert derive_asset_type("FX.Index.DXY/USD", "fx") == "fx-index"
+    assert derive_asset_type("Metal.Index.XAU/USD", "metal") == "metal-index"
+    # already-correct crypto-index is not double-suffixed
+    assert derive_asset_type("Crypto.Index.EBTC/USD", "crypto-index") == "crypto-index"
+    # a Crypto.Index feed mislabeled plain 'crypto' is fixed to crypto-index
+    assert derive_asset_type("Crypto.Index.FOO/USD", "crypto") == "crypto-index"
+    # non-index feeds are untouched
+    assert derive_asset_type("Equity.US.AAPL/USD", "equity") == "equity"
+    assert derive_asset_type("Equity.HK.0668/HKD", "equity") == "equity"
+    assert derive_asset_type("Crypto.BTC/USD", "crypto") == "crypto"
+
+
+def test_base_row_and_histogram_use_derived_asset_type():
+    fs = _FS(
+        feed_id=3191,
+        symbol="Equity.Index.AAPL/USD",
+        asset_type="equity",
+        session="REGULAR",
+        allowed=frozenset({1, 2}),
+        effective_min_pub=1,
+        schedule_str="UTC;O,O,O,O,O,O,O",
+    )
+    hist = histogram_rows(fs, np.array([2, 2, 3]))
+    assert all(r["asset_type"] == "equity-index" for r in hist)
 
 
 def test_histogram_rows_empty_when_no_counts():

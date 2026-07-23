@@ -66,6 +66,17 @@ see exactly where each feed-session's distribution sits relative to its floor.
 The console prints the verdict tally, the CRITICAL list (sorted by `pct_at_floor`),
 and the NO_DATA / LOW_SAMPLE lists.
 
+## Asset type: index feeds are split out
+
+`.Index.` feeds (symbol has `Index` as its second dotted segment — e.g.
+`Equity.Index.NVDA/USD`, `Commodities.Index.COPPER/USD`) are re-tagged
+`<class>-index` (`equity-index`, `commodity-index`, `fx-index`, `metal-index`,
+`crypto-index`) so they don't dilute the underlying asset class' publisher-count
+distribution. This also normalizes a config inconsistency (`Crypto.Index.*` is
+already `crypto-index`, but `Equity.Index.*` etc. were plain `equity`). The split
+is applied only in this script's output (`derive_asset_type`); the shared config
+metadata and `audit_min_pub` are untouched.
+
 ## Sessions
 
 US-equities feeds carry REGULAR / PRE_MARKET / POST_MARKET / OVER_NIGHT as distinct

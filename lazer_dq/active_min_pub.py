@@ -145,11 +145,28 @@ def classify(
     return "OK"
 
 
+def derive_asset_type(symbol, asset_type) -> str:
+    """Split index feeds into their own '<class>-index' asset type.
+
+    Feeds whose symbol has ``Index`` as its second dotted segment
+    (``Equity.Index.NVDA/USD``, ``Commodities.Index.COPPER/USD``, ...) are
+    tagged ``<asset_type>-index`` so they don't dilute the underlying asset
+    class' publisher-count distribution. The config is inconsistent here
+    (``Crypto.Index.*`` is already ``crypto-index`` but ``Equity.Index.*`` is
+    plain ``equity``); the guard makes every ``.Index.`` feed uniform without
+    double-suffixing the ones already correct.
+    """
+    parts = symbol.split(".")
+    if len(parts) >= 2 and parts[1] == "Index" and not asset_type.endswith("-index"):
+        return f"{asset_type}-index"
+    return asset_type
+
+
 def _base_row(fs) -> dict:
     return {
         "feed_id": fs.feed_id,
         "symbol": fs.symbol,
-        "asset_type": fs.asset_type,
+        "asset_type": derive_asset_type(fs.symbol, fs.asset_type),
         "session": fs.session,
         "effective_min_pub": fs.effective_min_pub,
     }
@@ -176,11 +193,12 @@ def histogram_rows(fs, counts) -> list:
     if len(counts) == 0:
         return []
     values, freqs = np.unique(counts, return_counts=True)
+    asset_type = derive_asset_type(fs.symbol, fs.asset_type)
     return [
         {
             "feed_id": fs.feed_id,
             "symbol": fs.symbol,
-            "asset_type": fs.asset_type,
+            "asset_type": asset_type,
             "session": fs.session,
             "effective_min_pub": fs.effective_min_pub,
             "publisher_count": int(v),
