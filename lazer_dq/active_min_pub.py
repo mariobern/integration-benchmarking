@@ -136,3 +136,47 @@ def classify(
     if stats["pct_at_floor"] == 0.0 and stats["pct_at_floor_1"] >= warn_pct:
         return "WARN"
     return "OK"
+
+
+def _base_row(fs) -> dict:
+    return {
+        "feed_id": fs.feed_id,
+        "symbol": fs.symbol,
+        "asset_type": fs.asset_type,
+        "session": fs.session,
+        "effective_min_pub": fs.effective_min_pub,
+    }
+
+
+def _zeroed_stats() -> dict:
+    return {
+        "n_updates": 0,
+        "min": 0,
+        "p1": 0.0,
+        "p5": 0.0,
+        "median": 0.0,
+        "pct_at_floor": 0.0,
+        "pct_at_floor_1": 0.0,
+    }
+
+
+def analyze_feed(
+    client, feed_sessions, start_utc, end_utc, critical_pct, warn_pct, min_updates
+) -> list:
+    """One price_feeds query for the feed; one result row per session."""
+    rows = fetch_feed_rows(client, feed_sessions[0].feed_id, start_utc, end_utc)
+    out = []
+    for fs in feed_sessions:
+        base = _base_row(fs)
+        if not fs.schedule_str:
+            out.append({**base, **_zeroed_stats(), "verdict": "NO_SCHEDULE"})
+            continue
+        try:
+            counts = masked_counts(rows, fs.schedule_str, start_utc, end_utc)
+        except ValueError:
+            out.append({**base, **_zeroed_stats(), "verdict": "NO_SCHEDULE"})
+            continue
+        stats = distribution_stats(counts, fs.effective_min_pub)
+        verdict = classify(stats, critical_pct, warn_pct, min_updates)
+        out.append({**base, **stats, "verdict": verdict})
+    return out

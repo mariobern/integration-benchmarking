@@ -199,3 +199,71 @@ def test_fetch_feed_rows_query_is_parameterized_and_scoped():
     assert "price_feeds" in PRICE_FEEDS_QUERY
     assert "publisher_count" in PRICE_FEEDS_QUERY
     assert "publisher_updates" not in PRICE_FEEDS_QUERY
+
+
+from lazer_dq.active_min_pub import analyze_feed
+from lazer_dq.min_pub_common import FeedSession
+
+
+def _regular_session(feed_id=100, min_pub=2):
+    return FeedSession(
+        feed_id=feed_id,
+        symbol="Equity.US.TEST/USD",
+        asset_type="equity-us",
+        session="REGULAR",
+        allowed=frozenset({1, 2, 3, 4, 5}),
+        effective_min_pub=min_pub,
+        schedule_str="UTC;O,O,O,O,O,O,O",  # always open -> no masking effect
+    )
+
+
+def test_analyze_feed_one_row_per_session_with_verdict():
+    start = datetime(2026, 7, 14, tzinfo=timezone.utc)
+    end = datetime(2026, 7, 15, tzinfo=timezone.utc)
+    # 200 updates all well above floor -> OK; feed_id 100, channel 1 has data.
+    t = datetime(2026, 7, 14, 13, 30)
+    rows = [(t, 5)] * 200
+    client = ChannelClient({1: rows})
+    result = analyze_feed(
+        client,
+        [_regular_session()],
+        start,
+        end,
+        critical_pct=1.0,
+        warn_pct=5.0,
+        min_updates=100,
+    )
+    assert len(result) == 1
+    r = result[0]
+    assert set(r.keys()) == set(RESULT_COLUMNS)
+    assert r["session"] == "REGULAR"
+    assert r["n_updates"] == 200
+    assert r["verdict"] == "OK"
+
+
+def test_analyze_feed_no_data_when_no_channel_has_rows():
+    start = datetime(2026, 7, 14, tzinfo=timezone.utc)
+    end = datetime(2026, 7, 15, tzinfo=timezone.utc)
+    client = ChannelClient({})  # empty
+    result = analyze_feed(client, [_regular_session()], start, end, 1.0, 5.0, 100)
+    assert result[0]["verdict"] == "NO_DATA"
+    assert result[0]["n_updates"] == 0
+
+
+def test_analyze_feed_malformed_schedule_yields_no_schedule():
+    start = datetime(2026, 7, 14, tzinfo=timezone.utc)
+    end = datetime(2026, 7, 15, tzinfo=timezone.utc)
+    t = datetime(2026, 7, 14, 13, 30)
+    client = ChannelClient({1: [(t, 5)] * 200})
+    bad = FeedSession(
+        feed_id=100,
+        symbol="Equity.US.TEST/USD",
+        asset_type="equity-us",
+        session="PRE_MARKET",
+        allowed=frozenset({1, 2}),
+        effective_min_pub=2,
+        schedule_str="not-a-schedule",
+    )
+    result = analyze_feed(client, [bad], start, end, 1.0, 5.0, 100)
+    assert result[0]["verdict"] == "NO_SCHEDULE"
+    assert set(result[0].keys()) == set(RESULT_COLUMNS)
