@@ -25,7 +25,9 @@ at the aggregate level?" — the input to feed-by-feed remediation.
         [--critical-pct 1.0] [--warn-pct 5.0] [--min-updates 100] [--workers 8]
 
 `--start-date`/`--end-date` are UTC (`end` exclusive). Omit both for the last 7
-full UTC days. `--feed-id N ...` restricts the sweep.
+full UTC days. `--feed-id N ...` restricts the sweep. `--exclude-internal` drops
+internal feed families (`Pyth.*`, `Custom.*`, `Internal.*`, `FeedComponent.*`)
+from the sweep entirely — use it for a purely consumer-facing report.
 
 ## Output
 
@@ -66,16 +68,24 @@ see exactly where each feed-session's distribution sits relative to its floor.
 The console prints the verdict tally, the CRITICAL list (sorted by `pct_at_floor`),
 and the NO_DATA / LOW_SAMPLE lists.
 
-## Asset type: index feeds are split out
+## Asset type refinement
 
-`.Index.` feeds (symbol has `Index` as its second dotted segment — e.g.
-`Equity.Index.NVDA/USD`, `Commodities.Index.COPPER/USD`) are re-tagged
-`<class>-index` (`equity-index`, `commodity-index`, `fx-index`, `metal-index`,
-`crypto-index`) so they don't dilute the underlying asset class' publisher-count
-distribution. This also normalizes a config inconsistency (`Crypto.Index.*` is
-already `crypto-index`, but `Equity.Index.*` etc. were plain `equity`). The split
-is applied only in this script's output (`derive_asset_type`); the shared config
-metadata and `audit_min_pub` are untouched.
+The raw config `asset_type` is refined in this script's output only
+(`derive_asset_type`); the shared config metadata and `audit_min_pub` are
+untouched. Two adjustments keep the per-class distributions honest:
+
+- **Internal feeds → `internal`.** `Pyth.*`, `Custom.*`, `Internal.*`, and
+  `FeedComponent.*` are non-consumer-facing but carry real asset_types in the
+  config (e.g. `Pyth.BN.AAPL` is tagged `equity`), so they would otherwise
+  pollute the true classes. They collapse to a single `internal` bucket.
+  `FundingRate.*` is a real product and is left as-is. Use `--exclude-internal`
+  to drop them from the sweep entirely.
+- **Index feeds → `<class>-index`.** `.Index.` feeds (symbol has `Index` as its
+  second dotted segment — `Equity.Index.NVDA/USD`, `Commodities.Index.COPPER/USD`)
+  are re-tagged `equity-index`, `commodity-index`, `fx-index`, `metal-index`,
+  `crypto-index` so they don't dilute the underlying class. This also normalizes
+  a config inconsistency (`Crypto.Index.*` was already `crypto-index`, but
+  `Equity.Index.*` was plain `equity`).
 
 ## Sessions
 

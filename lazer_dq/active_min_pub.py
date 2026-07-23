@@ -145,17 +145,33 @@ def classify(
     return "OK"
 
 
-def derive_asset_type(symbol, asset_type) -> str:
-    """Split index feeds into their own '<class>-index' asset type.
+# Non-consumer-facing feed families. Their symbols carry real asset_types
+# (e.g. Pyth.BN.AAPL is tagged "equity"), so they dilute the true asset-class
+# distributions unless separated. FundingRate.* is a real product, NOT internal.
+_INTERNAL_PREFIXES = ("Pyth.", "Custom.", "Internal.", "FeedComponent.")
 
-    Feeds whose symbol has ``Index`` as its second dotted segment
-    (``Equity.Index.NVDA/USD``, ``Commodities.Index.COPPER/USD``, ...) are
-    tagged ``<asset_type>-index`` so they don't dilute the underlying asset
-    class' publisher-count distribution. The config is inconsistent here
-    (``Crypto.Index.*`` is already ``crypto-index`` but ``Equity.Index.*`` is
-    plain ``equity``); the guard makes every ``.Index.`` feed uniform without
-    double-suffixing the ones already correct.
+
+def is_internal(symbol) -> bool:
+    """True for internal / non-consumer-facing feed families (see prefixes)."""
+    return symbol.startswith(_INTERNAL_PREFIXES)
+
+
+def derive_asset_type(symbol, asset_type) -> str:
+    """Refine the raw config asset_type for cleaner class distributions.
+
+    - Internal feeds (``Pyth.*``, ``Custom.*``, ``Internal.*``,
+      ``FeedComponent.*``) collapse to ``internal`` — they carry real
+      asset_types in the config but are not consumer-facing, so they would
+      otherwise pollute equity/fx/commodity/etc.
+    - Index feeds (symbol's second dotted segment is ``Index``:
+      ``Equity.Index.NVDA/USD``, ``Commodities.Index.COPPER/USD``, ...) get
+      ``<asset_type>-index`` so they don't dilute the underlying class. The
+      config is inconsistent here (``Crypto.Index.*`` is already
+      ``crypto-index`` but ``Equity.Index.*`` is plain ``equity``); the guard
+      makes every ``.Index.`` feed uniform without double-suffixing.
     """
+    if is_internal(symbol):
+        return "internal"
     parts = symbol.split(".")
     if len(parts) >= 2 and parts[1] == "Index" and not asset_type.endswith("-index"):
         return f"{asset_type}-index"
@@ -263,6 +279,11 @@ def parse_args(argv=None):
     p.add_argument("--min-updates", type=int, default=100)
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("--feed-id", type=int, nargs="*", help="restrict to these feeds")
+    p.add_argument(
+        "--exclude-internal",
+        action="store_true",
+        help="drop internal (Pyth.*, Custom.*, Internal.*, FeedComponent.*) feeds",
+    )
     p.add_argument("--output-dir", default="output_csv")
     return p.parse_args(argv)
 
@@ -321,10 +342,16 @@ def main(argv=None) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     by_feed: dict = {}
+    excluded_internal = 0
     for fs in iter_stable_sessions(config):
         if args.feed_id and fs.feed_id not in args.feed_id:
             continue
+        if args.exclude_internal and is_internal(fs.symbol):
+            excluded_internal += 1
+            continue
         by_feed.setdefault(fs.feed_id, []).append(fs)
+    if args.exclude_internal:
+        print(f"Excluded {excluded_internal} internal feed-sessions")
 
     stamp = f"{start_utc:%Y-%m-%d}_{end_utc:%Y-%m-%d}"
     out_path = out_dir / f"active_min_pub_{stamp}.csv"

@@ -297,6 +297,12 @@ def test_parse_args_defaults():
     assert args.warn_pct == 5.0
     assert args.min_updates == 100
     assert args.workers == 8
+    assert args.exclude_internal is False
+
+
+def test_parse_args_exclude_internal_flag():
+    args = parse_args(["--config", "x.json", "--exclude-internal"])
+    assert args.exclude_internal is True
 
 
 def test_summarize_tallies_by_verdict():
@@ -407,6 +413,27 @@ def test_derive_asset_type_splits_index_feeds():
     assert derive_asset_type("Equity.US.AAPL/USD", "equity") == "equity"
     assert derive_asset_type("Equity.HK.0668/HKD", "equity") == "equity"
     assert derive_asset_type("Crypto.BTC/USD", "crypto") == "crypto"
+
+
+def test_derive_asset_type_collapses_internal_feeds():
+    from lazer_dq.active_min_pub import is_internal
+
+    # internal families collapse to 'internal' regardless of their config tag
+    assert derive_asset_type("Pyth.BN.AAPL/USDT", "equity") == "internal"
+    assert derive_asset_type("Pyth.HL.COPPER/USDC", "commodity") == "internal"
+    assert derive_asset_type("Custom.PRF1/USD", "custom") == "internal"
+    assert derive_asset_type("Internal.E2EProbe/Latency", "custom") == "internal"
+    assert derive_asset_type("FeedComponent.SPY/USD.K", "custom") == "internal"
+    # internal wins even if the symbol also looks index-y (defensive)
+    assert derive_asset_type("Pyth.Index.FOO/USD", "equity") == "internal"
+    # FundingRate.* is a real product, NOT internal
+    assert is_internal("FundingRate.Hyperliquid.BTC/USD") is False
+    assert derive_asset_type("FundingRate.Hyperliquid.BTC/USD", "funding-rate") == (
+        "funding-rate"
+    )
+    # is_internal predicate
+    assert is_internal("Pyth.BN.AAPL/USDT") is True
+    assert is_internal("Equity.US.AAPL/USD") is False
 
 
 def test_base_row_and_histogram_use_derived_asset_type():
