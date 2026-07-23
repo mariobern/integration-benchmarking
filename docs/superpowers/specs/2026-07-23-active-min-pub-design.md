@@ -203,8 +203,10 @@ python3 -m lazer_dq.active_min_pub \
   `audit_min_pub`'s concurrency shape).
 - Reuse: `min_pub_common.iter_stable_sessions`, `market_schedule` helpers,
   `lib.config` ClickHouse client.
-- `--start-date` / `--end-date` are inclusive UTC dates; the query window is
-  `[start 00:00:00, (end+1) 00:00:00)`.
+- `--start-date` is inclusive and `--end-date` is **exclusive** UTC dates; the
+  query window is `[start 00:00:00, end 00:00:00)` — consistent with the sibling
+  `audit_min_pub` tool. (E.g. `--start-date 2026-07-14 --end-date 2026-07-22`
+  covers 07-14 through 07-21.)
 
 ## Testing
 
