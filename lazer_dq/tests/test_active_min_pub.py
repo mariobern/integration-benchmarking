@@ -142,3 +142,60 @@ def test_masked_counts_empty_rows():
     end = datetime(2026, 7, 15, tzinfo=timezone.utc)
     sched = "UTC;O,O,O,O,O,O,O"
     assert masked_counts([], sched, start, end).tolist() == []
+
+
+from lazer_dq.active_min_pub import fetch_feed_rows
+
+
+class FakeResult:
+    def __init__(self, rows):
+        self.result_rows = rows
+
+
+class ChannelClient:
+    """Returns rows only for a specific channel; records queried channels."""
+
+    def __init__(self, rows_by_channel):
+        self._rows_by_channel = rows_by_channel
+        self.channels_tried = []
+
+    def query(self, sql, parameters=None):
+        chan = parameters["channel"]
+        self.channels_tried.append(chan)
+        return FakeResult(self._rows_by_channel.get(chan, []))
+
+
+def test_fetch_feed_rows_uses_lowest_channel_with_data():
+    t = datetime(2026, 7, 14, 13, 30, tzinfo=timezone.utc)
+    client = ChannelClient({2: [(t.replace(tzinfo=None), 5)]})  # only chan 2 has data
+    rows = fetch_feed_rows(client, 100, t, datetime(2026, 7, 15, tzinfo=timezone.utc))
+    assert rows == [(t.replace(tzinfo=None), 5)]
+    assert client.channels_tried == [1, 2]  # stopped at 2, never tried 3
+
+
+def test_fetch_feed_rows_no_data_returns_empty():
+    client = ChannelClient({})  # no channel has data
+    rows = fetch_feed_rows(
+        client,
+        100,
+        datetime(2026, 7, 14, tzinfo=timezone.utc),
+        datetime(2026, 7, 15, tzinfo=timezone.utc),
+    )
+    assert rows == []
+    assert client.channels_tried == [1, 2, 3]
+
+
+def test_fetch_feed_rows_query_is_parameterized_and_scoped():
+    client = ChannelClient({1: [(datetime(2026, 7, 14, 13, 30), 5)]})
+    fetch_feed_rows(
+        client,
+        321,
+        datetime(2026, 7, 14, tzinfo=timezone.utc),
+        datetime(2026, 7, 15, tzinfo=timezone.utc),
+    )
+    # last query used channel 1 and feed 321
+    from lazer_dq.active_min_pub import PRICE_FEEDS_QUERY
+
+    assert "price_feeds" in PRICE_FEEDS_QUERY
+    assert "publisher_count" in PRICE_FEEDS_QUERY
+    assert "publisher_updates" not in PRICE_FEEDS_QUERY

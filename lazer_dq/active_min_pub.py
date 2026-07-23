@@ -48,6 +48,34 @@ RESULT_COLUMNS = [
 ]
 
 
+PRICE_FEEDS_QUERY = """
+    SELECT publish_time, publisher_count
+    FROM price_feeds
+    WHERE price_feed_id = {feed_id:UInt64}
+      AND channel = {channel:UInt8}
+      AND publish_time >= {start:String}
+      AND publish_time < {end:String}
+    ORDER BY publish_time
+"""
+
+
+def fetch_feed_rows(client, feed_id, start_utc, end_utc, channels=(1, 2, 3)) -> list:
+    """(publish_time, publisher_count) rows from the lowest channel with data."""
+    for channel in channels:
+        result = client.query(
+            PRICE_FEEDS_QUERY,
+            parameters={
+                "feed_id": feed_id,
+                "channel": channel,
+                "start": start_utc.strftime("%Y-%m-%d %H:%M:%S"),
+                "end": end_utc.strftime("%Y-%m-%d %H:%M:%S"),
+            },
+        )
+        if result.result_rows:
+            return list(result.result_rows)
+    return []
+
+
 def distribution_stats(counts: np.ndarray, min_pub: int) -> dict:
     """Distribution of aggregate publisher_count vs the min-pub floor.
 
