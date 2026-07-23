@@ -46,7 +46,7 @@ open but is out of scope here.
 For every STABLE `(feed, session)` in `lazer_newest.json`, over a multi-day window:
 
 1. Fetch the aggregate `publisher_count` per update from `price_feeds` (highest-freq
-   channel = the feed's `minChannel`).
+   channel = lowest-numbered channel with data, probing 1 → 2 → 3).
 2. Session-mask to the session's open hours.
 3. Compute the contributor-count distribution and a per-feed verdict driven by how
    often the aggregate scrapes/breaches the `minPublishers` floor.
@@ -72,7 +72,7 @@ For every STABLE `(feed, session)` in `lazer_newest.json`, over a multi-day wind
 lazer_newest.json ──iter_stable_sessions()──▶ [(feed, session, min_pub, schedule_str)]
                                                         │  per feed-session
 price_feeds  ──publisher_count per aggregate──▶  session-mask ──▶ counts[]  ──▶ stats + verdict
-   (channel = feed.minChannel)                   (open hrs only)
+   (channel = lowest with data, 1→2→3)           (open hrs only)
 ```
 
 ### Universe & floors
@@ -110,10 +110,16 @@ which requires `--overnight` + publisher-32 peer logic) — it is just another m
 window. The only masking subtlety is that OVER_NIGHT crosses midnight and has two
 disjoint intervals per day; this is covered by an explicit test case.
 
-### Query
+### Query & channel selection
 
-Per feed, over `[start, end)`, using the feed's own `minChannel` as the
-highest-frequency channel (no channel probing):
+The config's `minChannel` is **symbolic** (`{'realTime': {}}` or `{'rate': {}}`),
+not the numeric `channel` the `price_feeds` table keys on — so it can't be used
+directly. The transcript's intent is "the highest-frequency channel = the lowest
+number (~50ms)". We implement that with the proven pattern from
+`lib/benchmark_core.py`: **probe channels 1 → 2 → 3 and use the lowest-numbered
+channel that returns rows** (channel 1 = real-time/fastest).
+
+Per feed, over `[start, end)`:
 
 ```sql
 SELECT publish_time, publisher_count
@@ -125,7 +131,8 @@ WHERE price_feed_id = {feed_id:UInt64}
 ```
 
 Client: `lazer_clickhouse_prod` (via `lib.config`). Parameterized-query syntax
-(`{name:Type}` + `parameters=dict`).
+(`{name:Type}` + `parameters=dict`). One query per feed covers all its sessions
+(sessions are separated afterward by masking, not by re-querying).
 
 ### Session masking
 
@@ -211,7 +218,8 @@ python3 -m lazer_dq.active_min_pub \
 - Session masking: updates outside open hours are excluded from `counts[]`.
 - OVER_NIGHT midnight-crossing, multi-interval mask (`0000-0400 & 2000-2400`)
   keeps only updates inside either interval.
-- `minChannel` is used for the query (no channel probing).
+- Channel probing: when channel 1 has no rows, falls through to 2 then 3, and
+  uses the first channel that returns data.
 
 ## Documentation
 
