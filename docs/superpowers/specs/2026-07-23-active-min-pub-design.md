@@ -183,6 +183,21 @@ n_updates, min, p1, p5, median, pct_at_floor, pct_at_floor_1, verdict
 
 Sorted by verdict precedence (CRITICAL first), then `pct_at_floor` descending.
 
+### Histogram CSV
+
+`output_csv/active_min_pub_histogram_<start>_<end>.csv`, the raw distribution —
+one row per distinct `publisher_count` per feed-session (computed from the same
+masked `counts[]` array, no extra queries):
+
+```
+feed_id, symbol, asset_type, session, effective_min_pub, publisher_count, n_updates
+```
+
+Each session's `n_updates` sum equals its summary-row `n_updates`. This is the
+transcript's "count the number of updates per each distinct number → histogram".
+Sorted by `(feed_id, session, publisher_count)`. Sessions with no in-session
+updates contribute no rows.
+
 ### Console summary
 
 - Verdict tally (count of CRITICAL / WARN / OK / LOW_SAMPLE / NO_DATA).

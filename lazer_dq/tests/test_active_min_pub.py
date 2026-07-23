@@ -4,11 +4,14 @@ import numpy as np
 import pandas as pd
 
 from lazer_dq.active_min_pub import (
+    HISTOGRAM_COLUMNS,
     RESULT_COLUMNS,
     classify,
     distribution_stats,
+    histogram_rows,
     masked_counts,
 )
+from lazer_dq.min_pub_common import FeedSession as _FS
 
 
 def test_distribution_stats_basic():
@@ -224,7 +227,7 @@ def test_analyze_feed_one_row_per_session_with_verdict():
     t = datetime(2026, 7, 14, 13, 30)
     rows = [(t, 5)] * 200
     client = ChannelClient({1: rows})
-    result = analyze_feed(
+    summary, hist = analyze_feed(
         client,
         [_regular_session()],
         start,
@@ -233,21 +236,28 @@ def test_analyze_feed_one_row_per_session_with_verdict():
         warn_pct=5.0,
         min_updates=100,
     )
-    assert len(result) == 1
-    r = result[0]
+    assert len(summary) == 1
+    r = summary[0]
     assert set(r.keys()) == set(RESULT_COLUMNS)
     assert r["session"] == "REGULAR"
     assert r["n_updates"] == 200
     assert r["verdict"] == "OK"
+    # histogram: all 200 updates at publisher_count 5 -> one bucket
+    assert len(hist) == 1
+    assert set(hist[0].keys()) == set(HISTOGRAM_COLUMNS)
+    assert hist[0]["publisher_count"] == 5
+    assert hist[0]["n_updates"] == 200
+    assert hist[0]["session"] == "REGULAR"
 
 
 def test_analyze_feed_no_data_when_no_channel_has_rows():
     start = datetime(2026, 7, 14, tzinfo=timezone.utc)
     end = datetime(2026, 7, 15, tzinfo=timezone.utc)
     client = ChannelClient({})  # empty
-    result = analyze_feed(client, [_regular_session()], start, end, 1.0, 5.0, 100)
-    assert result[0]["verdict"] == "NO_DATA"
-    assert result[0]["n_updates"] == 0
+    summary, hist = analyze_feed(client, [_regular_session()], start, end, 1.0, 5.0, 100)
+    assert summary[0]["verdict"] == "NO_DATA"
+    assert summary[0]["n_updates"] == 0
+    assert hist == []  # no updates -> no histogram rows
 
 
 def test_analyze_feed_malformed_schedule_yields_no_schedule():
@@ -264,9 +274,10 @@ def test_analyze_feed_malformed_schedule_yields_no_schedule():
         effective_min_pub=2,
         schedule_str="not-a-schedule",
     )
-    result = analyze_feed(client, [bad], start, end, 1.0, 5.0, 100)
-    assert result[0]["verdict"] == "NO_SCHEDULE"
-    assert set(result[0].keys()) == set(RESULT_COLUMNS)
+    summary, hist = analyze_feed(client, [bad], start, end, 1.0, 5.0, 100)
+    assert summary[0]["verdict"] == "NO_SCHEDULE"
+    assert set(summary[0].keys()) == set(RESULT_COLUMNS)
+    assert hist == []  # NO_SCHEDULE session contributes no histogram rows
 
 
 from lazer_dq.active_min_pub import default_window, parse_args, summarize
@@ -346,6 +357,46 @@ def test_analyze_feed_none_min_pub_yields_no_min_pub():
         effective_min_pub=None,
         schedule_str="UTC;O,O,O,O,O,O,O",
     )
-    result = analyze_feed(client, [fs], start, end, 1.0, 5.0, 100)
-    assert result[0]["verdict"] == "NO_MIN_PUB"
-    assert set(result[0].keys()) == set(RESULT_COLUMNS)
+    summary, hist = analyze_feed(client, [fs], start, end, 1.0, 5.0, 100)
+    assert summary[0]["verdict"] == "NO_MIN_PUB"
+    assert set(summary[0].keys()) == set(RESULT_COLUMNS)
+    assert hist == []  # NO_MIN_PUB session contributes no histogram rows
+
+
+def test_histogram_rows_counts_per_distinct_value():
+    fs = _FS(
+        feed_id=1080,
+        symbol="Equity.US.DIA/USD",
+        asset_type="equity-us",
+        session="OVER_NIGHT",
+        allowed=frozenset({1, 2}),
+        effective_min_pub=2,
+        schedule_str="UTC;O,O,O,O,O,O,O",
+    )
+    counts = np.array([2, 2, 2, 3, 4, 4])
+    rows = histogram_rows(fs, counts)
+    # one row per distinct publisher_count, ascending
+    assert [(r["publisher_count"], r["n_updates"]) for r in rows] == [
+        (2, 3),
+        (3, 1),
+        (4, 2),
+    ]
+    # every row carries the full column set + feed-session identity
+    for r in rows:
+        assert set(r.keys()) == set(HISTOGRAM_COLUMNS)
+        assert r["feed_id"] == 1080
+        assert r["session"] == "OVER_NIGHT"
+        assert r["effective_min_pub"] == 2
+
+
+def test_histogram_rows_empty_when_no_counts():
+    fs = _FS(
+        feed_id=1,
+        symbol="X",
+        asset_type="fx",
+        session="REGULAR",
+        allowed=frozenset(),
+        effective_min_pub=2,
+        schedule_str="UTC;O,O,O,O,O,O,O",
+    )
+    assert histogram_rows(fs, np.array([], dtype=int)) == []

@@ -47,6 +47,16 @@ RESULT_COLUMNS = [
     "verdict",
 ]
 
+HISTOGRAM_COLUMNS = [
+    "feed_id",
+    "symbol",
+    "asset_type",
+    "session",
+    "effective_min_pub",
+    "publisher_count",
+    "n_updates",
+]
+
 
 PRICE_FEEDS_QUERY = """
     SELECT publish_time, publisher_count
@@ -157,29 +167,59 @@ def _zeroed_stats() -> dict:
     }
 
 
+def histogram_rows(fs, counts) -> list:
+    """One row per distinct publisher_count value for this feed-session.
+
+    The literal histogram: number of in-session aggregate updates at each
+    observed contributor count. Empty counts -> no rows.
+    """
+    if len(counts) == 0:
+        return []
+    values, freqs = np.unique(counts, return_counts=True)
+    return [
+        {
+            "feed_id": fs.feed_id,
+            "symbol": fs.symbol,
+            "asset_type": fs.asset_type,
+            "session": fs.session,
+            "effective_min_pub": fs.effective_min_pub,
+            "publisher_count": int(v),
+            "n_updates": int(n),
+        }
+        for v, n in zip(values, freqs)
+    ]
+
+
 def analyze_feed(
     client, feed_sessions, start_utc, end_utc, critical_pct, warn_pct, min_updates
-) -> list:
-    """One price_feeds query for the feed; one result row per session."""
+) -> tuple:
+    """One price_feeds query for the feed.
+
+    Returns (summary_rows, histogram_rows): one summary row per session, plus
+    the long-format histogram rows (one per distinct publisher_count) for every
+    session that had in-session updates.
+    """
     rows = fetch_feed_rows(client, feed_sessions[0].feed_id, start_utc, end_utc)
-    out = []
+    summary_out = []
+    hist_out = []
     for fs in feed_sessions:
         base = _base_row(fs)
         if fs.effective_min_pub is None:
-            out.append({**base, **_zeroed_stats(), "verdict": "NO_MIN_PUB"})
+            summary_out.append({**base, **_zeroed_stats(), "verdict": "NO_MIN_PUB"})
             continue
         if not fs.schedule_str:
-            out.append({**base, **_zeroed_stats(), "verdict": "NO_SCHEDULE"})
+            summary_out.append({**base, **_zeroed_stats(), "verdict": "NO_SCHEDULE"})
             continue
         try:
             counts = masked_counts(rows, fs.schedule_str, start_utc, end_utc)
         except ValueError:
-            out.append({**base, **_zeroed_stats(), "verdict": "NO_SCHEDULE"})
+            summary_out.append({**base, **_zeroed_stats(), "verdict": "NO_SCHEDULE"})
             continue
         stats = distribution_stats(counts, fs.effective_min_pub)
         verdict = classify(stats, critical_pct, warn_pct, min_updates)
-        out.append({**base, **stats, "verdict": verdict})
-    return out
+        summary_out.append({**base, **stats, "verdict": verdict})
+        hist_out.extend(histogram_rows(fs, counts))
+    return summary_out, hist_out
 
 
 def default_window():
@@ -268,7 +308,9 @@ def main(argv=None) -> int:
             continue
         by_feed.setdefault(fs.feed_id, []).append(fs)
 
-    out_path = out_dir / (f"active_min_pub_{start_utc:%Y-%m-%d}_{end_utc:%Y-%m-%d}.csv")
+    stamp = f"{start_utc:%Y-%m-%d}_{end_utc:%Y-%m-%d}"
+    out_path = out_dir / f"active_min_pub_{stamp}.csv"
+    hist_path = out_dir / f"active_min_pub_histogram_{stamp}.csv"
     print(
         f"Analyzing {len(by_feed)} feeds ({start_utc:%Y-%m-%d} .. {end_utc:%Y-%m-%d})"
     )
@@ -277,9 +319,7 @@ def main(argv=None) -> int:
 
     write_lock = threading.Lock()
     all_rows: list = []
-    csv_file = open(out_path, "w", newline="")
-    writer = csv.DictWriter(csv_file, fieldnames=RESULT_COLUMNS, extrasaction="ignore")
-    writer.writeheader()
+    all_hist: list = []
 
     failures = 0
     with ThreadLocalClients(load_config(), lazer_only=True) as pool:
@@ -303,19 +343,33 @@ def main(argv=None) -> int:
             for i, future in enumerate(as_completed(futures), 1):
                 fid = futures[future]
                 try:
-                    rows = future.result()
+                    summary_rows, hist_rows = future.result()
                 except Exception as e:  # soft-fail, continue
                     failures += 1
                     print(f"  [{i}/{len(by_feed)}] feed {fid} FAILED: {e}")
                     continue
                 with write_lock:
-                    all_rows.extend(rows)
+                    all_rows.extend(summary_rows)
+                    all_hist.extend(hist_rows)
 
-    writer.writerows(sort_rows(all_rows))
-    csv_file.close()
+    with open(out_path, "w", newline="") as csv_file:
+        writer = csv.DictWriter(
+            csv_file, fieldnames=RESULT_COLUMNS, extrasaction="ignore"
+        )
+        writer.writeheader()
+        writer.writerows(sort_rows(all_rows))
+
+    all_hist.sort(key=lambda r: (r["feed_id"], r["session"], r["publisher_count"]))
+    with open(hist_path, "w", newline="") as hist_file:
+        hist_writer = csv.DictWriter(
+            hist_file, fieldnames=HISTOGRAM_COLUMNS, extrasaction="ignore"
+        )
+        hist_writer.writeheader()
+        hist_writer.writerows(all_hist)
 
     tally = summarize(all_rows)
     print(f"\nAnalysis written to {out_path} ({failures} feed failures)")
+    print(f"Histogram written to {hist_path} ({len(all_hist)} rows)")
     for v in _VERDICT_ORDER:
         if v in tally:
             print(f"  {v:12} {tally[v]}")
