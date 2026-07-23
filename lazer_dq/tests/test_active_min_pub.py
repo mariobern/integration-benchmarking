@@ -302,3 +302,50 @@ def test_summarize_tallies_by_verdict():
     assert tally["OK"] == 1
     assert tally["NO_DATA"] == 1
     assert tally["LOW_SAMPLE"] == 1
+
+
+def test_sort_rows_critical_first_then_pct_desc():
+    from lazer_dq.active_min_pub import sort_rows
+
+    rows = [
+        {"verdict": "OK", "pct_at_floor": 0.0},
+        {"verdict": "CRITICAL", "pct_at_floor": 2.0},
+        {"verdict": "CRITICAL", "pct_at_floor": 9.0},
+        {"verdict": "NO_DATA", "pct_at_floor": 0.0},
+        {"verdict": "WARN", "pct_at_floor": 0.0},
+    ]
+    out = sort_rows(rows)
+    assert [r["verdict"] for r in out] == [
+        "CRITICAL",
+        "CRITICAL",
+        "OK",
+        "WARN",
+        "NO_DATA",
+    ]
+    # within CRITICAL, higher pct_at_floor first
+    assert out[0]["pct_at_floor"] == 9.0
+    assert out[1]["pct_at_floor"] == 2.0
+
+
+def test_analyze_feed_none_min_pub_yields_no_min_pub():
+    from datetime import datetime, timezone
+
+    from lazer_dq.active_min_pub import analyze_feed, RESULT_COLUMNS
+    from lazer_dq.min_pub_common import FeedSession
+
+    start = datetime(2026, 7, 14, tzinfo=timezone.utc)
+    end = datetime(2026, 7, 15, tzinfo=timezone.utc)
+    t = datetime(2026, 7, 14, 13, 30)
+    client = ChannelClient({1: [(t, 5)] * 200})
+    fs = FeedSession(
+        feed_id=100,
+        symbol="Equity.US.TEST/USD",
+        asset_type="equity-us",
+        session="REGULAR",
+        allowed=frozenset({1, 2}),
+        effective_min_pub=None,
+        schedule_str="UTC;O,O,O,O,O,O,O",
+    )
+    result = analyze_feed(client, [fs], start, end, 1.0, 5.0, 100)
+    assert result[0]["verdict"] == "NO_MIN_PUB"
+    assert set(result[0].keys()) == set(RESULT_COLUMNS)

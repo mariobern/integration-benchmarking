@@ -114,13 +114,10 @@ def masked_counts(rows, schedule_str, start_utc, end_utc) -> np.ndarray:
         return np.array([], dtype=int)
     schedule = parse_market_schedule(schedule_str)
     mask = open_minutes_mask(schedule, start_utc, end_utc)
-    open_minutes = set(mask.index[mask.to_numpy()])
-    out = []
-    for ts, count in rows:
-        minute = pd.Timestamp(ts, tz="UTC").floor("min")
-        if minute in open_minutes:
-            out.append(count)
-    return np.array(out, dtype=int)
+    open_minutes = mask.index[mask.to_numpy()]
+    times = pd.DatetimeIndex([r[0] for r in rows], tz="UTC").floor("min")
+    counts = np.array([r[1] for r in rows], dtype=int)
+    return counts[times.isin(open_minutes)]
 
 
 def classify(
@@ -168,6 +165,9 @@ def analyze_feed(
     out = []
     for fs in feed_sessions:
         base = _base_row(fs)
+        if fs.effective_min_pub is None:
+            out.append({**base, **_zeroed_stats(), "verdict": "NO_MIN_PUB"})
+            continue
         if not fs.schedule_str:
             out.append({**base, **_zeroed_stats(), "verdict": "NO_SCHEDULE"})
             continue
@@ -209,7 +209,38 @@ def parse_args(argv=None):
     return p.parse_args(argv)
 
 
-_VERDICT_ORDER = ["NO_DATA", "LOW_SAMPLE", "CRITICAL", "WARN", "OK", "NO_SCHEDULE"]
+_VERDICT_ORDER = [
+    "NO_DATA",
+    "LOW_SAMPLE",
+    "CRITICAL",
+    "WARN",
+    "OK",
+    "NO_SCHEDULE",
+    "NO_MIN_PUB",
+]
+
+_CSV_SORT_ORDER = [
+    "CRITICAL",
+    "OK",
+    "WARN",
+    "LOW_SAMPLE",
+    "NO_DATA",
+    "NO_SCHEDULE",
+    "NO_MIN_PUB",
+]
+
+
+def sort_rows(rows):
+    """CSV order: action priority (CRITICAL first), then pct_at_floor desc."""
+
+    def key(r):
+        try:
+            pri = _CSV_SORT_ORDER.index(r["verdict"])
+        except ValueError:
+            pri = len(_CSV_SORT_ORDER)
+        return (pri, -r["pct_at_floor"])
+
+    return sorted(rows, key=key)
 
 
 def main(argv=None) -> int:
@@ -278,9 +309,9 @@ def main(argv=None) -> int:
                     print(f"  [{i}/{len(by_feed)}] feed {fid} FAILED: {e}")
                     continue
                 with write_lock:
-                    writer.writerows(rows)
-                    csv_file.flush()
                     all_rows.extend(rows)
+
+    writer.writerows(sort_rows(all_rows))
     csv_file.close()
 
     tally = summarize(all_rows)
@@ -301,6 +332,13 @@ def main(argv=None) -> int:
                 f"  feed {r['feed_id']:>5} {r['symbol']:24} {r['session']:11} "
                 f"min_pub={r['effective_min_pub']} pct_at_floor={r['pct_at_floor']:.2f}%"
             )
+
+    for verdict_name in ("LOW_SAMPLE", "NO_DATA"):
+        items = [r for r in all_rows if r["verdict"] == verdict_name]
+        if items:
+            print(f"\n{verdict_name} feed-sessions ({len(items)}):")
+            for r in items:
+                print(f"  feed {r['feed_id']:>5} {r['symbol']:24} {r['session']}")
     return 0
 
 
