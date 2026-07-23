@@ -63,16 +63,15 @@ and `pct_at_floor_1` (% with `publisher_count <= minPublishers + 1`).
 
 Precedence: NO_DATA > LOW_SAMPLE > CRITICAL > WARN > OK.
 
-- **CRITICAL** — _reached or broke the floor._ `pct_at_floor >= --critical-pct`
-  (default 1.0%): at least 1% of aggregates ran on **at or below** `minPublishers`
-  publishers. Redundancy is failing with real frequency.
-- **WARN** — _one publisher from the floor._ `pct_at_floor == 0` **and**
-  `pct_at_floor_1 >= --warn-pct` (default 5.0%): never at the floor, but ≥5% of
-  aggregates ran on exactly `minPublishers + 1`. A single dropout would push it to
-  the floor.
-- **OK** — comfortable margin (everything else). Note the gap by construction: a
-  feed that touches the floor only _rarely_ (`0 < pct_at_floor < --critical-pct`)
-  is neither CRITICAL nor WARN — it lands here.
+- **CRITICAL** — `pct_at_floor >= --critical-pct` (default **1.0%**): at least 1%
+  of aggregates ran **at or below** the floor (`publisher_count <= minPublishers`).
+  Hits its minimum regularly.
+- **WARN** — `pct_at_floor == 0` **and** `pct_at_floor_1 >= --warn-pct`
+  (default **5.0%**): never at the floor, but ≥5% ran exactly **one above** it
+  (`= minPublishers + 1`). One dropout from CRITICAL.
+- **OK** — everything else: **< 1%** at the floor, and — if never at it — **< 5%**
+  one above. Rarely at or near the floor. (Gap by construction: a feed at the floor
+  only _rarely_, `0 < pct_at_floor < 1%`, is neither CRITICAL nor WARN — it lands here.)
 - **LOW_SAMPLE** — fewer than `--min-updates` (default 100) in-session updates.
 - **NO_DATA** — no aggregate updates in the window (non-trading / not ingested).
 - **NO_SCHEDULE** — session has no resolvable/parsable market schedule.
