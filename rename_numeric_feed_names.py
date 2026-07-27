@@ -13,7 +13,9 @@ and `metadata.description` is never modified.
 See docs/superpowers/specs/2026-07-28-numeric-feed-name-rename-design.md.
 """
 
+import csv
 import re
+from pathlib import Path
 
 MARKET_PREFIXES = ("Equity.HK.", "Equity.JP.", "Equity.KR.", "Equity.CN.")
 
@@ -74,3 +76,71 @@ def derive_name(feed: dict) -> tuple[str | None, str | None]:
     if not name:
         return None, f"derived name is empty from description {description!r}"
     return name, None
+
+
+class OverrideError(Exception):
+    """Raised on a malformed or invalid override CSV."""
+
+
+OVERRIDE_COLUMNS = ("feed_id", "name")
+
+
+def load_overrides(path: Path) -> dict[int, str]:
+    """Parse the override CSV into `{feed_id: name}`.
+
+    Raises OverrideError on any structural problem. Rows that are entirely
+    blank are skipped so a trailing newline is not an error.
+    """
+    if not path.exists():
+        raise OverrideError(f"override CSV not found: {path}")
+    overrides: dict[int, str] = {}
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if reader.fieldnames is None:
+            raise OverrideError(f"{path}: no header row")
+        missing = [c for c in OVERRIDE_COLUMNS if c not in reader.fieldnames]
+        if missing:
+            raise OverrideError(
+                f"{path}: missing required column(s): {', '.join(missing)}"
+            )
+        for lineno, row in enumerate(reader, start=2):  # line 2 = first data row
+            raw_id = (row.get("feed_id") or "").strip()
+            name = (row.get("name") or "").strip()
+            if not raw_id and not name:
+                continue
+            try:
+                feed_id = int(raw_id)
+            except ValueError:
+                raise OverrideError(
+                    f"{path} line {lineno}: feed_id {raw_id!r} is not an integer"
+                ) from None
+            if not name:
+                raise OverrideError(f"{path} line {lineno}: name is empty")
+            if feed_id in overrides:
+                raise OverrideError(
+                    f"{path} line {lineno}: duplicate feed_id {feed_id}"
+                )
+            overrides[feed_id] = name
+    return overrides
+
+
+def validate_overrides(
+    overrides: dict[int, str],
+    feeds: list[dict],
+    prefixes: tuple[str, ...] = MARKET_PREFIXES,
+) -> None:
+    """Raise OverrideError unless every override targets an in-scope feed.
+
+    An override may target a feed that is no longer a candidate (already
+    renamed), so a short code can be pinned after the bulk rename has run.
+    """
+    by_id = {f["feedId"]: f for f in feeds}
+    for feed_id in sorted(overrides):
+        feed = by_id.get(feed_id)
+        if feed is None:
+            raise OverrideError(f"override feed_id {feed_id} not found in config")
+        if not in_scope(feed, prefixes):
+            raise OverrideError(
+                f"override feed_id {feed_id} ({feed.get('symbol')}) is outside "
+                f"the configured symbol prefixes: {', '.join(prefixes)}"
+            )

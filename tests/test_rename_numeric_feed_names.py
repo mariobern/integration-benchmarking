@@ -1,9 +1,14 @@
 """Tests for rename_numeric_feed_names.py."""
 
+import pytest
+
 from rename_numeric_feed_names import (
+    OverrideError,
     derive_name,
     in_scope,
     is_candidate,
+    load_overrides,
+    validate_overrides,
 )
 
 
@@ -105,3 +110,66 @@ class TestDeriveName:
         name, reason = derive_name(feed)
         assert name is None
         assert "empty" in reason
+
+
+def _write_csv(tmp_path, text):
+    path = tmp_path / "overrides.csv"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+class TestLoadOverrides:
+    def test_parses_rows(self, tmp_path):
+        path = _write_csv(tmp_path, "feed_id,name\n3520,CXMT\n3360,GIGA (HK)\n")
+        assert load_overrides(path) == {3520: "CXMT", 3360: "GIGA (HK)"}
+
+    def test_strips_whitespace(self, tmp_path):
+        path = _write_csv(tmp_path, "feed_id,name\n 3520 , CXMT \n")
+        assert load_overrides(path) == {3520: "CXMT"}
+
+    def test_skips_fully_blank_rows(self, tmp_path):
+        path = _write_csv(tmp_path, "feed_id,name\n3520,CXMT\n,\n")
+        assert load_overrides(path) == {3520: "CXMT"}
+
+    def test_missing_file_is_error(self, tmp_path):
+        with pytest.raises(OverrideError, match="not found"):
+            load_overrides(tmp_path / "nope.csv")
+
+    def test_missing_column_is_error(self, tmp_path):
+        path = _write_csv(tmp_path, "feed_id\n3520\n")
+        with pytest.raises(OverrideError, match="missing required column"):
+            load_overrides(path)
+
+    def test_non_integer_feed_id_is_error(self, tmp_path):
+        path = _write_csv(tmp_path, "feed_id,name\nabc,CXMT\n")
+        with pytest.raises(OverrideError, match="not an integer"):
+            load_overrides(path)
+
+    def test_empty_name_is_error(self, tmp_path):
+        path = _write_csv(tmp_path, "feed_id,name\n3520,\n")
+        with pytest.raises(OverrideError, match="name is empty"):
+            load_overrides(path)
+
+    def test_duplicate_feed_id_is_error(self, tmp_path):
+        path = _write_csv(tmp_path, "feed_id,name\n3520,CXMT\n3520,OTHER\n")
+        with pytest.raises(OverrideError, match="duplicate feed_id"):
+            load_overrides(path)
+
+
+class TestValidateOverrides:
+    def test_in_scope_feed_accepted(self):
+        feeds = [_feed(feed_id=3520)]
+        validate_overrides({3520: "CXMT"}, feeds)
+
+    def test_already_renamed_feed_accepted(self):
+        feeds = [_feed(feed_id=3520, name="CHANGXIN MEMORY TECHNOLOGIES")]
+        validate_overrides({3520: "CXMT"}, feeds)
+
+    def test_unknown_feed_id_is_error(self):
+        with pytest.raises(OverrideError, match="not found in config"):
+            validate_overrides({999: "X"}, [_feed(feed_id=3520)])
+
+    def test_out_of_prefix_feed_is_error(self):
+        feeds = [_feed(feed_id=922, symbol="Equity.US.AAPL/USD")]
+        with pytest.raises(OverrideError, match="outside the configured"):
+            validate_overrides({922: "APPLE"}, feeds)
