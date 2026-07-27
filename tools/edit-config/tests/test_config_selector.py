@@ -116,7 +116,9 @@ class TestReadSelectorFileCsv:
 
     def test_csv_skips_header_row(self, tmp_path):
         p = tmp_path / "feeds.csv"
-        p.write_text("feed_id,date,mode\n1990,2026-07-24,jp-equities\n", encoding="utf-8")
+        p.write_text(
+            "feed_id,date,mode\n1990,2026-07-24,jp-equities\n", encoding="utf-8"
+        )
         assert read_selector_file(p) == {1990}
 
     def test_csv_supports_ranges_in_column_one(self, tmp_path):

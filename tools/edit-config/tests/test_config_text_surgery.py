@@ -393,7 +393,9 @@ class TestFindObjectFieldSpan:
         }
 
     def test_absent_field_returns_none(self):
-        assert find_object_field_span(SESSION_WITHOUT_FILTER, "stalePriceFilter") is None
+        assert (
+            find_object_field_span(SESSION_WITHOUT_FILTER, "stalePriceFilter") is None
+        )
 
 
 class TestFindNumberFieldSpan:

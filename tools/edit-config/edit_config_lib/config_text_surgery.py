@@ -191,9 +191,7 @@ def find_number_field_span(block: str, key: str) -> tuple[int, int] | None:
     `-?\\d+`, so pointed at `0.5` it would return the `0` and a splice would
     corrupt the value — use this helper for any field that may be fractional.
     """
-    pattern = re.compile(
-        rf'"{re.escape(key)}":\s*(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)'
-    )
+    pattern = re.compile(rf'"{re.escape(key)}":\s*(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)')
     match = pattern.search(block)
     if match is None:
         return None
