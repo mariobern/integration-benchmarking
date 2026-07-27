@@ -543,6 +543,17 @@ class TestVerifyOnDisk:
         with pytest.raises(VerificationError, match="does not parse"):
             verify_on_disk(path, dump_config(_config(_feed())), [])
 
+    def test_rejects_feed_count_change(self, tmp_path):
+        before_data = _config(
+            _feed(feed_id=3520), _feed(feed_id=3521, symbol="Equity.US.X/USD")
+        )
+        before_text = dump_config(before_data)
+        path = tmp_path / "cfg.json"
+        # Written file is missing one feed relative to before_text.
+        path.write_text(dump_config(_config(_feed(feed_id=3520))), encoding="utf-8")
+        with pytest.raises(VerificationError, match="feed count changed"):
+            verify_on_disk(path, before_text, [])
+
 
 def _write_config(tmp_path, *feeds):
     path = tmp_path / "cfg.json"
@@ -610,6 +621,48 @@ class TestMain:
         written = json.loads(path.read_text(encoding="utf-8"))
         assert written["feeds"][0]["metadata"]["name"] == "688825"
         assert written["feeds"][1]["metadata"]["name"] == "CLP HOLDINGS"
+
+    def test_missing_config_file_errors_cleanly(self, tmp_path, capsys):
+        missing = tmp_path / "nope.json"
+        assert main(["--config", str(missing)]) == 1
+        err = capsys.readouterr().err
+        assert "ERROR: Config file not found" in err
+        assert str(missing) in err
+
+    def test_trailing_newline_in_input_round_trips(self, tmp_path):
+        path = tmp_path / "cfg.json"
+        data = _config(_feed(feed_id=3520))
+        path.write_text(dump_config(data) + "\n", encoding="utf-8")
+        assert main(["--config", str(path), "--apply"]) == 0
+        written_text = path.read_text(encoding="utf-8")
+        assert written_text.endswith("\n")
+        assert not written_text.endswith("\n\n")
+        written = json.loads(written_text)
+        assert written["feeds"][0]["metadata"]["name"] == "CHANGXIN MEMORY TECHNOLOGIES"
+
+    def test_pre_write_verification_failure_writes_nothing(self, tmp_path, monkeypatch):
+        path = _write_config(tmp_path, _feed(feed_id=3520))
+        original = path.read_text(encoding="utf-8")
+
+        def _boom(*args, **kwargs):
+            raise VerificationError("boom")
+
+        monkeypatch.setattr("rename_numeric_feed_names.verify_text", _boom)
+        assert main(["--config", str(path), "--apply"]) == 1
+        assert path.read_text(encoding="utf-8") == original
+        assert not (tmp_path / "cfg.json.bak").exists()
+
+    def test_post_write_verification_failure_leaves_backup(self, tmp_path, monkeypatch):
+        path = _write_config(tmp_path, _feed(feed_id=3520))
+        original = path.read_text(encoding="utf-8")
+
+        def _boom(*args, **kwargs):
+            raise VerificationError("boom")
+
+        monkeypatch.setattr("rename_numeric_feed_names.verify_on_disk", _boom)
+        assert main(["--config", str(path), "--apply"]) == 1
+        assert (tmp_path / "cfg.json.bak").exists()
+        assert (tmp_path / "cfg.json.bak").read_text(encoding="utf-8") == original
 
     def test_duplicate_warning_printed(self, tmp_path, capsys):
         path = _write_config(

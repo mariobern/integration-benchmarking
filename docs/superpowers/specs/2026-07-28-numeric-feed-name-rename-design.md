@@ -270,7 +270,7 @@ Duplicates are a **warning, not an error** — `metadata.name` is already non-un
 across 176 feeds in production, and the two pairs here refer to the same issuer. The
 warning is actionable: it fires, you add override rows, it clears.
 
-- A summary line: candidates matched, changed, skipped, overridden, warnings.
+- A summary line: changed, skipped, and duplicate-name warnings.
 
 **Two-stage verification (as built).** This section originally specified a single
 post-write check; during implementation, a Task 4 review round found that a line-level

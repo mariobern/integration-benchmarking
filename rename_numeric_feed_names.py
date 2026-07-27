@@ -402,6 +402,10 @@ def main(argv: list[str] | None = None) -> int:
 
     prefixes = tuple(args.symbol_prefixes) if args.symbol_prefixes else MARKET_PREFIXES
 
+    if not args.config.exists():
+        print(f"ERROR: Config file not found: {args.config}", file=sys.stderr)
+        return 1
+
     before_text = args.config.read_text(encoding="utf-8")
     data = json.loads(before_text)
     feeds = data["feeds"]
@@ -426,10 +430,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     apply_changes(data, changes)
-    after_text = dump_config(data)
+    trailing = before_text[len(before_text.rstrip("\n")) :]
+    after_text = dump_config(data) + trailing
     # Verification runs before the write, so a dry run catches problems too.
     try:
         verify_text(before_text, after_text, changes)
+        verify_feed_names(json.loads(before_text), data, changes)
     except VerificationError as exc:
         print(f"\nERROR: verification failed: {exc}", file=sys.stderr)
         return 1
