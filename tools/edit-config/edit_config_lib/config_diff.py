@@ -7,7 +7,7 @@ line numbers in a 3 MB file.
 
 import json
 
-from edit_config_lib.config_ops import Change, STALE_FILTER_KEYS
+from edit_config_lib.config_ops import Change, STALE_FILTER_KEYS, format_stale_value
 
 
 def _format_publisher_list(ids: list[int]) -> str:
@@ -30,7 +30,9 @@ def _value_lines(change: Change) -> tuple[str, str]:
 
             def _fmt(val):
                 body = ", ".join(
-                    f'"{k}": {val[k]}' for k in STALE_FILTER_KEYS if k in val
+                    f'"{k}": {format_stale_value(k, val[k])}'
+                    for k in STALE_FILTER_KEYS
+                    if k in val
                 )
                 return f'      "stalePriceFilter": {{ {body} }},'
 
@@ -40,7 +42,10 @@ def _value_lines(change: Change) -> tuple[str, str]:
                 return "      (absent)", _fmt(change.after)
             return _fmt(change.before), _fmt(change.after)
         key = change.field.split(".", 1)[1]
-        return f'      "{key}": {change.before},', f'      "{key}": {change.after},'
+        return (
+            f'      "{key}": {format_stale_value(key, change.before)},',
+            f'      "{key}": {format_stale_value(key, change.after)},',
+        )
 
     if change.field in ("exchangeId", "marketSchedule"):
 

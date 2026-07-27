@@ -57,6 +57,7 @@ from edit_config_lib.config_ops import (
     RemoveExchangeId,
     ExchangeInfo,
     STALE_FILTER_KEYS,
+    format_stale_value,
 )
 from edit_config_lib.ric_csv import load_ric_csv, build_prefix_index, LoadError
 from edit_config_lib.config_selector import parse_selector_text, read_selector_file
@@ -532,13 +533,6 @@ def _set_session_min_publishers(sblock: str, value: int) -> str:
     return insert_field_before_session(sblock, f'"minPublishers": {value},')
 
 
-def _format_stale_value(key: str, value) -> str:
-    """Render one stalePriceFilter value: float for bps, int for the seconds."""
-    if key == "movedPriceThresholdBps":
-        return repr(float(value))
-    return str(int(value))
-
-
 def _render_stale_filter_object(spf: dict, indent: str) -> str:
     """Render the `{…}` of a stalePriceFilter, pretty-printed to match the file.
 
@@ -547,7 +541,7 @@ def _render_stale_filter_object(spf: dict, indent: str) -> str:
     """
     inner = indent + "  "
     body = ",\n".join(
-        f'{inner}"{key}": {_format_stale_value(key, spf[key])}'
+        f'{inner}"{key}": {format_stale_value(key, spf[key])}'
         for key in STALE_FILTER_KEYS
     )
     return "{\n" + body + "\n" + indent + "}"
@@ -667,7 +661,7 @@ def _apply_one_change(block: str, change: Change) -> str:
             raise RuntimeError(f"stalePriceFilter.{key} not found in session entry")
         new_fblock = (
             fblock[: fspan[0]]
-            + _format_stale_value(key, change.after)
+            + format_stale_value(key, change.after)
             + fblock[fspan[1] :]
         )
         new_sblock = sblock[: span[0]] + new_fblock + sblock[span[1] :]

@@ -248,3 +248,25 @@ class TestStaleFilterDiff:
         out = render_diff([c])
         assert '-      "windowSecs": 60,' in out
         assert '+      "windowSecs": 120,' in out
+
+    def test_whole_object_hunk_normalizes_bare_int_bps(self):
+        # A pre-existing config may carry `"movedPriceThresholdBps": 2` (a bare
+        # int, valid JSON) that survives unnormalized through
+        # `dict(current)` in SetStaleFilter.apply(). The diff must still
+        # render it as a float, matching what the applier writes to the file.
+        c = self._change(
+            before={
+                "movedPriceThresholdBps": 2,
+                "stalenessThresholdSecs": 10800,
+                "windowSecs": 60,
+            },
+            after={
+                "movedPriceThresholdBps": 2,
+                "stalenessThresholdSecs": 10800,
+                "windowSecs": 90,
+            },
+        )
+        out = render_diff([c])
+        assert '"movedPriceThresholdBps": 2.0' in out
+        assert '"movedPriceThresholdBps": 2,' not in out
+        assert '"movedPriceThresholdBps": 2 ' not in out

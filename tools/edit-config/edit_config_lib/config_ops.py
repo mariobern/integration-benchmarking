@@ -31,6 +31,19 @@ STALE_FILTER_KEYS: tuple[str, ...] = (
 )
 
 
+def format_stale_value(key: str, value) -> str:
+    """Render one stalePriceFilter value: float for bps, int for the seconds.
+
+    Shared by the text applier (`config_editor.py`) and the dry-run diff
+    renderer (`config_diff.py`) so both agree on how a bare int surviving
+    unnormalized through `dict(current)` (e.g. a pre-existing
+    `"movedPriceThresholdBps": 2` in the file) is displayed vs. written.
+    """
+    if key == "movedPriceThresholdBps":
+        return repr(float(value))
+    return str(int(value))
+
+
 @dataclass(frozen=True)
 class ExchangeInfo:
     """A resolved entry from the config's top-level `exchanges[]` array.
