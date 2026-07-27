@@ -1241,6 +1241,48 @@ class TestSetStaleFilterValidation:
         assert "shorter than the observation window" in warnings[0].message
 
 
+def _malformed_stale_feed(feed_id: int, spf: dict) -> dict:
+    """A feed with a hand-edited, incomplete stalePriceFilter (missing a
+    required key), forcing the whole-object-rewrite path in SetStaleFilter.
+    """
+    return {
+        "feedId": feed_id,
+        "symbol": "Equity.JP.TEST/JPY",
+        "state": "STABLE",
+        "marketSchedules": [{"session": "REGULAR", "stalePriceFilter": spf}],
+    }
+
+
+class TestSetStaleFilterMergedValidation:
+    """Inherited values from a hand-edited config must be validated on the
+    whole-object-rewrite path, not silently folded into the rewritten object."""
+
+    def test_negative_bps_in_existing_partial_filter_raises(self):
+        # Missing windowSecs -> "not complete" -> whole object rewritten;
+        # the existing (invalid) movedPriceThresholdBps must still be checked.
+        feed = _malformed_stale_feed(
+            9001, {"movedPriceThresholdBps": -1, "stalenessThresholdSecs": 3600}
+        )
+        with pytest.raises(OpError) as exc_info:
+            SetStaleFilter().apply(feed)
+        msg = str(exc_info.value)
+        assert "9001" in msg
+        assert "movedPriceThresholdBps" in msg
+
+    def test_null_value_in_existing_partial_filter_raises(self):
+        # Missing windowSecs -> whole object rewrite; a null existing value
+        # must be rejected here instead of reaching format_stale_value and
+        # crashing with an uncaught TypeError from float(None).
+        feed = _malformed_stale_feed(
+            9002, {"movedPriceThresholdBps": 0.5, "stalenessThresholdSecs": None}
+        )
+        with pytest.raises(OpError) as exc_info:
+            SetStaleFilter().apply(feed)
+        msg = str(exc_info.value)
+        assert "9002" in msg
+        assert "stalenessThresholdSecs" in msg
+
+
 class TestClearStaleFilter:
     def test_removes_filter(self, stale_feeds):
         feed = feed_by_id(stale_feeds, 2166)
@@ -1267,7 +1309,32 @@ class TestStaleFilterSessionScope:
         with pytest.raises(OpError, match="session=NONE is invalid"):
             SetStaleFilter(session="NONE").apply(feed)
 
+    def test_session_none_message_is_grammatical_for_stale_filter(self, stale_feeds):
+        # "stalePriceFilter" is singular — the message must not read as
+        # "stalePriceFilter live only in..." (singular noun, plural verb).
+        feed = feed_by_id(stale_feeds, 2166)
+        with pytest.raises(OpError) as exc_info:
+            SetStaleFilter(session="NONE").apply(feed)
+        msg = str(exc_info.value)
+        assert "stalePriceFilter live" not in msg
+        assert "keeps stalePriceFilter only in marketSchedules" in msg
+
     def test_session_all_targets_every_session(self, stale_feeds):
         feed = feed_by_id(stale_feeds, 1990)
         changes, _ = SetStaleFilter(session="ALL").apply(feed)
         assert [c.location for c in changes] == ["REGULAR"]
+
+
+from edit_config_lib.config_ops import RemovePublisher as _RemovePublisherForGrammar
+
+
+class TestResolveSessionNamesGrammar:
+    """Both callers of _resolve_session_names (default 'publisher lists',
+    and 'stalePriceFilter') must read grammatically for session=NONE."""
+
+    def test_publisher_lists_message_still_grammatical(self, stale_feeds):
+        feed = feed_by_id(stale_feeds, 2166)
+        with pytest.raises(OpError) as exc_info:
+            _RemovePublisherForGrammar(publisher_id=1, session="NONE").apply(feed)
+        msg = str(exc_info.value)
+        assert "keeps publisher lists only in marketSchedules" in msg

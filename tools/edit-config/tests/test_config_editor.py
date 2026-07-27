@@ -1362,3 +1362,28 @@ class TestApplyStaleFilter:
         cleared, _ = ClearStaleFilter().apply(feed2)
         final = apply_changes(out, cleared)
         assert json.loads(final) == json.loads(raw)
+
+    def test_session_all_inserts_into_every_session_of_multi_session_feed(self):
+        # Widest-blast-radius path: --session ALL fans out and each
+        # insertion happens in a DIFFERENT session block of the SAME feed.
+        # Feed 4001 has two sessions (REGULAR, PRE_MARKET), neither with an
+        # existing stalePriceFilter.
+        raw = _stale_raw()
+        feeds = json.loads(raw)["feeds"]
+        feed = next(f for f in feeds if f["feedId"] == 4001)
+        changes, _ = SetStaleFilter(session="ALL").apply(feed)
+        assert sorted(c.location for c in changes) == ["PRE_MARKET", "REGULAR"]
+
+        out = apply_changes(raw, changes)
+        expected_spf = {
+            "movedPriceThresholdBps": 0.5,
+            "stalenessThresholdSecs": 10800,
+            "windowSecs": 60,
+        }
+        parsed = json.loads(out)  # must re-parse as valid JSON
+        feed_out = next(f for f in parsed["feeds"] if f["feedId"] == 4001)
+        sessions = {s["session"]: s for s in feed_out["marketSchedules"]}
+        assert sessions["REGULAR"]["stalePriceFilter"] == expected_spf
+        assert sessions["PRE_MARKET"]["stalePriceFilter"] == expected_spf
+        # Untouched feeds stay byte-identical.
+        assert '"symbol": "Equity.KR.000660/KRW"' in out

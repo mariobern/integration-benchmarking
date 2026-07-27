@@ -17,11 +17,17 @@ _TOKEN_PATTERN = re.compile(r"^(\d+)(?:-(\d+))?$")
 
 
 def _first_column(text: str) -> str:
-    """Reduce CSV text to its first column, one selector token per line.
+    """Reduce CSV text to selector tokens, judging each row independently.
 
-    The repo's benchmark CSVs carry `feed_id,date,mode` rows, so only column 1
-    is a selector token. Blank lines and `#` comments are dropped, and a first
-    data row whose column 1 is not a selector token is treated as a header.
+    The repo's benchmark CSVs carry `feed_id,date,mode` rows, so normally only
+    column 1 is a selector token and the rest of the row is dropped. But the
+    rule is content-sensitive, not extension-sensitive: if EVERY comma-
+    separated field on a row matches the selector token pattern (`_TOKEN_
+    PATTERN`), the whole row is kept — otherwise a plain `--feed-ids-from`
+    list (e.g. `100-200, 205, 208, 3530`) would silently under-target to just
+    column 1 when saved with a `.csv` extension instead of `.txt`. Blank lines
+    and `#` comments are dropped, and a first data row whose column 1 is not a
+    selector token is treated as a header.
     """
     out: list[str] = []
     seen_first_row = False
@@ -29,14 +35,18 @@ def _first_column(text: str) -> str:
         stripped = line.split("#", 1)[0].strip()
         if not stripped:
             continue
-        first = stripped.split(",", 1)[0].strip()
+        fields = [f.strip() for f in stripped.split(",")]
+        first = fields[0]
         if not first:
             continue
         if not seen_first_row and not _TOKEN_PATTERN.match(first):
             seen_first_row = True
             continue  # header row
         seen_first_row = True
-        out.append(first)
+        if all(_TOKEN_PATTERN.match(f) for f in fields):
+            out.extend(fields)
+        else:
+            out.append(first)
     return "\n".join(out)
 
 

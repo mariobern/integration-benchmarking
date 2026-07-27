@@ -102,6 +102,30 @@
       "minPublishers": 1,
       "state": "STABLE",
       "symbol": "Crypto.BTC/USD"
+    },
+    {
+      "exchangeId": 29,
+      "expiryTime": "5.000000000s",
+      "exponent": -5,
+      "feedId": 4001,
+      "isEnabledInShard": true,
+      "kind": "PRICE",
+      "marketSchedules": [
+        {
+          "allowedPublisherIds": [24, 84],
+          "minPublishers": 2,
+          "session": "REGULAR"
+        },
+        {
+          "allowedPublisherIds": [24, 84],
+          "minPublishers": 2,
+          "session": "PRE_MARKET"
+        }
+      ],
+      "metadata": { "asset_type": "equity" },
+      "minPublishers": 2,
+      "state": "STABLE",
+      "symbol": "Equity.JP.9999/JPY"
     }
   ]
 }

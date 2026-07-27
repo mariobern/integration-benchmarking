@@ -150,7 +150,10 @@ def _resolve_session_names(
 
     Publisher lists and stalePriceFilter both live ONLY in marketSchedules
     entries in the new config format, so session=NONE is invalid here. `what`
-    names the field in the error message.
+    names the field in the error message. The sentence is built with a fixed
+    singular subject ("the new config format keeps ...") so it reads
+    grammatically regardless of whether `what` is singular ("stalePriceFilter")
+    or plural ("publisher lists") — no verb-agreement branch needed.
     """
     feed_id = feed["feedId"]
     if session is None:
@@ -159,8 +162,8 @@ def _resolve_session_names(
         return [s["session"] for s in feed.get("marketSchedules", [])]
     if session == "NONE":
         raise OpError(
-            f"feed {feed_id}: session=NONE is invalid — {what} live only in "
-            f"marketSchedules entries in the new config format"
+            f"feed {feed_id}: session=NONE is invalid — the new config format "
+            f"keeps {what} only in marketSchedules entries"
         )
     if session in SESSION_NAMES:
         return [session]
@@ -1044,6 +1047,42 @@ class SetState:
         return changes, warnings
 
 
+def _validate_stale_value(key: str, value: Any) -> Any:
+    """Validate and type-normalize one stalePriceFilter value.
+
+    Shared by `SetStaleFilter._requested` (CLI/YAML-supplied values) and
+    `_validate_stale_filter_dict` (a merged dict that may carry inherited
+    values from a hand-edited file). Returns the normalized value; raises
+    ValueError on failure, with the message naming `key`.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{key} must be numeric; got {value!r}")
+    if value <= 0:
+        raise ValueError(f"{key} must be > 0; got {value}")
+    if key == "movedPriceThresholdBps":
+        return float(value)
+    if float(value) != int(value):
+        raise ValueError(f"{key} must be a whole number of seconds; got {value}")
+    return int(value)
+
+
+def _validate_stale_filter_dict(feed_id: int, values: dict[str, Any]) -> None:
+    """Validate every value in a (possibly inherited) stalePriceFilter dict.
+
+    Used on the whole-object-rewrite path, where `merged` folds in an
+    existing (possibly hand-edited, possibly malformed) filter untouched via
+    `merged.update(before)`. Without this, an inherited negative bps or a
+    null value would be written straight into the file — or, for null,
+    crash `format_stale_value` with an uncaught TypeError during rendering.
+    Raises OpError naming both the feed id and the offending key.
+    """
+    for key, value in values.items():
+        try:
+            _validate_stale_value(key, value)
+        except ValueError as e:
+            raise OpError(f"feed {feed_id}: invalid stalePriceFilter.{key} — {e}")
+
+
 def _stale_window_warning(
     feed_id: int, symbol: str, location: str, spf: dict
 ) -> list[Warning]:
@@ -1092,18 +1131,10 @@ class SetStaleFilter:
         for key, value in raw:
             if value is None:
                 continue
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
-                raise OpError(f"{key} must be numeric; got {value!r}")
-            if value <= 0:
-                raise OpError(f"{key} must be > 0; got {value}")
-            if key == "movedPriceThresholdBps":
-                out[key] = float(value)
-            else:
-                if float(value) != int(value):
-                    raise OpError(
-                        f"{key} must be a whole number of seconds; got {value}"
-                    )
-                out[key] = int(value)
+            try:
+                out[key] = _validate_stale_value(key, value)
+            except ValueError as e:
+                raise OpError(str(e)) from e
         return out
 
     def apply(self, feed: dict) -> tuple[list[Change], list[Warning]]:
@@ -1136,8 +1167,7 @@ class SetStaleFilter:
                 if before is not None:
                     merged.update(before)
                 merged.update(requested)
-                if merged == before:
-                    continue
+                _validate_stale_filter_dict(feed_id, merged)
                 sess["stalePriceFilter"] = merged
                 changes.append(
                     Change(

@@ -143,3 +143,31 @@ class TestReadSelectorFileCsv:
         p = tmp_path / "ids.csv"
         p.write_text("1990\n2023\n", encoding="utf-8")
         assert read_selector_file(p) == {1990, 2023}
+
+    def test_csv_of_all_selector_tokens_keeps_every_token(self, tmp_path):
+        # Content-sensitive rule: when EVERY comma-separated field on a row is
+        # itself a selector token, keep them all — matches what the same
+        # content would yield saved as .txt. Regression for the bug where
+        # "100,200,300\n400\n" saved as .csv silently under-targeted to {100, 400}.
+        p = tmp_path / "ids.csv"
+        p.write_text("100,200,300\n400\n", encoding="utf-8")
+        assert read_selector_file(p) == {100, 200, 300, 400}
+
+    def test_csv_all_tokens_supports_ranges(self, tmp_path):
+        p = tmp_path / "ids.csv"
+        p.write_text("100-102, 205, 208\n3530\n", encoding="utf-8")
+        assert read_selector_file(p) == {100, 101, 102, 205, 208, 3530}
+
+    def test_csv_feed_id_date_mode_shape_still_yields_column_one_only(self, tmp_path):
+        # A row with a non-token field (date, mode) anywhere must fall back
+        # to column 1 only, even though column 1 itself is a valid token.
+        p = tmp_path / "batch.csv"
+        p.write_text("100,2026-07-24,fx\n205,2026-07-24,metals\n", encoding="utf-8")
+        assert read_selector_file(p) == {100, 205}
+
+    def test_csv_mixed_file_behaves_per_row(self, tmp_path):
+        # Row 1 is all-tokens (kept whole); row 2 is feed_id,date,mode shaped
+        # (column 1 only). Each row is judged independently.
+        p = tmp_path / "mixed.csv"
+        p.write_text("100,200,300\n205,2026-07-24,fx\n", encoding="utf-8")
+        assert read_selector_file(p) == {100, 200, 300, 205}
