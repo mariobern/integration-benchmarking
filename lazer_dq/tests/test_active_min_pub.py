@@ -288,7 +288,9 @@ def test_analyze_feed_no_data_when_no_channel_has_rows():
     start = datetime(2026, 7, 14, tzinfo=timezone.utc)
     end = datetime(2026, 7, 15, tzinfo=timezone.utc)
     client = ChannelClient({})  # empty
-    summary, hist = analyze_feed(client, [_regular_session()], start, end, 1.0, 1.0, 5.0, 100)
+    summary, hist = analyze_feed(
+        client, [_regular_session()], start, end, 1.0, 1.0, 5.0, 100
+    )
     assert summary[0]["verdict"] == "NO_DATA"
     assert summary[0]["n_updates"] == 0
     assert hist == []  # no updates -> no histogram rows

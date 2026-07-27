@@ -236,8 +236,14 @@ def histogram_rows(fs, counts) -> list:
 
 
 def analyze_feed(
-    client, feed_sessions, start_utc, end_utc,
-    breach_pct, critical_pct, warn_pct, min_updates,
+    client,
+    feed_sessions,
+    start_utc,
+    end_utc,
+    breach_pct,
+    critical_pct,
+    warn_pct,
+    min_updates,
 ) -> tuple:
     """One price_feeds query for the feed.
 
