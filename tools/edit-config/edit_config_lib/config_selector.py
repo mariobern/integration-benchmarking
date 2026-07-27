@@ -16,6 +16,30 @@ class SelectorError(ValueError):
 _TOKEN_PATTERN = re.compile(r"^(\d+)(?:-(\d+))?$")
 
 
+def _first_column(text: str) -> str:
+    """Reduce CSV text to its first column, one selector token per line.
+
+    The repo's benchmark CSVs carry `feed_id,date,mode` rows, so only column 1
+    is a selector token. Blank lines and `#` comments are dropped, and a first
+    data row whose column 1 is not a selector token is treated as a header.
+    """
+    out: list[str] = []
+    seen_first_row = False
+    for line in text.splitlines():
+        stripped = line.split("#", 1)[0].strip()
+        if not stripped:
+            continue
+        first = stripped.split(",", 1)[0].strip()
+        if not first:
+            continue
+        if not seen_first_row and not _TOKEN_PATTERN.match(first):
+            seen_first_row = True
+            continue  # header row
+        seen_first_row = True
+        out.append(first)
+    return "\n".join(out)
+
+
 def parse_selector_text(text: str) -> set[int]:
     """Parse selector text into a set of feed IDs.
 
@@ -45,9 +69,18 @@ def parse_selector_text(text: str) -> set[int]:
 
 
 def read_selector_file(path: str | Path) -> set[int]:
-    """Read selector content from a file path or '-' for stdin."""
+    """Read selector content from a file path or '-' for stdin.
+
+    A path ending in `.csv` is read as a CSV: only column 1 of each row is
+    parsed, so `feed_id,date,mode` files work as targeting input directly.
+    Every other path (and stdin) uses the strict `N` / `A-B` grammar.
+    """
     import sys
 
     if str(path) == "-":
         return parse_selector_text(sys.stdin.read())
-    return parse_selector_text(Path(path).read_text(encoding="utf-8"))
+    p = Path(path)
+    text = p.read_text(encoding="utf-8")
+    if p.suffix.lower() == ".csv":
+        text = _first_column(text)
+    return parse_selector_text(text)
