@@ -18,6 +18,31 @@ SESSION_NAMES: tuple[str, ...] = ("REGULAR", "PRE_MARKET", "POST_MARKET", "OVER_
 # format; every other asset class takes minPublishers at the feed level only.
 US_EQUITY_SYMBOL_PREFIX = "Equity.US."
 
+# stalePriceFilter defaults — the values carried by the feeds already running
+# the filter in production (2166, 3337, 3338).
+DEFAULT_MOVED_PRICE_THRESHOLD_BPS = 0.5
+DEFAULT_STALENESS_THRESHOLD_SECS = 10800
+DEFAULT_WINDOW_SECS = 60
+
+STALE_FILTER_KEYS: tuple[str, ...] = (
+    "movedPriceThresholdBps",
+    "stalenessThresholdSecs",
+    "windowSecs",
+)
+
+
+def format_stale_value(key: str, value) -> str:
+    """Render one stalePriceFilter value: float for bps, int for the seconds.
+
+    Shared by the text applier (`config_editor.py`) and the dry-run diff
+    renderer (`config_diff.py`) so both agree on how a bare int surviving
+    unnormalized through `dict(current)` (e.g. a pre-existing
+    `"movedPriceThresholdBps": 2` in the file) is displayed vs. written.
+    """
+    if key == "movedPriceThresholdBps":
+        return repr(float(value))
+    return str(int(value))
+
 
 @dataclass(frozen=True)
 class ExchangeInfo:
@@ -118,11 +143,17 @@ def _session_publisher_union(feed: dict) -> list[int]:
     return sorted(ids)
 
 
-def _resolve_publisher_sessions(feed: dict, session: str | None) -> list[str]:
-    """Session names a publisher op targets.
+def _resolve_session_names(
+    feed: dict, session: str | None, what: str = "publisher lists"
+) -> list[str]:
+    """Session names a session-scoped op targets.
 
-    Publisher lists live ONLY in marketSchedules entries in the new config
-    format; there is no feed-level roster, so session=NONE is invalid here.
+    Publisher lists and stalePriceFilter both live ONLY in marketSchedules
+    entries in the new config format, so session=NONE is invalid here. `what`
+    names the field in the error message. The sentence is built with a fixed
+    singular subject ("the new config format keeps ...") so it reads
+    grammatically regardless of whether `what` is singular ("stalePriceFilter")
+    or plural ("publisher lists") — no verb-agreement branch needed.
     """
     feed_id = feed["feedId"]
     if session is None:
@@ -131,8 +162,8 @@ def _resolve_publisher_sessions(feed: dict, session: str | None) -> list[str]:
         return [s["session"] for s in feed.get("marketSchedules", [])]
     if session == "NONE":
         raise OpError(
-            f"feed {feed_id}: session=NONE is invalid for publisher ops — "
-            f"the new config format has no feed-level allowedPublisherIds"
+            f"feed {feed_id}: session=NONE is invalid — the new config format "
+            f"keeps {what} only in marketSchedules entries"
         )
     if session in SESSION_NAMES:
         return [session]
@@ -165,7 +196,7 @@ class AddPublisher:
         feed_id = feed["feedId"]
         symbol = feed.get("symbol", "")
 
-        for name in _resolve_publisher_sessions(feed, self.session):
+        for name in _resolve_session_names(feed, self.session):
             sess = get_session(feed, name)
             if sess is None:
                 raise OpError(
@@ -251,7 +282,7 @@ class RemovePublisher:
         feed_id = feed["feedId"]
         symbol = feed.get("symbol", "")
 
-        names = _resolve_publisher_sessions(feed, self.session)
+        names = _resolve_session_names(feed, self.session)
         explicit = self.session in SESSION_NAMES
         feed_min = feed.get("minPublishers")
 
@@ -1013,4 +1044,211 @@ class SetState:
                     after=new_desc,
                 )
             )
+        return changes, warnings
+
+
+def _validate_stale_value(key: str, value: Any) -> Any:
+    """Validate and type-normalize one stalePriceFilter value.
+
+    Shared by `SetStaleFilter._requested` (CLI/YAML-supplied values) and
+    `_validate_stale_filter_dict` (a merged dict that may carry inherited
+    values from a hand-edited file). Returns the normalized value; raises
+    ValueError on failure, with the message naming `key`.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{key} must be numeric; got {value!r}")
+    if value <= 0:
+        raise ValueError(f"{key} must be > 0; got {value}")
+    if key == "movedPriceThresholdBps":
+        return float(value)
+    if float(value) != int(value):
+        raise ValueError(f"{key} must be a whole number of seconds; got {value}")
+    return int(value)
+
+
+def _validate_stale_filter_dict(feed_id: int, values: dict[str, Any]) -> None:
+    """Validate every value in a (possibly inherited) stalePriceFilter dict.
+
+    Used on the whole-object-rewrite path, where `merged` folds in an
+    existing (possibly hand-edited, possibly malformed) filter untouched via
+    `merged.update(before)`. Without this, an inherited negative bps or a
+    null value would be written straight into the file — or, for null,
+    crash `format_stale_value` with an uncaught TypeError during rendering.
+    Raises OpError naming both the feed id and the offending key.
+    """
+    for key, value in values.items():
+        try:
+            _validate_stale_value(key, value)
+        except ValueError as e:
+            raise OpError(f"feed {feed_id}: invalid stalePriceFilter.{key} — {e}")
+
+
+def _stale_window_warning(
+    feed_id: int, symbol: str, location: str, spf: dict
+) -> list[Warning]:
+    """Warn when the staleness horizon is shorter than the observation window."""
+    staleness = spf.get("stalenessThresholdSecs")
+    window = spf.get("windowSecs")
+    if staleness is None or window is None or staleness >= window:
+        return []
+    return [
+        Warning(
+            feed_id=feed_id,
+            symbol=symbol,
+            message=(
+                f"feed {feed_id} {location}: stalenessThresholdSecs="
+                f"{staleness} < windowSecs={window} — staleness horizon "
+                f"shorter than the observation window"
+            ),
+        )
+    ]
+
+
+@dataclass
+class SetStaleFilter:
+    """Create or patch a session entry's stalePriceFilter object.
+
+    Values left as None take the module defaults when the filter is being
+    created, and are left untouched when one already exists — so
+    `--set-stale-filter --window-secs 120` retunes one knob without restating
+    the other two. An existing filter missing any of the three keys is
+    rewritten whole (a key that isn't in the file can't be patched in place).
+    """
+
+    moved_price_threshold_bps: float | None = None
+    staleness_threshold_secs: int | None = None
+    window_secs: int | None = None
+    session: str | None = None
+
+    def _requested(self) -> dict[str, Any]:
+        """Validated, type-normalized {config key: value} for the knobs set."""
+        raw = (
+            ("movedPriceThresholdBps", self.moved_price_threshold_bps),
+            ("stalenessThresholdSecs", self.staleness_threshold_secs),
+            ("windowSecs", self.window_secs),
+        )
+        out: dict[str, Any] = {}
+        for key, value in raw:
+            if value is None:
+                continue
+            try:
+                out[key] = _validate_stale_value(key, value)
+            except ValueError as e:
+                raise OpError(str(e)) from e
+        return out
+
+    def apply(self, feed: dict) -> tuple[list[Change], list[Warning]]:
+        changes: list[Change] = []
+        warnings: list[Warning] = []
+        feed_id = feed["feedId"]
+        symbol = feed.get("symbol", "")
+        requested = self._requested()
+
+        for name in _resolve_session_names(feed, self.session, "stalePriceFilter"):
+            sess = get_session(feed, name)
+            if sess is None:
+                raise OpError(
+                    f"feed {feed_id}: session {name!r} does not exist on this feed"
+                )
+            current = sess.get("stalePriceFilter")
+            complete = isinstance(current, dict) and all(
+                k in current for k in STALE_FILTER_KEYS
+            )
+
+            if not complete:
+                # Create, or rewrite a partial/malformed object whole. Existing
+                # values win over defaults; requested values win over both.
+                merged: dict[str, Any] = {
+                    "movedPriceThresholdBps": DEFAULT_MOVED_PRICE_THRESHOLD_BPS,
+                    "stalenessThresholdSecs": DEFAULT_STALENESS_THRESHOLD_SECS,
+                    "windowSecs": DEFAULT_WINDOW_SECS,
+                }
+                before = dict(current) if isinstance(current, dict) else None
+                if before is not None:
+                    merged.update(before)
+                merged.update(requested)
+                _validate_stale_filter_dict(feed_id, merged)
+                sess["stalePriceFilter"] = merged
+                changes.append(
+                    Change(
+                        feed_id=feed_id,
+                        symbol=symbol,
+                        location=name,
+                        field="stalePriceFilter",
+                        before=before,
+                        after=dict(merged),
+                    )
+                )
+                warnings.extend(_stale_window_warning(feed_id, symbol, name, merged))
+                continue
+
+            touched = False
+            for key in STALE_FILTER_KEYS:
+                if key not in requested or current[key] == requested[key]:
+                    continue
+                changes.append(
+                    Change(
+                        feed_id=feed_id,
+                        symbol=symbol,
+                        location=name,
+                        field=f"stalePriceFilter.{key}",
+                        before=current[key],
+                        after=requested[key],
+                    )
+                )
+                current[key] = requested[key]
+                touched = True
+            if touched:
+                warnings.extend(_stale_window_warning(feed_id, symbol, name, current))
+
+        return changes, warnings
+
+
+@dataclass
+class ClearStaleFilter:
+    """Remove the stalePriceFilter object from targeted session entries.
+
+    The inverse of SetStaleFilter. A session with no filter is a no-op with a
+    warning, mirroring how ClearRic reports "nothing to clear".
+    """
+
+    session: str | None = None
+
+    def apply(self, feed: dict) -> tuple[list[Change], list[Warning]]:
+        changes: list[Change] = []
+        warnings: list[Warning] = []
+        feed_id = feed["feedId"]
+        symbol = feed.get("symbol", "")
+
+        for name in _resolve_session_names(feed, self.session, "stalePriceFilter"):
+            sess = get_session(feed, name)
+            if sess is None:
+                raise OpError(
+                    f"feed {feed_id}: session {name!r} does not exist on this feed"
+                )
+            current = sess.get("stalePriceFilter")
+            if not isinstance(current, dict):
+                warnings.append(
+                    Warning(
+                        feed_id=feed_id,
+                        symbol=symbol,
+                        message=(
+                            f"feed {feed_id} {name}: no stalePriceFilter — "
+                            f"nothing to clear"
+                        ),
+                    )
+                )
+                continue
+            del sess["stalePriceFilter"]
+            changes.append(
+                Change(
+                    feed_id=feed_id,
+                    symbol=symbol,
+                    location=name,
+                    field="stalePriceFilter",
+                    before=dict(current),
+                    after=None,
+                )
+            )
+
         return changes, warnings

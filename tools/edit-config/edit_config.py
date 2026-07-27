@@ -158,6 +158,21 @@ def _build_parser() -> argparse.ArgumentParser:
             "(inverse of --set-ric-mapping). Target with the usual filters."
         ),
     )
+    op_group.add_argument(
+        "--set-stale-filter",
+        action="store_true",
+        help=(
+            "Create or patch the session-level stalePriceFilter. Values come "
+            "from --moved-price-bps / --staleness-secs / --window-secs; when "
+            "the session has no filter yet, omitted values use the defaults "
+            "(0.5 / 10800 / 60)."
+        ),
+    )
+    op_group.add_argument(
+        "--clear-stale-filter",
+        action="store_true",
+        help="Remove the stalePriceFilter object from targeted sessions.",
+    )
 
     p.add_argument(
         "--from-csv",
@@ -176,6 +191,21 @@ def _build_parser() -> argparse.ArgumentParser:
         "--force-refresh",
         action="store_true",
         help="Bypass the NASDAQ-Trader cache during --set-ric resolution.",
+    )
+    p.add_argument(
+        "--moved-price-bps",
+        type=float,
+        help="stalePriceFilter.movedPriceThresholdBps (with --set-stale-filter).",
+    )
+    p.add_argument(
+        "--staleness-secs",
+        type=int,
+        help="stalePriceFilter.stalenessThresholdSecs (with --set-stale-filter).",
+    )
+    p.add_argument(
+        "--window-secs",
+        type=int,
+        help="stalePriceFilter.windowSecs (with --set-stale-filter).",
     )
 
     # Targeting

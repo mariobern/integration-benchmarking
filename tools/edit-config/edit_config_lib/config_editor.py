@@ -56,6 +56,10 @@ from edit_config_lib.config_ops import (
     AddExchangeId,
     RemoveExchangeId,
     ExchangeInfo,
+    SetStaleFilter,
+    ClearStaleFilter,
+    STALE_FILTER_KEYS,
+    format_stale_value,
 )
 from edit_config_lib.ric_csv import load_ric_csv, build_prefix_index, LoadError
 from edit_config_lib.config_selector import parse_selector_text, read_selector_file
@@ -78,6 +82,8 @@ _OP_FLAGS = (
     "remove_ric",
     "add_exchange_id",
     "remove_exchange_id",
+    "set_stale_filter",
+    "clear_stale_filter",
 )
 
 
@@ -109,7 +115,14 @@ def _parse_signed_int(s: str) -> int:
 
 # store_true flags default to False; other op flags default to None.
 _BOOL_OP_FLAGS = frozenset(
-    {"set_ric_mapping", "set_ric", "remove_ric", "remove_exchange_id"}
+    {
+        "set_ric_mapping",
+        "set_ric",
+        "remove_ric",
+        "remove_exchange_id",
+        "set_stale_filter",
+        "clear_stale_filter",
+    }
 )
 
 
@@ -182,12 +195,23 @@ def build_op_from_args(
             "no operation specified (use one of --add-publisher, "
             "--remove-publisher, --set-min-publishers, "
             "--bump-min-publishers, --set-state, --set-ric-mapping, --set-ric, "
-            "--remove-ric, --add-exchange-id, --remove-exchange-id)"
+            "--remove-ric, --add-exchange-id, --remove-exchange-id, "
+            "--set-stale-filter, --clear-stale-filter)"
         )
     if len(selected) > 1:
         raise ValueError(f"exactly one operation flag allowed; got {selected}")
 
     name = selected[0]
+
+    stale_value_flags = [
+        flag
+        for flag in ("moved_price_bps", "staleness_secs", "window_secs")
+        if getattr(args, flag, None) is not None
+    ]
+    if stale_value_flags and name != "set_stale_filter":
+        names = ", ".join("--" + f.replace("_", "-") for f in stale_value_flags)
+        verb = "requires" if len(stale_value_flags) == 1 else "require"
+        raise ValueError(f"{names} {verb} --set-stale-filter")
 
     if name == "set_ric_mapping":
         if not getattr(args, "from_csv", None):
@@ -240,6 +264,15 @@ def build_op_from_args(
         op = SetState(value=args.set_state)
     elif name == "remove_ric":
         op = ClearRic()
+    elif name == "set_stale_filter":
+        op = SetStaleFilter(
+            moved_price_threshold_bps=args.moved_price_bps,
+            staleness_threshold_secs=args.staleness_secs,
+            window_secs=args.window_secs,
+            session=args.session,
+        )
+    elif name == "clear_stale_filter":
+        op = ClearStaleFilter(session=args.session)
     elif name == "add_exchange_id":
         exchange = exchanges_by_id.get(args.add_exchange_id)
         if exchange is None:
@@ -269,6 +302,17 @@ _OP_REQUIRED_FIELDS = {
     "remove_ric": set(),
     "add_exchange_id": {"exchange_id"},
     "remove_exchange_id": set(),
+    "set_stale_filter": set(),
+    "clear_stale_filter": set(),
+}
+
+# Op fields that are allowed but not required (create/patch semantics).
+_OP_OPTIONAL_FIELDS = {
+    "set_stale_filter": {
+        "moved_price_threshold_bps",
+        "staleness_threshold_secs",
+        "window_secs",
+    },
 }
 
 _TARGETING_KEYS = {
@@ -330,7 +374,13 @@ def _filters_from_yaml_entry(entry: dict) -> FilterSet:
 
 
 def _validate_keys(entry: dict, op_name: str) -> None:
-    allowed = {"op"} | _TARGETING_KEYS | _SCOPE_KEYS | _OP_REQUIRED_FIELDS[op_name]
+    allowed = (
+        {"op"}
+        | _TARGETING_KEYS
+        | _SCOPE_KEYS
+        | _OP_REQUIRED_FIELDS[op_name]
+        | _OP_OPTIONAL_FIELDS.get(op_name, set())
+    )
     extras = set(entry.keys()) - allowed
     if extras:
         raise ValueError(f"unknown key(s) in op {op_name!r}: {sorted(extras)}")
@@ -381,6 +431,15 @@ def _build_op_from_yaml_entry(entry: dict, exchanges_by_id: dict):
         return AddExchangeId(exchange_id=eid, exchange=exchange)
     if op_name == "remove_exchange_id":
         return RemoveExchangeId(exchanges_by_id=exchanges_by_id)
+    if op_name == "set_stale_filter":
+        return SetStaleFilter(
+            moved_price_threshold_bps=entry.get("moved_price_threshold_bps"),
+            staleness_threshold_secs=entry.get("staleness_threshold_secs"),
+            window_secs=entry.get("window_secs"),
+            session=session,
+        )
+    if op_name == "clear_stale_filter":
+        return ClearStaleFilter(session=session)
     raise AssertionError(f"unhandled op {op_name}")
 
 
@@ -494,9 +553,13 @@ from edit_config_lib.config_text_surgery import (
     find_string_field_span,
     find_ric_identifier_spans,
     find_marketschedules_end,
+    find_object_field_span,
+    find_number_field_span,
     insert_field_after_open_brace,
     insert_field_before_session,
+    insert_field_before_close_brace,
     delete_scalar_field,
+    delete_object_field,
 )
 
 
@@ -525,6 +588,26 @@ def _set_session_min_publishers(sblock: str, value: int) -> str:
     if span is not None:
         return sblock[: span[0]] + str(value) + sblock[span[1] :]
     return insert_field_before_session(sblock, f'"minPublishers": {value},')
+
+
+def _render_stale_filter_object(spf: dict, indent: str) -> str:
+    """Render the `{…}` of a stalePriceFilter, pretty-printed to match the file.
+
+    `indent` is the indentation of the field's own line; keys sit two spaces
+    deeper and the closing brace lines up with `indent`.
+    """
+    inner = indent + "  "
+    body = ",\n".join(
+        f'{inner}"{key}": {format_stale_value(key, spf[key])}'
+        for key in STALE_FILTER_KEYS
+    )
+    return "{\n" + body + "\n" + indent + "}"
+
+
+def _session_field_indent(sblock: str) -> str:
+    """Indentation of the fields inside a session entry's block."""
+    m = re.search(r'\n(\s*)"', sblock)
+    return m.group(1) if m else "  "
 
 
 def _apply_one_change(block: str, change: Change) -> str:
@@ -611,6 +694,34 @@ def _apply_one_change(block: str, change: Change) -> str:
                 new_sblock = insert_field_before_session(
                     sblock, f'"marketSchedule": {json.dumps(change.after)},'
                 )
+    elif change.field == "stalePriceFilter":
+        indent = _session_field_indent(sblock)
+        span = find_object_field_span(sblock, "stalePriceFilter")
+        if change.after is None:
+            new_sblock = delete_object_field(sblock, "stalePriceFilter")
+        elif span is None:
+            field = '"stalePriceFilter": ' + _render_stale_filter_object(
+                change.after, indent
+            )
+            new_sblock = insert_field_before_close_brace(sblock, field)
+        else:
+            rendered = _render_stale_filter_object(change.after, indent)
+            new_sblock = sblock[: span[0]] + rendered + sblock[span[1] :]
+    elif change.field.startswith("stalePriceFilter."):
+        key = change.field.split(".", 1)[1]
+        span = find_object_field_span(sblock, "stalePriceFilter")
+        if span is None:
+            raise RuntimeError("stalePriceFilter object not found in session entry")
+        fblock = sblock[span[0] : span[1]]
+        fspan = find_number_field_span(fblock, key)
+        if fspan is None:
+            raise RuntimeError(f"stalePriceFilter.{key} not found in session entry")
+        new_fblock = (
+            fblock[: fspan[0]]
+            + format_stale_value(key, change.after)
+            + fblock[fspan[1] :]
+        )
+        new_sblock = sblock[: span[0]] + new_fblock + sblock[span[1] :]
     else:
         raise RuntimeError(f"unsupported session field {change.field!r}")
     return block[: sb[0]] + new_sblock + block[sb[1] :]
