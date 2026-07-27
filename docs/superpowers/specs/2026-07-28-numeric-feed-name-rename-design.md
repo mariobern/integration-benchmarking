@@ -272,15 +272,33 @@ warning is actionable: it fires, you add override rows, it clears.
 
 - A summary line: candidates matched, changed, skipped, overridden, warnings.
 
-**Post-write self-verification.** After writing, re-read the file from disk and assert:
+**Two-stage verification (as built).** This section originally specified a single
+post-write check; during implementation, a Task 4 review round found that a line-level
+check alone cannot catch a new name applied to the wrong feed (a value swap between two
+renamed feeds is invisible to a check that only compares changed values as an unordered
+multiset). `verify_feed_names` was added to close that gap, and verification was split
+into two stages so a dry run is checked too, not just `--apply`. The section below
+describes what shipped, not the original one-check design.
 
-1. It parses as JSON.
-2. The feed count is unchanged.
-3. Every line differing between the before and after text is a `"name":` line belonging
-   to a targeted feed.
+- **Before writing** (`verify_text`, runs on every invocation including dry runs):
+  textual only. Asserts the line count is unchanged, that the number of differing lines
+  equals the number of planned changes, that every differing line is a `"name":` line,
+  and that the multiset of changed values matches the plan. It proves no line outside
+  the expected `"name":` lines moved, but it cannot distinguish a feed's
+  `metadata.name` from `exchanges[].name`, and — because it only compares values as a
+  set — it cannot detect two changed feeds having their new names swapped.
 
-Any other difference aborts loudly. This is what makes a full-document rewrite
-trustworthy.
+- **After writing** (`verify_on_disk`, `--apply` only): re-reads the file from disk and
+  asserts it parses as JSON, that the feed count is unchanged, re-runs `verify_text`,
+  then runs `verify_feed_names`. `verify_feed_names` is JSON-path-aware — it diffs
+  `metadata.name` per `feedId` between the before and after data and asserts the set of
+  changed feeds exactly matches the plan, each with its intended new name. This is what
+  actually catches a wrong-feed / swapped-name write; the pre-write text check cannot.
+
+Any failure at either stage aborts loudly with exit code 1. Because the feed-count and
+JSON-parse checks, and `verify_feed_names` itself, only run post-write, a dry run's
+safety guarantee is weaker than `--apply`'s: it only has the line-level proof, not the
+JSON-path-aware one.
 
 ### 7. Known consumer of `metadata.name`
 

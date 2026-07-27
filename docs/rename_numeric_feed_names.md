@@ -71,7 +71,14 @@ Two same-issuer dual listings derive identical names (GigaDevice and Montage, ea
 - Dry run is the default; `--apply` writes.
 - The config is backed up to `<config>.bak` first, unless `--no-backup`.
 - Serialization is byte-identical to the stored format, so only the changed `"name":` lines differ.
-- Before writing (and again after), the script asserts that every differing line is an expected `"name":` line, that the file parses, and that the feed count is unchanged. Anything else aborts with exit code 1.
+
+Verification runs in two stages.
+
+**Before writing** — so a dry run catches problems too — `verify_text` asserts that the line count is unchanged, that the number of differing lines equals the number of planned changes, that every differing line is a `"name":` line, and that the changed values match the plan.
+
+**After writing** (`--apply` only), `verify_on_disk` re-reads the file from disk and asserts it parses, that the feed count is unchanged, re-runs `verify_text`, and then runs `verify_feed_names`. That last check is JSON-path-aware: it confirms the set of feeds whose `metadata.name` changed is exactly the planned set, with each new name on its intended feed. It is what catches a name applied to the wrong feed — a swap between two renamed feeds is invisible to the line-level check, which only compares values as an unordered multiset — and it ignores unrelated `name` keys elsewhere in the config, such as `exchanges[].name`.
+
+Any failure aborts with exit code 1. A post-write failure leaves the `.bak` for recovery.
 
 ## Tests
 
