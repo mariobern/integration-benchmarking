@@ -942,6 +942,45 @@ class TestStaleFilterCli:
         assert result.returncode == 1
         assert "--window-secs" in result.stdout + result.stderr
 
+    def test_single_value_flag_error_uses_singular_verb(self, stale_config):
+        # A single offending flag: "requires", not "require".
+        result = run_cli(
+            [
+                "--config",
+                str(stale_config),
+                "--add-publisher",
+                "80",
+                "--window-secs",
+                "120",
+                "--feed-id",
+                "1990",
+            ]
+        )
+        assert result.returncode == 1
+        msg = result.stdout + result.stderr
+        assert "--window-secs requires --set-stale-filter" in msg
+
+    def test_multiple_value_flags_error_uses_plural_verb(self, stale_config):
+        # Multiple offending flags: "require", not "requires".
+        result = run_cli(
+            [
+                "--config",
+                str(stale_config),
+                "--add-publisher",
+                "80",
+                "--window-secs",
+                "120",
+                "--staleness-secs",
+                "3600",
+                "--feed-id",
+                "1990",
+            ]
+        )
+        assert result.returncode == 1
+        msg = result.stdout + result.stderr
+        assert "require --set-stale-filter" in msg
+        assert "requires --set-stale-filter" not in msg
+
     def test_feed_ids_from_csv(self, stale_config, tmp_path):
         csv_path = tmp_path / "batch.csv"
         csv_path.write_text(

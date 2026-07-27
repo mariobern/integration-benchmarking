@@ -53,13 +53,13 @@ python3 tools/edit-config/edit_config.py --config lazer_update.json [OPERATION] 
 
 ### Targeting (≥1 required when not using `--from-spec`)
 
-| Flag               | Form                                       |
-| ------------------ | ------------------------------------------ |
-| `--feed-id`        | `922` or `100-200,205,208,3530-3540`       |
-| `--feed-ids-from`  | path to a text file (or `-` for stdin)     |
-| `--symbol-pattern` | fnmatch glob, e.g. `Equity.US.*`           |
-| `--asset-class`    | matches `metadata.asset_type`              |
-| `--state`          | filter for STABLE / COMING_SOON / INACTIVE |
+| Flag               | Form                                                                                                    |
+| ------------------ | ------------------------------------------------------------------------------------------------------- |
+| `--feed-id`        | `922` or `100-200,205,208,3530-3540`                                                                    |
+| `--feed-ids-from`  | path to a text file, a `.csv`, or `-` for stdin — see [file format](#--feed-ids-from-file-format) below |
+| `--symbol-pattern` | fnmatch glob, e.g. `Equity.US.*`                                                                        |
+| `--asset-class`    | matches `metadata.asset_type`                                                                           |
+| `--state`          | filter for STABLE / COMING_SOON / INACTIVE                                                              |
 
 ### Scope (publisher / minPublishers ops)
 

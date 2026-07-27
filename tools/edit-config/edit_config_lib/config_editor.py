@@ -210,7 +210,8 @@ def build_op_from_args(
     ]
     if stale_value_flags and name != "set_stale_filter":
         names = ", ".join("--" + f.replace("_", "-") for f in stale_value_flags)
-        raise ValueError(f"{names} require --set-stale-filter")
+        verb = "requires" if len(stale_value_flags) == 1 else "require"
+        raise ValueError(f"{names} {verb} --set-stale-filter")
 
     if name == "set_ric_mapping":
         if not getattr(args, "from_csv", None):
