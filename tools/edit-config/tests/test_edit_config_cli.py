@@ -842,3 +842,150 @@ class TestExchangeCli:
         feed = _feed(json.loads(ex_config_copy.read_text()), 300)
         assert feed["exchangeId"] == 1
         assert all("marketSchedule" not in s for s in feed["marketSchedules"])
+
+
+STALE_FIXTURE = Path(__file__).parent / "fixtures" / "stale_sample.json"
+
+
+@pytest.fixture
+def stale_config(tmp_path):
+    dst = tmp_path / "stale.json"
+    shutil.copy(STALE_FIXTURE, dst)
+    return dst
+
+
+def _spf(path, feed_id):
+    feeds = json.loads(Path(path).read_text(encoding="utf-8"))["feeds"]
+    feed = next(f for f in feeds if f["feedId"] == feed_id)
+    return feed["marketSchedules"][0].get("stalePriceFilter")
+
+
+class TestStaleFilterCli:
+    def test_dry_run_reports_change_and_writes_nothing(self, stale_config):
+        before = stale_config.read_text(encoding="utf-8")
+        result = run_cli(
+            ["--config", str(stale_config), "--set-stale-filter", "--feed-id", "1990"]
+        )
+        assert result.returncode == 0
+        assert "[DRY RUN]" in result.stdout
+        assert "@@ feedId 1990" in result.stdout
+        assert stale_config.read_text(encoding="utf-8") == before
+
+    def test_apply_creates_filter(self, stale_config):
+        result = run_cli(
+            [
+                "--config",
+                str(stale_config),
+                "--set-stale-filter",
+                "--feed-id",
+                "1990",
+                "--apply",
+                "--no-backup",
+            ]
+        )
+        assert result.returncode == 0
+        assert _spf(stale_config, 1990) == {
+            "movedPriceThresholdBps": 0.5,
+            "stalenessThresholdSecs": 10800,
+            "windowSecs": 60,
+        }
+
+    def test_apply_patches_single_knob(self, stale_config):
+        result = run_cli(
+            [
+                "--config",
+                str(stale_config),
+                "--set-stale-filter",
+                "--window-secs",
+                "120",
+                "--feed-id",
+                "2166",
+                "--apply",
+                "--no-backup",
+            ]
+        )
+        assert result.returncode == 0
+        assert _spf(stale_config, 2166) == {
+            "movedPriceThresholdBps": 0.5,
+            "stalenessThresholdSecs": 10800,
+            "windowSecs": 120,
+        }
+
+    def test_apply_clear(self, stale_config):
+        result = run_cli(
+            [
+                "--config",
+                str(stale_config),
+                "--clear-stale-filter",
+                "--feed-id",
+                "2166",
+                "--apply",
+                "--no-backup",
+            ]
+        )
+        assert result.returncode == 0
+        assert _spf(stale_config, 2166) is None
+
+    def test_value_flag_without_set_flag_errors(self, stale_config):
+        result = run_cli(
+            [
+                "--config",
+                str(stale_config),
+                "--add-publisher",
+                "80",
+                "--window-secs",
+                "120",
+                "--feed-id",
+                "1990",
+            ]
+        )
+        assert result.returncode == 1
+        assert "--window-secs" in result.stdout + result.stderr
+
+    def test_feed_ids_from_csv(self, stale_config, tmp_path):
+        csv_path = tmp_path / "batch.csv"
+        csv_path.write_text(
+            "1990, 2026-07-24, jp-equities\n2166, 2026-07-24, kr-equities\n",
+            encoding="utf-8",
+        )
+        result = run_cli(
+            [
+                "--config",
+                str(stale_config),
+                "--set-stale-filter",
+                "--feed-ids-from",
+                str(csv_path),
+                "--apply",
+                "--no-backup",
+            ]
+        )
+        assert result.returncode == 0
+        assert _spf(stale_config, 1990) is not None
+
+    def test_yaml_spec(self, stale_config, tmp_path):
+        spec = tmp_path / "spec.yaml"
+        spec.write_text(
+            "version: 1\n"
+            "operations:\n"
+            "  - op: set_stale_filter\n"
+            "    feed_id: 1990\n"
+            "    session: REGULAR\n"
+            "    window_secs: 90\n"
+            "  - op: clear_stale_filter\n"
+            "    feed_id: 2166\n"
+            "    session: REGULAR\n",
+            encoding="utf-8",
+        )
+        result = run_cli(
+            [
+                "--config",
+                str(stale_config),
+                "--from-spec",
+                str(spec),
+                "--apply",
+                "--no-backup",
+            ]
+        )
+        assert result.returncode == 0
+        assert _spf(stale_config, 1990)["windowSecs"] == 90
+        assert _spf(stale_config, 2166) is None

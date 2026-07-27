@@ -56,6 +56,8 @@ from edit_config_lib.config_ops import (
     AddExchangeId,
     RemoveExchangeId,
     ExchangeInfo,
+    SetStaleFilter,
+    ClearStaleFilter,
     STALE_FILTER_KEYS,
     format_stale_value,
 )
@@ -80,6 +82,8 @@ _OP_FLAGS = (
     "remove_ric",
     "add_exchange_id",
     "remove_exchange_id",
+    "set_stale_filter",
+    "clear_stale_filter",
 )
 
 
@@ -111,7 +115,14 @@ def _parse_signed_int(s: str) -> int:
 
 # store_true flags default to False; other op flags default to None.
 _BOOL_OP_FLAGS = frozenset(
-    {"set_ric_mapping", "set_ric", "remove_ric", "remove_exchange_id"}
+    {
+        "set_ric_mapping",
+        "set_ric",
+        "remove_ric",
+        "remove_exchange_id",
+        "set_stale_filter",
+        "clear_stale_filter",
+    }
 )
 
 
@@ -184,12 +195,22 @@ def build_op_from_args(
             "no operation specified (use one of --add-publisher, "
             "--remove-publisher, --set-min-publishers, "
             "--bump-min-publishers, --set-state, --set-ric-mapping, --set-ric, "
-            "--remove-ric, --add-exchange-id, --remove-exchange-id)"
+            "--remove-ric, --add-exchange-id, --remove-exchange-id, "
+            "--set-stale-filter, --clear-stale-filter)"
         )
     if len(selected) > 1:
         raise ValueError(f"exactly one operation flag allowed; got {selected}")
 
     name = selected[0]
+
+    stale_value_flags = [
+        flag
+        for flag in ("moved_price_bps", "staleness_secs", "window_secs")
+        if getattr(args, flag, None) is not None
+    ]
+    if stale_value_flags and name != "set_stale_filter":
+        names = ", ".join("--" + f.replace("_", "-") for f in stale_value_flags)
+        raise ValueError(f"{names} require --set-stale-filter")
 
     if name == "set_ric_mapping":
         if not getattr(args, "from_csv", None):
@@ -242,6 +263,15 @@ def build_op_from_args(
         op = SetState(value=args.set_state)
     elif name == "remove_ric":
         op = ClearRic()
+    elif name == "set_stale_filter":
+        op = SetStaleFilter(
+            moved_price_threshold_bps=args.moved_price_bps,
+            staleness_threshold_secs=args.staleness_secs,
+            window_secs=args.window_secs,
+            session=args.session,
+        )
+    elif name == "clear_stale_filter":
+        op = ClearStaleFilter(session=args.session)
     elif name == "add_exchange_id":
         exchange = exchanges_by_id.get(args.add_exchange_id)
         if exchange is None:
@@ -271,6 +301,17 @@ _OP_REQUIRED_FIELDS = {
     "remove_ric": set(),
     "add_exchange_id": {"exchange_id"},
     "remove_exchange_id": set(),
+    "set_stale_filter": set(),
+    "clear_stale_filter": set(),
+}
+
+# Op fields that are allowed but not required (create/patch semantics).
+_OP_OPTIONAL_FIELDS = {
+    "set_stale_filter": {
+        "moved_price_threshold_bps",
+        "staleness_threshold_secs",
+        "window_secs",
+    },
 }
 
 _TARGETING_KEYS = {
@@ -332,7 +373,13 @@ def _filters_from_yaml_entry(entry: dict) -> FilterSet:
 
 
 def _validate_keys(entry: dict, op_name: str) -> None:
-    allowed = {"op"} | _TARGETING_KEYS | _SCOPE_KEYS | _OP_REQUIRED_FIELDS[op_name]
+    allowed = (
+        {"op"}
+        | _TARGETING_KEYS
+        | _SCOPE_KEYS
+        | _OP_REQUIRED_FIELDS[op_name]
+        | _OP_OPTIONAL_FIELDS.get(op_name, set())
+    )
     extras = set(entry.keys()) - allowed
     if extras:
         raise ValueError(f"unknown key(s) in op {op_name!r}: {sorted(extras)}")
@@ -383,6 +430,15 @@ def _build_op_from_yaml_entry(entry: dict, exchanges_by_id: dict):
         return AddExchangeId(exchange_id=eid, exchange=exchange)
     if op_name == "remove_exchange_id":
         return RemoveExchangeId(exchanges_by_id=exchanges_by_id)
+    if op_name == "set_stale_filter":
+        return SetStaleFilter(
+            moved_price_threshold_bps=entry.get("moved_price_threshold_bps"),
+            staleness_threshold_secs=entry.get("staleness_threshold_secs"),
+            window_secs=entry.get("window_secs"),
+            session=session,
+        )
+    if op_name == "clear_stale_filter":
+        return ClearStaleFilter(session=session)
     raise AssertionError(f"unhandled op {op_name}")
 
 
