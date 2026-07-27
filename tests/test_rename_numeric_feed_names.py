@@ -1,6 +1,7 @@
 """Tests for rename_numeric_feed_names.py."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -631,3 +632,46 @@ class TestMain:
         out = capsys.readouterr().out
         assert "WARNING" in out
         assert "GIGADEVICE SEMICONDUCTOR INC" in out
+
+
+LIVE_CONFIG = Path("lazer-state.json")
+
+
+@pytest.mark.skipif(
+    not LIVE_CONFIG.exists(),
+    reason="lazer-state.json is gitignored and not present in this checkout",
+)
+class TestLiveConfigSmoke:
+    """Guards the measured expectations from the design doc.
+
+    The config is gitignored, so these are skipped wherever it is absent.
+    """
+
+    def _feeds(self):
+        return json.loads(LIVE_CONFIG.read_text(encoding="utf-8"))["feeds"]
+
+    def test_452_changes_no_skips(self):
+        changes, skips = build_changes(self._feeds())
+        assert len(changes) == 452
+        assert skips == []
+
+    def test_two_duplicate_warnings_without_overrides(self):
+        feeds = self._feeds()
+        changes, _ = build_changes(feeds)
+        duplicates = find_duplicate_names(feeds, changes)
+        assert [name for name, _ in duplicates] == [
+            "GIGADEVICE SEMICONDUCTOR INC",
+            "MONTAGE TECHNOLOGY CO LTD",
+        ]
+
+    def test_no_duplicates_with_committed_overrides(self):
+        feeds = self._feeds()
+        overrides = load_overrides(Path("feed_name_overrides.csv"))
+        changes, _ = build_changes(feeds, overrides=overrides)
+        assert find_duplicate_names(feeds, changes) == []
+
+    def test_feed_3520_gets_company_name(self):
+        changes, _ = build_changes(self._feeds())
+        by_id = {c.feed_id: c for c in changes}
+        assert by_id[3520].before == "688825"
+        assert by_id[3520].after == "CHANGXIN MEMORY TECHNOLOGIES"
