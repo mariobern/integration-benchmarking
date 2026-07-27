@@ -1,17 +1,25 @@
 """Tests for rename_numeric_feed_names.py."""
 
+import json
+
 import pytest
 
 from rename_numeric_feed_names import (
     Change,
     OverrideError,
+    VerificationError,
+    apply_changes,
     build_changes,
     derive_name,
+    dump_config,
     find_duplicate_names,
     in_scope,
     is_candidate,
     load_overrides,
+    verify_on_disk,
+    verify_text,
     validate_overrides,
+    write_config,
 )
 
 
@@ -311,3 +319,110 @@ class TestFindDuplicateNames:
         duplicates = find_duplicate_names(feeds, changes)
         assert len(duplicates) == 1
         assert duplicates[0][0] == "CHANGXIN MEMORY TECHNOLOGIES"
+
+
+def _config(*feeds):
+    return {"feeds": list(feeds)}
+
+
+class TestDumpConfig:
+    def test_round_trip_is_byte_identical(self, tmp_path):
+        data = _config(_feed(feed_id=3520))
+        text = dump_config(data)
+        assert dump_config(json.loads(text)) == text
+
+    def test_no_trailing_newline(self):
+        assert not dump_config(_config(_feed())).endswith("\n")
+
+    def test_non_ascii_is_not_escaped(self):
+        data = _config(_feed(description="COSTA RICAN COLÓN / CHINESE YUAN"))
+        assert "COLÓN" in dump_config(data)
+        assert "\\u00d3" not in dump_config(data).lower()
+
+
+class TestApplyChanges:
+    def test_sets_name_and_leaves_description(self):
+        data = _config(_feed(feed_id=3520))
+        changes, _ = build_changes(data["feeds"])
+        apply_changes(data, changes)
+        metadata = data["feeds"][0]["metadata"]
+        assert metadata["name"] == "CHANGXIN MEMORY TECHNOLOGIES"
+        assert metadata["description"] == "CHANGXIN MEMORY TECHNOLOGIES / CHINESE YUAN"
+
+    def test_symbol_untouched(self):
+        data = _config(_feed(feed_id=3520))
+        changes, _ = build_changes(data["feeds"])
+        apply_changes(data, changes)
+        assert data["feeds"][0]["symbol"] == "Equity.CN.688825/CNY"
+
+
+class TestVerifyText:
+    def _before_after(self):
+        data = _config(
+            _feed(feed_id=3520), _feed(feed_id=3521, symbol="Equity.US.X/USD")
+        )
+        before_text = dump_config(data)
+        changes, _ = build_changes(data["feeds"])
+        apply_changes(data, changes)
+        return before_text, dump_config(data), changes
+
+    def test_passes_on_name_only_diff(self):
+        before_text, after_text, changes = self._before_after()
+        verify_text(before_text, after_text, changes)
+
+    def test_untouched_feed_lines_are_identical(self):
+        before_text, after_text, changes = self._before_after()
+        differing = [
+            b for b, a in zip(before_text.split("\n"), after_text.split("\n")) if b != a
+        ]
+        assert len(differing) == 1
+        assert differing[0].strip().startswith('"name":')
+
+    def test_rejects_unexpected_field_change(self):
+        before_text, after_text, changes = self._before_after()
+        tampered = after_text.replace("Equity.CN.688825/CNY", "Equity.CN.999999/CNY")
+        with pytest.raises(VerificationError):
+            verify_text(before_text, tampered, changes)
+
+    def test_rejects_line_count_change(self):
+        before_text, after_text, changes = self._before_after()
+        with pytest.raises(VerificationError, match="line count changed"):
+            verify_text(before_text, after_text + "\n", changes)
+
+    def test_rejects_wrong_change_count(self):
+        before_text, after_text, changes = self._before_after()
+        with pytest.raises(VerificationError, match="changed line"):
+            verify_text(before_text, after_text, [])
+
+
+class TestWriteConfig:
+    def test_writes_and_backs_up(self, tmp_path):
+        path = tmp_path / "cfg.json"
+        path.write_text("original", encoding="utf-8")
+        write_config(path, "updated")
+        assert path.read_text(encoding="utf-8") == "updated"
+        assert (tmp_path / "cfg.json.bak").read_text(encoding="utf-8") == "original"
+
+    def test_no_backup_flag(self, tmp_path):
+        path = tmp_path / "cfg.json"
+        path.write_text("original", encoding="utf-8")
+        write_config(path, "updated", backup=False)
+        assert not (tmp_path / "cfg.json.bak").exists()
+
+
+class TestVerifyOnDisk:
+    def test_passes_after_real_write(self, tmp_path):
+        data = _config(_feed(feed_id=3520))
+        before_text = dump_config(data)
+        path = tmp_path / "cfg.json"
+        path.write_text(before_text, encoding="utf-8")
+        changes, _ = build_changes(data["feeds"])
+        apply_changes(data, changes)
+        write_config(path, dump_config(data), backup=False)
+        verify_on_disk(path, before_text, changes)
+
+    def test_rejects_unparseable_file(self, tmp_path):
+        path = tmp_path / "cfg.json"
+        path.write_text("{not json", encoding="utf-8")
+        with pytest.raises(VerificationError, match="does not parse"):
+            verify_on_disk(path, dump_config(_config(_feed())), [])

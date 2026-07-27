@@ -14,7 +14,9 @@ See docs/superpowers/specs/2026-07-28-numeric-feed-name-rename-design.md.
 """
 
 import csv
+import json
 import re
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -226,3 +228,85 @@ def find_duplicate_names(
         for name, members in groups.items()
         if len(members) > 1 and any(fid in new_names for fid, _ in members)
     )
+
+
+class VerificationError(Exception):
+    """Raised when the rewritten config differs in unexpected ways."""
+
+
+def dump_config(data: dict) -> str:
+    """Serialize exactly as the config is stored on disk.
+
+    2-space indent, raw UTF-8, no trailing newline. Verified byte-identical
+    against an unmodified `lazer-state.json`, so the only difference between
+    input and output is the lines this script deliberately changes.
+    """
+    return json.dumps(data, indent=2, ensure_ascii=False)
+
+
+def apply_changes(data: dict, changes: list[Change]) -> None:
+    """Write the planned names into the in-memory document."""
+    by_id = {f["feedId"]: f for f in data["feeds"]}
+    for change in changes:
+        by_id[change.feed_id]["metadata"]["name"] = change.after
+
+
+def _parse_name_line(line: str) -> str:
+    """Extract the value from a `"name": "..."` line, comma or not."""
+    return json.loads("{" + line.strip().rstrip(",") + "}")["name"]
+
+
+def verify_text(before_text: str, after_text: str, changes: list[Change]) -> None:
+    """Raise VerificationError unless every differing line is an expected name.
+
+    This is what makes a whole-document rewrite trustworthy: it proves no other
+    field, feed, or formatting detail moved.
+    """
+    before_lines = before_text.split("\n")
+    after_lines = after_text.split("\n")
+    if len(before_lines) != len(after_lines):
+        raise VerificationError(
+            f"line count changed: {len(before_lines)} -> {len(after_lines)}"
+        )
+    differing = [
+        (lineno, before, after)
+        for lineno, (before, after) in enumerate(
+            zip(before_lines, after_lines), start=1
+        )
+        if before != after
+    ]
+    if len(differing) != len(changes):
+        raise VerificationError(
+            f"expected {len(changes)} changed line(s), found {len(differing)}"
+        )
+    for lineno, before_line, _after_line in differing:
+        if not before_line.strip().startswith('"name":'):
+            raise VerificationError(
+                f"line {lineno} is not a name field: {before_line.strip()!r}"
+            )
+    expected = sorted(c.after for c in changes)
+    found = sorted(_parse_name_line(after) for _, _, after in differing)
+    if expected != found:
+        raise VerificationError("changed name values do not match the plan")
+
+
+def verify_on_disk(path: Path, before_text: str, changes: list[Change]) -> None:
+    """Re-read the written config and confirm it parses and changed only names."""
+    after_text = path.read_text(encoding="utf-8")
+    try:
+        data = json.loads(after_text)
+    except json.JSONDecodeError as exc:
+        raise VerificationError(f"written config does not parse: {exc}") from exc
+    expected_feeds = len(json.loads(before_text)["feeds"])
+    if len(data["feeds"]) != expected_feeds:
+        raise VerificationError(
+            f"feed count changed: {expected_feeds} -> {len(data['feeds'])}"
+        )
+    verify_text(before_text, after_text, changes)
+
+
+def write_config(path: Path, text: str, backup: bool = True) -> None:
+    """Back up (unless suppressed) then overwrite the config."""
+    if backup:
+        shutil.copy2(path, path.with_suffix(path.suffix + ".bak"))
+    path.write_text(text, encoding="utf-8")
