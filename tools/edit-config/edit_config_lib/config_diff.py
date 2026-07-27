@@ -7,7 +7,7 @@ line numbers in a 3 MB file.
 
 import json
 
-from edit_config_lib.config_ops import Change
+from edit_config_lib.config_ops import Change, STALE_FILTER_KEYS
 
 
 def _format_publisher_list(ids: list[int]) -> str:
@@ -25,6 +25,23 @@ def _hunk_header(change: Change) -> str:
 
 def _value_lines(change: Change) -> tuple[str, str]:
     """Return (before_line, after_line) formatted as JSON-ish text."""
+    if change.field.startswith("stalePriceFilter"):
+        if change.field == "stalePriceFilter":
+
+            def _fmt(val):
+                body = ", ".join(
+                    f'"{k}": {val[k]}' for k in STALE_FILTER_KEYS if k in val
+                )
+                return f'      "stalePriceFilter": {{ {body} }},'
+
+            if change.after is None:  # clear
+                return _fmt(change.before), "      (removed)"
+            if change.before is None:  # create
+                return "      (absent)", _fmt(change.after)
+            return _fmt(change.before), _fmt(change.after)
+        key = change.field.split(".", 1)[1]
+        return f'      "{key}": {change.before},', f'      "{key}": {change.after},'
+
     if change.field in ("exchangeId", "marketSchedule"):
 
         def _fmt(val):

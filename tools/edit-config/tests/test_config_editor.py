@@ -1274,3 +1274,91 @@ class TestYamlExchangeOps:
         )
         with pytest.raises(ValueError, match="not defined in exchanges"):
             parse_yaml_spec(str(spec), _ex_map())
+
+
+from edit_config_lib.config_editor import apply_changes
+from edit_config_lib.config_ops import SetStaleFilter, ClearStaleFilter
+
+
+STALE_FIXTURE_PATH = Path(__file__).parent / "fixtures" / "stale_sample.json"
+
+
+def _stale_raw():
+    return STALE_FIXTURE_PATH.read_text(encoding="utf-8")
+
+
+def _session_of(raw_text, feed_id):
+    feed = next(f for f in json.loads(raw_text)["feeds"] if f["feedId"] == feed_id)
+    return feed["marketSchedules"][0]
+
+
+class TestApplyStaleFilter:
+    def test_create_inserts_object_as_last_key(self):
+        raw = _stale_raw()
+        feeds = json.loads(raw)["feeds"]
+        feed = next(f for f in feeds if f["feedId"] == 1990)
+        changes, _ = SetStaleFilter().apply(feed)
+        out = apply_changes(raw, changes)
+        assert _session_of(out, 1990)["stalePriceFilter"] == {
+            "movedPriceThresholdBps": 0.5,
+            "stalenessThresholdSecs": 10800,
+            "windowSecs": 60,
+        }
+        # Untouched feeds stay byte-identical.
+        assert '"symbol": "Equity.KR.000660/KRW"' in out
+
+    def test_patch_rewrites_single_key(self):
+        raw = _stale_raw()
+        feeds = json.loads(raw)["feeds"]
+        feed = next(f for f in feeds if f["feedId"] == 2166)
+        changes, _ = SetStaleFilter(window_secs=120).apply(feed)
+        out = apply_changes(raw, changes)
+        spf = _session_of(out, 2166)["stalePriceFilter"]
+        assert spf == {
+            "movedPriceThresholdBps": 0.5,
+            "stalenessThresholdSecs": 10800,
+            "windowSecs": 120,
+        }
+
+    def test_patch_of_decimal_key_is_not_truncated(self):
+        raw = _stale_raw()
+        feeds = json.loads(raw)["feeds"]
+        feed = next(f for f in feeds if f["feedId"] == 2166)
+        changes, _ = SetStaleFilter(moved_price_threshold_bps=1.25).apply(feed)
+        out = apply_changes(raw, changes)
+        assert (
+            _session_of(out, 2166)["stalePriceFilter"]["movedPriceThresholdBps"] == 1.25
+        )
+
+    def test_whole_object_rewrite(self):
+        raw = _stale_raw()
+        feeds = json.loads(raw)["feeds"]
+        feed = next(f for f in feeds if f["feedId"] == 3337)
+        changes, _ = SetStaleFilter(window_secs=90).apply(feed)
+        out = apply_changes(raw, changes)
+        assert _session_of(out, 3337)["stalePriceFilter"] == {
+            "movedPriceThresholdBps": 2.0,
+            "stalenessThresholdSecs": 3600,
+            "windowSecs": 90,
+        }
+
+    def test_clear_removes_object(self):
+        raw = _stale_raw()
+        feeds = json.loads(raw)["feeds"]
+        feed = next(f for f in feeds if f["feedId"] == 2166)
+        changes, _ = ClearStaleFilter().apply(feed)
+        out = apply_changes(raw, changes)
+        session = _session_of(out, 2166)
+        assert "stalePriceFilter" not in session
+        assert session["minPublishers"] == 2
+
+    def test_create_then_clear_round_trips_to_valid_json(self):
+        raw = _stale_raw()
+        feeds = json.loads(raw)["feeds"]
+        feed = next(f for f in feeds if f["feedId"] == 1990)
+        created, _ = SetStaleFilter().apply(feed)
+        out = apply_changes(raw, created)
+        feed2 = next(f for f in json.loads(out)["feeds"] if f["feedId"] == 1990)
+        cleared, _ = ClearStaleFilter().apply(feed2)
+        final = apply_changes(out, cleared)
+        assert json.loads(final) == json.loads(raw)

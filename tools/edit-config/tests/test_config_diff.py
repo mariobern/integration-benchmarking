@@ -210,3 +210,41 @@ class TestExchangeDiff:
         out = _render([c])
         assert "(absent)" in out
         assert '+      "marketSchedule": "America/New_York;0930-1600;R",' in out
+
+
+class TestStaleFilterDiff:
+    def _change(self, **kw):
+        base = dict(
+            feed_id=2166,
+            symbol="Equity.KR.000660/KRW",
+            location="REGULAR",
+            field="stalePriceFilter",
+            before=None,
+            after=None,
+        )
+        base.update(kw)
+        return Change(**base)
+
+    def test_create_hunk(self):
+        c = self._change(
+            after={
+                "movedPriceThresholdBps": 0.5,
+                "stalenessThresholdSecs": 10800,
+                "windowSecs": 60,
+            }
+        )
+        out = render_diff([c])
+        assert "@@ feedId 2166 (Equity.KR.000660/KRW), session REGULAR @@" in out
+        assert "-      (absent)" in out
+        assert '+      "stalePriceFilter": { "movedPriceThresholdBps": 0.5, ' in out
+
+    def test_clear_hunk(self):
+        c = self._change(before={"windowSecs": 60}, after=None)
+        out = render_diff([c])
+        assert "+      (removed)" in out
+
+    def test_single_key_patch_hunk(self):
+        c = self._change(field="stalePriceFilter.windowSecs", before=60, after=120)
+        out = render_diff([c])
+        assert '-      "windowSecs": 60,' in out
+        assert '+      "windowSecs": 120,' in out

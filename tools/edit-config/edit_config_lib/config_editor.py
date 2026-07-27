@@ -56,6 +56,7 @@ from edit_config_lib.config_ops import (
     AddExchangeId,
     RemoveExchangeId,
     ExchangeInfo,
+    STALE_FILTER_KEYS,
 )
 from edit_config_lib.ric_csv import load_ric_csv, build_prefix_index, LoadError
 from edit_config_lib.config_selector import parse_selector_text, read_selector_file
@@ -494,9 +495,13 @@ from edit_config_lib.config_text_surgery import (
     find_string_field_span,
     find_ric_identifier_spans,
     find_marketschedules_end,
+    find_object_field_span,
+    find_number_field_span,
     insert_field_after_open_brace,
     insert_field_before_session,
+    insert_field_before_close_brace,
     delete_scalar_field,
+    delete_object_field,
 )
 
 
@@ -525,6 +530,33 @@ def _set_session_min_publishers(sblock: str, value: int) -> str:
     if span is not None:
         return sblock[: span[0]] + str(value) + sblock[span[1] :]
     return insert_field_before_session(sblock, f'"minPublishers": {value},')
+
+
+def _format_stale_value(key: str, value) -> str:
+    """Render one stalePriceFilter value: float for bps, int for the seconds."""
+    if key == "movedPriceThresholdBps":
+        return repr(float(value))
+    return str(int(value))
+
+
+def _render_stale_filter_object(spf: dict, indent: str) -> str:
+    """Render the `{…}` of a stalePriceFilter, pretty-printed to match the file.
+
+    `indent` is the indentation of the field's own line; keys sit two spaces
+    deeper and the closing brace lines up with `indent`.
+    """
+    inner = indent + "  "
+    body = ",\n".join(
+        f'{inner}"{key}": {_format_stale_value(key, spf[key])}'
+        for key in STALE_FILTER_KEYS
+    )
+    return "{\n" + body + "\n" + indent + "}"
+
+
+def _session_field_indent(sblock: str) -> str:
+    """Indentation of the fields inside a session entry's block."""
+    m = re.search(r'\n(\s*)"', sblock)
+    return m.group(1) if m else "  "
 
 
 def _apply_one_change(block: str, change: Change) -> str:
@@ -611,6 +643,34 @@ def _apply_one_change(block: str, change: Change) -> str:
                 new_sblock = insert_field_before_session(
                     sblock, f'"marketSchedule": {json.dumps(change.after)},'
                 )
+    elif change.field == "stalePriceFilter":
+        indent = _session_field_indent(sblock)
+        span = find_object_field_span(sblock, "stalePriceFilter")
+        if change.after is None:
+            new_sblock = delete_object_field(sblock, "stalePriceFilter")
+        elif span is None:
+            field = '"stalePriceFilter": ' + _render_stale_filter_object(
+                change.after, indent
+            )
+            new_sblock = insert_field_before_close_brace(sblock, field)
+        else:
+            rendered = _render_stale_filter_object(change.after, indent)
+            new_sblock = sblock[: span[0]] + rendered + sblock[span[1] :]
+    elif change.field.startswith("stalePriceFilter."):
+        key = change.field.split(".", 1)[1]
+        span = find_object_field_span(sblock, "stalePriceFilter")
+        if span is None:
+            raise RuntimeError("stalePriceFilter object not found in session entry")
+        fblock = sblock[span[0] : span[1]]
+        fspan = find_number_field_span(fblock, key)
+        if fspan is None:
+            raise RuntimeError(f"stalePriceFilter.{key} not found in session entry")
+        new_fblock = (
+            fblock[: fspan[0]]
+            + _format_stale_value(key, change.after)
+            + fblock[fspan[1] :]
+        )
+        new_sblock = sblock[: span[0]] + new_fblock + sblock[span[1] :]
     else:
         raise RuntimeError(f"unsupported session field {change.field!r}")
     return block[: sb[0]] + new_sblock + block[sb[1] :]
