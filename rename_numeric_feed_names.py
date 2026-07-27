@@ -259,8 +259,9 @@ def _parse_name_line(line: str) -> str:
 def verify_text(before_text: str, after_text: str, changes: list[Change]) -> None:
     """Raise VerificationError unless every differing line is an expected name.
 
-    This is what makes a whole-document rewrite trustworthy: it proves no other
-    field, feed, or formatting detail moved.
+    Proves at the line level that no line outside the expected "name": lines moved.
+    Textual only: cannot distinguish a feed's metadata.name from exchanges[].name or
+    detect value swaps between changed feeds. Use verify_feed_names for JSON-aware checks.
     """
     before_lines = before_text.split("\n")
     after_lines = after_text.split("\n")
@@ -290,6 +291,41 @@ def verify_text(before_text: str, after_text: str, changes: list[Change]) -> Non
         raise VerificationError("changed name values do not match the plan")
 
 
+def verify_feed_names(
+    before_data: dict, after_data: dict, changes: list[Change]
+) -> None:
+    """Raise VerificationError unless exactly the planned feed names changed.
+
+    The line-level check in `verify_text` proves no other line moved, but it is
+    textual: it cannot tell a feed's `metadata.name` from an `exchanges[].name`,
+    and its multiset comparison would accept two feeds having their new names
+    swapped. This check is JSON-path-aware and pins each new name to its feed.
+    """
+    before_names = {
+        f["feedId"]: str(f.get("metadata", {}).get("name", ""))
+        for f in before_data["feeds"]
+    }
+    after_names = {
+        f["feedId"]: str(f.get("metadata", {}).get("name", ""))
+        for f in after_data["feeds"]
+    }
+    if before_names.keys() != after_names.keys():
+        raise VerificationError("feed id set changed")
+    actual = {
+        feed_id: after_names[feed_id]
+        for feed_id in before_names
+        if before_names[feed_id] != after_names[feed_id]
+    }
+    expected = {c.feed_id: c.after for c in changes}
+    if actual != expected:
+        only_actual = {k: v for k, v in actual.items() if expected.get(k) != v}
+        only_expected = {k: v for k, v in expected.items() if actual.get(k) != v}
+        raise VerificationError(
+            f"feed name changes do not match the plan; unexpected={only_actual}, "
+            f"missing={only_expected}"
+        )
+
+
 def verify_on_disk(path: Path, before_text: str, changes: list[Change]) -> None:
     """Re-read the written config and confirm it parses and changed only names."""
     after_text = path.read_text(encoding="utf-8")
@@ -303,6 +339,7 @@ def verify_on_disk(path: Path, before_text: str, changes: list[Change]) -> None:
             f"feed count changed: {expected_feeds} -> {len(data['feeds'])}"
         )
     verify_text(before_text, after_text, changes)
+    verify_feed_names(json.loads(before_text), data, changes)
 
 
 def write_config(path: Path, text: str, backup: bool = True) -> None:

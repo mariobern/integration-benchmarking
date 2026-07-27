@@ -16,6 +16,7 @@ from rename_numeric_feed_names import (
     in_scope,
     is_candidate,
     load_overrides,
+    verify_feed_names,
     verify_on_disk,
     verify_text,
     validate_overrides,
@@ -379,9 +380,33 @@ class TestVerifyText:
         assert differing[0].strip().startswith('"name":')
 
     def test_rejects_unexpected_field_change(self):
-        before_text, after_text, changes = self._before_after()
-        tampered = after_text.replace("Equity.CN.688825/CNY", "Equity.CN.999999/CNY")
-        with pytest.raises(VerificationError):
+        # Apply 1 name change to create after_text, but then replace that name change
+        # with a description change. Count passes (1 diff line = 1 change), but branch catches it.
+        data = _config(_feed(feed_id=3520))
+        before_text = dump_config(data)
+        changes, _ = build_changes(data["feeds"])
+        apply_changes(data, changes)
+        after_text = dump_config(data)
+        # In after_text, undo the name change and modify the description instead.
+        lines_after = list(after_text.split("\n"))
+        name_found = False
+        desc_found = False
+        for i, line in enumerate(lines_after):
+            if not name_found and '"name":' in line:
+                # Undo the name change
+                lines_after[i] = line.replace("CHANGXIN MEMORY TECHNOLOGIES", "688825")
+                name_found = True
+            elif not desc_found and '"description":' in line:
+                # Change the description
+                lines_after[i] = line.replace(
+                    "CHANGXIN MEMORY TECHNOLOGIES",
+                    "CORRUPTED NAME CHANGE",
+                )
+                desc_found = True
+            if name_found and desc_found:
+                break
+        tampered = "\n".join(lines_after)
+        with pytest.raises(VerificationError, match="is not a name field"):
             verify_text(before_text, tampered, changes)
 
     def test_rejects_line_count_change(self):
@@ -393,6 +418,95 @@ class TestVerifyText:
         before_text, after_text, changes = self._before_after()
         with pytest.raises(VerificationError, match="changed line"):
             verify_text(before_text, after_text, [])
+
+
+class TestVerifyFeedNames:
+    def test_verify_feed_names_passes_on_planned_change(self):
+        before_data = _config(_feed(feed_id=3520))
+        after_data = _config(_feed(feed_id=3520))
+        changes, _ = build_changes(before_data["feeds"])
+        apply_changes(after_data, changes)
+        verify_feed_names(before_data, after_data, changes)
+
+    def test_verify_feed_names_rejects_swapped_values(self):
+        before_data = _config(
+            _feed(feed_id=3520),
+            _feed(
+                feed_id=3521,
+                symbol="Equity.JP.1234/JPY",
+                name="1234",
+                description="NIKKEI INC / JAPANESE YEN",
+                quote_currency="JPY",
+            ),
+        )
+        after_data = _config(
+            _feed(feed_id=3520),
+            _feed(
+                feed_id=3521,
+                symbol="Equity.JP.1234/JPY",
+                name="1234",
+                description="NIKKEI INC / JAPANESE YEN",
+                quote_currency="JPY",
+            ),
+        )
+        changes, _ = build_changes(before_data["feeds"])
+        apply_changes(after_data, changes)
+        # Swap the two new names between the two feeds
+        after_data["feeds"][0]["metadata"]["name"] = changes[1].after
+        after_data["feeds"][1]["metadata"]["name"] = changes[0].after
+        with pytest.raises(VerificationError, match="do not match the plan"):
+            verify_feed_names(before_data, after_data, changes)
+
+    def test_verify_feed_names_rejects_unplanned_rename(self):
+        before_data = _config(_feed(feed_id=3520))
+        after_data = _config(_feed(feed_id=3520))
+        changes, _ = build_changes(before_data["feeds"])
+        apply_changes(after_data, changes)
+        # Rename to something unexpected
+        after_data["feeds"][0]["metadata"]["name"] = "WRONG_NAME"
+        with pytest.raises(VerificationError, match="do not match the plan"):
+            verify_feed_names(before_data, after_data, changes)
+
+    def test_verify_feed_names_rejects_missing_rename(self):
+        before_data = _config(_feed(feed_id=3520))
+        after_data = _config(_feed(feed_id=3520))
+        changes, _ = build_changes(before_data["feeds"])
+        # Don't apply changes, so the name stays the same
+        with pytest.raises(VerificationError, match="do not match the plan"):
+            verify_feed_names(before_data, after_data, changes)
+
+    def test_verify_on_disk_rejects_swapped_values(self, tmp_path):
+        before_data = _config(
+            _feed(feed_id=3520),
+            _feed(
+                feed_id=3521,
+                symbol="Equity.JP.1234/JPY",
+                name="1234",
+                description="NIKKEI INC / JAPANESE YEN",
+                quote_currency="JPY",
+            ),
+        )
+        before_text = dump_config(before_data)
+        path = tmp_path / "cfg.json"
+        path.write_text(before_text, encoding="utf-8")
+        changes, _ = build_changes(before_data["feeds"])
+        after_data = _config(
+            _feed(feed_id=3520),
+            _feed(
+                feed_id=3521,
+                symbol="Equity.JP.1234/JPY",
+                name="1234",
+                description="NIKKEI INC / JAPANESE YEN",
+                quote_currency="JPY",
+            ),
+        )
+        apply_changes(after_data, changes)
+        # Swap the two new names between the two feeds
+        after_data["feeds"][0]["metadata"]["name"] = changes[1].after
+        after_data["feeds"][1]["metadata"]["name"] = changes[0].after
+        write_config(path, dump_config(after_data), backup=False)
+        with pytest.raises(VerificationError, match="do not match the plan"):
+            verify_on_disk(path, before_text, changes)
 
 
 class TestWriteConfig:
