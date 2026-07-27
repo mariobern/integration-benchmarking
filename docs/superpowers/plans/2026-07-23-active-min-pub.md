@@ -35,12 +35,15 @@
 ## Task 1: Distribution stats + verdict (pure functions)
 
 **Files:**
+
 - Create: `lazer_dq/active_min_pub.py`
 - Test: `lazer_dq/tests/test_active_min_pub.py`
 
 **Interfaces:**
+
 - Consumes: nothing (leaf functions).
 - Produces:
+
   - `RESULT_COLUMNS: list[str]` — CSV field order.
   - `distribution_stats(counts: np.ndarray, min_pub: int) -> dict` — returns keys `n_updates, min, p1, p5, median, pct_at_floor, pct_at_floor_1`. `counts` is the masked per-update `publisher_count` array (dtype int). On empty input returns `n_updates=0` and all other numeric keys `0`/`0.0`.
   - `classify(stats: dict, critical_pct: float, warn_pct: float, min_updates: int) -> str` — returns one of `NO_DATA, LOW_SAMPLE, CRITICAL, WARN, OK`. Thresholds are passed as arguments (not read from `stats`). Precedence: NO_DATA > LOW_SAMPLE > CRITICAL > WARN > OK.
@@ -269,12 +272,15 @@ git commit -m "feat(active_min_pub): distribution stats + verdict pure functions
 ## Task 2: Session-masked counts from raw price_feeds rows
 
 **Files:**
+
 - Modify: `lazer_dq/active_min_pub.py`
 - Test: `lazer_dq/tests/test_active_min_pub.py`
 
 **Interfaces:**
+
 - Consumes: `parse_market_schedule`, `open_minutes_mask` from `lazer_dq.market_schedule`.
 - Produces:
+
   - `masked_counts(rows: list[tuple], schedule_str: str, start_utc: datetime, end_utc: datetime) -> np.ndarray` — `rows` are `(publish_time_naive_utc, publisher_count)` tuples straight from ClickHouse. Floors each `publish_time` to its UTC minute, keeps only rows whose minute is open per the parsed schedule, and returns the surviving `publisher_count` values as an int array. Raises `ValueError` (propagated from `parse_market_schedule`) on a malformed schedule string — caller handles.
 
 - [ ] **Step 1: Write the failing test**
@@ -378,12 +384,15 @@ git commit -m "feat(active_min_pub): session-masked per-update counts"
 ## Task 3: ClickHouse fetch with channel probing
 
 **Files:**
+
 - Modify: `lazer_dq/active_min_pub.py`
 - Test: `lazer_dq/tests/test_active_min_pub.py`
 
 **Interfaces:**
+
 - Consumes: a ClickHouse client exposing `.query(sql, parameters=dict)` returning an object with `.result_rows` (list of `(publish_time, publisher_count)`).
 - Produces:
+
   - `PRICE_FEEDS_QUERY: str` — parameterized SQL (feed_id, channel, start, end).
   - `fetch_feed_rows(client, feed_id, start_utc, end_utc, channels=(1, 2, 3)) -> list[tuple]` — probes channels in order, returns `.result_rows` from the first channel with data; `[]` if none have data.
 
@@ -508,12 +517,15 @@ git commit -m "feat(active_min_pub): price_feeds fetch with channel probing"
 ## Task 4: Per-feed orchestration (rows -> per-session result rows)
 
 **Files:**
+
 - Modify: `lazer_dq/active_min_pub.py`
 - Test: `lazer_dq/tests/test_active_min_pub.py`
 
 **Interfaces:**
+
 - Consumes: `fetch_feed_rows`, `masked_counts`, `distribution_stats`, `classify`, and `FeedSession` from `lazer_dq.min_pub_common`.
 - Produces:
+
   - `analyze_feed(client, feed_sessions, start_utc, end_utc, critical_pct, warn_pct, min_updates) -> list[dict]` — one query for the feed (via `fetch_feed_rows`), then one result dict per session in `feed_sessions`. Each dict has every key in `RESULT_COLUMNS`. A session whose `schedule_str` is `None` or malformed gets `verdict="NO_SCHEDULE"` and zeroed stats (mirrors `audit_min_pub`'s NO_SCHEDULE handling).
 
 - [ ] **Step 1: Write the failing test**
@@ -669,12 +681,15 @@ git commit -m "feat(active_min_pub): per-feed orchestration to per-session rows"
 ## Task 5: CLI, parallel sweep, CSV + console output
 
 **Files:**
+
 - Modify: `lazer_dq/active_min_pub.py`
 - Test: `lazer_dq/tests/test_active_min_pub.py`
 
 **Interfaces:**
+
 - Consumes: `iter_stable_sessions`, `analyze_feed`, `ThreadLocalClients`/`load_config` from `lib.config`.
 - Produces:
+
   - `default_window() -> tuple[datetime, datetime]` — last 7 full UTC days.
   - `parse_args(argv=None)` — flags: `--config` (required), `--start-date`, `--end-date`, `--critical-pct` (default 1.0), `--warn-pct` (default 5.0), `--min-updates` (default 100), `--workers` (default 8), `--feed-id` (nargs `*`), `--output-dir` (default `output_csv`).
   - `summarize(rows: list[dict]) -> dict[str, int]` — verdict -> count tally over result rows.
@@ -880,6 +895,7 @@ git commit -m "feat(active_min_pub): CLI, parallel sweep, CSV + console output"
 ## Task 6: Docs + audit_min_pub distinction note
 
 **Files:**
+
 - Create: `docs/active_min_pub.md`
 - Modify: `CLAUDE.md` (Scripts table + Key Gotchas)
 - Modify: `lazer_dq/audit_min_pub.py:1-14` (docstring note)
@@ -901,11 +917,11 @@ distribution vs the session's `minPublishers`.
 
 ## Distinct from `audit_min_pub`
 
-| | `active_min_pub` | `audit_min_pub` |
-| --- | --- | --- |
-| Question | Aggregate contributor-count headroom | Per-minute publisher availability |
-| Source | `price_feeds.publisher_count` | `publisher_updates` (distinct ACCEPTED) |
-| Granularity | per aggregate update | per minute |
+|             | `active_min_pub`                     | `audit_min_pub`                         |
+| ----------- | ------------------------------------ | --------------------------------------- |
+| Question    | Aggregate contributor-count headroom | Per-minute publisher availability       |
+| Source      | `price_feeds.publisher_count`        | `publisher_updates` (distinct ACCEPTED) |
+| Granularity | per aggregate update                 | per minute                              |
 
 Use `active_min_pub` to answer "how close does each feed run to its min-pub floor,
 at the aggregate level?" — the input to feed-by-feed remediation.
@@ -954,7 +970,7 @@ special-casing here because this analysis never touches a Datascope benchmark.
 In `CLAUDE.md`, add a row to the Scripts table (after the `incumbent_quality.py` row):
 
 ```markdown
-| `lazer_dq/active_min_pub.py`            | Aggregate publisher-count headroom sweep: per STABLE feed-session, distribution of `price_feeds.publisher_count` per update vs `minPublishers`                                                                          | `python3 -m lazer_dq.active_min_pub --config lazer_newest.json --start-date A --end-date B`             | [docs/active_min_pub.md](docs/active_min_pub.md)                         |
+| `lazer_dq/active_min_pub.py` | Aggregate publisher-count headroom sweep: per STABLE feed-session, distribution of `price_feeds.publisher_count` per update vs `minPublishers` | `python3 -m lazer_dq.active_min_pub --config lazer_newest.json --start-date A --end-date B` | [docs/active_min_pub.md](docs/active_min_pub.md) |
 ```
 
 Add to the "Key Gotchas" list:
@@ -1011,12 +1027,14 @@ Expected: all PASS (the docstring edit is inert).
 - [ ] **Step 3: Live smoke run against ClickHouse (requires `config.yaml`)**
 
 Run:
+
 ```bash
 source venv/bin/activate
 python3 -m lazer_dq.active_min_pub --config lazer_newest.json \
     --start-date 2026-07-14 --end-date 2026-07-15 \
     --feed-id 1080 --workers 2
 ```
+
 Expected: prints "Analyzing 1 feeds …", writes `output_csv/active_min_pub_2026-07-14_2026-07-15.csv`, and prints a verdict tally. (Feed 1080 = DIA ETF from the transcript; adjust if needed.) Confirm the CSV has one row per session for the feed with populated `n_updates` and a plausible `pct_at_floor`.
 
 - [ ] **Step 4: Sanity-check against the transcript's manual method**

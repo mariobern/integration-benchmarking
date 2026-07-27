@@ -9,7 +9,7 @@
 A report run on 2026-07-22 attempted to answer "how many feeds run close to their
 `minPublishers` floor?" using the wrong methodology. It measured **per-minute distinct
 ACCEPTED publishers from the `publisher_updates` table** (via `audit_min_pub`) — a
-per-minute *union of individual submissions*. That count is inflated and does not
+per-minute _union of individual submissions_. That count is inflated and does not
 reflect what any single aggregate price update actually used.
 
 The correct question, per the design walkthrough (transcript `active_min_pub_220726.txt`):
@@ -31,10 +31,10 @@ identifies feeds needing feed-by-feed remediation.
 This is a **new standalone script**, not a replacement for `audit_min_pub`. The two
 answer genuinely different questions and must not be confused:
 
-| Script | Question | Source | Metric | Granularity |
-|---|---|---|---|---|
-| `audit_min_pub` (Stage 1) | Publisher *availability* | `publisher_updates` | distinct ACCEPTED publishers | per minute |
-| `active_min_pub` (new) | Aggregate *contributor-count headroom* | `price_feeds` | `publisher_count` on the aggregate | per aggregate update |
+| Script                    | Question                               | Source              | Metric                             | Granularity          |
+| ------------------------- | -------------------------------------- | ------------------- | ---------------------------------- | -------------------- |
+| `audit_min_pub` (Stage 1) | Publisher _availability_               | `publisher_updates` | distinct ACCEPTED publishers       | per minute           |
+| `active_min_pub` (new)    | Aggregate _contributor-count headroom_ | `price_feeds`       | `publisher_count` on the aggregate | per aggregate update |
 
 Both scripts get a one-line docstring note stating this distinction. The existing
 deployed pipeline (Stage 1/2/3) is left untouched. This script identifies the feeds;
@@ -55,15 +55,17 @@ For every STABLE `(feed, session)` in `lazer_newest.json`, over a multi-day wind
 ## Scope
 
 **In scope:**
+
 - New module `lazer_dq/active_min_pub.py` (thin CLI + parallel fetch).
 - Per-feed-session CSV + console summary.
 - Unit tests (`lazer_dq/tests/test_active_min_pub.py`).
 - Docs: `docs/active_min_pub.md`, Scripts-table row, one CLAUDE.md gotcha line.
 
 **Out of scope:**
+
 - Any change to `audit_min_pub`, `qualify_candidates`, `apply_min_pub_remediation`
   (beyond the one-line docstring distinction note).
-- Actually remediating feeds (feed-by-feed edits) — this script only *identifies*.
+- Actually remediating feeds (feed-by-feed edits) — this script only _identifies_.
 - Wiring output into the existing Stage 2/3 pipeline.
 
 ## Data Flow
@@ -144,14 +146,14 @@ Closed-hours thin prints are excluded so they don't pollute the histogram.
 
 All statistics are computed from the single masked `counts[]` array (numpy):
 
-| Field | Meaning |
-|---|---|
-| `min` | minimum contributor count observed in-session |
-| `p1`, `p5` | 1st / 5th percentile of contributor count |
-| `median` | median contributor count |
-| `pct_at_floor` | fraction of in-session updates with `publisher_count <= min_pub` — **primary trigger** |
-| `pct_at_floor_1` | fraction with `publisher_count <= min_pub + 1` (context) |
-| `n_updates` | total in-session aggregate updates (conclusiveness guard) |
+| Field            | Meaning                                                                                |
+| ---------------- | -------------------------------------------------------------------------------------- |
+| `min`            | minimum contributor count observed in-session                                          |
+| `p1`, `p5`       | 1st / 5th percentile of contributor count                                              |
+| `median`         | median contributor count                                                               |
+| `pct_at_floor`   | fraction of in-session updates with `publisher_count <= min_pub` — **primary trigger** |
+| `pct_at_floor_1` | fraction with `publisher_count <= min_pub + 1` (context)                               |
+| `n_updates`      | total in-session aggregate updates (conclusiveness guard)                              |
 
 `pct_at_floor` / `pct_at_floor_1` are reported as percentages (0–100).
 
