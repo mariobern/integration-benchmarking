@@ -47,17 +47,19 @@ python3 tools/edit-config/edit_config.py --config lazer_update.json [OPERATION] 
 | `--remove-exchange-id`                      | Remove `exchangeId` and restore `marketSchedule` strings from the exchange |
 | `--set-ric-mapping --from-csv PATH`         | Fill empty `datascope_ric.identifier` values                               |
 | `--remove-ric`                              | Clear all `datascope_ric` identifier values to `""`                        |
+| `--set-stale-filter`                        | Create or patch the session-level `stalePriceFilter`                       |
+| `--clear-stale-filter`                      | Remove `stalePriceFilter` from targeted sessions                           |
 | `--from-spec PATH`                          | Apply a batched YAML spec (multiple ops)                                   |
 
 ### Targeting (≥1 required when not using `--from-spec`)
 
-| Flag               | Form                                       |
-| ------------------ | ------------------------------------------ |
-| `--feed-id`        | `922` or `100-200,205,208,3530-3540`       |
-| `--feed-ids-from`  | path to a text file (or `-` for stdin)     |
-| `--symbol-pattern` | fnmatch glob, e.g. `Equity.US.*`           |
-| `--asset-class`    | matches `metadata.asset_type`              |
-| `--state`          | filter for STABLE / COMING_SOON / INACTIVE |
+| Flag               | Form                                                                                                    |
+| ------------------ | ------------------------------------------------------------------------------------------------------- |
+| `--feed-id`        | `922` or `100-200,205,208,3530-3540`                                                                    |
+| `--feed-ids-from`  | path to a text file, a `.csv`, or `-` for stdin — see [file format](#--feed-ids-from-file-format) below |
+| `--symbol-pattern` | fnmatch glob, e.g. `Equity.US.*`                                                                        |
+| `--asset-class`    | matches `metadata.asset_type`                                                                           |
+| `--state`          | filter for STABLE / COMING_SOON / INACTIVE                                                              |
 
 ### Scope (publisher / minPublishers ops)
 
@@ -241,6 +243,64 @@ operations:
     feed_id: "884,885"
 ```
 
+### `--set-stale-filter` / `--clear-stale-filter` — session staleness guard
+
+`stalePriceFilter` lives inside a `marketSchedules` session entry and carries three
+knobs:
+
+```json
+"stalePriceFilter": {
+  "movedPriceThresholdBps": 0.5,
+  "stalenessThresholdSecs": 10800,
+  "windowSecs": 60
+}
+```
+
+Values come from `--moved-price-bps`, `--staleness-secs` and `--window-secs`.
+
+**Create** — on a session with no filter, omitted values take the defaults
+`0.5 / 10800 / 60`:
+
+```bash
+python3 tools/edit-config/edit_config.py --config lazer_staleness.json \
+  --set-stale-filter --feed-ids-from jp_kr.csv --session REGULAR
+```
+
+**Patch** — on a session that already has one, only the values you pass are
+rewritten; the rest are left alone, so a fleet-wide retune of a single knob is one
+command:
+
+```bash
+python3 tools/edit-config/edit_config.py --config lazer_staleness.json \
+  --set-stale-filter --window-secs 120 --feed-ids-from jp_kr.csv --apply
+```
+
+**Clear** — the inverse:
+
+```bash
+python3 tools/edit-config/edit_config.py --config lazer_staleness.json \
+  --clear-stale-filter --feed-id 2166 --apply
+```
+
+Scope follows the publisher ops: `--session` defaults to `REGULAR`, `ALL` fans out
+over every session on the feed, and `NONE` is an error (the filter has no
+feed-level home). Non-numeric or non-positive values are errors;
+`stalenessThresholdSecs < windowSecs` is a warning.
+
+In a YAML spec, every value key is optional and patch semantics still apply:
+
+```yaml
+version: 1
+operations:
+  - op: set_stale_filter
+    feed_id: "1990,2023,2043-2064"
+    session: REGULAR
+    window_secs: 120
+  - op: clear_stale_filter
+    feed_id: 3337
+    session: REGULAR
+```
+
 ## State changes and the deprecation mark (`--set-state`)
 
 Setting a feed to `INACTIVE` also prepends `DEPRECATED FEED - ` to the feed's
@@ -302,6 +362,12 @@ Plain text, UTF-8. Tokens are `N` (single ID) or `A-B` (inclusive range). Tokens
 # inline pasted from a slack message
 100-200, 205, 208, 3530
 ```
+
+A path ending in `.csv` is read as a CSV: only column 1 of each row is parsed, so the
+repo's benchmark CSVs (`feed_id,date,mode` — `jp_kr.csv`, `kr.csv`, `hk_41.csv`, …)
+work as targeting files directly. A first row whose column 1 is not a feed ID is
+treated as a header and skipped. Every other path, and stdin (`-`), keeps the strict
+`N` / `A-B` grammar.
 
 ## Exchange inheritance
 

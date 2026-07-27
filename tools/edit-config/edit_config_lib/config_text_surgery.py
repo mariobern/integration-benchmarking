@@ -129,14 +129,13 @@ def find_session_block(feed_block: str, session_name: str) -> tuple[int, int] | 
     return (pos, close_idx + 1)
 
 
-def find_metadata_block(block: str) -> tuple[int, int] | None:
-    """Locate the {…} value of the feed-level `metadata` object within
-    `block` (the raw text of a single feed object).
+def find_object_field_span(block: str, key: str) -> tuple[int, int] | None:
+    """Locate the {…} value of an object-valued field `key` within `block`.
 
-    Returns (start, end) where start is the opening '{' and end is one
-    past the matching '}'. None if the field is absent.
+    Returns (start, end) where start is the opening '{' and end is one past
+    the matching '}'. None if the field is absent.
     """
-    match = re.search(r'"metadata"\s*:\s*\{', block)
+    match = re.search(rf'"{re.escape(key)}"\s*:\s*\{{', block)
     if match is None:
         return None
     open_idx = match.end() - 1
@@ -144,6 +143,16 @@ def find_metadata_block(block: str) -> tuple[int, int] | None:
     if close_idx is None:
         return None
     return (open_idx, close_idx + 1)
+
+
+def find_metadata_block(block: str) -> tuple[int, int] | None:
+    """Locate the {…} value of the feed-level `metadata` object within
+    `block` (the raw text of a single feed object).
+
+    Returns (start, end) where start is the opening '{' and end is one
+    past the matching '}'. None if the field is absent.
+    """
+    return find_object_field_span(block, "metadata")
 
 
 def find_publisher_array_span(block: str) -> tuple[int, int] | None:
@@ -169,6 +178,20 @@ def find_int_field_span(block: str, key: str) -> tuple[int, int] | None:
     whitespace, no comma). None if missing.
     """
     pattern = re.compile(rf'"{re.escape(key)}":\s*(-?\d+)')
+    match = pattern.search(block)
+    if match is None:
+        return None
+    return (match.start(1), match.end(1))
+
+
+def find_number_field_span(block: str, key: str) -> tuple[int, int] | None:
+    """Locate the numeric value of `"key": N` within `block`, int or decimal.
+
+    Returns the span of the literal only. `find_int_field_span` matches just
+    `-?\\d+`, so pointed at `0.5` it would return the `0` and a splice would
+    corrupt the value — use this helper for any field that may be fractional.
+    """
+    pattern = re.compile(rf'"{re.escape(key)}":\s*(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)')
     match = pattern.search(block)
     if match is None:
         return None
@@ -252,6 +275,54 @@ def insert_field_before_session(block: str, field_text: str) -> str:
     indent = m.group(1)
     pos = m.start() + 1  # just after the newline preceding the "session" line
     return block[:pos] + indent + field_text + "\n" + block[pos:]
+
+
+def insert_field_before_close_brace(block: str, field_text: str) -> str:
+    """Insert `field_text` as the LAST field of `block`'s outermost object.
+
+    `field_text` must NOT carry a trailing comma — the comma is appended to the
+    current last field's line instead. This is the inserter for
+    `stalePriceFilter`, which sorts after `session` and so is always last in a
+    session entry. Multi-line `field_text` must already carry the indentation
+    of its continuation lines; only the first line is indented here.
+    """
+    close = block.rindex("}")
+    head = block[:close]
+    tail = block[close:]
+    close_indent = head[head.rindex("\n") + 1 :] if "\n" in head else ""
+    m = re.search(r'\n(\s*)"', block)
+    indent = m.group(1) if m else close_indent + "  "
+    body = head.rstrip()
+    separator = "" if body.endswith("{") else ","
+    return body + separator + "\n" + indent + field_text + "\n" + close_indent + tail
+
+
+def delete_object_field(block: str, key: str) -> str:
+    """Delete `"key": { … }` from `block`, including the comma that precedes it.
+
+    The object-valued sibling of `delete_scalar_field`. Assumes the field is the
+    LAST field of its object (true for `stalePriceFilter`), so the comma to
+    remove sits before the field rather than after it. Deleting the only field
+    leaves a valid empty object. Returns `block` unchanged when `key` is absent.
+    """
+    span = find_object_field_span(block, key)
+    if span is None:
+        return block
+    key_match = re.search(rf'"{re.escape(key)}"\s*:\s*\{{', block)
+    start = key_match.start()
+    end = span[1]
+    # Walk back over the field's indentation, the newline before it, and the
+    # comma that terminated the previous field.
+    i = start - 1
+    while i >= 0 and block[i] in " \t":
+        i -= 1
+    if i >= 0 and block[i] == "\n":
+        i -= 1
+        while i >= 0 and block[i] in " \t":
+            i -= 1
+    if i >= 0 and block[i] == ",":
+        i -= 1
+    return block[: i + 1] + block[end:]
 
 
 def find_marketschedules_end(block: str) -> int:

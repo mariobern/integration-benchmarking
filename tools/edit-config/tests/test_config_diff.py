@@ -210,3 +210,63 @@ class TestExchangeDiff:
         out = _render([c])
         assert "(absent)" in out
         assert '+      "marketSchedule": "America/New_York;0930-1600;R",' in out
+
+
+class TestStaleFilterDiff:
+    def _change(self, **kw):
+        base = dict(
+            feed_id=2166,
+            symbol="Equity.KR.000660/KRW",
+            location="REGULAR",
+            field="stalePriceFilter",
+            before=None,
+            after=None,
+        )
+        base.update(kw)
+        return Change(**base)
+
+    def test_create_hunk(self):
+        c = self._change(
+            after={
+                "movedPriceThresholdBps": 0.5,
+                "stalenessThresholdSecs": 10800,
+                "windowSecs": 60,
+            }
+        )
+        out = render_diff([c])
+        assert "@@ feedId 2166 (Equity.KR.000660/KRW), session REGULAR @@" in out
+        assert "-      (absent)" in out
+        assert '+      "stalePriceFilter": { "movedPriceThresholdBps": 0.5, ' in out
+
+    def test_clear_hunk(self):
+        c = self._change(before={"windowSecs": 60}, after=None)
+        out = render_diff([c])
+        assert "+      (removed)" in out
+
+    def test_single_key_patch_hunk(self):
+        c = self._change(field="stalePriceFilter.windowSecs", before=60, after=120)
+        out = render_diff([c])
+        assert '-      "windowSecs": 60,' in out
+        assert '+      "windowSecs": 120,' in out
+
+    def test_whole_object_hunk_normalizes_bare_int_bps(self):
+        # A pre-existing config may carry `"movedPriceThresholdBps": 2` (a bare
+        # int, valid JSON) that survives unnormalized through
+        # `dict(current)` in SetStaleFilter.apply(). The diff must still
+        # render it as a float, matching what the applier writes to the file.
+        c = self._change(
+            before={
+                "movedPriceThresholdBps": 2,
+                "stalenessThresholdSecs": 10800,
+                "windowSecs": 60,
+            },
+            after={
+                "movedPriceThresholdBps": 2,
+                "stalenessThresholdSecs": 10800,
+                "windowSecs": 90,
+            },
+        )
+        out = render_diff([c])
+        assert '"movedPriceThresholdBps": 2.0' in out
+        assert '"movedPriceThresholdBps": 2,' not in out
+        assert '"movedPriceThresholdBps": 2 ' not in out

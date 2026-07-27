@@ -1,0 +1,131 @@
+{
+  "featureFlags": {},
+  "feeds": [
+    {
+      "exchangeId": 24,
+      "expiryTime": "5.000000000s",
+      "exponent": -5,
+      "feedId": 2166,
+      "isEnabledInShard": true,
+      "kind": "PRICE",
+      "marketSchedules": [
+        {
+          "allowedPublisherIds": [59, 84, 41],
+          "minPublishers": 2,
+          "session": "REGULAR",
+          "stalePriceFilter": {
+            "movedPriceThresholdBps": 0.5,
+            "stalenessThresholdSecs": 10800,
+            "windowSecs": 60
+          }
+        }
+      ],
+      "metadata": { "asset_type": "equity" },
+      "minPublishers": 2,
+      "state": "STABLE",
+      "symbol": "Equity.KR.000660/KRW"
+    },
+    {
+      "exchangeId": 29,
+      "expiryTime": "5.000000000s",
+      "exponent": -5,
+      "feedId": 1990,
+      "isEnabledInShard": true,
+      "kind": "PRICE",
+      "marketSchedules": [
+        {
+          "allowedPublisherIds": [24, 84],
+          "minPublishers": 2,
+          "session": "REGULAR"
+        }
+      ],
+      "metadata": { "asset_type": "equity" },
+      "minPublishers": 2,
+      "state": "COMING_SOON",
+      "symbol": "Equity.JP.4506/JPY"
+    },
+    {
+      "exchangeId": 29,
+      "expiryTime": "5.000000000s",
+      "exponent": -5,
+      "feedId": 3337,
+      "isEnabledInShard": true,
+      "kind": "PRICE",
+      "marketSchedules": [
+        {
+          "allowedPublisherIds": [24, 84],
+          "minPublishers": 2,
+          "session": "REGULAR",
+          "stalePriceFilter": {
+            "movedPriceThresholdBps": 2.0,
+            "stalenessThresholdSecs": 3600
+          }
+        }
+      ],
+      "metadata": { "asset_type": "equity" },
+      "minPublishers": 2,
+      "state": "STABLE",
+      "symbol": "Equity.JP.285A/JPY"
+    },
+    {
+      "exchangeId": 29,
+      "expiryTime": "5.000000000s",
+      "exponent": -5,
+      "feedId": 3338,
+      "isEnabledInShard": true,
+      "kind": "PRICE",
+      "marketSchedules": [
+        {
+          "allowedPublisherIds": [20, 41],
+          "minPublishers": 2,
+          "session": "REGULAR",
+          "stalePriceFilter": {
+            "movedPriceThresholdBps": 2.0,
+            "stalenessThresholdSecs": 3600,
+            "windowSecs": 45
+          }
+        }
+      ],
+      "metadata": { "asset_type": "equity" },
+      "minPublishers": 2,
+      "state": "STABLE",
+      "symbol": "Equity.JP.4062/JPY"
+    },
+    {
+      "expiryTime": "5.000000000s",
+      "exponent": -8,
+      "feedId": 1000,
+      "isEnabledInShard": true,
+      "kind": "PRICE",
+      "marketSchedules": [],
+      "metadata": { "asset_type": "crypto" },
+      "minPublishers": 1,
+      "state": "STABLE",
+      "symbol": "Crypto.BTC/USD"
+    },
+    {
+      "exchangeId": 29,
+      "expiryTime": "5.000000000s",
+      "exponent": -5,
+      "feedId": 4001,
+      "isEnabledInShard": true,
+      "kind": "PRICE",
+      "marketSchedules": [
+        {
+          "allowedPublisherIds": [24, 84],
+          "minPublishers": 2,
+          "session": "REGULAR"
+        },
+        {
+          "allowedPublisherIds": [24, 84],
+          "minPublishers": 2,
+          "session": "PRE_MARKET"
+        }
+      ],
+      "metadata": { "asset_type": "equity" },
+      "minPublishers": 2,
+      "state": "STABLE",
+      "symbol": "Equity.JP.9999/JPY"
+    }
+  ]
+}
