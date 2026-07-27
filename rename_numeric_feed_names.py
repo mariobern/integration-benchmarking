@@ -15,6 +15,7 @@ See docs/superpowers/specs/2026-07-28-numeric-feed-name-rename-design.md.
 
 import csv
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 MARKET_PREFIXES = ("Equity.HK.", "Equity.JP.", "Equity.KR.", "Equity.CN.")
@@ -144,3 +145,84 @@ def validate_overrides(
                 f"override feed_id {feed_id} ({feed.get('symbol')}) is outside "
                 f"the configured symbol prefixes: {', '.join(prefixes)}"
             )
+
+
+@dataclass(frozen=True)
+class Change:
+    """One planned `metadata.name` rewrite."""
+
+    feed_id: int
+    symbol: str
+    before: str
+    after: str
+    source: str  # "rule" or "override"
+
+
+@dataclass(frozen=True)
+class Skip:
+    """A candidate that could not be derived, with the reason why."""
+
+    feed_id: int
+    symbol: str
+    reason: str
+
+
+def build_changes(
+    feeds: list[dict],
+    prefixes: tuple[str, ...] = MARKET_PREFIXES,
+    overrides: dict[int, str] | None = None,
+) -> tuple[list[Change], list[Skip]]:
+    """Plan the rename over every in-scope feed.
+
+    Overrides take precedence over rule derivation and bypass the currency
+    check, since the value is supplied by hand. A feed whose name already
+    equals the target produces no change, which is what makes repeat runs
+    no-ops.
+    """
+    overrides = overrides or {}
+    changes: list[Change] = []
+    skips: list[Skip] = []
+    for feed in feeds:
+        if not in_scope(feed, prefixes):
+            continue
+        feed_id = feed["feedId"]
+        symbol = feed.get("symbol", "")
+        before = str(feed.get("metadata", {}).get("name", ""))
+
+        if feed_id in overrides:
+            after, source = overrides[feed_id], "override"
+        elif is_candidate(feed, prefixes):
+            after, reason = derive_name(feed)
+            if after is None:
+                skips.append(Skip(feed_id, symbol, reason))
+                continue
+            source = "rule"
+        else:
+            continue
+
+        if after != before:
+            changes.append(Change(feed_id, symbol, before, after, source))
+    return changes, skips
+
+
+def find_duplicate_names(
+    feeds: list[dict], changes: list[Change]
+) -> list[tuple[str, list[tuple[int, str]]]]:
+    """Names shared by two or more feeds after the rename.
+
+    Only groups containing at least one changed feed are reported, which keeps
+    pre-existing duplicates elsewhere in the config (`BA`, `AAL`) out of the
+    output while still catching a derived name colliding with an untouched one.
+    """
+    new_names = {c.feed_id: c.after for c in changes}
+    groups: dict[str, list[tuple[int, str]]] = {}
+    for feed in feeds:
+        feed_id = feed["feedId"]
+        current = str(feed.get("metadata", {}).get("name", ""))
+        name = new_names.get(feed_id, current)
+        groups.setdefault(name, []).append((feed_id, feed.get("symbol", "")))
+    return sorted(
+        (name, members)
+        for name, members in groups.items()
+        if len(members) > 1 and any(fid in new_names for fid, _ in members)
+    )

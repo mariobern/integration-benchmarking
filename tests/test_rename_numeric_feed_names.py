@@ -3,8 +3,11 @@
 import pytest
 
 from rename_numeric_feed_names import (
+    Change,
     OverrideError,
+    build_changes,
     derive_name,
+    find_duplicate_names,
     in_scope,
     is_candidate,
     load_overrides,
@@ -173,3 +176,138 @@ class TestValidateOverrides:
         feeds = [_feed(feed_id=922, symbol="Equity.US.AAPL/USD")]
         with pytest.raises(OverrideError, match="outside the configured"):
             validate_overrides({922: "APPLE"}, feeds)
+
+
+class TestBuildChanges:
+    def test_derives_name_for_candidate(self):
+        changes, skips = build_changes([_feed(feed_id=3520)])
+        assert skips == []
+        assert changes == [
+            Change(
+                feed_id=3520,
+                symbol="Equity.CN.688825/CNY",
+                before="688825",
+                after="CHANGXIN MEMORY TECHNOLOGIES",
+                source="rule",
+            )
+        ]
+
+    def test_out_of_scope_feed_untouched(self):
+        feeds = [_feed(feed_id=922, symbol="Equity.US.AAPL/USD", name="AAPL")]
+        changes, skips = build_changes(feeds)
+        assert changes == []
+        assert skips == []
+
+    def test_already_renamed_feed_is_noop(self):
+        feeds = [_feed(feed_id=3520, name="CHANGXIN MEMORY TECHNOLOGIES")]
+        changes, skips = build_changes(feeds)
+        assert changes == []
+        assert skips == []
+
+    def test_idempotent_second_pass(self):
+        feeds = [_feed(feed_id=3520)]
+        changes, _ = build_changes(feeds)
+        feeds[0]["metadata"]["name"] = changes[0].after
+        changes_again, skips_again = build_changes(feeds)
+        assert changes_again == []
+        assert skips_again == []
+
+    def test_undeliverable_description_is_skipped(self):
+        feeds = [_feed(feed_id=3520, description="SOME CORP / US DOLLAR")]
+        changes, skips = build_changes(feeds)
+        assert changes == []
+        assert len(skips) == 1
+        assert skips[0].feed_id == 3520
+
+    def test_override_beats_derived_name(self):
+        changes, skips = build_changes([_feed(feed_id=3520)], overrides={3520: "CXMT"})
+        assert skips == []
+        assert changes[0].after == "CXMT"
+        assert changes[0].source == "override"
+
+    def test_override_applies_to_already_renamed_feed(self):
+        feeds = [_feed(feed_id=3520, name="CHANGXIN MEMORY TECHNOLOGIES")]
+        changes, _ = build_changes(feeds, overrides={3520: "CXMT"})
+        assert changes[0].before == "CHANGXIN MEMORY TECHNOLOGIES"
+        assert changes[0].after == "CXMT"
+
+    def test_override_matching_current_name_is_noop(self):
+        changes, _ = build_changes([_feed(feed_id=3520)], overrides={3520: "688825"})
+        assert changes == []
+
+    def test_override_skips_currency_validation(self):
+        feeds = [_feed(feed_id=3520, description="BROKEN DESCRIPTION")]
+        changes, skips = build_changes(feeds, overrides={3520: "CXMT"})
+        assert skips == []
+        assert changes[0].after == "CXMT"
+
+
+class TestFindDuplicateNames:
+    def test_reports_dual_listing(self):
+        feeds = [
+            _feed(
+                feed_id=3339,
+                symbol="Equity.CN.603986/CNY",
+                name="603986",
+                description="GIGADEVICE SEMICONDUCTOR INC / CHINESE YUAN",
+            ),
+            _feed(
+                feed_id=3360,
+                symbol="Equity.HK.3986/HKD",
+                name="3986",
+                description="GIGADEVICE SEMICONDUCTOR INC / HONG KONG DOLLAR",
+                quote_currency="HKD",
+            ),
+        ]
+        changes, _ = build_changes(feeds)
+        duplicates = find_duplicate_names(feeds, changes)
+        assert duplicates == [
+            (
+                "GIGADEVICE SEMICONDUCTOR INC",
+                [(3339, "Equity.CN.603986/CNY"), (3360, "Equity.HK.3986/HKD")],
+            )
+        ]
+
+    def test_overrides_clear_the_duplicate(self):
+        feeds = [
+            _feed(
+                feed_id=3339,
+                symbol="Equity.CN.603986/CNY",
+                name="603986",
+                description="GIGADEVICE SEMICONDUCTOR INC / CHINESE YUAN",
+            ),
+            _feed(
+                feed_id=3360,
+                symbol="Equity.HK.3986/HKD",
+                name="3986",
+                description="GIGADEVICE SEMICONDUCTOR INC / HONG KONG DOLLAR",
+                quote_currency="HKD",
+            ),
+        ]
+        overrides = {
+            3339: "GIGADEVICE SEMICONDUCTOR INC (CN)",
+            3360: "GIGADEVICE SEMICONDUCTOR INC (HK)",
+        }
+        changes, _ = build_changes(feeds, overrides=overrides)
+        assert find_duplicate_names(feeds, changes) == []
+
+    def test_preexisting_duplicate_not_reported_when_untouched(self):
+        feeds = [
+            _feed(feed_id=979, symbol="Equity.US.BA/USD", name="BA"),
+            _feed(feed_id=790, symbol="Equity.GB.BA/GBP", name="BA"),
+        ]
+        assert find_duplicate_names(feeds, changes=[]) == []
+
+    def test_collision_with_untouched_feed_is_reported(self):
+        feeds = [
+            _feed(feed_id=3520),
+            _feed(
+                feed_id=3293,
+                symbol="Equity.US.CXMT/USD",
+                name="CHANGXIN MEMORY TECHNOLOGIES",
+            ),
+        ]
+        changes, _ = build_changes(feeds)
+        duplicates = find_duplicate_names(feeds, changes)
+        assert len(duplicates) == 1
+        assert duplicates[0][0] == "CHANGXIN MEMORY TECHNOLOGIES"
