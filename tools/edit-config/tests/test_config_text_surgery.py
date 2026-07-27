@@ -1,12 +1,17 @@
 from pathlib import Path
 
 import pytest
+import json
 from edit_config_lib.config_text_surgery import find_feed_block, find_matching_close
 from edit_config_lib.config_text_surgery import (
     find_session_block,
     find_publisher_array_span,
     find_int_field_span,
     find_string_field_span,
+    find_object_field_span,
+    find_number_field_span,
+    insert_field_before_close_brace,
+    delete_object_field,
 )
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "after_sample.json"
@@ -349,3 +354,95 @@ class TestDeleteScalarField:
         out = delete_scalar_field(block, "exchangeId")
         assert '"expiryTime"' in out and '"feedId"' in out
         assert '"exchangeId"' not in out
+
+
+SESSION_WITH_FILTER = """        {
+          "allowedPublisherIds": [
+            59,
+            84
+          ],
+          "minPublishers": 2,
+          "session": "REGULAR",
+          "stalePriceFilter": {
+            "movedPriceThresholdBps": 0.5,
+            "stalenessThresholdSecs": 10800,
+            "windowSecs": 60
+          }
+        }"""
+
+SESSION_WITHOUT_FILTER = """        {
+          "allowedPublisherIds": [
+            59,
+            84
+          ],
+          "minPublishers": 2,
+          "session": "REGULAR"
+        }"""
+
+
+class TestFindObjectFieldSpan:
+    def test_locates_stale_price_filter(self):
+        span = find_object_field_span(SESSION_WITH_FILTER, "stalePriceFilter")
+        assert span is not None
+        assert SESSION_WITH_FILTER[span[0]] == "{"
+        assert SESSION_WITH_FILTER[span[1] - 1] == "}"
+        assert json.loads(SESSION_WITH_FILTER[span[0] : span[1]]) == {
+            "movedPriceThresholdBps": 0.5,
+            "stalenessThresholdSecs": 10800,
+            "windowSecs": 60,
+        }
+
+    def test_absent_field_returns_none(self):
+        assert find_object_field_span(SESSION_WITHOUT_FILTER, "stalePriceFilter") is None
+
+
+class TestFindNumberFieldSpan:
+    def test_decimal_value_captured_whole(self):
+        span = find_number_field_span(SESSION_WITH_FILTER, "movedPriceThresholdBps")
+        assert span is not None
+        assert SESSION_WITH_FILTER[span[0] : span[1]] == "0.5"
+
+    def test_integer_value(self):
+        span = find_number_field_span(SESSION_WITH_FILTER, "windowSecs")
+        assert SESSION_WITH_FILTER[span[0] : span[1]] == "60"
+
+    def test_replacing_decimal_keeps_json_valid(self):
+        span = find_number_field_span(SESSION_WITH_FILTER, "movedPriceThresholdBps")
+        out = SESSION_WITH_FILTER[: span[0]] + "2.5" + SESSION_WITH_FILTER[span[1] :]
+        assert json.loads(out)["stalePriceFilter"]["movedPriceThresholdBps"] == 2.5
+
+    def test_absent_field_returns_none(self):
+        assert find_number_field_span(SESSION_WITH_FILTER, "nope") is None
+
+
+class TestInsertFieldBeforeCloseBrace:
+    def test_appends_as_last_field_with_comma_on_previous_line(self):
+        field = '"stalePriceFilter": {\n            "windowSecs": 60\n          }'
+        out = insert_field_before_close_brace(SESSION_WITHOUT_FILTER, field)
+        parsed = json.loads(out)
+        assert parsed["stalePriceFilter"] == {"windowSecs": 60}
+        assert parsed["session"] == "REGULAR"
+        assert '"session": "REGULAR",' in out
+
+    def test_empty_object(self):
+        out = insert_field_before_close_brace("{\n        }", '"a": 1')
+        assert json.loads(out) == {"a": 1}
+
+
+class TestDeleteObjectField:
+    def test_removes_field_and_preceding_comma(self):
+        out = delete_object_field(SESSION_WITH_FILTER, "stalePriceFilter")
+        parsed = json.loads(out)
+        assert "stalePriceFilter" not in parsed
+        assert parsed["session"] == "REGULAR"
+        assert parsed["minPublishers"] == 2
+
+    def test_absent_field_is_noop(self):
+        assert (
+            delete_object_field(SESSION_WITHOUT_FILTER, "stalePriceFilter")
+            == SESSION_WITHOUT_FILTER
+        )
+
+    def test_only_field_leaves_empty_object(self):
+        block = '{\n  "stalePriceFilter": {\n    "windowSecs": 60\n  }\n}'
+        assert json.loads(delete_object_field(block, "stalePriceFilter")) == {}
