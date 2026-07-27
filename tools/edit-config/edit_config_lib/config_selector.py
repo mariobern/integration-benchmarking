@@ -81,8 +81,11 @@ def parse_selector_text(text: str) -> set[int]:
 def read_selector_file(path: str | Path) -> set[int]:
     """Read selector content from a file path or '-' for stdin.
 
-    A path ending in `.csv` is read as a CSV: only column 1 of each row is
-    parsed, so `feed_id,date,mode` files work as targeting input directly.
+    A path ending in `.csv` is read as a CSV with content-sensitive handling:
+    for each row, if all comma-separated fields match the selector token pattern,
+    the whole row is kept; otherwise only column 1 is parsed. This allows
+    `feed_id,date,mode` benchmark CSV files to work as targeting input, while
+    still accepting plain lists saved as `.csv` (e.g., `100-200, 205, 208`).
     Every other path (and stdin) uses the strict `N` / `A-B` grammar.
     """
     import sys
