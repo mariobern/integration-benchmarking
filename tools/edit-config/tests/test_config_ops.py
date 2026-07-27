@@ -116,7 +116,7 @@ class TestAddPublisher:
     def test_session_none_raises(self, feeds):
         feed = feed_by_id(feeds, 922)
         op = AddPublisher(publisher_id=80, session="NONE")
-        with pytest.raises(OpError, match="NONE is invalid for publisher ops"):
+        with pytest.raises(OpError, match="session=NONE is invalid"):
             op.apply(feed)
 
     def test_explicit_session_missing_on_feed_raises(self, feeds):
@@ -190,7 +190,7 @@ class TestRemovePublisher:
     def test_session_none_raises(self, feeds):
         feed = feed_by_id(feeds, 922)
         op = RemovePublisher(publisher_id=22, session="NONE")
-        with pytest.raises(OpError, match="NONE is invalid for publisher ops"):
+        with pytest.raises(OpError, match="session=NONE is invalid"):
             op.apply(feed)
 
     def test_explicit_session_missing_on_feed_raises(self, feeds):
@@ -1079,3 +1079,195 @@ class TestRemoveExchangeId:
             get_session(feed, "REGULAR")["marketSchedule"]
             == "America/New_York;0930-1600;STALE-R"
         )
+
+
+from edit_config_lib.config_ops import (
+    SetStaleFilter,
+    ClearStaleFilter,
+    DEFAULT_MOVED_PRICE_THRESHOLD_BPS,
+    DEFAULT_STALENESS_THRESHOLD_SECS,
+    DEFAULT_WINDOW_SECS,
+)
+
+STALE_FIXTURE_PATH = Path(__file__).parent / "fixtures" / "stale_sample.json"
+
+
+@pytest.fixture
+def stale_feeds():
+    return json.loads(STALE_FIXTURE_PATH.read_text(encoding="utf-8"))["feeds"]
+
+
+def _regular(feed):
+    return get_session(feed, "REGULAR")
+
+
+class TestSetStaleFilterCreate:
+    def test_creates_with_all_defaults(self, stale_feeds):
+        feed = feed_by_id(stale_feeds, 1990)
+        changes, warnings = SetStaleFilter().apply(feed)
+        assert len(changes) == 1
+        c = changes[0]
+        assert c.location == "REGULAR"
+        assert c.field == "stalePriceFilter"
+        assert c.before is None
+        assert c.after == {
+            "movedPriceThresholdBps": DEFAULT_MOVED_PRICE_THRESHOLD_BPS,
+            "stalenessThresholdSecs": DEFAULT_STALENESS_THRESHOLD_SECS,
+            "windowSecs": DEFAULT_WINDOW_SECS,
+        }
+        assert _regular(feed)["stalePriceFilter"] == c.after
+        assert warnings == []
+
+    def test_creates_with_partial_override(self, stale_feeds):
+        feed = feed_by_id(stale_feeds, 1990)
+        changes, _ = SetStaleFilter(window_secs=120).apply(feed)
+        assert changes[0].after == {
+            "movedPriceThresholdBps": 0.5,
+            "stalenessThresholdSecs": 10800,
+            "windowSecs": 120,
+        }
+
+    def test_bps_stored_as_float(self, stale_feeds):
+        feed = feed_by_id(stale_feeds, 1990)
+        changes, _ = SetStaleFilter(moved_price_threshold_bps=2).apply(feed)
+        value = changes[0].after["movedPriceThresholdBps"]
+        assert isinstance(value, float) and value == 2.0
+
+    def test_session_missing_on_feed_errors(self, stale_feeds):
+        feed = feed_by_id(stale_feeds, 1000)  # no marketSchedules
+        with pytest.raises(OpError, match="does not exist"):
+            SetStaleFilter().apply(feed)
+
+
+class TestSetStaleFilterPatch:
+    def test_patches_only_named_key(self, stale_feeds):
+        feed = feed_by_id(stale_feeds, 2166)
+        changes, _ = SetStaleFilter(window_secs=120).apply(feed)
+        assert len(changes) == 1
+        c = changes[0]
+        assert c.field == "stalePriceFilter.windowSecs"
+        assert (c.before, c.after) == (60, 120)
+        assert _regular(feed)["stalePriceFilter"] == {
+            "movedPriceThresholdBps": 0.5,
+            "stalenessThresholdSecs": 10800,
+            "windowSecs": 120,
+        }
+
+    def test_identical_values_are_noop(self, stale_feeds):
+        feed = feed_by_id(stale_feeds, 2166)
+        changes, warnings = SetStaleFilter(
+            moved_price_threshold_bps=0.5,
+            staleness_threshold_secs=10800,
+            window_secs=60,
+        ).apply(feed)
+        assert changes == []
+
+    def test_bare_op_on_existing_filter_is_noop(self, stale_feeds):
+        # No value flags: defaults must NOT overwrite a complete existing
+        # filter, even one whose values differ from the defaults.
+        feed = feed_by_id(stale_feeds, 3338)
+        changes, _ = SetStaleFilter().apply(feed)
+        assert changes == []
+        assert _regular(feed)["stalePriceFilter"] == {
+            "movedPriceThresholdBps": 2.0,
+            "stalenessThresholdSecs": 3600,
+            "windowSecs": 45,
+        }
+
+    def test_bare_op_completes_a_partial_filter(self, stale_feeds):
+        # 3337 is missing windowSecs; a bare op fills only the gap from the
+        # defaults and preserves the two values already on the feed.
+        feed = feed_by_id(stale_feeds, 3337)
+        changes, _ = SetStaleFilter().apply(feed)
+        assert len(changes) == 1
+        assert changes[0].field == "stalePriceFilter"
+        assert changes[0].after == {
+            "movedPriceThresholdBps": 2.0,
+            "stalenessThresholdSecs": 3600,
+            "windowSecs": DEFAULT_WINDOW_SECS,
+        }
+
+    def test_partial_existing_filter_is_rewritten_whole(self, stale_feeds):
+        # 3337 has no windowSecs; the missing key can't be patched in place,
+        # so the whole object is rewritten (defaults fill the gap).
+        feed = feed_by_id(stale_feeds, 3337)
+        changes, _ = SetStaleFilter(window_secs=90).apply(feed)
+        assert len(changes) == 1
+        c = changes[0]
+        assert c.field == "stalePriceFilter"
+        assert c.before == {
+            "movedPriceThresholdBps": 2.0,
+            "stalenessThresholdSecs": 3600,
+        }
+        assert c.after == {
+            "movedPriceThresholdBps": 2.0,
+            "stalenessThresholdSecs": 3600,
+            "windowSecs": 90,
+        }
+
+
+class TestSetStaleFilterValidation:
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"moved_price_threshold_bps": 0},
+            {"moved_price_threshold_bps": -1.0},
+            {"staleness_threshold_secs": 0},
+            {"window_secs": -5},
+        ],
+    )
+    def test_non_positive_values_error(self, stale_feeds, kwargs):
+        feed = feed_by_id(stale_feeds, 1990)
+        with pytest.raises(OpError, match="must be > 0"):
+            SetStaleFilter(**kwargs).apply(feed)
+
+    def test_non_numeric_value_errors(self, stale_feeds):
+        feed = feed_by_id(stale_feeds, 1990)
+        with pytest.raises(OpError, match="must be numeric"):
+            SetStaleFilter(window_secs="sixty").apply(feed)
+
+    def test_fractional_seconds_error(self, stale_feeds):
+        feed = feed_by_id(stale_feeds, 1990)
+        with pytest.raises(OpError, match="whole number of seconds"):
+            SetStaleFilter(window_secs=1.5).apply(feed)
+
+    def test_staleness_below_window_warns(self, stale_feeds):
+        feed = feed_by_id(stale_feeds, 1990)
+        changes, warnings = SetStaleFilter(
+            staleness_threshold_secs=30, window_secs=60
+        ).apply(feed)
+        assert len(changes) == 1
+        assert len(warnings) == 1
+        assert "shorter than the observation window" in warnings[0].message
+
+
+class TestClearStaleFilter:
+    def test_removes_filter(self, stale_feeds):
+        feed = feed_by_id(stale_feeds, 2166)
+        changes, warnings = ClearStaleFilter().apply(feed)
+        assert len(changes) == 1
+        c = changes[0]
+        assert c.field == "stalePriceFilter"
+        assert c.after is None
+        assert c.before["windowSecs"] == 60
+        assert "stalePriceFilter" not in _regular(feed)
+        assert warnings == []
+
+    def test_missing_filter_warns_and_makes_no_change(self, stale_feeds):
+        feed = feed_by_id(stale_feeds, 1990)
+        changes, warnings = ClearStaleFilter().apply(feed)
+        assert changes == []
+        assert len(warnings) == 1
+        assert "nothing to clear" in warnings[0].message
+
+
+class TestStaleFilterSessionScope:
+    def test_session_none_is_rejected(self, stale_feeds):
+        feed = feed_by_id(stale_feeds, 2166)
+        with pytest.raises(OpError, match="session=NONE is invalid"):
+            SetStaleFilter(session="NONE").apply(feed)
+
+    def test_session_all_targets_every_session(self, stale_feeds):
+        feed = feed_by_id(stale_feeds, 1990)
+        changes, _ = SetStaleFilter(session="ALL").apply(feed)
+        assert [c.location for c in changes] == ["REGULAR"]
