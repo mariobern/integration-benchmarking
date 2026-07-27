@@ -13,10 +13,12 @@ and `metadata.description` is never modified.
 See docs/superpowers/specs/2026-07-28-numeric-feed-name-rename-design.md.
 """
 
+import argparse
 import csv
 import json
 import re
 import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -347,3 +349,104 @@ def write_config(path: Path, text: str, backup: bool = True) -> None:
     if backup:
         shutil.copy2(path, path.with_suffix(path.suffix + ".bak"))
     path.write_text(text, encoding="utf-8")
+
+
+def print_report(
+    changes: list[Change],
+    skips: list[Skip],
+    duplicates: list[tuple[str, list[tuple[int, str]]]],
+) -> None:
+    """Print the change table, skip list, and duplicate-name warnings."""
+    if changes:
+        width = max(len(c.symbol) for c in changes)
+        print(f"\nChanges ({len(changes)}):")
+        for change in changes:
+            print(
+                f"  {change.feed_id:5d}  {change.symbol:<{width}}  "
+                f"{change.before!r} -> {change.after!r}  [{change.source}]"
+            )
+    if skips:
+        print(f"\nSkipped ({len(skips)}):")
+        for skip in skips:
+            print(f"  {skip.feed_id:5d}  {skip.symbol}  {skip.reason}")
+    for name, members in duplicates:
+        print(f"\nWARNING  duplicate name {name!r}")
+        for feed_id, symbol in members:
+            print(f"           {feed_id:5d}  {symbol}")
+    print(
+        f"\nSummary: {len(changes)} change(s), {len(skips)} skip(s), "
+        f"{len(duplicates)} duplicate-name warning(s)."
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", type=Path, required=True, help="Path to the config")
+    parser.add_argument(
+        "--symbol-prefix",
+        action="append",
+        dest="symbol_prefixes",
+        help=(
+            "Symbol namespace to process; repeatable. Defaults to "
+            f"{', '.join(MARKET_PREFIXES)}"
+        ),
+    )
+    parser.add_argument(
+        "--name-overrides",
+        type=Path,
+        help="CSV of hand-curated names (columns: feed_id,name)",
+    )
+    parser.add_argument("--apply", action="store_true", help="Write changes")
+    parser.add_argument("--no-backup", action="store_true", help="Skip the .bak copy")
+    args = parser.parse_args(argv)
+
+    prefixes = tuple(args.symbol_prefixes) if args.symbol_prefixes else MARKET_PREFIXES
+
+    before_text = args.config.read_text(encoding="utf-8")
+    data = json.loads(before_text)
+    feeds = data["feeds"]
+    print(f"Reading {args.config} ({len(feeds)} feeds)...")
+
+    overrides: dict[int, str] = {}
+    if args.name_overrides:
+        try:
+            overrides = load_overrides(args.name_overrides)
+            validate_overrides(overrides, feeds, prefixes)
+        except OverrideError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+        print(f"Loaded {len(overrides)} override(s) from {args.name_overrides}")
+
+    changes, skips = build_changes(feeds, prefixes, overrides)
+    duplicates = find_duplicate_names(feeds, changes)
+    print_report(changes, skips, duplicates)
+
+    if not changes:
+        print("\nNo changes. Nothing to do.")
+        return 0
+
+    apply_changes(data, changes)
+    after_text = dump_config(data)
+    # Verification runs before the write, so a dry run catches problems too.
+    try:
+        verify_text(before_text, after_text, changes)
+    except VerificationError as exc:
+        print(f"\nERROR: verification failed: {exc}", file=sys.stderr)
+        return 1
+
+    if not args.apply:
+        print("\n[DRY RUN] No changes written. Re-run with --apply to write.")
+        return 0
+
+    write_config(args.config, after_text, backup=not args.no_backup)
+    try:
+        verify_on_disk(args.config, before_text, changes)
+    except VerificationError as exc:
+        print(f"\nERROR: post-write verification failed: {exc}", file=sys.stderr)
+        return 1
+    print(f"\nWrote {len(changes)} change(s) to {args.config}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

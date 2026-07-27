@@ -16,6 +16,7 @@ env/
 *.csv
 *.csv.gz
 !price_id_list.csv
+!feed_name_overrides.csv
 quick_benchmark_results.csv
 backups/pre-perf-optimization
 

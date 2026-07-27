@@ -16,6 +16,7 @@ from rename_numeric_feed_names import (
     in_scope,
     is_candidate,
     load_overrides,
+    main,
     verify_feed_names,
     verify_on_disk,
     verify_text,
@@ -540,3 +541,93 @@ class TestVerifyOnDisk:
         path.write_text("{not json", encoding="utf-8")
         with pytest.raises(VerificationError, match="does not parse"):
             verify_on_disk(path, dump_config(_config(_feed())), [])
+
+
+def _write_config(tmp_path, *feeds):
+    path = tmp_path / "cfg.json"
+    path.write_text(dump_config(_config(*feeds)), encoding="utf-8")
+    return path
+
+
+class TestMain:
+    def test_dry_run_writes_nothing(self, tmp_path, capsys):
+        path = _write_config(tmp_path, _feed(feed_id=3520))
+        original = path.read_text(encoding="utf-8")
+        assert main(["--config", str(path)]) == 0
+        assert path.read_text(encoding="utf-8") == original
+        assert not (tmp_path / "cfg.json.bak").exists()
+        assert "DRY RUN" in capsys.readouterr().out
+
+    def test_apply_writes_and_backs_up(self, tmp_path):
+        path = _write_config(tmp_path, _feed(feed_id=3520))
+        assert main(["--config", str(path), "--apply"]) == 0
+        written = json.loads(path.read_text(encoding="utf-8"))
+        assert written["feeds"][0]["metadata"]["name"] == "CHANGXIN MEMORY TECHNOLOGIES"
+        assert (tmp_path / "cfg.json.bak").exists()
+
+    def test_second_run_is_a_noop(self, tmp_path, capsys):
+        path = _write_config(tmp_path, _feed(feed_id=3520))
+        main(["--config", str(path), "--apply"])
+        capsys.readouterr()
+        assert main(["--config", str(path), "--apply"]) == 0
+        assert "No changes" in capsys.readouterr().out
+
+    def test_override_applied(self, tmp_path):
+        path = _write_config(tmp_path, _feed(feed_id=3520))
+        overrides = tmp_path / "ov.csv"
+        overrides.write_text("feed_id,name\n3520,CXMT\n", encoding="utf-8")
+        args = ["--config", str(path), "--name-overrides", str(overrides), "--apply"]
+        assert main(args) == 0
+        written = json.loads(path.read_text(encoding="utf-8"))
+        assert written["feeds"][0]["metadata"]["name"] == "CXMT"
+
+    def test_bad_override_exits_one_without_writing(self, tmp_path):
+        path = _write_config(tmp_path, _feed(feed_id=3520))
+        original = path.read_text(encoding="utf-8")
+        overrides = tmp_path / "ov.csv"
+        overrides.write_text("feed_id,name\n999,NOPE\n", encoding="utf-8")
+        args = ["--config", str(path), "--name-overrides", str(overrides), "--apply"]
+        assert main(args) == 1
+        assert path.read_text(encoding="utf-8") == original
+
+    def test_symbol_prefix_narrows_scope(self, tmp_path):
+        path = _write_config(
+            tmp_path,
+            _feed(feed_id=3520),
+            _feed(
+                feed_id=884,
+                symbol="Equity.HK.0002/HKD",
+                name="0002",
+                description="CLP HOLDINGS / HONG KONG DOLLAR",
+                quote_currency="HKD",
+            ),
+        )
+        assert (
+            main(["--config", str(path), "--symbol-prefix", "Equity.HK.", "--apply"])
+            == 0
+        )
+        written = json.loads(path.read_text(encoding="utf-8"))
+        assert written["feeds"][0]["metadata"]["name"] == "688825"
+        assert written["feeds"][1]["metadata"]["name"] == "CLP HOLDINGS"
+
+    def test_duplicate_warning_printed(self, tmp_path, capsys):
+        path = _write_config(
+            tmp_path,
+            _feed(
+                feed_id=3339,
+                symbol="Equity.CN.603986/CNY",
+                name="603986",
+                description="GIGADEVICE SEMICONDUCTOR INC / CHINESE YUAN",
+            ),
+            _feed(
+                feed_id=3360,
+                symbol="Equity.HK.3986/HKD",
+                name="3986",
+                description="GIGADEVICE SEMICONDUCTOR INC / HONG KONG DOLLAR",
+                quote_currency="HKD",
+            ),
+        )
+        assert main(["--config", str(path), "--apply"]) == 0
+        out = capsys.readouterr().out
+        assert "WARNING" in out
+        assert "GIGADEVICE SEMICONDUCTOR INC" in out
