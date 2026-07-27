@@ -1,104 +1,104 @@
 00:00:04,440 --> 00:00:12,180 [Speaker 0]
-Because the answer that we are getting, trying to get to Mario here is how many of the feeds come close to the min pop? 
+Because the answer that we are getting, trying to get to Mario here is how many of the feeds come close to the min pop?
 
 00:00:16,680 --> 00:00:24,080 [Speaker 0]
-And the action from there would be to go to those single feeds, to those feed by feed to remediate. 
+And the action from there would be to go to those single feeds, to those feed by feed to remediate.
 
 00:00:27,400 --> 00:00:28,800 [Speaker 1]
-Right. And- 
+Right. And-
 
 00:00:28,800 --> 00:00:32,320 [Speaker 0]
-It's very distinct from like the value of min pop itself, 
+It's very distinct from like the value of min pop itself,
 
 00:00:33,600 --> 00:00:44,420 [Speaker 0]
-but it's effectively at the aggregate. When we produce an aggregate, how many have been-- how many effective publishers have been at play for every single update? 
+but it's effectively at the aggregate. When we produce an aggregate, how many have been-- how many effective publishers have been at play for every single update?
 
 00:00:46,180 --> 00:01:05,900 [Speaker 0]
-Not like for a single update for one minute or whatever. The update is actually at the aggregate level. Each aggregate had a num- has a number of publishers that have contributed. The number of publishers is what creates, over time, is what creates that histogram/distribution that we want to, to compare to min pop. 
+Not like for a single update for one minute or whatever. The update is actually at the aggregate level. Each aggregate had a num- has a number of publishers that have contributed. The number of publishers is what creates, over time, is what creates that histogram/distribution that we want to, to compare to min pop.
 
 00:01:20,480 --> 00:01:22,860 [Speaker 0]
-Does it make sense to you? So 
+Does it make sense to you? So
 
 00:01:24,100 --> 00:01:42,240 [Speaker 0]
-to make it even more concrete, let me show you. Let me sh- let me, let me, let me pull something here quickly to show you what I, what I mean by that, because I think maybe there is also, uh, familiarity with the data might not be there, which is my fault for not explaining. All right. So, 
+to make it even more concrete, let me show you. Let me sh- let me, let me, let me pull something here quickly to show you what I, what I mean by that, because I think maybe there is also, uh, familiarity with the data might not be there, which is my fault for not explaining. All right. So,
 
 00:01:43,640 --> 00:01:48,720 [Speaker 0]
-um, let me show you quickly what I mean by this, just to reiterate. Um, 
+um, let me show you quickly what I mean by this, just to reiterate. Um,
 
 00:01:52,660 --> 00:01:54,240 [Speaker 0]
-so, so, so, so, so, so, so. 
+so, so, so, so, so, so, so.
 
 00:01:55,480 --> 00:01:57,170 [Speaker 0]
-Do you see my, uh, my Safari here? 
+Do you see my, uh, my Safari here?
 
 00:01:58,540 --> 00:01:59,200 [Speaker 1]
-Yeah. 
+Yeah.
 
 00:01:59,200 --> 00:02:24,840 [Speaker 0]
-You look at it? All right. So this is the table where we record. This is the price feeds tables as part of the, the database that is called Bitlaser read-only. This is ClickHouse. This is the price feeds table. The price feed has basically every single, every single feed that we, uh, that we, uh, that we, um, that we produce. Let's say I have a query here. I was looking at something yesterday. 
+You look at it? All right. So this is the table where we record. This is the price feeds tables as part of the, the database that is called Bitlaser read-only. This is ClickHouse. This is the price feeds table. The price feed has basically every single, every single feed that we, uh, that we, uh, that we, um, that we produce. Let's say I have a query here. I was looking at something yesterday.
 
 00:02:26,060 --> 00:03:11,840 [Speaker 0]
-And let me pull this. This is feed ten, ten eighty, whatever it was. It was a DIA, um, the ETF. So, so we have in this table, we have for each price feed ID per channel, which is always we pick up the, the channel with the, the, the highest, uh, or the lowest frequency. Like, uh, um, or sorry, the highest frequency or the lowest number, so fifty milliseconds or whatever it is. And if you look at... This is the price that we produce. This is the ask, okay? Before the exponent like that we apply the exponent to. This is what the we print out in terms of bid and ask. This is the publisher count that have contributed to the price. 
+And let me pull this. This is feed ten, ten eighty, whatever it was. It was a DIA, um, the ETF. So, so we have in this table, we have for each price feed ID per channel, which is always we pick up the, the channel with the, the, the highest, uh, or the lowest frequency. Like, uh, um, or sorry, the highest frequency or the lowest number, so fifty milliseconds or whatever it is. And if you look at... This is the price that we produce. This is the ask, okay? Before the exponent like that we apply the exponent to. This is what the we print out in terms of bid and ask. This is the publisher count that have contributed to the price.
 
 00:03:13,020 --> 00:03:18,700 [Speaker 0]
-Well, actually, this is exactly what you want, which is just the publisher count. 
+Well, actually, this is exactly what you want, which is just the publisher count.
 
 00:03:21,900 --> 00:03:27,040 [Speaker 0]
-Because if we change the time, let's say let's do this at fourteen hundred. 
+Because if we change the time, let's say let's do this at fourteen hundred.
 
 00:03:29,040 --> 00:03:29,680 [Speaker 0]
-Uh, 
+Uh,
 
 00:03:33,080 --> 00:03:35,420 [Speaker 0]
-see how the publisher count now is thirteen? 
+see how the publisher count now is thirteen?
 
 00:03:36,520 --> 00:03:41,310 [Speaker 0]
-So what you want to do is basically understand for this feed, for each feed, 
+So what you want to do is basically understand for this feed, for each feed,
 
 00:03:42,600 --> 00:03:50,400 [Speaker 0]
-where is this distribution? Do you see how the publisher... Uh, sorry, this is the theoretical publisher count. I think so, yes. Hold on. 
+where is this distribution? Do you see how the publisher... Uh, sorry, this is the theoretical publisher count. I think so, yes. Hold on.
 
 00:03:51,700 --> 00:04:07,200 [Speaker 0]
-Yeah, this is on the allowed list. Actually, you might not want to use this. What you want to use is you want to use these, these fields that are here, which is the publisher ID and the publisher data. Actually, let's, let's take a look quickly. 
+Yeah, this is on the allowed list. Actually, you might not want to use this. What you want to use is you want to use these, these fields that are here, which is the publisher ID and the publisher data. Actually, let's, let's take a look quickly.
 
 00:04:08,320 --> 00:04:12,960 [Speaker 0]
-No, it's right. Its, uh, publisher count is thirteen. Then you can use that. 
+No, it's right. Its, uh, publisher count is thirteen. Then you can use that.
 
 00:04:14,020 --> 00:04:20,160 [Speaker 0]
-I think you can use that as long as it, uh... Let's do something here quickly. Um, 
+I think you can use that as long as it, uh... Let's do something here quickly. Um,
 
 00:04:21,899 --> 00:04:24,500 [Speaker 0]
-let's call it distinct, 
+let's call it distinct,
 
 00:04:25,960 --> 00:04:27,120 [Speaker 0]
-uh, publisher 
+uh, publisher
 
 00:04:29,060 --> 00:04:29,880 [Speaker 0]
-count, 
+count,
 
 00:04:31,200 --> 00:04:32,540 [Speaker 0]
-uh, from, 
+uh, from,
 
 00:04:34,280 --> 00:04:37,460 [Speaker 0]
-uh, let's give it a very wide time. 
+uh, let's give it a very wide time.
 
 00:04:39,460 --> 00:04:44,240 [Speaker 0]
-Let's do from zero zero all the way to the end of day. 
+Let's do from zero zero all the way to the end of day.
 
 00:04:48,360 --> 00:04:57,120 [Speaker 0]
-Ah, there we go. So you can use publisher count. So this is throughout the day. So this is throughout the day on the seventeenth, 
+Ah, there we go. So you can use publisher count. So this is throughout the day. So this is throughout the day on the seventeenth,
 
 00:04:58,140 --> 00:05:06,320 [Speaker 0]
-the number of publishers at any given time that were, um, that were part of the aggregate 
+the number of publishers at any given time that were, um, that were part of the aggregate
 
 00:05:07,660 --> 00:05:08,420 [Speaker 0]
-for this feed. 
+for this feed.
 
 00:05:11,640 --> 00:05:22,740 [Speaker 0]
-Okay? So I only have like here the distinct numbers. I don't have a distribution. So what you want is you want to count the number of updates per, 
+Okay? So I only have like here the distinct numbers. I don't have a distribution. So what you want is you want to count the number of updates per,
 
 00:05:23,960 --> 00:05:27,660 [Speaker 0]
-per each of these distinct numbers. That will give you the histogram. 
+per each of these distinct numbers. That will give you the histogram.
 
 00:05:29,080 --> 00:05:29,520 [Speaker 1]
 Hmm.
