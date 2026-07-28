@@ -224,3 +224,98 @@ def build_candidates(
         if skip is not None:
             skips.append(skip)
     return candidates, skips
+
+
+CANDIDATE_COLUMNS = (
+    "feed_id",
+    "symbol",
+    "current_name",
+    "proposed_name",
+    "source",
+    "notes",
+)
+
+
+def write_candidates_csv(path: Path, candidates: list[Candidate]) -> None:
+    """Write the review CSV. Never touches any Lazer config file."""
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(CANDIDATE_COLUMNS)
+        for c in candidates:
+            writer.writerow(
+                [
+                    c.feed_id,
+                    c.symbol,
+                    c.current_name,
+                    c.proposed_name,
+                    c.source,
+                    c.notes,
+                ]
+            )
+
+
+def print_report(candidates: list[Candidate], skips: list[SkipReason]) -> None:
+    if candidates:
+        width = max(len(c.symbol) for c in candidates)
+        print(f"\nCandidates ({len(candidates)}):")
+        for c in candidates:
+            note = f"  [{c.notes}]" if c.notes else ""
+            print(
+                f"  {c.feed_id:5d}  {c.symbol:<{width}}  "
+                f"{c.current_name!r} -> {c.proposed_name!r}  [{c.source}]{note}"
+            )
+    if skips:
+        print(f"\nSkipped ({len(skips)}):")
+        for s in skips:
+            print(f"  {s.feed_id:5d}  {s.symbol}  {s.reason}")
+
+    by_source: dict[str, int] = {}
+    for c in candidates:
+        by_source[c.source] = by_source.get(c.source, 0) + 1
+    source_breakdown = ", ".join(f"{n} {src}" for src, n in sorted(by_source.items()))
+    print(
+        f"\nSummary: {len(candidates)} candidate(s)"
+        f"{f' ({source_breakdown})' if source_breakdown else ''}, "
+        f"{len(skips)} skip(s)."
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", type=Path, required=True, help="Path to the config")
+    parser.add_argument(
+        "--symbol-prefix",
+        action="append",
+        dest="symbol_prefixes",
+        help=(
+            "Symbol namespace to process; repeatable. Defaults to "
+            f"{', '.join(MARKET_PREFIXES)}"
+        ),
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("name_override_candidates.csv"),
+        help="Where to write the review CSV",
+    )
+    args = parser.parse_args(argv)
+
+    prefixes = tuple(args.symbol_prefixes) if args.symbol_prefixes else MARKET_PREFIXES
+
+    if not args.config.exists():
+        print(f"ERROR: Config file not found: {args.config}", file=sys.stderr)
+        return 1
+
+    data = json.loads(args.config.read_text(encoding="utf-8"))
+    feeds = data["feeds"]
+    print(f"Reading {args.config} ({len(feeds)} feeds)...")
+
+    candidates, skips = build_candidates(feeds, prefixes)
+    print_report(candidates, skips)
+    write_candidates_csv(args.output, candidates)
+    print(f"\nWrote {len(candidates)} candidate(s) to {args.output}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -333,3 +333,76 @@ class TestBuildCandidates:
         candidates, skips = build_candidates(feeds)
         assert [c.feed_id for c in candidates] == [5]
         assert [s.feed_id for s in skips] == [6]
+
+
+import json
+
+from generate_short_name_candidates import main, print_report, write_candidates_csv
+
+
+class TestWriteCandidatesCsv:
+    def test_writes_header_and_rows(self, tmp_path):
+        out = tmp_path / "candidates.csv"
+        candidates = [
+            Candidate(
+                1, "Equity.HK.0700/HKD", "0700", "TENCENT", "yahoo_shortname", ""
+            ),
+            Candidate(
+                2,
+                "Equity.JP.7203/JPY",
+                "TOYOTA MOTOR CORPORATION",
+                "TOYOTA MOTOR",
+                "suffix_stripped",
+                "",
+            ),
+        ]
+        write_candidates_csv(out, candidates)
+        text = out.read_text(encoding="utf-8")
+        assert "feed_id,symbol,current_name,proposed_name,source,notes" in text
+        assert "TENCENT,yahoo_shortname" in text
+        assert "TOYOTA MOTOR,suffix_stripped" in text
+
+
+class TestPrintReport:
+    def test_reports_counts_by_source(self, capsys):
+        candidates = [
+            Candidate(
+                1, "Equity.HK.0700/HKD", "0700", "TENCENT", "yahoo_shortname", ""
+            ),
+            Candidate(
+                2, "Equity.JP.7203/JPY", "7203", "TOYOTA MOTOR", "suffix_stripped", ""
+            ),
+        ]
+        skips = [SkipReason(3, "Equity.KR.000000/KRW", "no Yahoo shortName found")]
+        print_report(candidates, skips)
+        out = capsys.readouterr().out
+        assert "2 candidate(s)" in out
+        assert "1 skip(s)" in out
+
+
+class TestMain:
+    def test_missing_config_returns_error(self, tmp_path, capsys):
+        missing = tmp_path / "nope.json"
+        code = main(["--config", str(missing)])
+        assert code == 1
+        assert "not found" in capsys.readouterr().err
+
+    def test_writes_output_csv_from_build_candidates(self, tmp_path, monkeypatch):
+        import generate_short_name_candidates as module
+
+        config = tmp_path / "lazer-state.json"
+        config.write_text(json.dumps({"feeds": []}), encoding="utf-8")
+        output = tmp_path / "out.csv"
+
+        stub_candidates = [
+            Candidate(1, "Equity.HK.0700/HKD", "0700", "TENCENT", "yahoo_shortname", "")
+        ]
+        monkeypatch.setattr(
+            module,
+            "build_candidates",
+            lambda feeds, prefixes=None: (stub_candidates, []),
+        )
+
+        code = main(["--config", str(config), "--output", str(output)])
+        assert code == 0
+        assert "TENCENT" in output.read_text(encoding="utf-8")
