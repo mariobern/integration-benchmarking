@@ -60,3 +60,35 @@ class TestStripCorporateSuffix:
 
     def test_never_strips_down_to_nothing(self):
         assert strip_corporate_suffix("CORP") == "CORP"
+
+
+from generate_short_name_candidates import normalize_yahoo_name
+
+
+class TestNormalizeYahooName:
+    def test_already_uppercase_single_word(self):
+        assert normalize_yahoo_name("TENCENT") == "TENCENT"
+
+    def test_camel_case_two_words(self):
+        assert normalize_yahoo_name("SamsungElec") == "SAMSUNG ELEC"
+
+    def test_camel_case_three_words(self):
+        assert normalize_yahoo_name("SamsungHvyInd") == "SAMSUNG HVY IND"
+
+    def test_acronym_then_word_boundary(self):
+        assert normalize_yahoo_name("SKTelecom") == "SK TELECOM"
+
+    def test_lowercase_input(self):
+        assert normalize_yahoo_name("kakaopay") == "KAKAOPAY"
+
+    def test_already_spaced_title_case(self):
+        assert normalize_yahoo_name("Hanwha Ocean") == "HANWHA OCEAN"
+
+    def test_punctuation_replaced_not_glued(self):
+        assert normalize_yahoo_name("SAMSUNG SDI CO.,LTD.") == "SAMSUNG SDI CO LTD"
+
+    def test_apostrophe_preserved(self):
+        assert normalize_yahoo_name("HENGAN INT'L") == "HENGAN INT'L"
+
+    def test_share_class_hyphen_preserved(self):
+        assert normalize_yahoo_name("ZTO EXPRESS-W") == "ZTO EXPRESS-W"

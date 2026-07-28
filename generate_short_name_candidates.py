@@ -66,3 +66,23 @@ def strip_corporate_suffix(name: str) -> str:
         else:
             break
     return " ".join(tokens)
+
+
+_CAMEL_BOUNDARY_RE = re.compile(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+_PUNCTUATION_RE = re.compile(r"[.,]")
+_WHITESPACE_RE = re.compile(r"\s+")
+
+
+def normalize_yahoo_name(raw: str) -> str:
+    """Normalize a Yahoo Finance `shortName` for display consistency.
+
+    Yahoo stores some short names camelCase-merged with no spaces (e.g.
+    'HyundaiMtr', 'SKTelecom'); blindly uppercasing those collapses them into
+    unreadable blobs ('HYUNDAIMTR'). This inserts a space at camelCase word
+    boundaries first, then strips stray punctuation ('CO.,LTD.' -> 'CO LTD',
+    not 'COLTD'), before uppercasing.
+    """
+    spaced = _CAMEL_BOUNDARY_RE.sub(" ", raw)
+    spaced = _PUNCTUATION_RE.sub(" ", spaced)
+    collapsed = _WHITESPACE_RE.sub(" ", spaced).strip()
+    return collapsed.upper()
