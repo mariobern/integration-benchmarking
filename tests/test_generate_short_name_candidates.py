@@ -271,11 +271,13 @@ class TestSuggestFromSuffixStrip:
         """derive_name reads description, not the current name, so this works
         whether metadata.name is still numeric or already the long name."""
         candidate, skip = suggest_from_suffix_strip(
-            _jp_feed(name="TOYOTA MOTOR CORPORATION")
+            _jp_feed(name="Toyota Motor Corp")  # differs from description-derived name
         )
         assert skip is None
-        assert candidate.current_name == "TOYOTA MOTOR CORPORATION"
-        assert candidate.proposed_name == "TOYOTA MOTOR"
+        assert (
+            candidate.current_name == "Toyota Motor Corp"
+        )  # proves it read metadata.name
+        assert candidate.proposed_name == "TOYOTA MOTOR"  # proves it read description
 
 
 class TestBuildCandidates:
