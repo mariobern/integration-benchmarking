@@ -92,3 +92,124 @@ class TestNormalizeYahooName:
 
     def test_share_class_hyphen_preserved(self):
         assert normalize_yahoo_name("ZTO EXPRESS-W") == "ZTO EXPRESS-W"
+
+
+from unittest.mock import MagicMock, patch
+
+from generate_short_name_candidates import (
+    Candidate,
+    SkipReason,
+    suggest_from_yahoo,
+    yahoo_tickers,
+)
+
+
+def _feed(
+    feed_id=100,
+    symbol="Equity.HK.0700/HKD",
+    name="0700",
+):
+    return {
+        "feedId": feed_id,
+        "symbol": symbol,
+        "metadata": {
+            "asset_type": "equity",
+            "name": name,
+        },
+    }
+
+
+class TestYahooTickers:
+    def test_hk_zero_pads_to_four_digits(self):
+        assert yahoo_tickers("HK", "700") == ["0700.HK"]
+
+    def test_hk_already_four_digits(self):
+        assert yahoo_tickers("HK", "0005") == ["0005.HK"]
+
+    def test_kr_tries_kospi_then_kosdaq(self):
+        assert yahoo_tickers("KR", "005380") == ["005380.KS", "005380.KQ"]
+
+
+class TestSuggestFromYahoo:
+    @patch("yfinance.Ticker")
+    def test_kospi_hit_on_first_try(self, mock_ticker_cls):
+        mock_ticker = MagicMock()
+        mock_ticker.info = {"shortName": "HyundaiMtr"}
+        mock_ticker_cls.return_value = mock_ticker
+
+        candidate, skip = suggest_from_yahoo(
+            _feed(symbol="Equity.KR.005380/KRW", name="005380")
+        )
+        assert skip is None
+        assert candidate == Candidate(
+            feed_id=100,
+            symbol="Equity.KR.005380/KRW",
+            current_name="005380",
+            proposed_name="HYUNDAI MTR",
+            source="yahoo_shortname",
+            notes="",
+        )
+        mock_ticker_cls.assert_called_once_with("005380.KS")
+
+    @patch("yfinance.Ticker")
+    def test_kosdaq_fallback_when_kospi_has_no_shortname(self, mock_ticker_cls):
+        kospi_miss = MagicMock()
+        kospi_miss.info = {}
+        kosdaq_hit = MagicMock()
+        kosdaq_hit.info = {"shortName": "SomeKosdaqCo"}
+        mock_ticker_cls.side_effect = [kospi_miss, kosdaq_hit]
+
+        candidate, skip = suggest_from_yahoo(
+            _feed(symbol="Equity.KR.377300/KRW", name="377300")
+        )
+        assert skip is None
+        assert candidate.proposed_name == "SOME KOSDAQ CO"
+        assert candidate.source == "yahoo_shortname"
+        assert mock_ticker_cls.call_args_list[0].args == ("377300.KS",)
+        assert mock_ticker_cls.call_args_list[1].args == ("377300.KQ",)
+
+    @patch("yfinance.Ticker")
+    def test_no_shortname_on_any_ticker_is_skipped(self, mock_ticker_cls):
+        miss = MagicMock()
+        miss.info = {}
+        mock_ticker_cls.return_value = miss
+
+        candidate, skip = suggest_from_yahoo(
+            _feed(symbol="Equity.KR.000000/KRW", name="000000")
+        )
+        assert candidate is None
+        assert isinstance(skip, SkipReason)
+        assert skip.feed_id == 100
+
+    @patch("yfinance.Ticker")
+    def test_network_error_is_skipped_not_raised(self, mock_ticker_cls):
+        mock_ticker_cls.side_effect = ConnectionError("network unreachable")
+
+        candidate, skip = suggest_from_yahoo(_feed())
+        assert candidate is None
+        assert isinstance(skip, SkipReason)
+
+    @patch("yfinance.Ticker")
+    def test_result_matching_current_name_is_skipped(self, mock_ticker_cls):
+        mock_ticker = MagicMock()
+        mock_ticker.info = {"shortName": "TENCENT"}
+        mock_ticker_cls.return_value = mock_ticker
+
+        candidate, skip = suggest_from_yahoo(
+            _feed(symbol="Equity.HK.0700/HKD", name="TENCENT")
+        )
+        assert candidate is None
+        assert "matches current name" in skip.reason
+
+    @patch("yfinance.Ticker")
+    def test_share_class_suffix_is_flagged_in_notes(self, mock_ticker_cls):
+        mock_ticker = MagicMock()
+        mock_ticker.info = {"shortName": "ZTO EXPRESS-W"}
+        mock_ticker_cls.return_value = mock_ticker
+
+        candidate, skip = suggest_from_yahoo(
+            _feed(symbol="Equity.HK.2057/HKD", name="2057")
+        )
+        assert skip is None
+        assert candidate.proposed_name == "ZTO EXPRESS-W"
+        assert candidate.notes == "share_class_suffix_retained"
