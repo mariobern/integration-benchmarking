@@ -177,3 +177,50 @@ def suggest_from_yahoo(feed: dict) -> tuple[Candidate | None, SkipReason | None]
     return None, SkipReason(
         feed_id, symbol, f"no Yahoo shortName found for tickers {tickers}"
     )
+
+
+def suggest_from_suffix_strip(feed: dict) -> tuple[Candidate | None, SkipReason | None]:
+    """Propose a name for a JP/CN feed by stripping trailing corporate words
+    off the description-derived name. No network call."""
+    feed_id = feed["feedId"]
+    symbol = feed.get("symbol", "")
+    current_name = str(feed.get("metadata", {}).get("name", ""))
+
+    base_name, reason = derive_name(feed)
+    if base_name is None:
+        return None, SkipReason(feed_id, symbol, reason)
+
+    stripped = strip_corporate_suffix(base_name)
+    if stripped == base_name:
+        return None, SkipReason(feed_id, symbol, "no corporate suffix matched")
+
+    return Candidate(feed_id, symbol, current_name, stripped, "suffix_stripped"), None
+
+
+def build_candidates(
+    feeds: list[dict], prefixes: tuple[str, ...] = MARKET_PREFIXES
+) -> tuple[list[Candidate], list[SkipReason]]:
+    """Plan name-shortening candidates over every in-scope feed.
+
+    Runs regardless of whether a feed's current `metadata.name` is still
+    numeric or already renamed — both strategies derive the base name from
+    fields `rename_numeric_feed_names.py` never modifies (`symbol`,
+    `description`).
+    """
+    candidates: list[Candidate] = []
+    skips: list[SkipReason] = []
+    for feed in feeds:
+        if not in_scope(feed, prefixes):
+            continue
+        market = feed.get("symbol", "").split(".")[1]
+        if market in ("HK", "KR"):
+            candidate, skip = suggest_from_yahoo(feed)
+        elif market in ("JP", "CN"):
+            candidate, skip = suggest_from_suffix_strip(feed)
+        else:
+            continue
+        if candidate is not None:
+            candidates.append(candidate)
+        if skip is not None:
+            skips.append(skip)
+    return candidates, skips
