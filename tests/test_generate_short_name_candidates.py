@@ -213,3 +213,13 @@ class TestSuggestFromYahoo:
         assert skip is None
         assert candidate.proposed_name == "ZTO EXPRESS-W"
         assert candidate.notes == "share_class_suffix_retained"
+
+    @patch("yfinance.Ticker")
+    def test_yfinance_rate_limit_error_is_skipped_not_raised(self, mock_ticker_cls):
+        import yfinance
+
+        mock_ticker_cls.side_effect = yfinance.exceptions.YFRateLimitError()
+
+        candidate, skip = suggest_from_yahoo(_feed())
+        assert candidate is None
+        assert isinstance(skip, SkipReason)

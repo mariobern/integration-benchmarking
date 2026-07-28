@@ -131,7 +131,14 @@ def _fetch_yahoo_short_name(ticker: str) -> str | None:
 
     try:
         info = yf.Ticker(ticker).info
-    except (ValueError, KeyError, AttributeError, ConnectionError, OSError):
+    except (
+        ValueError,
+        KeyError,
+        AttributeError,
+        ConnectionError,
+        OSError,
+        yf.exceptions.YFException,
+    ):
         return None
     short_name = info.get("shortName") if info else None
     return short_name or None
