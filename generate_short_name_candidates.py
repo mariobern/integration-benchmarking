@@ -125,8 +125,16 @@ def yahoo_tickers(market: str, code: str) -> list[str]:
     raise ValueError(f"unsupported market for Yahoo lookup: {market}")
 
 
-def _fetch_yahoo_short_name(ticker: str) -> str | None:
-    """Return `info['shortName']` for `ticker`, or None on any failure."""
+def _fetch_yahoo_short_name(ticker: str) -> tuple[str | None, str | None]:
+    """Return `(short_name, error_reason)` for `ticker`.
+
+    `error_reason` is `None` when the ticker was queried successfully --
+    whether or not it had a `shortName` (that's genuinely missing data, not
+    an error). When the query itself raised, `error_reason` is the raised
+    exception's class name (e.g. `"YFRateLimitError"`, `"ConnectionError"`),
+    a pragmatic stand-in for a hand-maintained message table so callers can
+    tell "Yahoo/network failure" apart from "no data for this ticker".
+    """
     import yfinance as yf
 
     try:
@@ -138,10 +146,10 @@ def _fetch_yahoo_short_name(ticker: str) -> str | None:
         ConnectionError,
         OSError,
         yf.exceptions.YFException,
-    ):
-        return None
+    ) as exc:
+        return None, type(exc).__name__
     short_name = info.get("shortName") if info else None
-    return short_name or None
+    return (short_name or None), None
 
 
 def suggest_from_yahoo(feed: dict) -> tuple[Candidate | None, SkipReason | None]:
@@ -153,8 +161,11 @@ def suggest_from_yahoo(feed: dict) -> tuple[Candidate | None, SkipReason | None]
     code = extract_exchange_code(symbol)
     tickers = yahoo_tickers(market, code)
 
+    errors: list[tuple[str, str]] = []
     for ticker in tickers:
-        raw_short_name = _fetch_yahoo_short_name(ticker)
+        raw_short_name, error_reason = _fetch_yahoo_short_name(ticker)
+        if error_reason is not None:
+            errors.append((ticker, error_reason))
         if not raw_short_name:
             continue
         proposed = normalize_yahoo_name(raw_short_name)
@@ -172,6 +183,12 @@ def suggest_from_yahoo(feed: dict) -> tuple[Candidate | None, SkipReason | None]
                 feed_id, symbol, current_name, proposed, "yahoo_shortname", notes
             ),
             None,
+        )
+
+    if errors:
+        detail = ", ".join(f"{ticker}: {reason}" for ticker, reason in errors)
+        return None, SkipReason(
+            feed_id, symbol, f"Yahoo fetch error for tickers [{detail}]"
         )
 
     return None, SkipReason(
@@ -268,6 +285,14 @@ def print_report(candidates: list[Candidate], skips: list[SkipReason]) -> None:
         print(f"\nSkipped ({len(skips)}):")
         for s in skips:
             print(f"  {s.feed_id:5d}  {s.symbol}  {s.reason}")
+
+    yahoo_error_skips = sum(1 for s in skips if "Yahoo fetch error" in s.reason)
+    if yahoo_error_skips:
+        print(
+            f"\nWARNING: {yahoo_error_skips} skip(s) were caused by Yahoo fetch "
+            "errors (e.g. rate-limiting or network failure), not genuine missing "
+            "shortName data. Re-run before trusting the skip list as complete."
+        )
 
     by_source: dict[str, int] = {}
     for c in candidates:

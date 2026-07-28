@@ -188,6 +188,54 @@ class TestSuggestFromYahoo:
         candidate, skip = suggest_from_yahoo(_feed())
         assert candidate is None
         assert isinstance(skip, SkipReason)
+        assert "Yahoo fetch error" in skip.reason
+        assert "ConnectionError" in skip.reason
+
+    @patch("yfinance.Ticker")
+    def test_fetch_error_skip_reason_differs_from_genuine_no_data(
+        self, mock_ticker_cls
+    ):
+        """An exception talking to Yahoo must not read like 'no data exists'.
+
+        Operators scanning skip messages need to tell "Yahoo/network failure,
+        re-run me" apart from "Yahoo genuinely has no shortName for this
+        ticker" -- collapsing both into one message wastes time hand-curating
+        overrides that a re-run would have resolved automatically.
+        """
+        mock_ticker_cls.side_effect = ConnectionError("network unreachable")
+        _, error_skip = suggest_from_yahoo(
+            _feed(symbol="Equity.HK.0700/HKD", name="0700")
+        )
+
+        mock_no_data = MagicMock()
+        mock_no_data.info = {}
+        mock_ticker_cls.side_effect = None
+        mock_ticker_cls.return_value = mock_no_data
+        _, no_data_skip = suggest_from_yahoo(
+            _feed(symbol="Equity.HK.0701/HKD", name="0701")
+        )
+
+        assert error_skip.reason != no_data_skip.reason
+        assert "Yahoo fetch error" in error_skip.reason
+        assert "Yahoo fetch error" not in no_data_skip.reason
+        assert "no Yahoo shortName found" in no_data_skip.reason
+
+    @patch("yfinance.Ticker")
+    def test_fetch_error_on_first_ticker_then_success_yields_candidate(
+        self, mock_ticker_cls
+    ):
+        """A transient error on one ticker in the fallback chain shouldn't
+        block a later successful ticker from producing a normal Candidate."""
+        kospi_hit = MagicMock()
+        kospi_hit.info = {"shortName": "SomeKospiCo"}
+        mock_ticker_cls.side_effect = [ConnectionError("flaky"), kospi_hit]
+
+        candidate, skip = suggest_from_yahoo(
+            _feed(symbol="Equity.KR.005380/KRW", name="005380")
+        )
+        assert skip is None
+        assert candidate.proposed_name == "SOME KOSPI CO"
+        assert candidate.source == "yahoo_shortname"
 
     @patch("yfinance.Ticker")
     def test_result_matching_current_name_is_skipped(self, mock_ticker_cls):
@@ -223,6 +271,8 @@ class TestSuggestFromYahoo:
         candidate, skip = suggest_from_yahoo(_feed())
         assert candidate is None
         assert isinstance(skip, SkipReason)
+        assert "Yahoo fetch error" in skip.reason
+        assert "YFRateLimitError" in skip.reason
 
 
 from generate_short_name_candidates import build_candidates, suggest_from_suffix_strip
@@ -378,6 +428,34 @@ class TestPrintReport:
         out = capsys.readouterr().out
         assert "2 candidate(s)" in out
         assert "1 skip(s)" in out
+        assert "WARNING" not in out
+
+    def test_warns_when_skips_include_yahoo_fetch_errors(self, capsys):
+        skips = [
+            SkipReason(
+                3,
+                "Equity.KR.000000/KRW",
+                "Yahoo fetch error for tickers [000000.KS: ConnectionError]",
+            )
+        ]
+        print_report([], skips)
+        out = capsys.readouterr().out
+        assert "WARNING" in out
+        assert "1 skip(s)" in out
+        # WARNING must land before the trailing summary line, per spec.
+        assert out.index("WARNING") < out.index("Summary:")
+
+    def test_no_warning_when_skips_are_all_genuine_no_data(self, capsys):
+        skips = [
+            SkipReason(
+                3,
+                "Equity.KR.000000/KRW",
+                "no Yahoo shortName found for tickers ['000000.KS']",
+            )
+        ]
+        print_report([], skips)
+        out = capsys.readouterr().out
+        assert "WARNING" not in out
 
 
 class TestMain:
