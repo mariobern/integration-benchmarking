@@ -13,7 +13,6 @@ See docs/superpowers/specs/2026-07-29-add-nasdaq-symbol-design.md.
 
 import argparse
 import json
-import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,7 +27,17 @@ ASIAN_MARKET_PREFIXES = (
     "Equity.IN.",
 )
 
-_WHITESPACE_RE = re.compile(r"\s")
+
+def _symbol_code(symbol: str) -> str:
+    """Extract the exchange code/ticker segment from `symbol`.
+
+    E.g. 'Equity.HK.0002/HKD' -> '0002', 'Equity.JP.1321-JP/JPY' -> '1321-JP'.
+    This segment is never touched by rename_numeric_feed_names.py, unlike
+    metadata.name, so comparing against it is an exact check for whether a
+    feed has already been renamed -- not a heuristic.
+    """
+    root = symbol.split("/", 1)[0]
+    return root.rsplit(".", 1)[-1]
 
 
 @dataclass(frozen=True)
@@ -53,11 +62,12 @@ def plan_change(feed: dict) -> tuple[Change | None, Skip | None]:
     """Decide what to do with one in-scope feed.
 
     Skips (never overwrites) a feed that already has `nasdaq_symbol` set, so
-    a second run is a no-op. Skips a feed whose `metadata.name` contains
-    whitespace, since every real exchange code/ticker observed in this
-    config is a single whitespace-free token, while every name
-    `rename_numeric_feed_names.py` produces is a multi-word company name --
-    this catches the hazard of running against an already-renamed config.
+    a second run is a no-op. Compares metadata.name against the code embedded
+    in symbol, which rename_numeric_feed_names.py never touches -- an exact
+    check for whether this feed has already been renamed, rather than a
+    heuristic. A mismatch (not just a name containing whitespace) triggers
+    the skip, since some already-renamed display names are a single word
+    (e.g. `HITACHI`, `CNOOC`) and would slip past a whitespace-only check.
     """
     feed_id = feed["feedId"]
     symbol = feed.get("symbol", "")
@@ -66,15 +76,16 @@ def plan_change(feed: dict) -> tuple[Change | None, Skip | None]:
     if "nasdaq_symbol" in metadata:
         return None, Skip(feed_id, symbol, "nasdaq_symbol already set")
 
-    name = str(metadata.get("name", ""))
+    name = str(metadata.get("name") or "")
     if not name:
         return None, Skip(feed_id, symbol, "metadata.name is empty")
 
-    if _WHITESPACE_RE.search(name):
+    code = _symbol_code(symbol)
+    if name != code:
         return None, Skip(
             feed_id,
             symbol,
-            "metadata.name looks like a display name, not a code (contains whitespace)",
+            f"metadata.name {name!r} does not match symbol code {code!r} (already renamed?)",
         )
 
     return Change(feed_id, symbol, name), None
@@ -234,6 +245,7 @@ def main(argv: list[str] | None = None) -> int:
     trailing = before_text[len(before_text.rstrip("\n")) :]
     after_text = dump_config(data) + trailing
 
+    # Verification runs before the write, so a dry run catches problems too.
     try:
         verify_feed_metadata(json.loads(before_text), data, changes)
     except VerificationError as exc:

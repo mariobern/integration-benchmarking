@@ -76,14 +76,18 @@ For each in-scope feed:
    idempotent — a second run over an unchanged config is a no-op.
 2. **Empty name:** if `metadata.name` is empty/missing, skip with reason
    `"metadata.name is empty"` — nothing to copy.
-3. **Suspicious name (ordering guard):** if `metadata.name` contains whitespace, skip with
-   reason `"metadata.name looks like a display name, not a code (contains whitespace)"`.
-   Every real exchange code/ticker observed in `lazer_jpkr.json` today is a single
-   whitespace-free token (`603986`, `0002`, `HKHZ5`, `KSH6`, `NIFTYBEES`, `1321-JP`);
-   every name `rename_numeric_feed_names.py` produces is a multi-word company name
-   (`GIGADEVICE SEMICONDUCTOR INC`). This catches the hazard of running this script
-   against a config where the rename has already happened, which would otherwise copy a
-   display name into `nasdaq_symbol` silently.
+3. **Suspicious name (ordering guard):** compare `metadata.name` against the code
+   segment embedded in `symbol` (e.g. `0002` in `Equity.HK.0002/HKD`, `1321-JP` in
+   `Equity.JP.1321-JP/JPY`). `rename_numeric_feed_names.py` never touches `symbol`, so
+   this segment is an exact fingerprint of the not-yet-renamed state -- unlike a
+   whitespace check, which a heuristic based on "names look multi-word" would miss:
+   some already-renamed display names are a single word (`HITACHI`, `CNOOC`, `CITIC`,
+   `ICBC`, `XIAOMI-W`) and would slip past it, silently copying a company name into
+   `nasdaq_symbol`. On a mismatch, skip with reason
+   `"metadata.name {name!r} does not match symbol code {code!r} (already renamed?)"`.
+   This catches the hazard of running this script against a config where the rename has
+   already happened, which would otherwise copy a display name into `nasdaq_symbol`
+   silently.
 4. **Otherwise:** plan `metadata.nasdaq_symbol = metadata.name`, verbatim.
 
 This mirrors the `Change`/`Skip` dataclass-and-report shape used by
@@ -145,7 +149,8 @@ written is a verbatim copy with no judgment call for a human to review.
 2. In-scope alphabetic-but-whitespace-free name (`NIFTYBEES`, `HKHZ5`, `KSH6`) →
    `nasdaq_symbol` set to that value.
 3. `metadata.nasdaq_symbol` already present → skipped, reported, value unchanged.
-4. `metadata.name` contains a space (already renamed) → skipped, reported, no
+4. `metadata.name` does not match the code embedded in `symbol` (already renamed,
+   including single-word display names like `HITACHI`) → skipped, reported, no
    `nasdaq_symbol` added.
 5. `metadata.name` empty → skipped, reported.
 6. Feed outside the configured prefixes (e.g. `Equity.US.*`, `Equity.Index.*`) → never

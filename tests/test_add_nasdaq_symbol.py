@@ -1,6 +1,7 @@
 """Tests for add_nasdaq_symbol.py."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -11,6 +12,7 @@ from add_nasdaq_symbol import (
     build_changes,
     plan_change,
     apply_changes,
+    main,
     VerificationError,
     verify_feed_metadata,
     verify_on_disk,
@@ -97,12 +99,18 @@ class TestPlanChange:
     def test_name_with_space_is_skipped(self):
         change, skip = plan_change(_feed(name="CHANGXIN MEMORY TECHNOLOGIES"))
         assert change is None
-        assert "whitespace" in skip.reason
+        assert "does not match symbol code" in skip.reason
 
     def test_name_with_internal_space_is_skipped(self):
         change, skip = plan_change(_feed(name="GIGADEVICE SEMICONDUCTOR INC (CN)"))
         assert change is None
-        assert "whitespace" in skip.reason
+        assert "does not match symbol code" in skip.reason
+
+    def test_single_word_display_name_is_still_skipped(self):
+        # Regression: a whitespace-only check would wrongly accept this.
+        change, skip = plan_change(_feed(symbol="Equity.JP.6501/JPY", name="HITACHI"))
+        assert change is None
+        assert "does not match symbol code" in skip.reason
 
 
 class TestBuildChanges:
@@ -277,9 +285,6 @@ class TestVerifyOnDisk:
             verify_on_disk(path, before_text, [])
 
 
-from add_nasdaq_symbol import main
-
-
 def _write_config(tmp_path, *feeds):
     path = tmp_path / "cfg.json"
     path.write_text(dump_config(_config(*feeds)), encoding="utf-8")
@@ -343,7 +348,7 @@ class TestMain:
         assert main(["--config", str(path)]) == 0
         out = capsys.readouterr().out
         assert "Skipped (1)" in out
-        assert "whitespace" in out
+        assert "does not match symbol code" in out
 
     def test_pre_write_verification_failure_writes_nothing(self, tmp_path, monkeypatch):
         path = _write_config(tmp_path, _feed(feed_id=3520))
@@ -369,8 +374,6 @@ class TestMain:
         assert (tmp_path / "cfg.json.bak").exists()
         assert (tmp_path / "cfg.json.bak").read_text(encoding="utf-8") == original
 
-
-from pathlib import Path
 
 LIVE_CONFIG = Path("lazer_jpkr.json")
 

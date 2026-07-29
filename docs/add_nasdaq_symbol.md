@@ -38,10 +38,14 @@ For every in-scope feed:
 
 - **Already has `nasdaq_symbol`:** skipped, reported -- makes a second run a no-op.
 - **`metadata.name` is empty:** skipped, reported -- nothing to copy.
-- **`metadata.name` contains whitespace:** skipped, reported. Every real exchange
-  code/ticker in scope is a single whitespace-free token; a name with a space has
-  already been through `rename_numeric_feed_names.py` and copying it into
-  `nasdaq_symbol` would put a display name where the exchange code belongs.
+- **`metadata.name` does not match the code embedded in `symbol`:** skipped, reported.
+  `rename_numeric_feed_names.py` never touches `symbol`, so the code segment embedded
+  in it (e.g. `0002` in `Equity.HK.0002/HKD`) is an exact fingerprint of the
+  not-yet-renamed state. A mismatch means the feed has already been through
+  `rename_numeric_feed_names.py` and copying `metadata.name` into `nasdaq_symbol` would
+  put a display name where the exchange code belongs -- this is an exact check, not a
+  whitespace heuristic, since some renamed display names are a single word (e.g.
+  `HITACHI`, `CNOOC`) and would slip past a whitespace-only check.
 - **Otherwise:** `metadata.nasdaq_symbol` is set to `metadata.name`, verbatim.
 
 `metadata` dict keys are rebuilt in alphabetical order whenever `nasdaq_symbol` is
