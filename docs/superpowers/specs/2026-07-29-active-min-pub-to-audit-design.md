@@ -49,6 +49,17 @@ blocker — Stage 2/3 is idempotent and config-driven, so a fresh run naturally
 reflects whatever the current config already has — but it's worth a quick check
 before assuming all 34 are still fully open.
 
+**Addendum (found while writing the implementation plan):** `active_min_pub.py`
+has since been extended (commit `98e6b55`, already merged, unrelated to this
+design) to split what used to be a single `CRITICAL` verdict into two tiers:
+`BREACH` (aggregate `publisher_count` actually falls *below* `minPublishers` —
+a real floor violation) and a narrower `CRITICAL` (sits *at* the floor but never
+below it). The CSVs analyzed above predate this split (no `BREACH` rows, no
+`pct_below_par`/`pct_at_par` columns), so the `min_pub >= 2` rule itself is
+unaffected by the split — but the filter this adapter applies must now target
+**both** `BREACH` and `CRITICAL`, not `CRITICAL` alone, or it would systematically
+skip the more severe cases. This is reflected in the Filter logic section below.
+
 ## Relationship to the existing min_pub pipeline
 
 This is a **new standalone adapter script**, not a modification to any shipped
@@ -68,7 +79,7 @@ CSV.
                                             │
                                             ▼
                        [NEW] active_min_pub_to_audit.py
-                            filter: verdict == CRITICAL
+                            filter: verdict in {BREACH, CRITICAL}
                                     AND effective_min_pub >= min_pub_floor (2)
                                             │
                     ┌───────────────────────┴───────────────────────┐
@@ -87,10 +98,10 @@ CSV.
 ## Goal
 
 Given an `active_min_pub.py` output CSV, produce an `--audit-csv`-compatible file
-containing exactly the feed-sessions that are (a) CRITICAL by the aggregate-
-contributor-count signal and (b) structurally capable of benefiting from a new
-publisher (`effective_min_pub >= 2`), so they can be run through the existing,
-unmodified Stage 2/3 tooling.
+containing exactly the feed-sessions that are (a) `BREACH` or `CRITICAL` by the
+aggregate-contributor-count signal and (b) structurally capable of benefiting from
+a new publisher (`effective_min_pub >= 2`), so they can be run through the
+existing, unmodified Stage 2/3 tooling.
 
 ## Scope
 
@@ -110,9 +121,9 @@ unmodified Stage 2/3 tooling.
 - Actually qualifying or applying publishers — this script only reshapes/filters;
   Stage 2/3 does the real work, unchanged.
 - WARN-verdict feed-sessions. `active_min_pub`'s WARN rows ("living one publisher
-  above the floor") are excluded from this pass by default; only CRITICAL is
-  routed forward, matching the immediate ask. An `--include-warn` flag is included
-  for future use but defaults off.
+  above the floor") are excluded from this pass by default; only `BREACH`/
+  `CRITICAL` are routed forward, matching the immediate ask. An `--include-warn`
+  flag is included for future use but defaults off.
 - Investigating or resolving the `bucketA` overlap noted above — left as an
   operational check for whoever runs the pipeline, not something this script
   needs to detect or special-case.
@@ -120,31 +131,42 @@ unmodified Stage 2/3 tooling.
 ## Filter logic
 
 Expected input is the **standard** `active_min_pub.py` per-feed-session output
-(`active_min_pub_<start>_<end>.csv`, columns `feed_id, symbol, asset_type, session,
-effective_min_pub, n_updates, min, p1, p5, median, pct_at_floor, pct_at_floor_1,
-verdict` per its own spec) — not the hand-curated
+(`active_min_pub_<start>_<end>.csv`, current columns per `RESULT_COLUMNS` in
+`lazer_dq/active_min_pub.py`: `feed_id, symbol, asset_type, session,
+effective_min_pub, n_updates, min, p1, p5, median, pct_below_par, pct_at_par,
+pct_at_floor, pct_at_floor_1, verdict`, with `verdict` one of `BREACH, CRITICAL,
+WARN, OK, LOW_SAMPLE, NO_DATA, NO_SCHEDULE, NO_MIN_PUB`) — not the hand-curated
 `active_min_pub_CRITICAL_<date>.csv` snapshot, whose `category`/`actionable`
-columns were this design's input for reverse-engineering the rule but which has no
-`verdict` column and isn't itself meant to be re-consumed. If the input filename
-doesn't match the `active_min_pub_<start>_<end>.csv` pattern (so the date suffix
-can't be parsed), the script errors out with a clear message rather than guessing
-a fallback name.
+columns were this design's input for reverse-engineering the rule but which has
+no `verdict` column and isn't itself meant to be re-consumed. If the input
+filename doesn't match the `active_min_pub_<start>_<end>.csv` pattern (so the
+date suffix can't be parsed), the script errors out with a clear message rather
+than guessing a fallback name.
 
-Given one row of `active_min_pub`'s per-feed-session CSV:
+Given one row of `active_min_pub`'s per-feed-session CSV, using
+`_TARGET_VERDICTS = {"BREACH", "CRITICAL"}` (extended to include `"WARN"` when
+`--include-warn` is passed):
 
 ```
 include (→ flagged) if:
-    verdict == "CRITICAL"                          (or also "WARN" if --include-warn)
+    verdict in _TARGET_VERDICTS
     and effective_min_pub >= args.min_pub_floor     (default 2)
 
-else if verdict == "CRITICAL" and effective_min_pub < args.min_pub_floor:
+else if verdict in _TARGET_VERDICTS and effective_min_pub < args.min_pub_floor:
     include (→ excluded, reason="min_pub_floor_1")
 
 else:
-    drop silently (WARN/OK/LOW_SAMPLE/NO_DATA rows when --include-warn is off,
-    or below the floor filter but not CRITICAL/WARN — these were never part of
-    the actionable universe and don't need surfacing)
+    drop silently (rows whose verdict isn't in _TARGET_VERDICTS — OK/LOW_SAMPLE/
+    NO_DATA/NO_SCHEDULE/NO_MIN_PUB always, plus WARN when --include-warn is off —
+    these were never part of the actionable universe and don't need surfacing)
 ```
+
+The output `classification` column collapses both `BREACH` and `CRITICAL` source
+rows to the literal string `"CRITICAL"` (Stage 2's `qualify_candidates.py` only
+recognizes `"CRITICAL"`/`"WARN"` — it has no `BREACH` concept and doesn't need
+one, since both tiers get the same remediation treatment). The original verdict
+is preserved in a separate `source_verdict` passthrough column so a human
+reading the flagged CSV can still tell BREACH from CRITICAL rows.
 
 `min_pub_floor` is CLI-tunable rather than hardcoded to `2`, consistent with
 `active_min_pub`'s own `--critical-pct`/`--warn-pct` pattern, in case future data
@@ -158,12 +180,15 @@ that's also structurally single-source).
 `output_csv/active_min_pub_flagged_<start>_<end>.csv`:
 
 ```
-feed_id, symbol, session, classification, asset_type, effective_min_pub,
-pct_at_floor, pct_at_floor_1, min, median, n_updates
+feed_id, symbol, session, classification, source_verdict, asset_type,
+effective_min_pub, pct_below_par, pct_at_par, pct_at_floor, pct_at_floor_1,
+min, median, n_updates
 ```
 
-`classification` is always `"CRITICAL"` (or `"WARN"`, passthrough from `verdict`
-when `--include-warn` is set) — never re-derived, just copied from `verdict`. Sorted
+`classification` is `"CRITICAL"` for both `BREACH`- and `CRITICAL`-sourced rows
+(or `"WARN"` when `--include-warn` is set and the source verdict is `WARN`) — the
+value Stage 2 expects. `source_verdict` carries the original `active_min_pub`
+verdict (`BREACH`, `CRITICAL`, or `WARN`) unchanged, for human traceability. Sorted
 by `pct_at_floor` descending, matching `active_min_pub`'s own severity ordering.
 
 ### Excluded CSV (visibility, not consumed downstream)
@@ -171,7 +196,7 @@ by `pct_at_floor` descending, matching `active_min_pub`'s own severity ordering.
 `output_csv/active_min_pub_excluded_<start>_<end>.csv`:
 
 ```
-feed_id, symbol, session, effective_min_pub, pct_at_floor, reason
+feed_id, symbol, session, source_verdict, effective_min_pub, pct_at_floor, reason
 ```
 
 `reason` is `"min_pub_floor_1"` for every row in v1 (the only exclusion rule that
@@ -213,13 +238,17 @@ CSVs (no ClickHouse mocking needed, unlike `active_min_pub`'s own tests):
 
 - `effective_min_pub == 2` (boundary, included) vs `== 1` (excluded) vs `== 3`
   (included) — exact-boundary correctness.
+- BREACH row and CRITICAL row (both with `min_pub >= 2`) both land in flagged
+  with `classification="CRITICAL"` and their own `source_verdict` preserved
+  (`BREACH` stays `BREACH`, `CRITICAL` stays `CRITICAL`, in the `source_verdict`
+  column).
 - CRITICAL row with `--include-warn` off is included; WARN row with it off is
   dropped entirely (appears in neither output).
 - CRITICAL row with `--include-warn` on and `min_pub == 1` lands in excluded with
   `reason=min_pub_floor_1`; WARN row with it on and `min_pub >= 2` lands in
-  flagged with `classification=WARN`.
-- OK/LOW_SAMPLE/NO_DATA verdict rows are dropped regardless of `min_pub_floor` or
-  `--include-warn`.
+  flagged with `classification="WARN"`, `source_verdict="WARN"`.
+- OK/LOW_SAMPLE/NO_DATA/NO_SCHEDULE/NO_MIN_PUB verdict rows are dropped
+  regardless of `min_pub_floor` or `--include-warn`.
 - Empty input (zero CRITICAL rows) produces empty flagged/excluded CSVs with
   correct headers, not a crash.
 - Output filename date-suffix parsing from an arbitrary input filename.
@@ -230,12 +259,14 @@ CSVs (no ClickHouse mocking needed, unlike `active_min_pub`'s own tests):
   output schema, and the explicit "flagged CSV is a drop-in `--audit-csv` for
   `qualify_candidates.py`" contract.
 - Scripts table row in `CLAUDE.md`.
-- One "Key Gotchas" line in `CLAUDE.md`: `active_min_pub_to_audit` routes CRITICAL
-  feed-sessions into the existing Stage 2/3 pipeline only when
-  `effective_min_pub >= 2` — `min_pub == 1` feed-sessions (internal `Pyth.*`/
-  `Custom.*`, interest-rates, some thin futures) are structurally single-source
-  and have no qualifiable second publisher, so they're excluded rather than fed
-  into a mechanism that can't help them.
+- One "Key Gotchas" line in `CLAUDE.md`: `active_min_pub_to_audit` routes
+  `BREACH`/`CRITICAL` feed-sessions into the existing Stage 2/3 pipeline only
+  when `effective_min_pub >= 2` (both collapse to `classification="CRITICAL"`
+  for Stage 2, with the original verdict kept in `source_verdict`) —
+  `min_pub == 1` feed-sessions (internal `Pyth.*`/`Custom.*`, interest-rates,
+  some thin futures) are structurally single-source and have no qualifiable
+  second publisher, so they're excluded rather than fed into a mechanism that
+  can't help them.
 
 ## Open Questions / Future Work
 
