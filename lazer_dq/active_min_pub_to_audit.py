@@ -54,10 +54,27 @@ EXCLUDED_COLUMNS = [
 
 _BASE_TARGET_VERDICTS = frozenset({"BREACH", "CRITICAL"})
 
+# Every column to_flagged_row()/to_excluded_row() read from a source row.
+REQUIRED_INPUT_COLUMNS = [
+    "feed_id",
+    "symbol",
+    "session",
+    "verdict",
+    "asset_type",
+    "effective_min_pub",
+    "pct_below_par",
+    "pct_at_par",
+    "pct_at_floor",
+    "pct_at_floor_1",
+    "min",
+    "median",
+    "n_updates",
+]
+
 _FILENAME_RE = re.compile(r"active_min_pub_(\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2})\.csv")
 
 
-def target_verdicts(include_warn: bool) -> frozenset:
+def target_verdicts(include_warn: bool) -> frozenset[str]:
     """Verdicts this adapter routes forward, before the min_pub_floor split."""
     return _BASE_TARGET_VERDICTS | ({"WARN"} if include_warn else frozenset())
 
@@ -144,7 +161,18 @@ def main(argv=None) -> int:
         return 1
 
     with open(in_path, newline="") as f:
-        rows = list(csv.DictReader(f))
+        reader = csv.DictReader(f)
+        fieldnames = reader.fieldnames or []
+        rows = list(reader)
+
+    missing = [c for c in REQUIRED_INPUT_COLUMNS if c not in fieldnames]
+    if missing:
+        print(
+            f"ERROR: {in_path} is missing required column(s): {', '.join(missing)} -- "
+            "CSVs predating the BREACH/CRITICAL split lack pct_below_par/pct_at_par; "
+            "regenerate the input with a current active_min_pub.py"
+        )
+        return 1
 
     verdict_tally = Counter(r["verdict"] for r in rows)
     warn_skipped = verdict_tally.get("WARN", 0) if not args.include_warn else 0
@@ -155,7 +183,8 @@ def main(argv=None) -> int:
         if bucket == "flagged":
             flagged.append(to_flagged_row(row))
         elif bucket == "excluded":
-            excluded.append(to_excluded_row(row, "min_pub_floor_1"))
+            reason = f"below_min_pub_floor_{args.min_pub_floor}"
+            excluded.append(to_excluded_row(row, reason))
 
     flagged.sort(key=lambda r: -float(r["pct_at_floor"]))
 

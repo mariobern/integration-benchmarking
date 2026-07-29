@@ -64,7 +64,8 @@ reason`
 
 Rows that were `BREACH`/`CRITICAL` (or `WARN` with `--include-warn`) but fell
 below `--min-pub-floor` — surfaced here rather than silently dropped.
-`reason` is `"min_pub_floor_1"` in v1 (the only exclusion rule that exists).
+`reason` is `"below_min_pub_floor_<N>"` where `<N>` is the `--min-pub-floor`
+value used (the only exclusion rule that exists in v1).
 
 ## Running the full pipeline
 

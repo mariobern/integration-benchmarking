@@ -1,3 +1,4 @@
+import csv
 from pathlib import Path
 
 import pytest
@@ -104,6 +105,17 @@ def test_bucket_respects_custom_floor():
     )
 
 
+def test_bucket_no_min_pub_row_with_blank_min_pub_is_dropped():
+    # Real active_min_pub.py output can have an empty-string effective_min_pub for
+    # NO_MIN_PUB/NO_SCHEDULE verdicts. This only works because the verdict-membership
+    # check in bucket_for_row() runs before int(row["effective_min_pub"]) -- pin that
+    # ordering so a future refactor can't silently reintroduce a ValueError crash.
+    assert (
+        bucket_for_row(_row(verdict="NO_MIN_PUB", effective_min_pub=""), 2, True)
+        == "drop"
+    )
+
+
 def test_to_flagged_row_breach_maps_to_critical_classification():
     row = to_flagged_row(_row(verdict="BREACH"))
     assert row["classification"] == "CRITICAL"
@@ -163,8 +175,6 @@ def test_parse_window_from_filename_rejects_unrelated_name():
     with pytest.raises(ValueError):
         parse_window_from_filename(Path("min_pub_audit_2026-07-14_2026-07-22.csv"))
 
-
-import csv as csv_module
 
 _HEADER = [
     "feed_id",
@@ -280,7 +290,7 @@ _FIXTURE_ROWS = [
 
 def _write_fixture(path):
     with open(path, "w", newline="") as f:
-        writer = csv_module.writer(f)
+        writer = csv.writer(f)
         writer.writerow(_HEADER)
         writer.writerows(_FIXTURE_ROWS)
 
@@ -306,7 +316,7 @@ def test_main_default_flags_breach_and_critical_only(tmp_path, capsys):
     assert excluded_path.exists()
 
     with open(flagged_path, newline="") as f:
-        flagged = list(csv_module.DictReader(f))
+        flagged = list(csv.DictReader(f))
     assert [r["feed_id"] for r in flagged] == ["100", "101"]  # sorted pct_at_floor desc
     assert flagged[0]["classification"] == "CRITICAL"
     assert flagged[0]["source_verdict"] == "BREACH"
@@ -314,9 +324,9 @@ def test_main_default_flags_breach_and_critical_only(tmp_path, capsys):
     assert flagged[1]["source_verdict"] == "CRITICAL"
 
     with open(excluded_path, newline="") as f:
-        excluded = list(csv_module.DictReader(f))
+        excluded = list(csv.DictReader(f))
     assert [r["feed_id"] for r in excluded] == ["102"]
-    assert excluded[0]["reason"] == "min_pub_floor_1"
+    assert excluded[0]["reason"] == "below_min_pub_floor_2"
 
     out = capsys.readouterr().out
     assert "Flagged 2 feed-sessions" in out
@@ -342,7 +352,7 @@ def test_main_include_warn_adds_warn_rows(tmp_path):
 
     flagged_path = out_dir / "active_min_pub_flagged_2026-07-14_2026-07-22.csv"
     with open(flagged_path, newline="") as f:
-        flagged = list(csv_module.DictReader(f))
+        flagged = list(csv.DictReader(f))
     feed_ids = {r["feed_id"] for r in flagged}
     assert feed_ids == {"100", "101", "103"}
     warn_row = next(r for r in flagged if r["feed_id"] == "103")
@@ -370,11 +380,11 @@ def test_main_custom_min_pub_floor(tmp_path):
     flagged_path = out_dir / "active_min_pub_flagged_2026-07-14_2026-07-22.csv"
     excluded_path = out_dir / "active_min_pub_excluded_2026-07-14_2026-07-22.csv"
     with open(flagged_path, newline="") as f:
-        flagged = list(csv_module.DictReader(f))
+        flagged = list(csv.DictReader(f))
     assert [r["feed_id"] for r in flagged] == ["101"]  # only min_pub=3 clears floor=3
 
     with open(excluded_path, newline="") as f:
-        excluded = list(csv_module.DictReader(f))
+        excluded = list(csv.DictReader(f))
     assert {r["feed_id"] for r in excluded} == {"100", "102"}  # both min_pub < 3 now
 
 
@@ -396,10 +406,44 @@ def test_main_bad_filename_errors_without_writing_output(tmp_path, capsys):
     assert not out_dir.exists()
 
 
+def test_main_missing_columns_errors_without_writing_output(tmp_path, capsys):
+    # Real active_min_pub_*.csv files predating the BREACH/CRITICAL split lack
+    # pct_below_par/pct_at_par; main() must reject them cleanly rather than crash
+    # inside to_flagged_row() with a bare KeyError.
+    in_path = tmp_path / "active_min_pub_2026-07-14_2026-07-22.csv"
+    legacy_header = [c for c in _HEADER if c not in ("pct_below_par", "pct_at_par")]
+    with open(in_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(legacy_header)
+        writer.writerow(
+            [
+                v
+                for c, v in zip(_HEADER, _FIXTURE_ROWS[0])
+                if c not in ("pct_below_par", "pct_at_par")
+            ]
+        )
+    out_dir = tmp_path / "out"
+
+    rc = main(
+        [
+            "--active-min-pub-csv",
+            str(in_path),
+            "--output-dir",
+            str(out_dir),
+        ]
+    )
+    assert rc == 1
+    out = capsys.readouterr().out
+    assert "ERROR" in out
+    assert "pct_below_par" in out
+    assert "pct_at_par" in out
+    assert not out_dir.exists()
+
+
 def test_main_empty_input_produces_empty_outputs_with_headers(tmp_path):
     in_path = tmp_path / "active_min_pub_2026-07-14_2026-07-22.csv"
     with open(in_path, "w", newline="") as f:
-        writer = csv_module.writer(f)
+        writer = csv.writer(f)
         writer.writerow(_HEADER)
     out_dir = tmp_path / "out"
 
@@ -415,7 +459,7 @@ def test_main_empty_input_produces_empty_outputs_with_headers(tmp_path):
 
     flagged_path = out_dir / "active_min_pub_flagged_2026-07-14_2026-07-22.csv"
     with open(flagged_path, newline="") as f:
-        reader = csv_module.reader(f)
+        reader = csv.reader(f)
         header = next(reader)
         rows = list(reader)
     assert header == FLAGGED_COLUMNS
