@@ -368,3 +368,27 @@ class TestMain:
         assert main(["--config", str(path), "--apply"]) == 1
         assert (tmp_path / "cfg.json.bak").exists()
         assert (tmp_path / "cfg.json.bak").read_text(encoding="utf-8") == original
+
+
+from pathlib import Path
+
+LIVE_CONFIG = Path("lazer_jpkr.json")
+
+
+@pytest.mark.skipif(
+    not LIVE_CONFIG.exists(),
+    reason="lazer_jpkr.json is gitignored and not present in this checkout",
+)
+class TestLiveConfigSmoke:
+    """Guards the measured expectations from the design doc.
+
+    The config is gitignored, so these are skipped wherever it is absent.
+    """
+
+    def _feeds(self):
+        return json.loads(LIVE_CONFIG.read_text(encoding="utf-8"))["feeds"]
+
+    def test_465_changes_no_skips(self):
+        changes, skips = build_changes(self._feeds())
+        assert len(changes) == 465
+        assert skips == []
