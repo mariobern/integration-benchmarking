@@ -6,6 +6,7 @@ from add_nasdaq_symbol import (
     Skip,
     build_changes,
     plan_change,
+    apply_changes,
 )
 
 
@@ -134,3 +135,53 @@ class TestBuildChanges:
         changes, skips = build_changes(feeds)
         assert [c.feed_id for c in changes] == [3520]
         assert [s.feed_id for s in skips] == [3521]
+
+
+def _config(*feeds):
+    return {"feeds": list(feeds)}
+
+
+class TestApplyChanges:
+    def test_sets_nasdaq_symbol(self):
+        data = _config(_feed(feed_id=3520))
+        changes, _ = build_changes(data["feeds"])
+        apply_changes(data, changes)
+        assert data["feeds"][0]["metadata"]["nasdaq_symbol"] == "688825"
+
+    def test_other_fields_untouched(self):
+        data = _config(_feed(feed_id=3520))
+        changes, _ = build_changes(data["feeds"])
+        apply_changes(data, changes)
+        metadata = data["feeds"][0]["metadata"]
+        assert metadata["name"] == "688825"
+        assert metadata["description"] == "CHANGXIN MEMORY TECHNOLOGIES / CHINESE YUAN"
+        assert metadata["quote_currency"] == "CNY"
+
+    def test_symbol_untouched(self):
+        data = _config(_feed(feed_id=3520))
+        changes, _ = build_changes(data["feeds"])
+        apply_changes(data, changes)
+        assert data["feeds"][0]["symbol"] == "Equity.CN.688825/CNY"
+
+    def test_metadata_keys_are_alphabetically_sorted(self):
+        data = _config(_feed(feed_id=3520))
+        changes, _ = build_changes(data["feeds"])
+        apply_changes(data, changes)
+        keys = list(data["feeds"][0]["metadata"].keys())
+        assert keys == sorted(keys)
+        assert keys == [
+            "asset_type",
+            "description",
+            "name",
+            "nasdaq_symbol",
+            "quote_currency",
+        ]
+
+    def test_untouched_feed_not_mutated(self):
+        data = _config(
+            _feed(feed_id=3520),
+            _feed(feed_id=922, symbol="Equity.US.AAPL/USD", name="AAPL"),
+        )
+        changes, _ = build_changes(data["feeds"])
+        apply_changes(data, changes)
+        assert "nasdaq_symbol" not in data["feeds"][1]["metadata"]

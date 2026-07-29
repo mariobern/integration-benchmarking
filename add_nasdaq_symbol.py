@@ -95,3 +95,26 @@ def build_changes(
         if skip is not None:
             skips.append(skip)
     return changes, skips
+
+
+def _with_sorted_keys(metadata: dict, key: str, value: str) -> dict:
+    """Return a new dict with `key` set to `value`, all keys alphabetically sorted.
+
+    Every metadata dict in this config is already alphabetically sorted (verified
+    against both HK and US-equity feeds), and on US feeds `nasdaq_symbol` already
+    sits between `name` and `quote_currency`. This keeps newly-touched feeds
+    consistent with that existing convention instead of appending the new key
+    at the end via plain dict assignment.
+    """
+    merged = {**metadata, key: value}
+    return dict(sorted(merged.items()))
+
+
+def apply_changes(data: dict, changes: list[Change]) -> None:
+    """Write the planned nasdaq_symbol values into the in-memory document."""
+    by_id = {f["feedId"]: f for f in data["feeds"]}
+    for change in changes:
+        feed = by_id[change.feed_id]
+        feed["metadata"] = _with_sorted_keys(
+            feed["metadata"], "nasdaq_symbol", change.name
+        )
