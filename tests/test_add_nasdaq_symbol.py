@@ -1,5 +1,9 @@
 """Tests for add_nasdaq_symbol.py."""
 
+import json
+
+import pytest
+
 from add_nasdaq_symbol import (
     ASIAN_MARKET_PREFIXES,
     Change,
@@ -7,7 +11,11 @@ from add_nasdaq_symbol import (
     build_changes,
     plan_change,
     apply_changes,
+    VerificationError,
+    verify_feed_metadata,
+    verify_on_disk,
 )
+from rename_numeric_feed_names import dump_config, write_config
 
 
 def _feed(
@@ -185,3 +193,84 @@ class TestApplyChanges:
         changes, _ = build_changes(data["feeds"])
         apply_changes(data, changes)
         assert "nasdaq_symbol" not in data["feeds"][1]["metadata"]
+
+
+class TestVerifyFeedMetadata:
+    def test_passes_on_planned_change(self):
+        before_data = _config(_feed(feed_id=3520))
+        after_data = _config(_feed(feed_id=3520))
+        changes, _ = build_changes(before_data["feeds"])
+        apply_changes(after_data, changes)
+        verify_feed_metadata(before_data, after_data, changes)
+
+    def test_rejects_feed_id_set_change(self):
+        before_data = _config(
+            _feed(feed_id=3520),
+            _feed(feed_id=884, symbol="Equity.HK.0002/HKD", name="0002"),
+        )
+        after_data = _config(_feed(feed_id=3520))
+        with pytest.raises(VerificationError, match="feed id set changed"):
+            verify_feed_metadata(before_data, after_data, changes=[])
+
+    def test_rejects_unplanned_metadata_change(self):
+        before_data = _config(_feed(feed_id=3520))
+        after_data = _config(_feed(feed_id=3520))
+        after_data["feeds"][0]["metadata"]["name"] = "TAMPERED"
+        with pytest.raises(VerificationError, match="had no planned change"):
+            verify_feed_metadata(before_data, after_data, changes=[])
+
+    def test_rejects_wrong_nasdaq_symbol_value(self):
+        before_data = _config(_feed(feed_id=3520))
+        after_data = _config(_feed(feed_id=3520, nasdaq_symbol="WRONG"))
+        changes, _ = build_changes(before_data["feeds"])
+        with pytest.raises(VerificationError, match="does not match the plan"):
+            verify_feed_metadata(before_data, after_data, changes)
+
+    def test_rejects_change_leaking_to_unplanned_feed(self):
+        before_data = _config(
+            _feed(feed_id=3520),
+            _feed(feed_id=884, symbol="Equity.HK.0002/HKD", name="0002"),
+        )
+        after_data = _config(
+            _feed(feed_id=3520),
+            _feed(
+                feed_id=884,
+                symbol="Equity.HK.0002/HKD",
+                name="0002",
+                nasdaq_symbol="0002",
+            ),
+        )
+        # Plan only covers CN, so the HK feed gaining nasdaq_symbol is unplanned.
+        changes, _ = build_changes(before_data["feeds"], prefixes=("Equity.CN.",))
+        with pytest.raises(VerificationError, match="had no planned change"):
+            verify_feed_metadata(before_data, after_data, changes)
+
+
+class TestVerifyOnDisk:
+    def test_passes_after_real_write(self, tmp_path):
+        data = _config(_feed(feed_id=3520))
+        before_text = dump_config(data)
+        path = tmp_path / "cfg.json"
+        path.write_text(before_text, encoding="utf-8")
+        changes, _ = build_changes(data["feeds"])
+        apply_changes(data, changes)
+        write_config(path, dump_config(data), backup=False)
+        verify_on_disk(path, before_text, changes)
+
+    def test_rejects_unparseable_file(self, tmp_path):
+        path = tmp_path / "cfg.json"
+        path.write_text("{not json", encoding="utf-8")
+        before_text = dump_config(_config(_feed(feed_id=3520)))
+        with pytest.raises(VerificationError, match="does not parse"):
+            verify_on_disk(path, before_text, [])
+
+    def test_rejects_feed_count_change(self, tmp_path):
+        before_data = _config(
+            _feed(feed_id=3520),
+            _feed(feed_id=884, symbol="Equity.HK.0002/HKD", name="0002"),
+        )
+        before_text = dump_config(before_data)
+        path = tmp_path / "cfg.json"
+        path.write_text(dump_config(_config(_feed(feed_id=3520))), encoding="utf-8")
+        with pytest.raises(VerificationError, match="feed count changed"):
+            verify_on_disk(path, before_text, [])

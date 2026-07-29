@@ -118,3 +118,67 @@ def apply_changes(data: dict, changes: list[Change]) -> None:
         feed["metadata"] = _with_sorted_keys(
             feed["metadata"], "nasdaq_symbol", change.name
         )
+
+
+class VerificationError(Exception):
+    """Raised when the rewritten config differs in unexpected ways."""
+
+
+def verify_feed_metadata(
+    before_data: dict, after_data: dict, changes: list[Change]
+) -> None:
+    """Raise VerificationError unless exactly the planned nasdaq_symbol values changed.
+
+    Confirms every feed outside the change set has a byte-identical `metadata`
+    dict to before (no leak beyond the plan), and every feed in the change set
+    gained exactly the planned `nasdaq_symbol` value with every other field
+    unchanged.
+    """
+    before_by_id = {f["feedId"]: f for f in before_data["feeds"]}
+    after_by_id = {f["feedId"]: f for f in after_data["feeds"]}
+    if before_by_id.keys() != after_by_id.keys():
+        raise VerificationError("feed id set changed")
+
+    planned = {c.feed_id: c.name for c in changes}
+
+    # Check unplanned feeds first (data corruption risk)
+    for feed_id in before_by_id:
+        if feed_id in planned:
+            continue
+        before_metadata = before_by_id[feed_id].get("metadata", {})
+        after_metadata = after_by_id[feed_id].get("metadata", {})
+        if before_metadata != after_metadata:
+            raise VerificationError(
+                f"feed {feed_id} metadata changed but had no planned change: "
+                f"before={before_metadata}, after={after_metadata}"
+            )
+
+    # Then check planned feeds
+    for feed_id in before_by_id:
+        if feed_id not in planned:
+            continue
+        before_metadata = before_by_id[feed_id].get("metadata", {})
+        after_metadata = after_by_id[feed_id].get("metadata", {})
+        expected = dict(
+            sorted({**before_metadata, "nasdaq_symbol": planned[feed_id]}.items())
+        )
+        if after_metadata != expected:
+            raise VerificationError(
+                f"feed {feed_id} metadata does not match the plan: "
+                f"expected={expected}, actual={after_metadata}"
+            )
+
+
+def verify_on_disk(path: Path, before_text: str, changes: list[Change]) -> None:
+    """Re-read the written config and confirm it parses and changed only as planned."""
+    after_text = path.read_text(encoding="utf-8")
+    try:
+        after_data = json.loads(after_text)
+    except json.JSONDecodeError as exc:
+        raise VerificationError(f"written config does not parse: {exc}") from exc
+    before_data = json.loads(before_text)
+    if len(after_data["feeds"]) != len(before_data["feeds"]):
+        raise VerificationError(
+            f"feed count changed: {len(before_data['feeds'])} -> {len(after_data['feeds'])}"
+        )
+    verify_feed_metadata(before_data, after_data, changes)
