@@ -232,7 +232,8 @@ class TestVerifyFeedMetadata:
             _feed(feed_id=884, symbol="Equity.HK.0002/HKD", name="0002"),
         )
         after_data = _config(
-            _feed(feed_id=3520),
+            # feed 3520 correctly matches the plan, so it isn't what trips the check.
+            _feed(feed_id=3520, nasdaq_symbol="688825"),
             _feed(
                 feed_id=884,
                 symbol="Equity.HK.0002/HKD",
