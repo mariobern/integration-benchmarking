@@ -140,25 +140,18 @@ def verify_feed_metadata(
         raise VerificationError("feed id set changed")
 
     planned = {c.feed_id: c.name for c in changes}
-
-    # Check unplanned feeds first (data corruption risk)
-    for feed_id in before_by_id:
-        if feed_id in planned:
-            continue
-        before_metadata = before_by_id[feed_id].get("metadata", {})
+    for feed_id, before_feed in before_by_id.items():
+        before_metadata = before_feed.get("metadata", {})
         after_metadata = after_by_id[feed_id].get("metadata", {})
-        if before_metadata != after_metadata:
-            raise VerificationError(
-                f"feed {feed_id} metadata changed but had no planned change: "
-                f"before={before_metadata}, after={after_metadata}"
-            )
 
-    # Then check planned feeds
-    for feed_id in before_by_id:
         if feed_id not in planned:
+            if before_metadata != after_metadata:
+                raise VerificationError(
+                    f"feed {feed_id} metadata changed but had no planned change: "
+                    f"before={before_metadata}, after={after_metadata}"
+                )
             continue
-        before_metadata = before_by_id[feed_id].get("metadata", {})
-        after_metadata = after_by_id[feed_id].get("metadata", {})
+
         expected = dict(
             sorted({**before_metadata, "nasdaq_symbol": planned[feed_id]}.items())
         )
