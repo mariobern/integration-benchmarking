@@ -175,3 +175,84 @@ def verify_on_disk(path: Path, before_text: str, changes: list[Change]) -> None:
             f"feed count changed: {len(before_data['feeds'])} -> {len(after_data['feeds'])}"
         )
     verify_feed_metadata(before_data, after_data, changes)
+
+
+def print_report(changes: list[Change], skips: list[Skip]) -> None:
+    """Print the change table, skip list, and summary."""
+    if changes:
+        width = max(len(c.symbol) for c in changes)
+        print(f"\nChanges ({len(changes)}):")
+        for change in changes:
+            print(
+                f"  {change.feed_id:5d}  {change.symbol:<{width}}  "
+                f"nasdaq_symbol -> {change.name!r}"
+            )
+    if skips:
+        print(f"\nSkipped ({len(skips)}):")
+        for skip in skips:
+            print(f"  {skip.feed_id:5d}  {skip.symbol}  {skip.reason}")
+    print(f"\nSummary: {len(changes)} change(s), {len(skips)} skip(s).")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", type=Path, required=True, help="Path to the config")
+    parser.add_argument(
+        "--symbol-prefix",
+        action="append",
+        dest="symbol_prefixes",
+        help=(
+            "Symbol namespace to process; repeatable. Defaults to "
+            f"{', '.join(ASIAN_MARKET_PREFIXES)}"
+        ),
+    )
+    parser.add_argument("--apply", action="store_true", help="Write changes")
+    parser.add_argument("--no-backup", action="store_true", help="Skip the .bak copy")
+    args = parser.parse_args(argv)
+
+    prefixes = (
+        tuple(args.symbol_prefixes) if args.symbol_prefixes else ASIAN_MARKET_PREFIXES
+    )
+
+    if not args.config.exists():
+        print(f"ERROR: Config file not found: {args.config}", file=sys.stderr)
+        return 1
+
+    before_text = args.config.read_text(encoding="utf-8")
+    data = json.loads(before_text)
+    feeds = data["feeds"]
+    print(f"Reading {args.config} ({len(feeds)} feeds)...")
+
+    changes, skips = build_changes(feeds, prefixes)
+    print_report(changes, skips)
+
+    if not changes:
+        print("\nNo changes. Nothing to do.")
+        return 0
+
+    apply_changes(data, changes)
+    trailing = before_text[len(before_text.rstrip("\n")) :]
+    after_text = dump_config(data) + trailing
+
+    try:
+        verify_feed_metadata(json.loads(before_text), data, changes)
+    except VerificationError as exc:
+        print(f"\nERROR: verification failed: {exc}", file=sys.stderr)
+        return 1
+
+    if not args.apply:
+        print("\n[DRY RUN] No changes written. Re-run with --apply to write.")
+        return 0
+
+    write_config(args.config, after_text, backup=not args.no_backup)
+    try:
+        verify_on_disk(args.config, before_text, changes)
+    except VerificationError as exc:
+        print(f"\nERROR: post-write verification failed: {exc}", file=sys.stderr)
+        return 1
+    print(f"\nWrote {len(changes)} change(s) to {args.config}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -275,3 +275,96 @@ class TestVerifyOnDisk:
         path.write_text(dump_config(_config(_feed(feed_id=3520))), encoding="utf-8")
         with pytest.raises(VerificationError, match="feed count changed"):
             verify_on_disk(path, before_text, [])
+
+
+from add_nasdaq_symbol import main
+
+
+def _write_config(tmp_path, *feeds):
+    path = tmp_path / "cfg.json"
+    path.write_text(dump_config(_config(*feeds)), encoding="utf-8")
+    return path
+
+
+class TestMain:
+    def test_dry_run_writes_nothing(self, tmp_path, capsys):
+        path = _write_config(tmp_path, _feed(feed_id=3520))
+        original = path.read_text(encoding="utf-8")
+        assert main(["--config", str(path)]) == 0
+        assert path.read_text(encoding="utf-8") == original
+        assert not (tmp_path / "cfg.json.bak").exists()
+        assert "DRY RUN" in capsys.readouterr().out
+
+    def test_apply_writes_and_backs_up(self, tmp_path):
+        path = _write_config(tmp_path, _feed(feed_id=3520))
+        assert main(["--config", str(path), "--apply"]) == 0
+        written = json.loads(path.read_text(encoding="utf-8"))
+        assert written["feeds"][0]["metadata"]["nasdaq_symbol"] == "688825"
+        assert (tmp_path / "cfg.json.bak").exists()
+
+    def test_second_run_is_a_noop(self, tmp_path, capsys):
+        path = _write_config(tmp_path, _feed(feed_id=3520))
+        main(["--config", str(path), "--apply"])
+        capsys.readouterr()
+        assert main(["--config", str(path), "--apply"]) == 0
+        assert "No changes" in capsys.readouterr().out
+
+    def test_symbol_prefix_narrows_scope(self, tmp_path):
+        path = _write_config(
+            tmp_path,
+            _feed(feed_id=3520),
+            _feed(feed_id=884, symbol="Equity.HK.0002/HKD", name="0002"),
+        )
+        assert (
+            main(["--config", str(path), "--symbol-prefix", "Equity.HK.", "--apply"])
+            == 0
+        )
+        written = json.loads(path.read_text(encoding="utf-8"))
+        assert "nasdaq_symbol" not in written["feeds"][0]["metadata"]
+        assert written["feeds"][1]["metadata"]["nasdaq_symbol"] == "0002"
+
+    def test_missing_config_file_errors_cleanly(self, tmp_path, capsys):
+        missing = tmp_path / "nope.json"
+        assert main(["--config", str(missing)]) == 1
+        err = capsys.readouterr().err
+        assert "ERROR: Config file not found" in err
+        assert str(missing) in err
+
+    def test_no_backup_flag(self, tmp_path):
+        path = _write_config(tmp_path, _feed(feed_id=3520))
+        assert main(["--config", str(path), "--apply", "--no-backup"]) == 0
+        assert not (tmp_path / "cfg.json.bak").exists()
+
+    def test_skip_reasons_are_reported(self, tmp_path, capsys):
+        path = _write_config(
+            tmp_path,
+            _feed(feed_id=3520, name="ALREADY MULTI WORD"),
+        )
+        assert main(["--config", str(path)]) == 0
+        out = capsys.readouterr().out
+        assert "Skipped (1)" in out
+        assert "whitespace" in out
+
+    def test_pre_write_verification_failure_writes_nothing(self, tmp_path, monkeypatch):
+        path = _write_config(tmp_path, _feed(feed_id=3520))
+        original = path.read_text(encoding="utf-8")
+
+        def _boom(*args, **kwargs):
+            raise VerificationError("boom")
+
+        monkeypatch.setattr("add_nasdaq_symbol.verify_feed_metadata", _boom)
+        assert main(["--config", str(path), "--apply"]) == 1
+        assert path.read_text(encoding="utf-8") == original
+        assert not (tmp_path / "cfg.json.bak").exists()
+
+    def test_post_write_verification_failure_leaves_backup(self, tmp_path, monkeypatch):
+        path = _write_config(tmp_path, _feed(feed_id=3520))
+        original = path.read_text(encoding="utf-8")
+
+        def _boom(*args, **kwargs):
+            raise VerificationError("boom")
+
+        monkeypatch.setattr("add_nasdaq_symbol.verify_on_disk", _boom)
+        assert main(["--config", str(path), "--apply"]) == 1
+        assert (tmp_path / "cfg.json.bak").exists()
+        assert (tmp_path / "cfg.json.bak").read_text(encoding="utf-8") == original
