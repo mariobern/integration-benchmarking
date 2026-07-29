@@ -956,7 +956,7 @@ Modify `CLAUDE.md`: in the Scripts table, add a row directly after the
 `rename_numeric_feed_names.py` row:
 
 ```markdown
-| `add_nasdaq_symbol.py`                  | Backfill metadata.nasdaq_symbol = metadata.name for HK/CN/JP/KR/IN equity feeds (run before rename_numeric_feed_names.py)                                                                          | `python3 add_nasdaq_symbol.py --config lazer_jpkr.json --dry-run`                                     | [docs/add_nasdaq_symbol.md](docs/add_nasdaq_symbol.md)                          |
+| `add_nasdaq_symbol.py`                  | Backfill metadata.nasdaq_symbol = metadata.name for HK/CN/JP/KR/IN equity feeds (run before rename_numeric_feed_names.py)                                                                          | `python3 add_nasdaq_symbol.py --config lazer_jpkr.json`                                               | [docs/add_nasdaq_symbol.md](docs/add_nasdaq_symbol.md)                          |
 ````
 
 Match the existing table's column widths/padding style as closely as practical --
