@@ -31,12 +31,15 @@
 ### Task 1: Core filter/reshape functions
 
 **Files:**
+
 - Create: `lazer_dq/active_min_pub_to_audit.py`
 - Test: `lazer_dq/tests/test_active_min_pub_to_audit.py`
 
 **Interfaces:**
+
 - Consumes: nothing (first task).
 - Produces (used by Task 2):
+
   - `FLAGGED_COLUMNS: list[str]` — `["feed_id", "symbol", "session", "classification", "source_verdict", "asset_type", "effective_min_pub", "pct_below_par", "pct_at_par", "pct_at_floor", "pct_at_floor_1", "min", "median", "n_updates"]`
   - `EXCLUDED_COLUMNS: list[str]` — `["feed_id", "symbol", "session", "source_verdict", "effective_min_pub", "pct_at_floor", "reason"]`
   - `target_verdicts(include_warn: bool) -> frozenset[str]`
@@ -378,10 +381,12 @@ EOF
 ### Task 2: CLI wiring (`main`) + integration tests
 
 **Files:**
+
 - Modify: `lazer_dq/active_min_pub_to_audit.py`
 - Test: `lazer_dq/tests/test_active_min_pub_to_audit.py`
 
 **Interfaces:**
+
 - Consumes: everything produced in Task 1 (`FLAGGED_COLUMNS`, `EXCLUDED_COLUMNS`, `target_verdicts`, `bucket_for_row`, `to_flagged_row`, `to_excluded_row`, `parse_window_from_filename`, `parse_args`).
 - Produces: `main(argv=None) -> int` — reads `args.active_min_pub_csv`, writes `<output_dir>/active_min_pub_flagged_<stamp>.csv` and `<output_dir>/active_min_pub_excluded_<stamp>.csv`, prints the console summary, returns `0` on success or `1` if the input filename can't be parsed.
 
@@ -677,20 +682,22 @@ Expected: all tests PASS; pre-commit hooks clean (or auto-fixed — re-run once 
 - [ ] **Step 6: Manual smoke test against real data**
 
 Run:
+
 ```bash
 python3 -m lazer_dq.active_min_pub_to_audit \
     --active-min-pub-csv output_csv/active_min_pub_2026-07-14_2026-07-18.csv \
     --output-dir /tmp/active_min_pub_to_audit_smoke
 ```
+
 Expected: console prints a verdict tally matching the earlier-observed `2360 OK, 144 CRITICAL, 32 WARN, 18 NO_DATA` (this file predates the BREACH split, so all 144 CRITICAL rows are evaluated as CRITICAL, none as BREACH — the summary won't show a `BREACH` line), followed by `Flagged 86 feed-sessions`, `Excluded 58 feed-sessions`, and `Skipped 32 WARN rows` — verified directly against this file by filtering it with pandas/csv by hand before writing this plan: of the 144 `CRITICAL` rows, 86 have `effective_min_pub >= 2` and 58 have `effective_min_pub == 1`.
 
 Note this 86/58 split is **not** the same as the 34/52 split quoted earlier in
 `docs/superpowers/specs/2026-07-29-active-min-pub-to-audit-design.md` — that
 34/52 came from the hand-curated `active_min_pub_CRITICAL_2026-07-22.csv`
-snapshot, a *different* underlying run/window than this 07-14→07-18 file (86
+snapshot, a _different_ underlying run/window than this 07-14→07-18 file (86
 CRITICAL keys of overlap out of 144 vs. 87 total curated rows — confirmed not
-identical). The 34/52 numbers validate the *rule*; this step validates the
-*tool* against whichever file is actually fed to it, so the two won't match and
+identical). The 34/52 numbers validate the _rule_; this step validates the
+_tool_ against whichever file is actually fed to it, so the two won't match and
 that's expected, not a bug.
 
 Inspect `/tmp/active_min_pub_to_audit_smoke/active_min_pub_flagged_2026-07-14_2026-07-18.csv`
@@ -722,10 +729,12 @@ EOF
 ### Task 3: Documentation
 
 **Files:**
+
 - Create: `docs/active_min_pub_to_audit.md`
 - Modify: `CLAUDE.md`
 
 **Interfaces:**
+
 - Consumes: the finished CLI from Task 2 (`--active-min-pub-csv`, `--min-pub-floor`, `--include-warn`, `--output-dir`; output filenames `active_min_pub_flagged_<stamp>.csv` / `active_min_pub_excluded_<stamp>.csv`).
 - Produces: nothing consumed by later tasks — this is the last task.
 
@@ -744,7 +753,7 @@ themselves.
 
 A feed-session's `active_min_pub` verdict (`BREACH` or `CRITICAL`) says the
 aggregate is running at or below its `minPublishers` floor. Whether that's
-*fixable* by qualifying a new publisher depends on whether a second publisher
+_fixable_ by qualifying a new publisher depends on whether a second publisher
 could plausibly exist: feed-sessions with `effective_min_pub == 1` (internal
 `Pyth.*`/`Custom.*` feeds, interest-rates, some thin futures) are structurally
 single-source — there is no second candidate for Stage 2 to find. This rule was

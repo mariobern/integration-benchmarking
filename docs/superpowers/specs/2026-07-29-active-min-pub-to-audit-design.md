@@ -7,7 +7,7 @@
 ## Background & Motivation
 
 `lazer_dq/active_min_pub.py` (shipped 2026-07-23) measures how often each STABLE
-feed-session's *aggregate* `publisher_count` scrapes or breaches its `minPublishers`
+feed-session's _aggregate_ `publisher_count` scrapes or breaches its `minPublishers`
 floor. Its design spec explicitly left one question open:
 
 > Whether to later feed CRITICAL feed-sessions into the existing Stage 2/3
@@ -42,8 +42,8 @@ Note for whoever runs this: cross-referencing ad-hoc Stage 2/3 batch directories
 under `output_csv/` (`bucketA`, `pub20_severe`, `pub41_severe`, `pub19_severe`,
 `pub71_7day`) — leftovers from the 2026-07-22 dominance de-risk work — shows about
 12 of the 34 feed-sessions already have a Stage-2 "no qualifying candidate found"
-result in `bucketA/flagged_feeds.csv`, and 2 (`Equity.US.CELH/USD` OVER_NIGHT,
-`Equity.US.QUBT/USD` OVER_NIGHT) already had a candidate *selected* there. Whether
+result in `bucketA/flagged_feeds.csv`, and 2 (`Equity.US.CELH/USD` OVER*NIGHT,
+`Equity.US.QUBT/USD` OVER_NIGHT) already had a candidate \_selected* there. Whether
 that selection was ever applied to a live config was not confirmed. This isn't a
 blocker — Stage 2/3 is idempotent and config-driven, so a fresh run naturally
 reflects whatever the current config already has — but it's worth a quick check
@@ -52,8 +52,8 @@ before assuming all 34 are still fully open.
 **Addendum (found while writing the implementation plan):** `active_min_pub.py`
 has since been extended (commit `98e6b55`, already merged, unrelated to this
 design) to split what used to be a single `CRITICAL` verdict into two tiers:
-`BREACH` (aggregate `publisher_count` actually falls *below* `minPublishers` —
-a real floor violation) and a narrower `CRITICAL` (sits *at* the floor but never
+`BREACH` (aggregate `publisher_count` actually falls _below_ `minPublishers` —
+a real floor violation) and a narrower `CRITICAL` (sits _at_ the floor but never
 below it). The CSVs analyzed above predate this split (no `BREACH` rows, no
 `pct_below_par`/`pct_at_par` columns), so the `min_pub >= 2` rule itself is
 unaffected by the split — but the filter this adapter applies must now target
