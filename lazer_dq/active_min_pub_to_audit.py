@@ -77,9 +77,6 @@ def to_flagged_row(row: dict) -> dict:
     classification collapses BREACH and CRITICAL to the literal "CRITICAL" that
     qualify_candidates.py expects; the original verdict survives in
     source_verdict for human traceability.
-
-    Handles both old and new active_min_pub.py outputs: pct_below_par and pct_at_par
-    are optional (may not exist in older runs), filled with empty strings if missing.
     """
     classification = "WARN" if row["verdict"] == "WARN" else "CRITICAL"
     return {
@@ -90,8 +87,8 @@ def to_flagged_row(row: dict) -> dict:
         "source_verdict": row["verdict"],
         "asset_type": row["asset_type"],
         "effective_min_pub": row["effective_min_pub"],
-        "pct_below_par": row.get("pct_below_par", ""),
-        "pct_at_par": row.get("pct_at_par", ""),
+        "pct_below_par": row["pct_below_par"],
+        "pct_at_par": row["pct_at_par"],
         "pct_at_floor": row["pct_at_floor"],
         "pct_at_floor_1": row["pct_at_floor_1"],
         "min": row["min"],
