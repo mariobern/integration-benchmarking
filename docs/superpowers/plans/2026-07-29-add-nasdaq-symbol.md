@@ -6,7 +6,7 @@
 
 **Architecture:** One standalone script, `add_nasdaq_symbol.py`, mirroring the existing `rename_numeric_feed_names.py` conventions: dry-run by default, `--apply` to write, `.bak` backup, JSON-aware before/after verification. Reuses `in_scope`, `dump_config`, and `write_config` from `rename_numeric_feed_names.py` rather than re-implementing them.
 
-**Tech Stack:** Python 3 standard library only (`argparse`, `json`, `re`, `dataclasses`, `pathlib`) — no new dependencies.
+**Tech Stack:** Python 3 standard library only (`argparse`, `json`, `dataclasses`, `pathlib`) — no new dependencies.
 
 ## Global Constraints
 
@@ -14,7 +14,7 @@
 - Default symbol prefixes: `Equity.HK.`, `Equity.CN.`, `Equity.JP.`, `Equity.KR.`, `Equity.IN.` (a new tuple, distinct from `rename_numeric_feed_names.MARKET_PREFIXES`, which excludes IN).
 - Copy is verbatim — no transformation of the value.
 - Skip (never overwrite) a feed that already has `metadata.nasdaq_symbol` set — idempotent re-run.
-- Skip (don't guess) a feed whose `metadata.name` contains whitespace — treat as already-renamed, report it, don't touch it.
+- Skip (don't guess) a feed whose `metadata.name` does not match the exchange code embedded in `symbol` — that code segment is never touched by `rename_numeric_feed_names.py`, so a mismatch means the feed has already been renamed; report it, don't touch it.
 - `metadata` dict keys are rebuilt in alphabetical order whenever `nasdaq_symbol` is added, matching the existing convention observed on US-equity feeds and every other metadata dict in the config.
 - Dry run is the default for `--apply`-gated scripts in this repo; never write without `--apply`.
 - Per CLAUDE.md, the repo-root `pytest -q` fails on a pre-existing conftest clash — this suite is always run standalone: `pytest tests/test_add_nasdaq_symbol.py -v`.
@@ -131,12 +131,20 @@ class TestPlanChange:
     def test_name_with_space_is_skipped(self):
         change, skip = plan_change(_feed(name="CHANGXIN MEMORY TECHNOLOGIES"))
         assert change is None
-        assert "whitespace" in skip.reason
+        assert "does not match symbol code" in skip.reason
 
     def test_name_with_internal_space_is_skipped(self):
         change, skip = plan_change(_feed(name="GIGADEVICE SEMICONDUCTOR INC (CN)"))
         assert change is None
-        assert "whitespace" in skip.reason
+        assert "does not match symbol code" in skip.reason
+
+    def test_single_word_display_name_is_still_skipped(self):
+        # Regression: a whitespace-only check would wrongly accept this.
+        change, skip = plan_change(
+            _feed(symbol="Equity.JP.6501/JPY", name="HITACHI")
+        )
+        assert change is None
+        assert "does not match symbol code" in skip.reason
 
 
 class TestBuildChanges:
@@ -204,7 +212,6 @@ See docs/superpowers/specs/2026-07-29-add-nasdaq-symbol-design.md.
 
 import argparse
 import json
-import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -219,7 +226,17 @@ ASIAN_MARKET_PREFIXES = (
     "Equity.IN.",
 )
 
-_WHITESPACE_RE = re.compile(r"\s")
+
+def _symbol_code(symbol: str) -> str:
+    """Extract the exchange code/ticker segment from `symbol`.
+
+    E.g. 'Equity.HK.0002/HKD' -> '0002', 'Equity.JP.1321-JP/JPY' -> '1321-JP'.
+    This segment is never touched by rename_numeric_feed_names.py, unlike
+    metadata.name, so comparing against it is an exact check for whether a
+    feed has already been renamed -- not a heuristic.
+    """
+    root = symbol.split("/", 1)[0]
+    return root.rsplit(".", 1)[-1]
 
 
 @dataclass(frozen=True)
@@ -244,11 +261,12 @@ def plan_change(feed: dict) -> tuple[Change | None, Skip | None]:
     """Decide what to do with one in-scope feed.
 
     Skips (never overwrites) a feed that already has `nasdaq_symbol` set, so
-    a second run is a no-op. Skips a feed whose `metadata.name` contains
-    whitespace, since every real exchange code/ticker observed in this
-    config is a single whitespace-free token, while every name
-    `rename_numeric_feed_names.py` produces is a multi-word company name --
-    this catches the hazard of running against an already-renamed config.
+    a second run is a no-op. Compares metadata.name against the code embedded
+    in symbol, which rename_numeric_feed_names.py never touches -- an exact
+    check for whether this feed has already been renamed, rather than a
+    heuristic. A mismatch (not just a name containing whitespace) triggers
+    the skip, since some already-renamed display names are a single word
+    (e.g. `HITACHI`, `CNOOC`) and would slip past a whitespace-only check.
     """
     feed_id = feed["feedId"]
     symbol = feed.get("symbol", "")
@@ -257,15 +275,16 @@ def plan_change(feed: dict) -> tuple[Change | None, Skip | None]:
     if "nasdaq_symbol" in metadata:
         return None, Skip(feed_id, symbol, "nasdaq_symbol already set")
 
-    name = str(metadata.get("name", ""))
+    name = str(metadata.get("name") or "")
     if not name:
         return None, Skip(feed_id, symbol, "metadata.name is empty")
 
-    if _WHITESPACE_RE.search(name):
+    code = _symbol_code(symbol)
+    if name != code:
         return None, Skip(
             feed_id,
             symbol,
-            "metadata.name looks like a display name, not a code (contains whitespace)",
+            f"metadata.name {name!r} does not match symbol code {code!r} (already renamed?)",
         )
 
     return Change(feed_id, symbol, name), None
@@ -481,7 +500,8 @@ class TestVerifyFeedMetadata:
             _feed(feed_id=884, symbol="Equity.HK.0002/HKD", name="0002"),
         )
         after_data = _config(
-            _feed(feed_id=3520),
+            # feed 3520 correctly matches the plan, so it isn't what trips the check.
+            _feed(feed_id=3520, nasdaq_symbol="688825"),
             _feed(
                 feed_id=884,
                 symbol="Equity.HK.0002/HKD",
@@ -689,7 +709,7 @@ class TestMain:
         assert main(["--config", str(path)]) == 0
         out = capsys.readouterr().out
         assert "Skipped (1)" in out
-        assert "whitespace" in out
+        assert "does not match symbol code" in out
 
     def test_pre_write_verification_failure_writes_nothing(self, tmp_path, monkeypatch):
         path = _write_config(tmp_path, _feed(feed_id=3520))
@@ -919,10 +939,14 @@ For every in-scope feed:
 
 - **Already has `nasdaq_symbol`:** skipped, reported -- makes a second run a no-op.
 - **`metadata.name` is empty:** skipped, reported -- nothing to copy.
-- **`metadata.name` contains whitespace:** skipped, reported. Every real exchange
-  code/ticker in scope is a single whitespace-free token; a name with a space has
-  already been through `rename_numeric_feed_names.py` and copying it into
-  `nasdaq_symbol` would put a display name where the exchange code belongs.
+- **`metadata.name` does not match the code embedded in `symbol`:** skipped, reported.
+  `rename_numeric_feed_names.py` never touches `symbol`, so the code segment embedded
+  in it (e.g. `0002` in `Equity.HK.0002/HKD`) is an exact fingerprint of the
+  not-yet-renamed state. A mismatch means the feed has already been through
+  `rename_numeric_feed_names.py` and copying `metadata.name` into `nasdaq_symbol` would
+  put a display name where the exchange code belongs -- this is an exact check, not a
+  whitespace heuristic, since some renamed display names are a single word (e.g.
+  `HITACHI`, `CNOOC`) and would slip past a whitespace-only check.
 - **Otherwise:** `metadata.nasdaq_symbol` is set to `metadata.name`, verbatim.
 
 `metadata` dict keys are rebuilt in alphabetical order whenever `nasdaq_symbol` is
@@ -955,7 +979,7 @@ Modify `CLAUDE.md`: in the Scripts table, add a row directly after the
 `rename_numeric_feed_names.py` row:
 
 ```markdown
-| `add_nasdaq_symbol.py`                  | Backfill metadata.nasdaq_symbol = metadata.name for HK/CN/JP/KR/IN equity feeds (run before rename_numeric_feed_names.py)                                                                          | `python3 add_nasdaq_symbol.py --config lazer_jpkr.json --dry-run`                                     | [docs/add_nasdaq_symbol.md](docs/add_nasdaq_symbol.md)                          |
+| `add_nasdaq_symbol.py`                  | Backfill metadata.nasdaq_symbol = metadata.name for HK/CN/JP/KR/IN equity feeds (run before rename_numeric_feed_names.py)                                                                          | `python3 add_nasdaq_symbol.py --config lazer_jpkr.json`                                               | [docs/add_nasdaq_symbol.md](docs/add_nasdaq_symbol.md)                          |
 ````
 
 Match the existing table's column widths/padding style as closely as practical --
