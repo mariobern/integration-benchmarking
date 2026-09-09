@@ -1028,7 +1028,7 @@ def main():
         if not pd.isna(exponent):
             # Convert price using exponent
             # If exponent is -5, divide by 10^5 (100000)
-            divisor = 10 ** abs(exponent)
+            divisor = 10 ** int(abs(exponent))
             df_publisher_data["publisher_price"] = (
                 df_publisher_data["publisher_price"] / divisor
             )
@@ -1097,7 +1097,7 @@ def main():
             # Adjust price using exponent
             exponent = df_feed_metadata["exponent"].iloc[0]
             if not pd.isna(exponent):
-                divisor = 10 ** abs(exponent)
+                divisor = 10 ** int(abs(exponent))
                 df_feed_data["publisher_price"] = (
                     df_feed_data["publisher_price"] / divisor
                 )
@@ -1184,9 +1184,13 @@ def main():
                 AND qualifiers NOT LIKE '%DAP[IRGCOND]%'
                 AND qualifiers NOT LIKE '%102[ODDSALCOND]%'
                 AND qualifiers NOT LIKE '%101[IRGSALCOND]%'
+                AND qualifiers NOT LIKE '%TW[IRGSALCOND]%'
                 AND qualifiers NOT LIKE '%141[IRGCOND]%'
                 AND qualifiers NOT LIKE '%2835[IRGCOND]%'
                 AND qualifiers NOT LIKE '%4575[IRGCOND]%'
+                AND qualifiers NOT LIKE '%4235[IRGCOND]%'
+                AND qualifiers NOT LIKE '%955[IRGCOND]%'
+                AND qualifiers NOT LIKE '%Odd Lot Trade[USER]%'
                 AND NOT match(qualifiers, 'PD_[A-Za-z0-9_]*')
                 )
                 )

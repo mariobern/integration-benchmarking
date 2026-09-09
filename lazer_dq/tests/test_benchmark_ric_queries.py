@@ -173,6 +173,26 @@ def test_equities_new_qualifier_filters_present(engine, monkeypatch, tmp_path):
         assert "'%4575[IRGCOND]%'" in sql
 
 
+def test_equities_research_parity_qualifier_filters_present(
+    engine, monkeypatch, tmp_path
+):
+    # Research PRs #294/#295/#300/#305 added four more exclusions to the shared
+    # equities branch; they must appear for every equities mode.
+    for mode in (
+        "us-equities",
+        "hk-equities",
+        "jp-equities",
+        "kr-equities",
+        "in-equities",
+    ):
+        sql_log, _ = _run_and_capture(engine, monkeypatch, tmp_path, mode)
+        sql = _benchmark_sql(sql_log)
+        assert "'%4235[IRGCOND]%'" in sql
+        assert "'%955[IRGCOND]%'" in sql
+        assert "'%TW[IRGSALCOND]%'" in sql
+        assert "'%Odd Lot Trade[USER]%'" in sql
+
+
 def test_treasuries_price_selects_price(engine, monkeypatch, tmp_path):
     sql_log, _ = _run_and_capture(engine, monkeypatch, tmp_path, "us-treasuries-price")
     sql = _benchmark_sql(sql_log)
