@@ -34,7 +34,7 @@ unchanged in content.
   - Set `Notes` (col D) to
     `excluded — see missing_us_equities_post_2026-07-27.csv`, overwriting
     whatever was there before (including existing top-up notes and `mode
-    missing for 2026-07-28` notes — both get the same treatment so the sheet
+missing for 2026-07-28` notes — both get the same treatment so the sheet
     reads uniformly across all 29 feeds).
 - Write the result to a new file,
   `dq_summary_lazer-prod_2026-07-28_post-excluded.xlsx`, in the repo root.

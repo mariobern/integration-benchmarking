@@ -24,12 +24,14 @@
 ### Task 1: Write and test the exclusion function
 
 **Files:**
+
 - Create: `<scratchpad>/exclude_post_market.py`
 - Test: `<scratchpad>/test_exclude_post_market.py`
 
 (`<scratchpad>` = `/private/tmp/claude-501/-Users-mariobernardi-Documents-GitHub-integration-benchmarking/0a51616a-5baf-44ff-b36b-c60f2e65dd7c/scratchpad`)
 
 **Interfaces:**
+
 - Produces: `load_feed_ids(csv_path: str) -> set[int]` — reads a CSV with header row `feed_id` and one integer per subsequent row, returns the set of ints.
 - Produces: `exclude_post_market(input_path: str, feed_ids: set[int], output_path: str) -> int` — loads `input_path`, rewrites the `allowed` sheet's `POST_MARKET` rows for `feed_ids`, saves to `output_path`, returns the count of rows modified. Task 2 calls both of these directly.
 
@@ -200,12 +202,14 @@ No commit for this step — scratch script only, per Global Constraints.
 ### Task 2: Run against the real files and verify the deliverable
 
 **Files:**
+
 - Modify: `<scratchpad>/exclude_post_market.py` (add a `if __name__ == "__main__":` driver block)
 - Read: `/Users/mariobernardi/Documents/GitHub/integration-benchmarking/dq_summary_lazer-prod_2026-07-28.xlsx`
 - Read: `/Users/mariobernardi/Documents/GitHub/integration-benchmarking/missing_us_equities_post_2026-07-27.csv`
 - Create: `/Users/mariobernardi/Documents/GitHub/integration-benchmarking/dq_summary_lazer-prod_2026-07-28_post-excluded.xlsx`
 
 **Interfaces:**
+
 - Consumes: `load_feed_ids` and `exclude_post_market` from Task 1, unchanged signatures.
 
 - [ ] **Step 1: Add the driver block**
@@ -233,6 +237,7 @@ Expected output: `feed_ids loaded: 29` and `POST_MARKET rows excluded: 29` (all 
 - [ ] **Step 3: Verify row count is unchanged**
 
 Run:
+
 ```bash
 source /Users/mariobernardi/Documents/GitHub/integration-benchmarking/venv/bin/activate
 python3 -c "
@@ -246,11 +251,13 @@ assert len(rows_a) == len(rows_b), (len(rows_a), len(rows_b))
 print('row count OK:', len(rows_a))
 "
 ```
+
 Expected: `row count OK: <same number as original, no exception>`
 
 - [ ] **Step 4: Verify only the 29 target POST_MARKET rows changed, everything else identical**
 
 Run:
+
 ```bash
 source /Users/mariobernardi/Documents/GitHub/integration-benchmarking/venv/bin/activate
 python3 -c "
@@ -292,11 +299,13 @@ for feed_id, a, b in diffs:
 print('all diffs are exactly the 29 target POST_MARKET rows, correctly rewritten')
 "
 ```
+
 Expected: `total diffs: 29`, `unexpected diffs: 0`, no `AssertionError`, final line prints.
 
 - [ ] **Step 5: Verify the rankings sheet is untouched**
 
 Run:
+
 ```bash
 source /Users/mariobernardi/Documents/GitHub/integration-benchmarking/venv/bin/activate
 python3 -c "
@@ -310,6 +319,7 @@ assert rows_a == rows_b
 print('rankings sheet identical:', len(rows_a), 'rows')
 "
 ```
+
 Expected: `rankings sheet identical: 705 rows` (no exception).
 
 - [ ] **Step 6: Report the deliverable to the user**

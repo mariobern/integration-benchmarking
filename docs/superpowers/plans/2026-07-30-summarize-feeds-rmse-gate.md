@@ -21,10 +21,12 @@
 ### Task 1: `apply_filter()` raw-rmse passer gate
 
 **Files:**
+
 - Modify: `lazer_dq/summarize_feeds.py:222-273` (the `apply_filter` function)
 - Test: `lazer_dq/tests/test_summarize_feeds.py:164-171` (the `_stat` helper) and `:227-341` (the `apply_filter` test block)
 
 **Interfaces:**
+
 - Consumes: nothing new — reads the existing `r["rmse"]` key already present in every real `stats.csv` row (see `STATS_HEADER` at `lazer_dq/tests/test_summarize_feeds.py:110-114`: `...,rmse,nrmse,rmse_over_spread,...`).
 - Produces: `apply_filter(stats, max_ros, min_hit, min_obs, floor, ceiling_mult, max_rmse=None)` — same 3-tuple return `(selected, n_passed, n_topup)` as before. `max_rmse` is keyword-only in practice (always passed by name from Task 2 onward); existing positional callers are unaffected since it has a default.
 
@@ -269,11 +271,13 @@ git commit -m "feat: add optional max_rmse passer gate to apply_filter"
 ### Task 2: Thread `--max-rmse-*` CLI flags through `main()` and `_build_per_feed_data()`
 
 **Files:**
+
 - Modify: `lazer_dq/summarize_feeds.py:559-653` (`_build_per_feed_data`)
 - Modify: `lazer_dq/summarize_feeds.py:656-904` (`main`)
 - Test: `lazer_dq/tests/test_summarize_feeds.py` (extend the `_build_per_feed_data` and `main` test blocks)
 
 **Interfaces:**
+
 - Consumes: `apply_filter(..., max_rmse=None)` from Task 1 (exact signature above).
 - Produces: `_build_per_feed_data(..., max_rmse_map=None)` — new keyword-only parameter, a `dict[str, float | None]` keyed by mode name (same keying as `max_ros_map`/`min_hit_map`). `main()` builds this dict and passes it through. CLI flags: `--max-rmse-regular`, `--max-rmse-pre`, `--max-rmse-post`, `--max-rmse-overnight` (all `type=float`, `default=None`).
 
@@ -691,9 +695,11 @@ git commit -m "feat: add --max-rmse-* CLI flags to summarize_feeds.py"
 ### Task 3: Document the new flags
 
 **Files:**
+
 - Modify: `docs/summarize_feeds.md`
 
 **Interfaces:**
+
 - Consumes: the finished `--max-rmse-regular/-pre/-post/-overnight` flags and gating semantics from Task 2 (final behavior, not new code).
 - Produces: nothing consumed by later tasks — this is the last task.
 
@@ -702,21 +708,21 @@ git commit -m "feat: add --max-rmse-* CLI flags to summarize_feeds.py"
 In `docs/summarize_feeds.md`, find this row (in the Arguments table):
 
 ```markdown
-| `--max-rmse-over-spread-overnight` | RMSE/spread ceiling for `us-equities-overnight`                                                                         | `3.0`                              |
-| `--min-hit-rate-overnight`         | Hit-rate floor (%) for `us-equities-overnight`                                                                          | `25.0`                             |
-| `--min-n-observations`             | Minimum sample size to consider a publisher                                                                             | `1000`                             |
+| `--max-rmse-over-spread-overnight` | RMSE/spread ceiling for `us-equities-overnight` | `3.0` |
+| `--min-hit-rate-overnight` | Hit-rate floor (%) for `us-equities-overnight` | `25.0` |
+| `--min-n-observations` | Minimum sample size to consider a publisher | `1000` |
 ```
 
 Replace it with (adding 4 rows before `--min-n-observations`):
 
 ```markdown
-| `--max-rmse-over-spread-overnight` | RMSE/spread ceiling for `us-equities-overnight`                                                                         | `3.0`                              |
-| `--min-hit-rate-overnight`         | Hit-rate floor (%) for `us-equities-overnight`                                                                          | `25.0`                             |
-| `--max-rmse-regular`               | Optional raw-rmse ceiling for `us-equities` passers (disabled unless set)                                              | none (off)                         |
-| `--max-rmse-pre`                   | Optional raw-rmse ceiling for `us-equities-pre` passers (disabled unless set)                                          | none (off)                         |
-| `--max-rmse-post`                  | Optional raw-rmse ceiling for `us-equities-post` passers (disabled unless set)                                         | none (off)                         |
-| `--max-rmse-overnight`             | Optional raw-rmse ceiling for `us-equities-overnight` passers (disabled unless set)                                    | none (off)                         |
-| `--min-n-observations`             | Minimum sample size to consider a publisher                                                                             | `1000`                             |
+| `--max-rmse-over-spread-overnight` | RMSE/spread ceiling for `us-equities-overnight` | `3.0` |
+| `--min-hit-rate-overnight` | Hit-rate floor (%) for `us-equities-overnight` | `25.0` |
+| `--max-rmse-regular` | Optional raw-rmse ceiling for `us-equities` passers (disabled unless set) | none (off) |
+| `--max-rmse-pre` | Optional raw-rmse ceiling for `us-equities-pre` passers (disabled unless set) | none (off) |
+| `--max-rmse-post` | Optional raw-rmse ceiling for `us-equities-post` passers (disabled unless set) | none (off) |
+| `--max-rmse-overnight` | Optional raw-rmse ceiling for `us-equities-overnight` passers (disabled unless set) | none (off) |
+| `--min-n-observations` | Minimum sample size to consider a publisher | `1000` |
 ```
 
 - [ ] **Step 2: Extend the "Ranking & Filtering" passer bullet**
@@ -724,14 +730,14 @@ Replace it with (adding 4 rows before `--min-n-observations`):
 Find this bullet in the "Ranking & Filtering" section:
 
 ```markdown
-   - **Passers** = publishers meeting all three thresholds — `rmse_over_spread`, `hit_rate`, and `n_observations ≥ --min-n-observations` — sorted ascending by `rmse_over_spread`.
+- **Passers** = publishers meeting all three thresholds — `rmse_over_spread`, `hit_rate`, and `n_observations ≥ --min-n-observations` — sorted ascending by `rmse_over_spread`.
 ```
 
 Replace with:
 
 ```markdown
-   - **Passers** = publishers meeting all thresholds — `rmse_over_spread`, `hit_rate`, `n_observations ≥ --min-n-observations`, and (when `--max-rmse-*` is set for the mode) raw `rmse ≤ --max-rmse-<mode>` — sorted ascending by `rmse_over_spread`.
-   - `--max-rmse-*` is `us-equities`-only and off by default. Like `hit_rate`, it gates passers only — top-ups are never rmse-gated, only capped by the existing `rmse_over_spread` ceiling (`--topup-ceiling-mult`).
+- **Passers** = publishers meeting all thresholds — `rmse_over_spread`, `hit_rate`, `n_observations ≥ --min-n-observations`, and (when `--max-rmse-*` is set for the mode) raw `rmse ≤ --max-rmse-<mode>` — sorted ascending by `rmse_over_spread`.
+- `--max-rmse-*` is `us-equities`-only and off by default. Like `hit_rate`, it gates passers only — top-ups are never rmse-gated, only capped by the existing `rmse_over_spread` ceiling (`--topup-ceiling-mult`).
 ```
 
 - [ ] **Step 3: Add a usage example**
@@ -740,20 +746,22 @@ Find the "Override per-mode thresholds" example block:
 
 ```markdown
 # Override per-mode thresholds
+
 python -m lazer_dq.summarize_feeds \
-    --csv feeds.csv --cluster lazer-prod --date 2026-05-06 \
-    --max-rmse-over-spread-regular 0.8 --min-hit-rate-regular 85.0 \
-    --max-rmse-over-spread-pre 1.5 --min-hit-rate-pre 60.0
+ --csv feeds.csv --cluster lazer-prod --date 2026-05-06 \
+ --max-rmse-over-spread-regular 0.8 --min-hit-rate-regular 85.0 \
+ --max-rmse-over-spread-pre 1.5 --min-hit-rate-pre 60.0
 ```
 
 Add a new example directly after it (before the "Override ranking knobs" block):
 
-````markdown
+```markdown
 # Also gate REGULAR-session passers by raw rmse (off by default)
+
 python -m lazer_dq.summarize_feeds \
-    --csv feeds.csv --cluster lazer-prod --date 2026-05-06 \
-    --max-rmse-regular 0.05
-````
+ --csv feeds.csv --cluster lazer-prod --date 2026-05-06 \
+ --max-rmse-regular 0.05
+```
 
 - [ ] **Step 4: Proofread the diff**
 
