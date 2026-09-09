@@ -27,7 +27,8 @@ python -m lazer_dq.summarize_feeds \
     --reports-dir dq_reports --publishers-md publishers.md \
     --output dq_summary_pre.xlsx
 
-# HK equities (1 mode); see Asset Classes & Modes below
+# Single-market foreign equities (1 mode each) — same shape for
+# hk/jp/kr/tw; see Asset Classes & Modes below
 python -m lazer_dq.summarize_feeds \
     --csv equity_hk_feed_ids.csv --asset-class hk-equities \
     --cluster lazer-prod --date 2026-05-19
@@ -113,16 +114,21 @@ Malformed rows are skipped silently.
 | `us-equities-post`      | POST_MARKET |
 | `us-equities-overnight` | OVER_NIGHT  |
 
-**`hk-equities`** — 1 mode, 6-column rankings layout:
+**Single-market foreign equities** — 1 mode each, 6-column rankings layout:
 
-| Mode          | Session |
-| ------------- | ------- |
-| `hk-equities` | REGULAR |
+| Asset class   | Mode          | Session | Market    |
+| ------------- | ------------- | ------- | --------- |
+| `hk-equities` | `hk-equities` | REGULAR | Hong Kong |
+| `jp-equities` | `jp-equities` | REGULAR | Japan     |
+| `kr-equities` | `kr-equities` | REGULAR | Korea     |
+| `tw-equities` | `tw-equities` | REGULAR | Taiwan    |
+
+Per-market trading windows are in [evaluate_feeds_bulk.md](evaluate_feeds_bulk.md); `summarize_feeds` only reads the `dq_reports/<cluster>/<mode>/` directories those runs produce.
 
 Notes:
 
 - The CSV's column-3 mode must be one of the selected asset class's modes, or the run exits with a clear error.
-- The per-mode threshold flags (`--max-rmse-over-spread-*`, `--min-hit-rate-*`) apply only to `us-equities`. Other asset classes use the registry defaults — `hk-equities` REGULAR uses `max rmse_over_spread 1.0` and `min hit_rate 80%`.
+- The per-mode threshold flags (`--max-rmse-over-spread-*`, `--min-hit-rate-*`) apply only to `us-equities`. Other asset classes use the registry defaults — every single-mode foreign-equities class uses `max rmse_over_spread 1.0` and `min hit_rate 80%` on its REGULAR session.
 
 ## Ranking & Filtering
 
