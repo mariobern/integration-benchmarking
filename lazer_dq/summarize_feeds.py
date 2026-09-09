@@ -11,6 +11,7 @@ Per-asset-class layout. Pick the asset class with --asset-class:
   jp-equities           — 1 mode:  regular (6-col layout)
   kr-equities           — 1 mode:  regular (6-col layout)
   in-equities           — 1 mode:  regular (6-col layout)
+  tw-equities           — 1 mode:  regular (6-col layout)
 
 Adding a new asset class = adding one entry to ASSET_CLASS_CONFIG.
 
@@ -83,6 +84,12 @@ ASSET_CLASS_CONFIG: dict = {
         "sessions": {"in-equities": "REGULAR"},
         "default_max_ros": {"in-equities": 1.0},
         "default_min_hit": {"in-equities": 80.0},
+    },
+    "tw-equities": {
+        "modes": ["tw-equities"],
+        "sessions": {"tw-equities": "REGULAR"},
+        "default_max_ros": {"tw-equities": 1.0},
+        "default_min_hit": {"tw-equities": 80.0},
     },
 }
 

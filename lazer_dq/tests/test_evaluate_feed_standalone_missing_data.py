@@ -114,6 +114,7 @@ def patched_engine(monkeypatch, tmp_path):
         ("us-equities-post", "20:30:00", "21:30:00"),
         ("us-equities-overnight", "00:00:00", "01:00:00"),
         ("hk-equities", "01:30:00", "02:30:00"),
+        ("tw-equities", "01:00:00", "02:00:00"),
     ],
 )
 def test_empty_benchmark_exits_2_with_diagnostic(

@@ -85,6 +85,22 @@ def test_time_computation_hk_equities_winter():
     )
 
 
+def test_time_computation_tw_equities():
+    # Taipei is fixed UTC+8 year-round (no DST): 09:00 -> 01:00 UTC, 10:00 -> 02:00 UTC.
+    assert compute_times_from_mode("2026-05-04", "tw-equities") == (
+        "01:00:00",
+        "02:00:00",
+    )
+
+
+def test_time_computation_tw_equities_winter():
+    # No DST in Taiwan — winter date must produce identical UTC times as summer.
+    assert compute_times_from_mode("2026-12-15", "tw-equities") == (
+        "01:00:00",
+        "02:00:00",
+    )
+
+
 def test_time_computation_hk_equities_case_insensitive():
     # mode_lower normalization should accept mixed-case input.
     assert compute_times_from_mode("2026-05-04", "HK-Equities") == (

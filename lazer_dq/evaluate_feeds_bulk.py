@@ -59,6 +59,12 @@ def compute_times_from_mode(date: str, mode: str) -> tuple[str, str]:
             _local_to_utc("10:15:00", "Asia/Kolkata"),
         )
 
+    if mode_lower == "tw-equities":
+        return (
+            _local_to_utc("09:00:00", "Asia/Taipei"),
+            _local_to_utc("10:00:00", "Asia/Taipei"),
+        )
+
     if mode_lower == "us-equities-pre":
         start_ny, end_ny = "08:30:00", "09:30:00"
     elif mode_lower == "us-equities-post":

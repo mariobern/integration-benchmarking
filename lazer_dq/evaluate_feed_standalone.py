@@ -847,7 +847,7 @@ def parse_args():
     parser.add_argument(
         "--mode",
         required=True,
-        help="Mode (e.g. fx, metals, us-equities, us-equities-pre, us-equities-post, us-equities-overnight, us-equities-on, hk-equities, jp-equities, kr-equities, in-equities, us-futures, us-treasuries-yield, us-treasuries-price)",
+        help="Mode (e.g. fx, metals, us-equities, us-equities-pre, us-equities-post, us-equities-overnight, us-equities-on, hk-equities, jp-equities, kr-equities, in-equities, tw-equities, us-futures, us-treasuries-yield, us-treasuries-price)",
     )
     parser.add_argument(
         "--cluster", required=True, help="Cluster name (e.g. lazer-prod)"
@@ -1153,6 +1153,7 @@ def main():
         "jp-equities",
         "kr-equities",
         "in-equities",
+        "tw-equities",
     ):
         benchmark_query = f"""
             SELECT

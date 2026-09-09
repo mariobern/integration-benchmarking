@@ -132,6 +132,7 @@ def _benchmark_sql(sql_log):
         ("jp-equities", "AAPL.O", "datascope_global_equities_benchmark_data"),
         ("kr-equities", "AAPL.O", "datascope_global_equities_benchmark_data"),
         ("in-equities", "AAPL.O", "datascope_global_equities_benchmark_data"),
+        ("tw-equities", "AAPL.O", "datascope_global_equities_benchmark_data"),
         ("us-futures", "AAPL.O", "datascope_futures_benchmark_data"),
         ("us-treasuries-yield", "AAPL.O", "datascope_us_treasury_benchmark_data"),
         ("us-treasuries-price", "AAPL.O", "datascope_us_treasury_benchmark_data"),
@@ -165,6 +166,7 @@ def test_equities_new_qualifier_filters_present(engine, monkeypatch, tmp_path):
         "jp-equities",
         "kr-equities",
         "in-equities",
+        "tw-equities",
     ):
         sql_log, _ = _run_and_capture(engine, monkeypatch, tmp_path, mode)
         sql = _benchmark_sql(sql_log)
@@ -184,6 +186,7 @@ def test_equities_research_parity_qualifier_filters_present(
         "jp-equities",
         "kr-equities",
         "in-equities",
+        "tw-equities",
     ):
         sql_log, _ = _run_and_capture(engine, monkeypatch, tmp_path, mode)
         sql = _benchmark_sql(sql_log)
