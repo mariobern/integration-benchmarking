@@ -245,6 +245,7 @@ Two paths, chosen per (feed, session) by `engine_mode_for`:
 | `equity`      | `Equity.JP.*`, session `REGULAR`     | `jp-equities`           |
 | `equity`      | `Equity.KR.*`, session `REGULAR`     | `kr-equities`           |
 | `equity`      | `Equity.IN.*`, session `REGULAR`     | `in-equities`           |
+| `equity`      | `Equity.TW.*`, session `REGULAR`     | `tw-equities`           |
 | anything else | everything not matched above         | **peer path** (`None`)  |
 
 The "peer path" row above covers crypto, funding-rate, nav, redemption-rate,

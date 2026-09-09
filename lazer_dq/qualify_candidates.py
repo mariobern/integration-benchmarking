@@ -172,6 +172,7 @@ SINGLE_MODE_EQUITY_PREFIXES = {
     "Equity.JP.": "jp-equities",
     "Equity.KR.": "kr-equities",
     "Equity.IN.": "in-equities",
+    "Equity.TW.": "tw-equities",
 }
 
 ENGINE_MODE_THRESHOLDS = {}

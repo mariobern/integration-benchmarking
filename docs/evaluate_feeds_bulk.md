@@ -77,6 +77,7 @@ The `mode` column selects the benchmark table and the market session whose Datas
 | `jp-equities`                              | `datascope_global_equities_benchmark_data`     | REGULAR              |
 | `kr-equities`                              | `datascope_global_equities_benchmark_data`     | REGULAR              |
 | `in-equities`                              | `datascope_global_equities_benchmark_data`     | REGULAR              |
+| `tw-equities`                              | `datascope_global_equities_benchmark_data`     | REGULAR              |
 | `us-futures`                               | `datascope_futures_benchmark_data`             | REGULAR              |
 | `us-treasuries-yield`                      | `datascope_us_treasury_benchmark_data` (yield) | REGULAR              |
 | `us-treasuries-price`                      | `datascope_us_treasury_benchmark_data` (price) | REGULAR              |
@@ -96,6 +97,7 @@ When `--start-time` / `--end-time` are not both provided, the window is computed
 | `jp-equities`                                                 | 09:00:00–10:00:00 | `Asia/Tokyo`       |
 | `kr-equities`                                                 | 09:00:00–10:00:00 | `Asia/Seoul`       |
 | `in-equities`                                                 | 09:15:00–10:15:00 | `Asia/Kolkata`     |
+| `tw-equities`                                                 | 09:00:00–10:00:00 | `Asia/Taipei`      |
 | `us-equities` _(or any other value, including unknown modes)_ | 09:30:00–10:30:00 | `America/New_York` |
 
 Providing **both** `--start-time` and `--end-time` bypasses mode-based computation for every row.

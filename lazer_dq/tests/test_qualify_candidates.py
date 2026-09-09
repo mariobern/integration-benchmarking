@@ -56,6 +56,9 @@ def test_engine_mode_for_mapping():
         == "kr-equities"
     )
     assert (
+        engine_mode_for(_fs("equity", "Equity.TW.2330/TWD", "REGULAR")) == "tw-equities"
+    )
+    assert (
         engine_mode_for(_fs("equity", "Equity.IN.RELIANCE/INR", "REGULAR"))
         == "in-equities"
     )
